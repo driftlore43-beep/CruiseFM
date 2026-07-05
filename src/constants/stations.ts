@@ -1,0 +1,190 @@
+import type { ImageSourcePropType } from 'react-native';
+
+export type Station = {
+  id: string;
+  name: string;
+  tagline: string;
+  tags: string[];
+  premium: boolean;
+  gradientColors: [string, string, string];
+  /** Vibrant mood gradient used for the card previews (top-left → bottom-right) */
+  cardGradient: [string, string, string];
+  /** MaterialCommunityIcons glyph name — clean white icon for the card */
+  iconName: string;
+  /** Equalizer bar gradient, bottom → mid → top. Optional; modes fall back to a default. */
+  eqColors?: [string, string, string];
+  glowColor: string;
+  image: ImageSourcePropType;
+  icon: string;
+  iconBg: string;
+  bestTime: string;
+  duration: string;
+  trackCount: number;
+  spotifyUrl: string;
+  appleMusicUrl: string;
+};
+
+export const STATIONS: Station[] = [
+  {
+    id: 'night-run',
+    name: 'Night Run FM',
+    tagline: 'Empty expressways. Violet dashboards.',
+    tags: ['dark vibes', 'neon nights'],
+    premium: false,
+    gradientColors: ['#1a0533', '#4a1a7a', '#000000'],
+    cardGradient: ['#2f1d55', '#1c1740', '#0c0a22'],
+    iconName: 'weather-night',
+    eqColors: ['#5EE7FF', '#5B7BFF', '#C44CFF'],
+    glowColor: '#4a1a7a',
+    image: require('../../assets/stations/night-run.jpg'),
+    icon: '🌙',
+    iconBg: '#2d1060',
+    bestTime: 'Late night',
+    duration: '2 hr mix',
+    trackCount: 24,
+    spotifyUrl: 'https://open.spotify.com/search/night%20drive%20playlist',
+    appleMusicUrl: 'https://music.apple.com/search?term=night+drive',
+  },
+  {
+    id: 'rain-drive',
+    name: 'Rain Drive FM',
+    tagline: 'Streetlights reflected in glass. Slow roads.',
+    tags: ['rainy', 'reflective'],
+    premium: true,
+    gradientColors: ['#051530', '#0a3a5c', '#2a1060'],
+    cardGradient: ['#123049', '#164034', '#0a1622'],
+    iconName: 'weather-pouring',
+    eqColors: ['#FFF3B8', '#FFE070', '#F0C24C'],
+    glowColor: '#0a3a5c',
+    image: require('../../assets/stations/rain-drive.jpg'),
+    icon: '🌧',
+    iconBg: '#0c2b45',
+    bestTime: 'Rainy days',
+    duration: '45 min',
+    trackCount: 18,
+    spotifyUrl: 'https://open.spotify.com/search/rainy+drive+playlist',
+    appleMusicUrl: 'https://music.apple.com/search?term=rainy+drive',
+  },
+  {
+    id: 'coastal',
+    name: 'Coastal FM',
+    tagline: 'Ocean air. Open horizons. Golden hour.',
+    tags: ['sunset', 'coastal'],
+    premium: true,
+    gradientColors: ['#032830', '#1a6b50', '#c45a10'],
+    cardGradient: ['#153840', '#33383a', '#5a3820'],
+    iconName: 'waves',
+    eqColors: ['#4FE0C0', '#F0B048', '#FF7A3C'],
+    glowColor: '#c45a10',
+    image: require('../../assets/stations/coastal.jpg'),
+    icon: '🌅',
+    iconBg: '#1a4030',
+    bestTime: 'Golden hour',
+    duration: '1.5 hr mix',
+    trackCount: 30,
+    spotifyUrl: 'https://open.spotify.com/search/coastal+drive+playlist',
+    appleMusicUrl: 'https://music.apple.com/search?term=coastal+drive',
+  },
+  {
+    id: 'mountain-pass',
+    name: 'Mountain Pass FM',
+    tagline: 'Cold air. Fog ahead. One more corner.',
+    tags: ['mountain', 'adventure'],
+    premium: true,
+    gradientColors: ['#021a15', '#0d4a3a', '#000000'],
+    cardGradient: ['#1a4038', '#16282e', '#0a1518'],
+    iconName: 'image-filter-hdr',
+    eqColors: ['#8FE8C8', '#3FA88A', '#4FA8D8'],
+    glowColor: '#0d4a3a',
+    image: require('../../assets/stations/mountain.jpg'),
+    icon: '⛰',
+    iconBg: '#0d3a2a',
+    bestTime: 'Morning',
+    duration: '1 hr mix',
+    trackCount: 20,
+    spotifyUrl: 'https://open.spotify.com/search/mountain+drive+playlist',
+    appleMusicUrl: 'https://music.apple.com/search?term=mountain+drive',
+  },
+  {
+    id: 'after-midnight',
+    name: 'After Midnight FM',
+    tagline: 'When the world is asleep. And the road belongs to you.',
+    tags: ['late night', 'solitude'],
+    premium: false,
+    gradientColors: ['#111118', '#0a0f2b', '#000000'],
+    cardGradient: ['#1c1a3c', '#141a30', '#0a0a1c'],
+    iconName: 'star-four-points',
+    eqColors: ['#FF4444', '#FF1111', '#FF0000'],
+    glowColor: '#0a0f2b',
+    image: require('../../assets/stations/after-midnight.jpg'),
+    icon: '🌑',
+    iconBg: '#16162a',
+    bestTime: 'After midnight',
+    duration: '1.5 hr mix',
+    trackCount: 22,
+    spotifyUrl: 'https://open.spotify.com/search/after+midnight+drive+playlist',
+    appleMusicUrl: 'https://music.apple.com/search?term=after+midnight+drive',
+  },
+  {
+    id: 'sunset',
+    name: 'Sunset FM',
+    tagline: 'Golden hour. Open roads.',
+    tags: ['sunset glow', 'warm vibes'],
+    premium: false,
+    gradientColors: ['#8a3a05', '#5a1a6a', '#000000'],
+    cardGradient: ['#5a2a1a', '#43223a', '#1e1428'],
+    iconName: 'weather-sunset',
+    eqColors: ['#FFC24C', '#FF7A48', '#D84C8A'],
+    glowColor: '#8a3a05',
+    image: require('../../assets/stations/sunset.jpg'),
+    icon: '🌇',
+    iconBg: '#5a2800',
+    bestTime: 'Sunset',
+    duration: '1 hr mix',
+    trackCount: 20,
+    spotifyUrl: 'https://open.spotify.com/search/sunset+drive+playlist',
+    appleMusicUrl: 'https://music.apple.com/search?term=sunset+drive',
+  },
+  {
+    id: 'cars-coffee',
+    name: 'Cars & Coffee FM',
+    tagline: 'Cold mornings. Warm cups. Engines idling.',
+    tags: ['sunday morning', 'motors'],
+    premium: true,
+    gradientColors: ['#2a1505', '#6b3a10', '#000000'],
+    cardGradient: ['#4a341f', '#2f2216', '#16100a'],
+    iconName: 'coffee',
+    eqColors: ['#FFD9A0', '#F0A050', '#C06A28'],
+    glowColor: '#8a5a1a',
+    image: require('../../assets/stations/cars-coffee.jpg'),
+    icon: '☕',
+    iconBg: '#3a2410',
+    bestTime: 'Sunday morning',
+    duration: '1 hr mix',
+    trackCount: 20,
+    spotifyUrl: 'https://open.spotify.com/search/cars+and+coffee+morning+playlist',
+    appleMusicUrl: 'https://music.apple.com/search?term=cars+and+coffee+morning',
+  },
+  {
+    id: 'tunnel',
+    name: 'Tunnel FM',
+    tagline: 'Underground. Neon tubes. Bass reverberating.',
+    tags: ['tunnel run', 'high energy'],
+    premium: true,
+    gradientColors: ['#2a0a5a', '#0a2a40', '#000000'],
+    cardGradient: ['#251c48', '#161f3a', '#0d0a20'],
+    iconName: 'flash',
+    eqColors: ['#FFD24C', '#FF8A2A', '#F03A2E'],
+    glowColor: '#2a0a5a',
+    image: require('../../assets/stations/tunnel.jpg'),
+    icon: '🚇',
+    iconBg: '#1a1040',
+    bestTime: 'Any time',
+    duration: '45 min',
+    trackCount: 16,
+    spotifyUrl: 'https://open.spotify.com/search/tunnel+drive+playlist',
+    appleMusicUrl: 'https://music.apple.com/search?term=tunnel+drive',
+  },
+];
+
+export const RECOMMENDED_IDS = ['night-run', 'after-midnight', 'sunset'];

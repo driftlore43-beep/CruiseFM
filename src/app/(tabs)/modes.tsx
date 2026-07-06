@@ -16,6 +16,10 @@ import { EqualizerFullscreen } from '@/components/EqualizerMode';
 import { CassetteFullscreen } from '@/components/CassetteMode';
 import { VinylFullscreen } from '@/components/VinylMode';
 import { RetroRadioFullscreen } from '@/components/RetroRadioMode';
+import { IpodClassicFullscreen } from '@/components/IpodMode';
+import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
+import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
+import { GlossSheen } from '@/components/GlossSheen';
 import { OWNER_MODE } from '@/constants/config';
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
 
@@ -109,16 +113,19 @@ function CompactModeCard({
   icon,
   gradient,
   locked,
+  premium = false,
 }: {
   title: string;
   desc: string;
   icon: string;
   gradient: [string, string, string];
   locked: boolean;
+  premium?: boolean;
 }) {
   return (
     <View style={styles.compactCard}>
       <LinearGradient colors={gradient} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
+      {premium && <GlossSheen radius={18} />}
       <View style={styles.compactIconWrap}>
         <MaterialCommunityIcons name={icon as any} size={22} color="#fff" />
       </View>
@@ -200,6 +207,7 @@ export default function ModesScreen() {
             icon="album"
             gradient={['#c05a20', '#8a3a18', '#3a180a']}
             locked={!isPro}
+            premium
           />
         </AnimatedCard>
 
@@ -210,6 +218,39 @@ export default function ModesScreen() {
             icon="radio"
             gradient={['#6a3ae0', '#3a6aa8', '#1a8a9a']}
             locked={!isPro}
+            premium
+          />
+        </AnimatedCard>
+
+        <AnimatedCard scrollY={scrollY} onPress={() => open('ipod', !isPro)} style={{ marginBottom: 14 }}>
+          <CompactModeCard
+            title="iPod Classic Mode"
+            desc="A silver click-wheel classic — spin the wheel, flip through the menu, hit play."
+            icon="ipod"
+            gradient={['#6b6b72', '#4a4a50', '#2a2a2e']}
+            locked={!isPro}
+            premium
+          />
+        </AnimatedCard>
+
+        <AnimatedCard scrollY={scrollY} onPress={() => open('waves', false)} style={{ marginBottom: 14 }}>
+          <CompactModeCard
+            title="Sound Waves Mode"
+            desc="A flowing, glowing waveform that ripples in your station's mood colours."
+            icon="waveform"
+            gradient={['#22b8e6', '#2f6ad0', '#1a2a70']}
+            locked={false}
+          />
+        </AnimatedCard>
+
+        <AnimatedCard scrollY={scrollY} onPress={() => open('orb', !isPro)} style={{ marginBottom: 14 }}>
+          <CompactModeCard
+            title="Circular Equaliser Mode"
+            desc="A glowing orb of light that pulses and radiates to your station's mood."
+            icon="circle-slice-8"
+            gradient={['#b23ae6', '#7a2ac0', '#2a1550']}
+            locked={!isPro}
+            premium
           />
         </AnimatedCard>
 
@@ -219,6 +260,9 @@ export default function ModesScreen() {
       <CassetteFullscreen visible={activeMode === 'cassette'} onClose={() => setActiveMode(null)} />
       <VinylFullscreen visible={activeMode === 'vinyl'} onClose={() => setActiveMode(null)} />
       <RetroRadioFullscreen visible={activeMode === 'radio'} onClose={() => setActiveMode(null)} />
+      <IpodClassicFullscreen visible={activeMode === 'ipod'} onClose={() => setActiveMode(null)} />
+      <SoundWaveFullscreen visible={activeMode === 'waves'} onClose={() => setActiveMode(null)} />
+      <CircularWaveFullscreen visible={activeMode === 'orb'} onClose={() => setActiveMode(null)} />
     </View>
   );
 }

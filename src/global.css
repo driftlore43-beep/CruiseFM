@@ -7,3 +7,11 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 }
+
+/* Prevent Safari's edge-swipe "go back" gesture from hijacking horizontal
+   drags inside modals/sheets (web-preview testing only — swiping near the
+   screen edge was triggering a real browser back-navigation instead of the
+   app's own dismiss gesture, landing on an unrelated page/scroll position). */
+html, body {
+  overscroll-behavior-x: none;
+}

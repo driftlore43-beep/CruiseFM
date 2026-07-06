@@ -11,6 +11,9 @@ import { EqualizerFullscreen } from '@/components/EqualizerMode';
 import { VinylFullscreen } from '@/components/VinylMode';
 import { CassetteFullscreen } from '@/components/CassetteMode';
 import { RetroRadioFullscreen } from '@/components/RetroRadioMode';
+import { IpodClassicFullscreen } from '@/components/IpodMode';
+import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
+import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
 import { OWNER_MODE } from '@/constants/config';
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
 import { RECOMMENDED_IDS, STATIONS, type Station } from '@/constants/stations';
@@ -129,6 +132,9 @@ export default function CruiseScreen() {
       <VinylFullscreen visible={activeMode === 'vinyl'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
       <CassetteFullscreen visible={activeMode === 'cassette'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
       <RetroRadioFullscreen visible={activeMode === 'radio'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
+      <IpodClassicFullscreen visible={activeMode === 'ipod'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
+      <SoundWaveFullscreen visible={activeMode === 'waves'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
+      <CircularWaveFullscreen visible={activeMode === 'orb'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
     </SafeAreaView>
   );
 }

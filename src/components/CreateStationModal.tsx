@@ -12,13 +12,34 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Cruise } from '@/constants/theme';
 import { saveCustomStation, type CustomStation } from '@/utils/customStations';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
-const ICONS = ['🎵', '🚗', '🌙', '🌅', '🌧', '⛰', '🌊', '🔥', '❄️', '🌿', '🎸', '🎹', '🛣', '🌃', '🌌', '⚡', '🕶', '🎭'];
+// Bold white icon marks (MaterialCommunityIcons) — replaces the old emoji grid.
+const ICONS = [
+  'music-note', 'car-convertible', 'weather-night', 'weather-sunset', 'weather-pouring',
+  'image-filter-hdr', 'waves', 'fire', 'snowflake', 'leaf', 'guitar-electric', 'piano',
+  'road-variant', 'city-variant-outline', 'star-four-points', 'flash', 'sunglasses', 'drama-masks',
+] as const;
+
+// Soft blue glass wash (~20% opacity) laid behind the sheet's cards.
+const CARD_BLUE = ['rgba(94,199,255,0.20)', 'rgba(26,107,181,0.20)'] as const;
+
+function CardWash({ radius }: { radius: number }) {
+  return (
+    <LinearGradient
+      colors={CARD_BLUE}
+      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      style={[StyleSheet.absoluteFill, { borderRadius: radius }]}
+      pointerEvents="none"
+    />
+  );
+}
 
 const PALETTES: { label: string; color: string; gradientColors: [string, string, string]; glowColor: string; iconBg: string }[] = [
   { label: 'Violet',   color: '#7B38E0', gradientColors: ['#1a0533', '#4a1a7a', '#000000'], glowColor: '#4a1a7a', iconBg: '#2d1060' },
@@ -46,18 +67,25 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
 
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState(ICONS[0]);
+  const [selectedIcon, setSelectedIcon] = useState<string>(ICONS[0]);
   const [selectedPalette, setSelectedPalette] = useState(PALETTES[0]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // Once the slide-in settles we drop the transform entirely — a lingering
+  // transform on the sheet stops iOS Safari from focusing the text inputs.
+  const [settled, setSettled] = useState(false);
 
   const atLimit = !isPro && existingCount >= maxFree;
 
   function handleShow() {
-    Animated.spring(slideY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
+    setSettled(false);
+    Animated.spring(slideY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start(
+      () => setSettled(true),
+    );
   }
 
   function handleHide(cb?: () => void) {
+    setSettled(false);
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 280, useNativeDriver: true }).start(() => {
       resetForm();
       cb?.();
@@ -112,7 +140,12 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
         style={styles.backdrop}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => handleHide(onClose)} />
-        <Animated.View style={[styles.sheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: slideY }] }]}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            { paddingBottom: insets.bottom + 16 },
+            !settled && { transform: [{ translateY: slideY }] },
+          ]}>
           <View style={styles.handle} />
           <Text style={styles.sheetTitle}>Create station</Text>
 
@@ -124,28 +157,34 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={styles.label}>Name</Text>
-            <TextInput
-              style={[styles.input, atLimit && styles.inputDisabled]}
-              placeholder="e.g. Good Vibes"
-              placeholderTextColor={Cruise.textMuted}
-              value={name}
-              onChangeText={(t) => { setName(t); setError(''); }}
-              maxLength={32}
-              editable={!atLimit}
-              selectionColor={Cruise.violet}
-            />
+            <View style={[styles.inputWrap, atLimit && styles.inputDisabled]}>
+              <CardWash radius={12} />
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Good Vibes"
+                placeholderTextColor={Cruise.textMuted}
+                value={name}
+                onChangeText={(t) => { setName(t); setError(''); }}
+                maxLength={32}
+                editable={!atLimit}
+                selectionColor={Cruise.violet}
+              />
+            </View>
 
             <Text style={styles.label}>Tagline</Text>
-            <TextInput
-              style={[styles.input, atLimit && styles.inputDisabled]}
-              placeholder="e.g. Windows down, nothing to worry about"
-              placeholderTextColor={Cruise.textMuted}
-              value={tagline}
-              onChangeText={setTagline}
-              maxLength={60}
-              editable={!atLimit}
-              selectionColor={Cruise.violet}
-            />
+            <View style={[styles.inputWrap, atLimit && styles.inputDisabled]}>
+              <CardWash radius={12} />
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Windows down, nothing to worry about"
+                placeholderTextColor={Cruise.textMuted}
+                value={tagline}
+                onChangeText={setTagline}
+                maxLength={60}
+                editable={!atLimit}
+                selectionColor={Cruise.violet}
+              />
+            </View>
 
             <Text style={styles.label}>Icon</Text>
             <View style={styles.iconGrid}>
@@ -154,7 +193,8 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
                   key={icon}
                   style={[styles.iconBtn, selectedIcon === icon && { borderColor: selectedPalette.color, backgroundColor: selectedPalette.iconBg }]}
                   onPress={() => !atLimit && setSelectedIcon(icon)}>
-                  <Text style={styles.iconEmoji}>{icon}</Text>
+                  {selectedIcon !== icon && <CardWash radius={12} />}
+                  <MaterialCommunityIcons name={icon as any} size={22} color="#fff" />
                 </Pressable>
               ))}
             </View>
@@ -171,8 +211,9 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
             </View>
 
             <View style={[styles.preview, { backgroundColor: selectedPalette.iconBg, borderColor: selectedPalette.color + '55' }]}>
+              <CardWash radius={16} />
               <View style={[styles.previewIcon, { backgroundColor: selectedPalette.iconBg, borderColor: selectedPalette.color + '88' }]}>
-                <Text style={styles.previewEmoji}>{selectedIcon}</Text>
+                <MaterialCommunityIcons name={selectedIcon as any} size={24} color="#fff" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.previewName} numberOfLines={1}>{name || 'Station name'}</Text>
@@ -247,15 +288,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 16,
   },
-  input: {
-    backgroundColor: Cruise.surface,
+  inputWrap: {
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(94,199,255,0.25)',
+    overflow: 'hidden',
+  },
+  input: {
     paddingHorizontal: 14,
     paddingVertical: 12,
     color: Cruise.textPrimary,
     fontSize: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   inputDisabled: {
     opacity: 0.4,
@@ -271,12 +314,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Cruise.surface,
+    overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  iconEmoji: {
-    fontSize: 20,
+    borderColor: 'rgba(94,199,255,0.20)',
   },
   paletteRow: {
     flexDirection: 'row',
@@ -302,6 +342,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginTop: 20,
     borderWidth: 1,
+    overflow: 'hidden',
   },
   previewIcon: {
     width: 48,
@@ -311,7 +352,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-  previewEmoji: { fontSize: 22 },
   previewName: {
     color: Cruise.textPrimary,
     fontSize: 15,

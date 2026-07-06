@@ -1,10 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Cruise } from '@/constants/theme';
+import { GlossSheen } from '@/components/GlossSheen';
 import type { Station } from '@/constants/stations';
 import {
   PLATFORMS,
@@ -57,17 +58,20 @@ function CompactCard({ station, onPress }: { station: Station; onPress?: () => v
       {/* Clip everything to the rounded rect */}
       <View style={styles.compactCard}>
 
-        {/* Layer 1 — mood gradient preview (diagonal) */}
+        {/* Layer 0 — the station's own photo, so the card previews its mood */}
+        <Image source={station.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+
+        {/* Layer 1 — mood colour wash over the photo (diagonal, photo still reads through) */}
         <LinearGradient
-          colors={station.cardGradient}
+          colors={[station.cardGradient[0] + 'b3', station.cardGradient[1] + '66', station.cardGradient[2] + 'b3']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Layer 1b — depth vignette */}
+        {/* Layer 1b — subtle depth vignette, kept light so the mood colour stays vivid */}
         <LinearGradient
-          colors={['rgba(0,0,0,0.25)', 'transparent']}
+          colors={['rgba(0,0,0,0.06)', 'transparent']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
@@ -75,11 +79,14 @@ function CompactCard({ station, onPress }: { station: Station; onPress?: () => v
 
         {/* Layer 2 — dark fade at the bottom for text legibility */}
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.5)']}
+          colors={['transparent', 'rgba(0,0,0,0.32)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.compactOverlay}
         />
+
+        {/* Premium cards get a glossy shine on top of their mood colour */}
+        {station.premium && <GlossSheen />}
 
         {/* Layer 4 — UI chrome */}
         <View style={styles.iconCircleSmall}>
@@ -138,7 +145,7 @@ function ListCard({ station, onPress }: { station: Station; onPress?: () => void
 
         {/* Layer 2 — gentle left scrim for text legibility */}
         <LinearGradient
-          colors={['rgba(3,3,10,0.35)', 'rgba(3,3,10,0)']}
+          colors={['rgba(3,3,10,0.20)', 'rgba(3,3,10,0)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={StyleSheet.absoluteFill}
@@ -146,6 +153,9 @@ function ListCard({ station, onPress }: { station: Station; onPress?: () => void
 
         {/* Layer 3 — hairline top-edge highlight */}
         <View style={styles.cardInnerHighlight} />
+
+        {/* Premium cards get a glossy shine on top of their mood colour */}
+        {station.premium && <GlossSheen />}
 
         {/* Layer 4 — row content */}
         <View style={styles.cardRow}>

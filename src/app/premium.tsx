@@ -14,7 +14,7 @@ const FEATURES: { emoji: string; title: string; desc: string }[] = [
   {
     emoji: '💿',
     title: 'Premium Music Modes',
-    desc: 'Vinyl and Retro Radio — the warmest, most tactile ways to drive.',
+    desc: 'Vinyl, Retro Radio, iPod Classic and the Circular Wave orb — the richest ways to drive.',
   },
   {
     emoji: '🎨',
@@ -37,7 +37,7 @@ const COMPARISON: { label: string; free: boolean; premium: boolean }[] = [
   { label: 'Cassette & Equalizer modes', free: true,  premium: true },
   { label: 'Basic playback controls',    free: true,  premium: true },
   { label: 'Badges & achievements',      free: true,  premium: true },
-  { label: 'Vinyl & Retro Radio modes',  free: false, premium: true },
+  { label: 'Vinyl, Radio, iPod & Orb',   free: false, premium: true },
   { label: 'All premium mood themes',    free: false, premium: true },
   { label: 'Unlimited custom playlists', free: false, premium: true },
   { label: 'Future premium modes',       free: false, premium: true },

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
 import { StationCard } from '@/components/StationCard';
@@ -10,6 +12,10 @@ import { EqualizerFullscreen } from '@/components/EqualizerMode';
 import { VinylFullscreen } from '@/components/VinylMode';
 import { CassetteFullscreen } from '@/components/CassetteMode';
 import { RetroRadioFullscreen } from '@/components/RetroRadioMode';
+import { IpodClassicFullscreen } from '@/components/IpodMode';
+import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
+import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
+import { GlossSheen } from '@/components/GlossSheen';
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
 import { STATIONS, type Station } from '@/constants/stations';
 import { OWNER_MODE } from '@/constants/config';
@@ -60,33 +66,37 @@ export default function StationsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <View style={styles.titleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.eyebrow}>STATIONS</Text>
-            <Text style={styles.title}>What's the mood?</Text>
-          </View>
-          <Pressable style={styles.createBtn} onPress={() => setShowCreate(true)}>
-            <Text style={styles.createBtnText}>+ Create</Text>
-          </Pressable>
-        </View>
-        <View style={styles.searchBox}>
-          <Text style={styles.searchIcon}>⌕</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search stations, vibes..."
-            placeholderTextColor={Cruise.textMuted}
-            value={query}
-            onChangeText={setQuery}
-            selectionColor={Cruise.violet}
-          />
-        </View>
-      </View>
-
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: TAB_SAFE_INSET + insets.bottom }]}
         showsVerticalScrollIndicator={false}>
+
+        <View style={styles.headerBlock}>
+          <Text style={styles.title}>What's the mood?</Text>
+          <View style={styles.searchBox}>
+            <Text style={styles.searchIcon}>⌕</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search stations, vibes..."
+              placeholderTextColor={Cruise.textMuted}
+              value={query}
+              onChangeText={setQuery}
+              selectionColor={Cruise.violet}
+            />
+          </View>
+        </View>
+
+        <Pressable
+          style={({ pressed }) => [styles.createPill, pressed && styles.pressed]}
+          onPress={() => setShowCreate(true)}>
+          <LinearGradient
+            colors={['rgba(255,45,150,0.45)', 'rgba(142,36,170,0.40)', 'rgba(58,16,110,0.45)']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <GlossSheen radius={26} />
+          <Text style={styles.createPillText}>+  Create Station</Text>
+        </Pressable>
 
         {filteredCustom.length > 0 && (
           <>
@@ -177,6 +187,21 @@ export default function StationsScreen() {
         onClose={() => setActiveMode(null)}
         stationId={activeStationId}
       />
+      <IpodClassicFullscreen
+        visible={activeMode === 'ipod'}
+        onClose={() => setActiveMode(null)}
+        stationId={activeStationId}
+      />
+      <SoundWaveFullscreen
+        visible={activeMode === 'waves'}
+        onClose={() => setActiveMode(null)}
+        stationId={activeStationId}
+      />
+      <CircularWaveFullscreen
+        visible={activeMode === 'orb'}
+        onClose={() => setActiveMode(null)}
+        stationId={activeStationId}
+      />
     </SafeAreaView>
   );
 }
@@ -191,7 +216,12 @@ function CustomStationCard({ station }: { station: CustomStation }) {
       ]}>
       <View style={[styles.customCardInner, { borderColor: station.color + '33' }]}>
         <View style={[styles.customIcon, { backgroundColor: station.iconBg, borderColor: station.color + '66' }]}>
-          <Text style={styles.customIconEmoji}>{station.icon}</Text>
+          {/* New stations store an icon name; older ones may still hold an emoji. */}
+          {/^[a-z]/.test(station.icon) ? (
+            <MaterialCommunityIcons name={station.icon as any} size={24} color="#fff" />
+          ) : (
+            <Text style={styles.customIconEmoji}>{station.icon}</Text>
+          )}
         </View>
         <View style={styles.customText}>
           <Text style={styles.customName} numberOfLines={1}>{station.name}</Text>
@@ -213,24 +243,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Cruise.midnight,
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
+  headerBlock: {
+    paddingTop: 218,
     paddingBottom: 12,
-    gap: 12,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  eyebrow: {
-    color: Cruise.violetLight,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 3,
-    marginBottom: 4,
+    gap: 14,
   },
   title: {
     color: Cruise.textPrimary,
@@ -238,16 +254,26 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.5,
   },
-  createBtn: {
-    backgroundColor: Cruise.violet,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+  createPill: {
+    borderRadius: 26,
+    overflow: 'hidden',
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    shadowColor: Cruise.violet,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  createBtnText: {
+  createPillText: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
   searchBox: {
     flexDirection: 'row',

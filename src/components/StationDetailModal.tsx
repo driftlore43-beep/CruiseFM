@@ -19,6 +19,8 @@ import * as Haptics from 'expo-haptics';
 
 import { type Station } from '@/constants/stations';
 import { Cruise } from '@/constants/theme';
+import { GlossSheen } from '@/components/GlossSheen';
+import { useTheme } from '@/context/ThemeContext';
 import { isSpotifyConnected, getUserPlaylists } from '@/utils/spotify';
 import {
   getStationPlaylist,
@@ -29,6 +31,16 @@ import {
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get('window');
 const SPOTIFY_GREEN = '#1DB954';
 
+/** Darken a hex colour toward black by `amount` (0–1) — used to build a
+ * two-stop gradient from the user's chosen accent colour, whatever it is. */
+function darken(hex: string, amount: number): string {
+  const c = hex.replace('#', '');
+  const r = Math.round(parseInt(c.slice(0, 2), 16) * (1 - amount));
+  const g = Math.round(parseInt(c.slice(2, 4), 16) * (1 - amount));
+  const b = Math.round(parseInt(c.slice(4, 6), 16) * (1 - amount));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
 type Mode = { id: string; label: string; pro: boolean };
 
 const MODES: Mode[] = [
@@ -36,6 +48,9 @@ const MODES: Mode[] = [
   { id: 'equalizer', label: 'Equalizer',   pro: false },
   { id: 'vinyl',     label: 'Vinyl',       pro: true  },
   { id: 'radio',     label: 'Retro Radio', pro: true  },
+  { id: 'ipod',      label: 'iPod',        pro: true  },
+  { id: 'waves',     label: 'Sound Waves', pro: false },
+  { id: 'orb',       label: 'Circular EQ', pro: true  },
 ];
 
 type Props = {
@@ -48,6 +63,7 @@ type Props = {
 
 export function StationDetailModal({ station, visible, onClose, onStartDrive, isPro }: Props) {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
   const [selectedMode, setSelectedMode] = useState('cassette');
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
@@ -156,8 +172,13 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
               return (
                 <Pressable
                   key={mode.id}
-                  style={[styles.modeBtn, active && styles.modeBtnActive, !unlocked && styles.modeBtnLocked]}
+                  style={[
+                    styles.modeBtn,
+                    active && { backgroundColor: theme.accentColor + '40', borderColor: theme.accentColor },
+                    !unlocked && styles.modeBtnLocked,
+                  ]}
                   onPress={() => unlocked && setSelectedMode(mode.id)}>
+                  {mode.pro && <GlossSheen />}
                   <Text style={[styles.modeLabel, active && styles.modeLabelActive]}>{mode.label}</Text>
                   {!unlocked && <Text style={styles.modeLockIcon}>🔒</Text>}
                   {mode.pro && unlocked && (
@@ -170,10 +191,10 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
 
           {/* Start Drive */}
           <Pressable
-            style={({ pressed }) => [styles.startBtn, pressed && { opacity: 0.9 }]}
+            style={({ pressed }) => [styles.startBtn, { shadowColor: theme.accentColor }, pressed && { opacity: 0.9 }]}
             onPress={handleStartDrive}>
             <LinearGradient
-              colors={[station.gradientColors[1] || '#7B38E0', '#7B38E0']}
+              colors={[theme.accentColor, darken(theme.accentColor, 0.35)]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.startGradient}>
               <Text style={styles.startBtnText}>Start Drive</Text>
@@ -314,12 +335,12 @@ const styles = StyleSheet.create({
   modeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 28 },
   modeBtn: {
     width: (SCREEN_W - 48 - 10) / 2,
-    backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 14,
     paddingVertical: 16, paddingHorizontal: 14,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)',
     flexDirection: 'row', alignItems: 'center', gap: 8,
+    overflow: 'hidden',
   },
-  modeBtnActive: { backgroundColor: 'rgba(123,56,224,0.28)', borderColor: Cruise.violet },
   modeBtnLocked: { opacity: 0.5 },
   modeLabel: { flex: 1, color: 'rgba(255,255,255,0.75)', fontSize: 14, fontWeight: '700' },
   modeLabelActive: { color: '#fff' },

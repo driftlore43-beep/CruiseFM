@@ -314,7 +314,7 @@ function HeadUnit({
 
       {/* Main row: VOL | LCD | TUNE */}
       <View style={hu.mainRow}>
-        <HeadUnitKnob topLabel="SRC" botLabel="VOL" onPress={onVolPress} />
+        <HeadUnitKnob topLabel="SRC" botLabel="VOL" size={84} onPress={onVolPress} />
 
         {/* LCD display — recessed into body */}
         <View style={hu.displayBezel}>
@@ -369,7 +369,7 @@ function HeadUnit({
           </View>
         </View>
 
-        <HeadUnitKnob botLabel="TUNE" onPress={onTunePress} />
+        <HeadUnitKnob botLabel="TUNE" size={84} onPress={onTunePress} />
       </View>
 
       {/* Control buttons — raised bevel */}
@@ -834,13 +834,16 @@ export function RetroRadioFullscreen({ visible, onClose, stationId }: { visible:
               <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>{station.name}</Text>
             </View>
 
-            {/* Head unit — flex:1 so it fills available vertical space */}
-            <View style={{ flex: 1, width: '100%', paddingHorizontal: 12, justifyContent: 'center' }}>
+            {/* Flexible spacer — balances the composition around the hero */}
+            <View style={{ flex: 1 }} />
+
+            {/* Head unit — the hero, inset from the edges for breathing room */}
+            <View style={{ width: '100%', paddingHorizontal: 20 }}>
               {headUnit}
             </View>
 
             {/* Song title — bottom-left, Spotify style */}
-            <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 16, paddingBottom: 4, alignItems: 'flex-start' }}>
+            <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 20, paddingBottom: 4, alignItems: 'flex-start' }}>
               <Text style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={1}>{spotify.track?.title ?? currentTrack.title}</Text>
               <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 }} numberOfLines={1}>{spotify.track?.artist ?? currentTrack.artist}</Text>
             </View>
@@ -848,8 +851,11 @@ export function RetroRadioFullscreen({ visible, onClose, stationId }: { visible:
             {progressBar}
             {controls}
 
+            {/* Flexible spacer — pins the playlist button to the bottom */}
+            <View style={{ flex: 1 }} />
+
             {/* Playlist button */}
-            <TouchableOpacity onPress={toggleDrawer} style={[fs.freqLogBtn, fs.playlistBtn, { marginTop: 16 }]} activeOpacity={0.7}>
+            <TouchableOpacity onPress={toggleDrawer} style={[fs.freqLogBtn, fs.playlistBtn, { marginTop: 12 }]} activeOpacity={0.7}>
               <Ionicons name="musical-notes-outline" size={14} color={R.textDim} />
               <Text style={[fs.freqLogBtnText, { fontFamily: Fonts.mono }]}>PLAYLIST</Text>
               <Ionicons name={showFreqLog ? 'chevron-up' : 'chevron-down'} size={14} color={R.textDim} />
@@ -967,12 +973,12 @@ export function RetroRadioFullscreen({ visible, onClose, stationId }: { visible:
 // ── Head unit styles ──────────────────────────────────────────────────────────
 const hu = StyleSheet.create({
   body: {
-    width: '100%', overflow: 'hidden',
+    width: '100%', overflow: 'hidden', borderRadius: 16,
     backgroundColor: '#050505',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.85, shadowRadius: 12, elevation: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.9, shadowRadius: 18, elevation: 18,
   },
-  cdSlotOuter: { paddingTop: 10, paddingBottom: 6 },
+  cdSlotOuter: { paddingTop: 13, paddingBottom: 7 },
   cdSlot: {
     height: 4, backgroundColor: '#000',
     borderTopWidth: 0.5, borderBottomWidth: 0.5,
@@ -980,32 +986,32 @@ const hu = StyleSheet.create({
   },
   mainRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 10, paddingVertical: 4, gap: 8,
+    paddingHorizontal: 14, paddingVertical: 8, gap: 12,
   },
   displayBezel: {
-    flex: 1, borderRadius: 4,
-    backgroundColor: '#000', padding: 3,
+    flex: 1, borderRadius: 5,
+    backgroundColor: '#000', padding: 4,
     borderWidth: 1.5, borderColor: '#111111',
     shadowColor: R.amber, shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.55, shadowRadius: 14, elevation: 8,
   },
   display: {
-    backgroundColor: R.lcdBg, borderRadius: 2, padding: 8,
+    backgroundColor: R.lcdBg, borderRadius: 3, padding: 12,
     overflow: 'hidden', borderWidth: 1, borderColor: '#201000',
-    gap: 5, minHeight: 82,
+    gap: 7, minHeight: 120,
   },
   freqText: {
-    color: R.amber, fontSize: 32, fontWeight: '700', letterSpacing: 2.5, lineHeight: 34,
-    textShadowColor: 'rgba(255,179,0,0.6)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10,
+    color: R.amber, fontSize: 44, fontWeight: '700', letterSpacing: 3, lineHeight: 46,
+    textShadowColor: 'rgba(255,179,0,0.6)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12,
   },
-  fmLabel:   { color: '#CC8800', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginLeft: 4, marginBottom: 2 },
-  scrollClip:{ overflow: 'hidden', height: 14 },
-  scrollText:{ color: '#CC8800', fontSize: 10, letterSpacing: 0.8, lineHeight: 14 },
-  trackText: { color: 'rgba(204,136,0,0.65)', fontSize: 9, letterSpacing: 0.6, lineHeight: 14 },
+  fmLabel:   { color: '#CC8800', fontSize: 14, fontWeight: '700', letterSpacing: 1, marginLeft: 6, marginBottom: 4 },
+  scrollClip:{ overflow: 'hidden', height: 18 },
+  scrollText:{ color: '#CC8800', fontSize: 13, letterSpacing: 0.8, lineHeight: 18 },
+  trackText: { color: 'rgba(204,136,0,0.65)', fontSize: 12, letterSpacing: 0.6, lineHeight: 18 },
 
-  ctrlRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 10, paddingTop: 8 },
+  ctrlRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingTop: 12 },
   ctrlBtn: {
-    flex: 1, height: 26, borderRadius: 3,
+    flex: 1, height: 40, borderRadius: 5,
     backgroundColor: '#1e1e1e',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: '#383838',
@@ -1014,12 +1020,12 @@ const hu = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.5, shadowRadius: 2,
   },
   ctrlBtnPlay: { backgroundColor: '#001525', borderColor: R.cyan, borderTopColor: 'rgba(0,180,216,0.28)' },
-  ctrlText:    { color: R.amber, fontSize: 8, fontFamily: 'Courier New', fontWeight: '700', letterSpacing: 0.3 },
+  ctrlText:    { color: R.amber, fontSize: 11, fontFamily: 'Courier New', fontWeight: '700', letterSpacing: 0.5 },
   ctrlTextPlay:{ color: R.cyan },
 
-  presetRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 10, paddingTop: 5 },
+  presetRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingTop: 7, paddingBottom: 2 },
   presetBtn: {
-    flex: 1, height: 24, borderRadius: 3,
+    flex: 1, height: 34, borderRadius: 5,
     backgroundColor: '#181818',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: '#303030',
@@ -1027,7 +1033,7 @@ const hu = StyleSheet.create({
     borderBottomWidth: 2, borderBottomColor: '#020202',
   },
   presetBtnActive: { backgroundColor: 'rgba(0,180,216,0.14)', borderColor: R.cyan, borderTopColor: 'rgba(0,180,216,0.22)' },
-  presetText:      { color: R.amber, fontSize: 9, fontWeight: '700' },
+  presetText:      { color: R.amber, fontSize: 12, fontWeight: '700' },
   presetTextActive:{ color: R.cyan },
 });
 

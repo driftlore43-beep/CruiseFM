@@ -1,4 +1,6 @@
+import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { TidalLogo } from '@/components/icons/TidalLogo';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -25,6 +27,26 @@ const PLATFORM_ENTRIES = [
   ...Object.entries(PLATFORMS).map(([id, p]) => ({ id: id as PlatformId, ...p })),
   NONE_ENTRY,
 ];
+
+// Real brand marks for this sheet only — bold and white, sitting on each
+// platform's tinted chip.
+type IconDef = { family: 'FontAwesome' | 'MaterialCommunityIcons'; name: string };
+const PLATFORM_ICONS: Partial<Record<PlatformId, IconDef>> = {
+  spotify:      { family: 'FontAwesome', name: 'spotify' },
+  appleMusic:   { family: 'FontAwesome', name: 'apple' },
+  youtubeMusic: { family: 'FontAwesome', name: 'youtube-play' },
+  amazonMusic:  { family: 'FontAwesome', name: 'amazon' },
+  none:         { family: 'MaterialCommunityIcons', name: 'close-thick' },
+};
+
+function PlatformIcon({ id, size = 18 }: { id: PlatformId; size?: number }) {
+  if (id === 'tidal') return <TidalLogo size={size + 2} color="#fff" />;
+  const def = PLATFORM_ICONS[id]!;
+  if (def.family === 'FontAwesome') {
+    return <FontAwesome name={def.name as any} size={size} color="#fff" />;
+  }
+  return <MaterialCommunityIcons name={def.name as any} size={size + 2} color="#fff" />;
+}
 
 type Props = {
   visible: boolean;
@@ -117,9 +139,6 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
           {/* ── Header branding ─────────────────────────────────────────── */}
           <View style={styles.headerRow}>
             <View style={styles.logoRow}>
-              <View style={styles.carIconWrap}>
-                <Text style={styles.carIcon}>🚗</Text>
-              </View>
               <Text style={styles.logoText}>CRUISE FM</Text>
             </View>
             <TouchableOpacity
@@ -151,24 +170,24 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
                   ]}
                   onPress={() => setSelected(platform.id)}>
 
-                  {/* Subtle brand gradient background */}
+                  {/* Brand gradient background — signature colour per platform */}
                   <LinearGradient
                     colors={
                       isSelected
-                        ? [`${platform.color}33`, `${platform.color}0A`]
-                        : ['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.01)']
+                        ? [`${platform.color}66`, `${platform.color}2e`]
+                        : ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.05)']
                     }
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={StyleSheet.absoluteFill}
                   />
 
-                  {/* Brand color emoji / icon */}
+                  {/* Brand mark — bold white icon on a tinted chip */}
                   <View style={[
                     styles.emojiWrap,
                     { backgroundColor: `${platform.color}22`, borderColor: `${platform.color}44` },
                   ]}>
-                    <Text style={styles.platformEmoji}>{platform.emoji}</Text>
+                    <PlatformIcon id={platform.id} />
                   </View>
 
                   <Text
@@ -291,15 +310,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   closeBtnText: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '600' },
-  carIconWrap: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: 'rgba(123,56,224,0.25)',
-    borderWidth: 1, borderColor: 'rgba(123,56,224,0.5)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  carIcon: { fontSize: 17 },
   logoText: {
-    color: Cruise.violet, fontSize: 12, fontWeight: '800', letterSpacing: 3.5,
+    color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 3.5,
   },
   title: {
     color: '#fff', fontSize: 26, fontWeight: '700', marginBottom: 6, letterSpacing: -0.3,
@@ -334,7 +346,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   },
-  platformEmoji: { fontSize: 16 },
   platformName: {
     flex: 1, fontSize: 13, fontWeight: '600',
   },

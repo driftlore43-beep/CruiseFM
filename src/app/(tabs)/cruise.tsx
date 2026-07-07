@@ -22,14 +22,24 @@ import {
   loadLastCruise,
   saveLastCruise,
   defaultStationForNow,
-  resolveCruiseToStart,
+  type LastCruise,
 } from '@/utils/lastCruise';
 import { isSpotifyConnected, startPlayback } from '@/utils/spotify';
 
 const recommended = STATIONS.filter((s) => RECOMMENDED_IDS.includes(s.id));
 
-function stationName(id: string): string {
-  return STATIONS.find((s) => s.id === id)?.name ?? STATIONS[0].name;
+const MODE_LABELS: Record<string, string> = {
+  cassette: 'Cassette',
+  equalizer: 'Equalizer',
+  vinyl: 'Vinyl',
+  radio: 'Retro Radio',
+  ipod: 'iPod',
+  waves: 'Sound Waves',
+  orb: 'Circular EQ',
+};
+
+function stationById(id: string): Station {
+  return STATIONS.find((s) => s.id === id) ?? STATIONS[0];
 }
 
 function SkipBanner({ onDismiss }: { onDismiss: () => void }) {
@@ -43,34 +53,35 @@ function SkipBanner({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
+
 export default function CruiseScreen() {
   const insets = useSafeAreaInsets();
   const [showBanner, setShowBanner] = useState(false);
-  const [cueLabel, setCueLabel] = useState('Tap to start your drive');
   const [activeMode, setActiveMode] = useState<string | null>(null);
   const [activeStationId, setActiveStationId] = useState<string | undefined>(undefined);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  // One smart hero: it becomes your last cruise if you have one, otherwise
+  // tonight's time-of-day pick. Scene, cue and button all track it.
+  const [tonightPick, setTonightPick] = useState<Station>(() => stationById(defaultStationForNow()));
+  const [lastCruise, setLastCruise] = useState<LastCruise | null>(null);
 
   useEffect(() => {
     getPlatformSkipped().then((skipped) => { if (skipped) setShowBanner(true); });
   }, []);
 
-  // Refresh the cue label each time the screen is focused (last cruise may change).
+  // Refresh on every focus — the time of day and last cruise both move on.
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      loadLastCruise().then((last) => {
-        if (!active) return;
-        if (last) setCueLabel(`Resuming ${stationName(last.stationId)}`);
-        else setCueLabel(`Tonight's pick: ${stationName(defaultStationForNow())}`);
-      });
+      setTonightPick(stationById(defaultStationForNow()));
+      loadLastCruise().then((last) => { if (active) setLastCruise(last); });
       return () => { active = false; };
     }, []),
   );
 
-  async function handleStartDrive() {
-    const cruise = await resolveCruiseToStart();
+  async function launchCruise(cruise: LastCruise) {
     await saveLastCruise(cruise);
+    setLastCruise(cruise);
     setActiveStationId(cruise.stationId);
 
     if (await isSpotifyConnected()) {
@@ -81,6 +92,14 @@ export default function CruiseScreen() {
     setActiveMode(cruise.mode);
   }
 
+  const heroCruise: LastCruise = lastCruise ?? { stationId: tonightPick.id, mode: 'equalizer' };
+  const heroStation = stationById(heroCruise.stationId);
+  const heroCue = lastCruise
+    ? `${heroStation.name} · ${MODE_LABELS[heroCruise.mode] ?? 'Equalizer'} mode`
+    : `Tonight's pick: ${heroStation.name}`;
+
+  const handleStartDrive = () => launchCruise(heroCruise);
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
@@ -89,7 +108,12 @@ export default function CruiseScreen() {
         showsVerticalScrollIndicator={false}>
         <EqualizerHeader />
         {showBanner && <SkipBanner onDismiss={() => setShowBanner(false)} />}
-        <HeroCard onStartDrive={handleStartDrive} cueLabel={cueLabel} />
+        <HeroCard
+          onStartDrive={handleStartDrive}
+          cueLabel={heroCue}
+          station={heroStation}
+          buttonLabel={lastCruise ? 'Continue Drive' : 'Start Drive'}
+        />
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>RECOMMENDED</Text>
@@ -102,15 +126,6 @@ export default function CruiseScreen() {
             ))}
           </ScrollView>
         </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>ALL STATIONS</Text>
-          <View style={styles.stationList}>
-            {STATIONS.map((station) => (
-              <StationCard key={station.id} station={station} onPress={() => setSelectedStation(station)} />
-            ))}
-          </View>
-        </View>
       </ScrollView>
 
       <StationDetailModal
@@ -119,7 +134,9 @@ export default function CruiseScreen() {
         onClose={() => setSelectedStation(null)}
         onStartDrive={(mode) => {
           if (selectedStation) {
-            saveLastCruise({ stationId: selectedStation.id, mode });
+            const cruise = { stationId: selectedStation.id, mode };
+            saveLastCruise(cruise);
+            setLastCruise(cruise);
             setActiveStationId(selectedStation.id);
           }
           setSelectedStation(null);
@@ -152,7 +169,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 22,
   },
   horizontal: { paddingHorizontal: 22, paddingBottom: 6 },
-  stationList: { paddingHorizontal: 16 },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',

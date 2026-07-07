@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
@@ -14,6 +15,9 @@ const TABS: { name: string; label: string; icon: IoniconName; iconActive: Ionico
   { name: 'profile', label: 'PROFILE',  icon: 'person-circle-outline', iconActive: 'person-circle' },
 ];
 
+const PILL_PAD_H = 16;
+const POD_INSET = 5;
+
 function FloatingTabBar({
   state,
   navigation,
@@ -26,9 +30,56 @@ function FloatingTabBar({
     ? Math.max(insets.bottom, TAB_BAR_BOTTOM)
     : TAB_BAR_BOTTOM;
 
+  // App Store-style: a grey pod glides to the active tab; the whole bar
+  // brightens slightly while a finger is down on it.
+  const [barW, setBarW] = useState(0);
+  const podX = useRef(new Animated.Value(0)).current;
+  const podPlaced = useRef(false);
+  const pressGlow = useRef(new Animated.Value(0)).current;
+
+  const slotW = barW > 0 ? (barW - PILL_PAD_H * 2) / state.routes.length : 0;
+  const podW = Math.max(0, slotW - POD_INSET * 2);
+
+  useEffect(() => {
+    if (barW === 0) return;
+    const target = PILL_PAD_H + state.index * slotW + POD_INSET;
+    if (!podPlaced.current) {
+      // First layout: park the pod on the active tab without animating.
+      podX.setValue(target);
+      podPlaced.current = true;
+      return;
+    }
+    Animated.spring(podX, {
+      toValue: target,
+      useNativeDriver: true,
+      tension: 120,
+      friction: 16,
+    }).start();
+  }, [state.index, barW, slotW]);
+
+  const glowIn = () =>
+    Animated.timing(pressGlow, { toValue: 1, duration: 110, useNativeDriver: true }).start();
+  const glowOut = () =>
+    Animated.timing(pressGlow, { toValue: 0, duration: 260, useNativeDriver: true }).start();
+
   return (
     <View style={[styles.wrapper, { bottom }]} pointerEvents="box-none">
-      <View style={styles.pill}>
+      <View style={styles.pill} onLayout={(e) => setBarW(e.nativeEvent.layout.width)}>
+        {/* Whole-bar press glow */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.pressGlow,
+            { opacity: pressGlow.interpolate({ inputRange: [0, 1], outputRange: [0, 0.07] }) },
+          ]}
+        />
+        {/* Sliding pod behind the active tab */}
+        {barW > 0 && (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.pod, { width: podW, transform: [{ translateX: podX }] }]}
+          />
+        )}
         {state.routes.map((route, index) => {
           const tab = TABS.find((t) => t.name === route.name);
           if (!tab) return null;
@@ -37,6 +88,8 @@ function FloatingTabBar({
             <Pressable
               key={route.key}
               style={styles.tabItem}
+              onPressIn={glowIn}
+              onPressOut={glowOut}
               onPress={() => navigation.navigate(route.name)}>
               <Ionicons
                 name={active ? tab.iconActive : tab.icon}
@@ -92,6 +145,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.55,
     shadowRadius: 24,
     elevation: 18,
+  },
+  pressGlow: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: '#ffffff',
+    borderRadius: 30,
+  },
+  pod: {
+    position: 'absolute',
+    left: 0,
+    top: 9,
+    bottom: 9,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.13)',
   },
   tabItem: {
     flex: 1,

@@ -1,9 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Cruise, Fonts } from '@/constants/theme';
+import { GlossSheen } from '@/components/GlossSheen';
 import { WelcomeCueLine } from '@/components/WelcomeMessage';
+import type { Station } from '@/constants/stations';
 
 function triggerHaptic() {
   if (Platform.OS !== 'web') {
@@ -13,35 +15,52 @@ function triggerHaptic() {
 
 type HeroCardProps = {
   onStartDrive: () => void;
-  /** e.g. "Resuming Night Run FM" or "Tonight's pick: Sunset FM" */
+  /** e.g. "Tonight's pick: Sunset FM" or "Night Run FM · iPod mode" */
   cueLabel: string;
+  /** The station the button will launch — its photo becomes the hero scene. */
+  station: Station;
+  /** "Start Drive" fresh, "Continue Drive" when resuming. */
+  buttonLabel?: string;
 };
 
-export function HeroCard({ onStartDrive, cueLabel }: HeroCardProps) {
+export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start Drive' }: HeroCardProps) {
   const handleStart = () => {
     triggerHaptic();
     onStartDrive();
   };
 
+  const glowTint = (station.eqColors?.[1] ?? Cruise.violet) + '22';
+
   return (
     <View style={styles.cardShadow}>
       <View style={styles.card}>
-        {/* Gradient background */}
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            styles.cardBg,
-            // @ts-ignore
-            {
-              experimental_backgroundImage:
-                'linear-gradient(150deg, #2C0B6E 0%, #15083C 40%, #0A0A22 100%)',
-            },
-          ]}
+        {/* Tonight's pick, full bleed — the hero is a scene, not a box */}
+        <ImageBackground
+          source={station.image}
+          style={StyleSheet.absoluteFill}
+          imageStyle={{ width: '100%', height: '100%' }}
+          blurRadius={2}
+          resizeMode="cover"
         />
-        {/* Top-right ambient orb */}
-        <View style={styles.orbTopRight} />
-        {/* Bottom-left subtle orb */}
-        <View style={styles.orbBottomLeft} />
+        {/* Dark fade so the copy stays readable over any photo */}
+        <LinearGradient
+          colors={[
+            'rgba(2,2,12,0.30)',
+            'rgba(2,2,12,0.18)',
+            'rgba(2,2,12,0.38)',
+            'rgba(2,2,12,0.62)',
+          ]}
+          locations={[0, 0.35, 0.68, 1]}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Soft mood tint pulled from the station's own palette */}
+        <LinearGradient
+          colors={['transparent', glowTint]}
+          start={{ x: 0.5, y: 0.3 }} end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
 
         {/* ── Top row: weather (right-aligned) ── */}
         <View style={styles.topRow}>
@@ -64,14 +83,16 @@ export function HeroCard({ onStartDrive, cueLabel }: HeroCardProps) {
             style={({ pressed }) => [styles.startBtn, pressed && styles.startBtnPressed]}
             onPress={handleStart}
             hitSlop={8}>
+            {/* White glass — translucent, the scene glows through */}
             <LinearGradient
-              colors={['rgba(160,98,255,0.55)', 'rgba(123,56,224,0.40)', 'rgba(96,40,190,0.35)']}
+              colors={['rgba(255,255,255,0.30)', 'rgba(255,255,255,0.14)', 'rgba(255,255,255,0.08)']}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+              end={{ x: 0, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
+            <GlossSheen radius={18} />
             <Text style={styles.startBtnIcon}>▶</Text>
-            <Text style={styles.startBtnText}>Start Drive</Text>
+            <Text style={styles.startBtnText}>{buttonLabel}</Text>
           </Pressable>
         </View>
       </View>
@@ -95,29 +116,9 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(123, 56, 224, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     minHeight: 280,
-  },
-  cardBg: {
-    borderRadius: 26,
-  },
-  orbTopRight: {
-    position: 'absolute',
-    top: -60,
-    right: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: 'rgba(110, 40, 220, 0.22)',
-  },
-  orbBottomLeft: {
-    position: 'absolute',
-    bottom: -80,
-    left: -40,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(40, 10, 100, 0.3)',
+    backgroundColor: '#0A0A22',
   },
   // ── Top row ──
   topRow: {
@@ -132,16 +133,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(8,8,20,0.45)',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   weatherIcon: {
     fontSize: 13,
   },
   weatherText: {
-    color: 'rgba(255,255,255,0.75)',
+    color: 'rgba(255,255,255,0.85)',
     fontSize: 12,
     fontWeight: '500',
   },
@@ -158,26 +161,15 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     gap: 10,
   },
-  eyebrow: {
-    color: Cruise.violetLight,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 3,
-    marginBottom: 6,
-  },
   title: {
     color: '#fff',
     fontSize: 40,
     fontWeight: '800',
     lineHeight: 44,
     letterSpacing: -1,
-  },
-  sub: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 13.5,
-    fontWeight: '500',
-    lineHeight: 20,
-    marginTop: 8,
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowRadius: 12,
+    textShadowOffset: { width: 0, height: 2 },
   },
   // ── Buttons ──
   buttonsRow: {
@@ -194,11 +186,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingVertical: 20,
     borderWidth: 1,
-    borderColor: 'rgba(180,130,255,0.35)',
-    shadowColor: Cruise.violet,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 16,
+    borderColor: 'rgba(255,255,255,0.35)',
+    shadowColor: '#ffffff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
     elevation: 10,
   },
   startBtnPressed: {

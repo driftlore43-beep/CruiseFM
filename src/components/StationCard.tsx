@@ -43,9 +43,12 @@ async function handleStartDrive(stationName: string) {
   await openMusicPlatform(stationName);
 }
 
-// ── Tall card for horizontal recommended strip (175 × 228) ────────────────────
+// ── Landscape postcard for the horizontal recommended strip (250 × 150) ───────
+// Photo-first: the station's scene runs sharp and full-bleed; the mood colour
+// lives in the glow around the card and the tinted tag chip, not on the photo.
 function CompactCard({ station, onPress }: { station: Station; onPress?: () => void }) {
   const platformColor = usePlatformColor();
+  const tagTint = station.eqColors?.[1] ?? '#ffffff';
   return (
     <Pressable
       style={({ pressed }) => [
@@ -58,39 +61,22 @@ function CompactCard({ station, onPress }: { station: Station; onPress?: () => v
       {/* Clip everything to the rounded rect */}
       <View style={styles.compactCard}>
 
-        {/* Layer 0 — the station's own photo, so the card previews its mood */}
+        {/* The scene itself — sharp, untinted */}
         <Image source={station.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
 
-        {/* Layer 1 — mood colour wash over the photo (diagonal, photo still reads through) */}
+        {/* Bottom scrim for the name */}
         <LinearGradient
-          colors={[station.cardGradient[0] + 'b3', station.cardGradient[1] + '66', station.cardGradient[2] + 'b3']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-
-        {/* Layer 1b — subtle depth vignette, kept light so the mood colour stays vivid */}
-        <LinearGradient
-          colors={['rgba(0,0,0,0.06)', 'transparent']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-
-        {/* Layer 2 — dark fade at the bottom for text legibility */}
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.32)']}
+          colors={['transparent', 'rgba(0,0,0,0.62)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.compactOverlay}
         />
 
-        {/* Premium cards get a glossy shine on top of their mood colour */}
-        {station.premium && <GlossSheen />}
+        {/* Glass finish — rim + light catch */}
+        <GlossSheen radius={20} />
 
-        {/* Layer 4 — UI chrome */}
         <View style={styles.iconCircleSmall}>
-          <MaterialCommunityIcons name={station.iconName as any} size={19} color="#fff" />
+          <MaterialCommunityIcons name={station.iconName as any} size={17} color="#fff" />
         </View>
 
         {station.premium && (
@@ -100,11 +86,13 @@ function CompactCard({ station, onPress }: { station: Station; onPress?: () => v
         )}
 
         <View style={styles.compactBottom}>
-          <Text style={styles.compactName} numberOfLines={2}>{station.name}</Text>
+          <Text style={styles.compactName} numberOfLines={1}>{station.name}</Text>
           <View style={styles.compactDriveRow}>
             <View style={styles.tagsRow}>
               {station.tags.slice(0, 1).map((tag) => (
-                <View key={tag} style={styles.tag}>
+                <View
+                  key={tag}
+                  style={[styles.tag, { backgroundColor: tagTint + '30', borderWidth: 1, borderColor: tagTint + '55' }]}>
                   <Text style={styles.tagText}>{tag}</Text>
                 </View>
               ))}
@@ -213,8 +201,8 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   compactCard: {
-    width: 175,
-    height: 228,
+    width: 250,
+    height: 150,
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
@@ -228,36 +216,36 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 95,
+    height: 78,
   },
   compactBottom: {
     position: 'absolute',
-    bottom: 14,
+    bottom: 12,
     left: 14,
     right: 14,
     gap: 6,
   },
   compactName: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 19,
+    fontSize: 15.5,
+    fontWeight: '800',
+    lineHeight: 20,
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowRadius: 6,
     textShadowOffset: { width: 0, height: 1 },
   },
   iconCircleSmall: {
     position: 'absolute',
-    top: 14,
-    left: 14,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    top: 12,
+    left: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(8,8,20,0.40)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: 'rgba(255,255,255,0.20)',
   },
   iconEmojiSmall: { fontSize: 16 },
 

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 
+import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
 import { HeroCard } from '@/components/HeroCard';
 import { StationCard } from '@/components/StationCard';
@@ -24,6 +25,7 @@ import {
   defaultStationForNow,
   type LastCruise,
 } from '@/utils/lastCruise';
+import { recordDriveStart, recordDriveEnd } from '@/utils/driveStats';
 import { isSpotifyConnected, startPlayback } from '@/utils/spotify';
 
 const recommended = STATIONS.filter((s) => RECOMMENDED_IDS.includes(s.id));
@@ -64,16 +66,18 @@ export default function CruiseScreen() {
   // tonight's time-of-day pick. Scene, cue and button all track it.
   const [tonightPick, setTonightPick] = useState<Station>(() => stationById(defaultStationForNow()));
   const [lastCruise, setLastCruise] = useState<LastCruise | null>(null);
+  const [statsKey, setStatsKey] = useState(0);
 
   useEffect(() => {
     getPlatformSkipped().then((skipped) => { if (skipped) setShowBanner(true); });
   }, []);
 
-  // Refresh on every focus — the time of day and last cruise both move on.
+  // Refresh on every focus — the time of day, last cruise and stats move on.
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setTonightPick(stationById(defaultStationForNow()));
+      setStatsKey((k) => k + 1);
       loadLastCruise().then((last) => { if (active) setLastCruise(last); });
       return () => { active = false; };
     }, []),
@@ -83,6 +87,7 @@ export default function CruiseScreen() {
     await saveLastCruise(cruise);
     setLastCruise(cruise);
     setActiveStationId(cruise.stationId);
+    recordDriveStart(cruise.stationId);
 
     if (await isSpotifyConnected()) {
       // Resume only if Spotify already has a live device. If not, we do NOT
@@ -91,6 +96,12 @@ export default function CruiseScreen() {
     }
     setActiveMode(cruise.mode);
   }
+
+  // Closing a mode banks the drive's minutes, then the strip refreshes.
+  const closeMode = () => {
+    setActiveMode(null);
+    recordDriveEnd().then(() => setStatsKey((k) => k + 1));
+  };
 
   const heroCruise: LastCruise = lastCruise ?? { stationId: tonightPick.id, mode: 'equalizer' };
   const heroStation = stationById(heroCruise.stationId);
@@ -115,11 +126,15 @@ export default function CruiseScreen() {
           buttonLabel={lastCruise ? 'Continue Drive' : 'Start Drive'}
         />
 
+        <DriveStatsStrip refreshKey={statsKey} />
+
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>RECOMMENDED</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            snapToInterval={264}
+            decelerationRate="fast"
             contentContainerStyle={styles.horizontal}>
             {recommended.map((station) => (
               <StationCard key={station.id} station={station} compact onPress={() => setSelectedStation(station)} />
@@ -138,6 +153,7 @@ export default function CruiseScreen() {
             saveLastCruise(cruise);
             setLastCruise(cruise);
             setActiveStationId(selectedStation.id);
+            recordDriveStart(selectedStation.id);
           }
           setSelectedStation(null);
           setActiveMode(mode);
@@ -145,13 +161,13 @@ export default function CruiseScreen() {
         isPro={OWNER_MODE}
       />
 
-      <EqualizerFullscreen visible={activeMode === 'equalizer'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
-      <VinylFullscreen visible={activeMode === 'vinyl'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
-      <CassetteFullscreen visible={activeMode === 'cassette'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
-      <RetroRadioFullscreen visible={activeMode === 'radio'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
-      <IpodClassicFullscreen visible={activeMode === 'ipod'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
-      <SoundWaveFullscreen visible={activeMode === 'waves'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
-      <CircularWaveFullscreen visible={activeMode === 'orb'} onClose={() => setActiveMode(null)} stationId={activeStationId} />
+      <EqualizerFullscreen visible={activeMode === 'equalizer'} onClose={closeMode} stationId={activeStationId} />
+      <VinylFullscreen visible={activeMode === 'vinyl'} onClose={closeMode} stationId={activeStationId} />
+      <CassetteFullscreen visible={activeMode === 'cassette'} onClose={closeMode} stationId={activeStationId} />
+      <RetroRadioFullscreen visible={activeMode === 'radio'} onClose={closeMode} stationId={activeStationId} />
+      <IpodClassicFullscreen visible={activeMode === 'ipod'} onClose={closeMode} stationId={activeStationId} />
+      <SoundWaveFullscreen visible={activeMode === 'waves'} onClose={closeMode} stationId={activeStationId} />
+      <CircularWaveFullscreen visible={activeMode === 'orb'} onClose={closeMode} stationId={activeStationId} />
     </SafeAreaView>
   );
 }

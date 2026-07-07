@@ -1,5 +1,6 @@
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { GlossSheen } from '@/components/GlossSheen';
 import { TidalLogo } from '@/components/icons/TidalLogo';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -222,13 +223,17 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
             onPress={handleConfirm}
             disabled={!isReady}>
             {isReady ? (
-              <LinearGradient
-                colors={['#9B5CFF', '#7B38E0']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.confirmGradient}>
-                <Text style={styles.confirmText}>Let's Drive 🚗</Text>
-              </LinearGradient>
+              <View style={styles.confirmGradient}>
+                {/* Glassy translucent gradient — the sheet glows through */}
+                <LinearGradient
+                  colors={['rgba(160,98,255,0.55)', 'rgba(123,56,224,0.42)', 'rgba(96,40,190,0.38)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <GlossSheen radius={16} />
+                <Text style={styles.confirmText}>Let's Drive</Text>
+              </View>
             ) : (
               <Text style={[styles.confirmText, { color: 'rgba(255,255,255,0.3)' }]}>
                 Select a platform
@@ -365,9 +370,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confirmBtnActive: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
     shadowColor: Cruise.violet,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
+    shadowOpacity: 0.5,
     shadowRadius: 18,
     elevation: 12,
   },
@@ -382,6 +389,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 16,
+    overflow: 'hidden',
   },
   confirmText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
   skipRow: { alignItems: 'center', paddingTop: 16 },

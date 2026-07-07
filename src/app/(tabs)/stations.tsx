@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,17 +16,102 @@ import { IpodClassicFullscreen } from '@/components/IpodMode';
 import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
 import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
 import { GlossSheen } from '@/components/GlossSheen';
-import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
+import { Cruise, Fonts, TAB_SAFE_INSET } from '@/constants/theme';
 import { STATIONS, type Station } from '@/constants/stations';
 import { OWNER_MODE } from '@/constants/config';
 import { loadCustomStations, type CustomStation } from '@/utils/customStations';
-import { saveLastCruise } from '@/utils/lastCruise';
+import { recordDriveStart, recordDriveEnd } from '@/utils/driveStats';
+import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
 
 const FREE_CUSTOM_LIMIT = 3;
 const IS_PRO = OWNER_MODE;
 
+// One line of road poetry per visit, rotating on each focus.
+const POETRY = [
+  'Pick a feeling, not a genre.',
+  'Every road has a frequency.',
+  'The city sounds different after midnight.',
+  'Somewhere, a road is waiting.',
+  'Tune the drive to the mood.',
+];
+
+// Time-flavoured tagline for the station currently "on air".
+const ON_AIR_LINES: Record<string, string> = {
+  'after-midnight': 'After midnight — the road is all yours.',
+  'mountain-pass':  'Morning air — take the high road.',
+  'coastal':        'Midday light — the coast is clear.',
+  'sunset':         'Golden hour — catch it while it lasts.',
+  'night-run':      'City lights on — the night is young.',
+};
+
+function stationById(id: string): Station {
+  return STATIONS.find((s) => s.id === id) ?? STATIONS[0];
+}
+
+/** Pulsing red "live" dot. */
+function OnAirDot() {
+  const pulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 0.25, duration: 900, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  return <Animated.View style={[styles.onAirDot, { opacity: pulse }]} />;
+}
+
+/** Letterboxed banner for the station matching this hour — tap to open it. */
+function OnAirBanner({ station, onPress }: { station: Station; onPress: () => void }) {
+  const line = ON_AIR_LINES[station.id] ?? `${station.name} is calling.`;
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.onAirShadow, { shadowColor: station.glowColor }, pressed && styles.pressed]}
+      onPress={onPress}>
+      <View style={styles.onAirCard}>
+        <ImageBackground
+          source={station.image}
+          style={StyleSheet.absoluteFill}
+          imageStyle={{ width: '100%', height: '100%' }}
+          blurRadius={1.5}
+          resizeMode="cover"
+        />
+        <LinearGradient
+          colors={['rgba(3,3,12,0.66)', 'rgba(3,3,12,0.18)']}
+          start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <GlossSheen radius={22} />
+        <View style={styles.onAirContent}>
+          <View style={styles.onAirRow}>
+            <OnAirDot />
+            <Text style={[styles.onAirEyebrow, { fontFamily: Fonts.mono }]}>ON AIR THIS HOUR</Text>
+          </View>
+          <Text style={styles.onAirName} numberOfLines={1}>{station.name}</Text>
+          <Text style={styles.onAirLine} numberOfLines={1}>{line}</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+/** FM-dial section divider — ruler ticks with the label and a frequency. */
+function DialDivider({ label, freq }: { label: string; freq: string }) {
+  return (
+    <View style={styles.dialRow}>
+      <Text style={[styles.dialLabel, { fontFamily: Fonts.mono }]}>{label}</Text>
+      <View style={styles.dialTicks}>
+        {Array.from({ length: 25 }).map((_, i) => (
+          <View key={i} style={[styles.dialTick, i % 4 === 0 && styles.dialTickTall]} />
+        ))}
+      </View>
+      <Text style={[styles.dialFreq, { fontFamily: Fonts.mono }]}>{freq}</Text>
+    </View>
+  );
+}
+
 export default function StationsScreen() {
-  const [query, setQuery] = useState('');
   const [customStations, setCustomStations] = useState<CustomStation[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
@@ -34,35 +119,29 @@ export default function StationsScreen() {
   const [activeStationId, setActiveStationId] = useState<string | undefined>(undefined);
   const insets = useSafeAreaInsets();
 
+  const [onAirStation, setOnAirStation] = useState<Station>(() => stationById(defaultStationForNow()));
+  const [poetry, setPoetry] = useState(POETRY[0]);
+
   async function fetchCustom() {
     const loaded = await loadCustomStations();
     setCustomStations(loaded);
   }
 
   useEffect(() => { fetchCustom(); }, []);
-  useFocusEffect(useCallback(() => { fetchCustom(); }, []));
+  useFocusEffect(useCallback(() => {
+    fetchCustom();
+    setOnAirStation(stationById(defaultStationForNow()));
+    setPoetry(POETRY[Math.floor(Math.random() * POETRY.length)]);
+  }, []));
 
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim();
-    if (!q) return STATIONS;
-    return STATIONS.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.tagline.toLowerCase().includes(q) ||
-        s.tags.some((t) => t.toLowerCase().includes(q)),
-    );
-  }, [query]);
+  const free = STATIONS.filter((s) => !s.premium);
+  const premium = STATIONS.filter((s) => s.premium);
 
-  const filteredCustom = useMemo(() => {
-    const q = query.toLowerCase().trim();
-    if (!q) return customStations;
-    return customStations.filter(
-      (s) => s.name.toLowerCase().includes(q) || s.tagline.toLowerCase().includes(q),
-    );
-  }, [query, customStations]);
-
-  const free = filtered.filter((s) => !s.premium);
-  const premium = filtered.filter((s) => s.premium);
+  // Closing a mode banks the drive's minutes into the stats log.
+  const closeMode = () => {
+    setActiveMode(null);
+    recordDriveEnd();
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -72,36 +151,31 @@ export default function StationsScreen() {
         showsVerticalScrollIndicator={false}>
 
         <View style={styles.headerBlock}>
-          <Text style={styles.title}>What's the mood?</Text>
-          <View style={styles.searchBox}>
-            <Text style={styles.searchIcon}>⌕</Text>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search stations, vibes..."
-              placeholderTextColor={Cruise.textMuted}
-              value={query}
-              onChangeText={setQuery}
-              selectionColor={Cruise.violet}
-            />
+          <View style={styles.titleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>What's the mood?</Text>
+              <Text style={styles.poetry}>{poetry}</Text>
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.createBtn, pressed && styles.pressed]}
+              onPress={() => setShowCreate(true)}
+              hitSlop={6}>
+              <LinearGradient
+                colors={['rgba(255,45,150,0.55)', 'rgba(142,36,170,0.50)', 'rgba(58,16,110,0.55)']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <GlossSheen radius={22} />
+              <MaterialCommunityIcons name="plus" size={22} color="#fff" />
+            </Pressable>
           </View>
+          <OnAirBanner station={onAirStation} onPress={() => setSelectedStation(onAirStation)} />
         </View>
 
-        <Pressable
-          style={({ pressed }) => [styles.createPill, pressed && styles.pressed]}
-          onPress={() => setShowCreate(true)}>
-          <LinearGradient
-            colors={['rgba(255,45,150,0.45)', 'rgba(142,36,170,0.40)', 'rgba(58,16,110,0.45)']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <GlossSheen radius={26} />
-          <Text style={styles.createPillText}>+  Create Station</Text>
-        </Pressable>
-
-        {filteredCustom.length > 0 && (
+        {customStations.length > 0 && (
           <>
-            <Text style={styles.sectionLabel}>MY STATIONS</Text>
-            {filteredCustom.map((station) => (
+            <DialDivider label="MY STATIONS" freq="87.9" />
+            {customStations.map((station) => (
               <CustomStationCard key={station.id} station={station} />
             ))}
           </>
@@ -109,7 +183,7 @@ export default function StationsScreen() {
 
         {free.length > 0 && (
           <>
-            <Text style={styles.sectionLabel}>FREE</Text>
+            <DialDivider label="FREE" freq="92.1" />
             {free.map((station) => (
               <StationCard key={station.id} station={station} onPress={() => setSelectedStation(station)} />
             ))}
@@ -118,7 +192,7 @@ export default function StationsScreen() {
 
         {premium.length > 0 && (
           <>
-            <Text style={styles.sectionLabel}>PREMIUM</Text>
+            <DialDivider label="PREMIUM" freq="101.3" />
             {premium.map((station) =>
               OWNER_MODE ? (
                 <StationCard key={station.id} station={station} onPress={() => setSelectedStation(station)} />
@@ -135,9 +209,6 @@ export default function StationsScreen() {
           </>
         )}
 
-        {filtered.length === 0 && filteredCustom.length === 0 && (
-          <Text style={styles.empty}>No stations match "{query}"</Text>
-        )}
       </ScrollView>
 
       <CreateStationModal
@@ -160,6 +231,7 @@ export default function StationsScreen() {
           if (selectedStation) {
             saveLastCruise({ stationId: selectedStation.id, mode });
             setActiveStationId(selectedStation.id);
+            recordDriveStart(selectedStation.id);
           }
           setSelectedStation(null);
           setActiveMode(mode);
@@ -169,37 +241,37 @@ export default function StationsScreen() {
 
       <EqualizerFullscreen
         visible={activeMode === 'equalizer'}
-        onClose={() => setActiveMode(null)}
+        onClose={closeMode}
         stationId={activeStationId}
       />
       <VinylFullscreen
         visible={activeMode === 'vinyl'}
-        onClose={() => setActiveMode(null)}
+        onClose={closeMode}
         stationId={activeStationId}
       />
       <CassetteFullscreen
         visible={activeMode === 'cassette'}
-        onClose={() => setActiveMode(null)}
+        onClose={closeMode}
         stationId={activeStationId}
       />
       <RetroRadioFullscreen
         visible={activeMode === 'radio'}
-        onClose={() => setActiveMode(null)}
+        onClose={closeMode}
         stationId={activeStationId}
       />
       <IpodClassicFullscreen
         visible={activeMode === 'ipod'}
-        onClose={() => setActiveMode(null)}
+        onClose={closeMode}
         stationId={activeStationId}
       />
       <SoundWaveFullscreen
         visible={activeMode === 'waves'}
-        onClose={() => setActiveMode(null)}
+        onClose={closeMode}
         stationId={activeStationId}
       />
       <CircularWaveFullscreen
         visible={activeMode === 'orb'}
-        onClose={() => setActiveMode(null)}
+        onClose={closeMode}
         stationId={activeStationId}
       />
     </SafeAreaView>
@@ -244,8 +316,8 @@ const styles = StyleSheet.create({
     backgroundColor: Cruise.midnight,
   },
   headerBlock: {
-    paddingTop: 218,
-    paddingBottom: 12,
+    paddingTop: 20,
+    paddingBottom: 10,
     gap: 14,
   },
   title: {
@@ -254,46 +326,126 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.5,
   },
-  createPill: {
-    borderRadius: 26,
+  poetry: {
+    color: Cruise.textSecondary,
+    fontSize: 13.5,
+    fontStyle: 'italic',
+    marginTop: 5,
+  },
+
+  // ── On Air banner ──
+  onAirShadow: {
+    borderRadius: 22,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  onAirCard: {
+    height: 112,
+    borderRadius: 22,
     overflow: 'hidden',
-    paddingVertical: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    justifyContent: 'flex-end',
+  },
+  onAirContent: {
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+    gap: 2,
+  },
+  onAirRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 3,
+  },
+  onAirDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF453A',
+    shadowColor: '#FF453A',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+  },
+  onAirEyebrow: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 2.5,
+  },
+  onAirName: {
+    color: '#fff',
+    fontSize: 21,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 8,
+  },
+  onAirLine: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12.5,
+    fontWeight: '500',
+  },
+
+  // ── FM-dial section dividers ──
+  dialRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 10,
+    marginBottom: 14,
+    paddingHorizontal: 2,
+  },
+  dialLabel: {
+    color: Cruise.textMuted,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+  dialTicks: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 10,
+  },
+  dialTick: {
+    width: 1,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  dialTickTall: {
+    height: 9,
+    backgroundColor: 'rgba(255,255,255,0.30)',
+  },
+  dialFreq: {
+    color: Cruise.amber,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  createBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
     shadowColor: Cruise.violet,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
-    shadowRadius: 16,
+    shadowRadius: 12,
     elevation: 8,
-  },
-  createPillText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Cruise.surface,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(123, 56, 224, 0.15)',
-    gap: 8,
-  },
-  searchIcon: {
-    color: Cruise.textMuted,
-    fontSize: 18,
-  },
-  searchInput: {
-    flex: 1,
-    color: Cruise.textPrimary,
-    fontSize: 15,
   },
   scroll: { flex: 1 },
   content: {

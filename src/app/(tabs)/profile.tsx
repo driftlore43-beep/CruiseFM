@@ -1,23 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
+import { STATIONS } from '@/constants/stations';
 import { useTheme } from '@/context/ThemeContext';
 import { ThemeGenerator } from '@/components/ThemeGenerator';
 import { PLATFORMS, PlatformId, getSavedPlatform } from '@/utils/musicPlatform';
 import { PlatformSelector } from '@/components/PlatformSelector';
 import { SpotifyConnectRow } from '@/components/SpotifyConnectRow';
 import { SettingsSheet, type SettingsPage } from '@/components/SettingsSheet';
+import { getDriveStats } from '@/utils/driveStats';
 
-const STATS: { label: string; value: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
-  { label: 'Total Drives',     value: '142',          icon: 'steering' },
-  { label: 'Hours Driven',     value: '387',          icon: 'clock-outline' },
-  { label: 'Favorite Station', value: 'Night Run FM', icon: 'radio-tower' },
-];
+const DRIVER_NAME = 'Night Driver';
+
+function stationName(id: string | null): string {
+  return STATIONS.find((s) => s.id === id)?.name ?? '—';
+}
+
+function formatHours(totalMinutes: number): string {
+  const hours = totalMinutes / 60;
+  if (hours === 0) return '0';
+  return hours >= 10 ? String(Math.round(hours)) : hours.toFixed(1);
+}
 
 const PREMIUM_ITEMS: { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; sub: string }[] = [
   { icon: 'album',            label: 'Premium Music Modes', sub: 'Vinyl, Retro Radio, iPod & Orb' },
@@ -95,6 +103,22 @@ export default function ProfileScreen() {
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [themeGenVisible, setThemeGenVisible] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage | null>(null);
+  const [stats, setStats] = useState<{ totalDrives: number; totalMinutes: number; favoriteStationId: string | null } | null>(null);
+
+  // Real numbers from the drive log, refreshed each time the tab is focused.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getDriveStats().then((s) => { if (active) setStats(s); });
+      return () => { active = false; };
+    }, []),
+  );
+
+  const STATS: { label: string; value: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
+    { label: 'Total Drives',     value: String(stats?.totalDrives ?? 0),        icon: 'steering' },
+    { label: 'Hours Driven',     value: formatHours(stats?.totalMinutes ?? 0),  icon: 'clock-outline' },
+    { label: 'Favorite Station', value: stationName(stats?.favoriteStationId ?? null), icon: 'radio-tower' },
+  ];
 
   const handlePlatformRowPress = () => setSelectorVisible(true);
   const handlePlatformDismiss = () => {
@@ -119,7 +143,7 @@ export default function ProfileScreen() {
               <Text style={styles.avatarInitials}>ND</Text>
             </LinearGradient>
           </View>
-          <Text style={styles.name}>Night Driver</Text>
+          <Text style={styles.name}>{DRIVER_NAME}</Text>
           <View style={styles.planBadge}>
             <LinearGradient
               colors={[theme.accentColor + '2e', theme.accentColor + '0a']}

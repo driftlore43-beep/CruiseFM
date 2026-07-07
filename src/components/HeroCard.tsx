@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ImageBackground, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Cruise, Fonts } from '@/constants/theme';
+import { Cruise } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
 import { WelcomeCueLine } from '@/components/WelcomeMessage';
 import type { Station } from '@/constants/stations';
@@ -21,9 +21,10 @@ type HeroCardProps = {
   station: Station;
   /** "Start Drive" fresh, "Continue Drive" when resuming. */
   buttonLabel?: string;
+  driverName?: string;
 };
 
-export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start Drive' }: HeroCardProps) {
+export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start Drive', driverName = 'Night Driver' }: HeroCardProps) {
   const handleStart = () => {
     triggerHaptic();
     onStartDrive();
@@ -62,16 +63,9 @@ export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start
           pointerEvents="none"
         />
 
-        {/* ── Top row: weather (right-aligned) ── */}
-        <View style={styles.topRow}>
-          <View style={styles.weatherPill}>
-            <Text style={styles.weatherIcon}>🌧</Text>
-            <Text style={styles.weatherText}>68°  Light rain</Text>
-          </View>
-        </View>
-
         {/* ── Main copy ── */}
         <View style={styles.copyBlock}>
+          <Text style={styles.greeting}>Welcome back, {driverName}</Text>
           <Text style={styles.title}>Let’s cruise.</Text>
           {/* Greeting fades in first, then cross-fades into the cue label */}
           <WelcomeCueLine cueLabel={cueLabel} />
@@ -120,46 +114,20 @@ const styles = StyleSheet.create({
     minHeight: 280,
     backgroundColor: '#0A0A22',
   },
-  // ── Top row ──
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: 22,
-    paddingTop: 22,
-    paddingBottom: 6,
-  },
-  weatherPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(8,8,20,0.45)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-  },
-  weatherIcon: {
-    fontSize: 13,
-  },
-  weatherText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  clock: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 13,
-    fontWeight: '500',
-    fontFamily: Fonts?.mono ?? 'monospace',
-  },
   // ── Copy ──
   copyBlock: {
     paddingHorizontal: 22,
-    paddingTop: 14,
+    paddingTop: 28,
     paddingBottom: 10,
-    gap: 10,
+    gap: 8,
+  },
+  greeting: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowRadius: 8,
   },
   title: {
     color: '#fff',

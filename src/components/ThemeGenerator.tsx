@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CardStyle, CruiseTheme, DEFAULT_THEME, FontStyle, useTheme } from '@/context/ThemeContext';
@@ -20,10 +21,10 @@ const ACCENT_COLORS = [
 ] as const;
 
 const BACKGROUNDS = [
-  { name: 'Midnight',     emoji: '🌙', colors: ['#0A0F2B', '#1a1a3a'] as [string, string] },
-  { name: 'Deep Space',   emoji: '🌌', colors: ['#050510', '#0d0d2b'] as [string, string] },
-  { name: 'Sunset',       emoji: '🌅', colors: ['#1a0a00', '#2a1000'] as [string, string] },
-  { name: 'Forest Night', emoji: '🌲', colors: ['#021a15', '#051f0f'] as [string, string] },
+  { name: 'Midnight',     icon: 'weather-night' as const,          colors: ['#0A0F2B', '#1a1a3a'] as [string, string] },
+  { name: 'Deep Space',   icon: 'star-shooting' as const,          colors: ['#050510', '#0d0d2b'] as [string, string] },
+  { name: 'Sunset',       icon: 'weather-sunset' as const,         colors: ['#1a0a00', '#2a1000'] as [string, string] },
+  { name: 'Forest Night', icon: 'pine-tree' as const,              colors: ['#021a15', '#051f0f'] as [string, string] },
 ] as const;
 
 const GLOW_STOPS = ['Off', 'Subtle', 'Medium', 'Intense'] as const;
@@ -272,7 +273,7 @@ export function ThemeGenerator({ visible, onClose }: { visible: boolean; onClose
                     style={[bg_.card, sel && { borderColor: draft.accentColor,
                       shadowColor: draft.accentColor, shadowOpacity: 0.5, shadowRadius: 10, elevation: 6 }]}>
                     <LinearGradient colors={mood.colors} style={bg_.swatch} />
-                    <Text style={bg_.emoji}>{mood.emoji}</Text>
+                    <MaterialCommunityIcons name={mood.icon} size={20} color="#fff" style={bg_.emoji} />
                     <Text style={bg_.name}>{mood.name}</Text>
                     {sel && <View style={[bg_.checkDot, { backgroundColor: draft.accentColor }]} />}
                   </Pressable>

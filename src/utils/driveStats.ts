@@ -9,6 +9,8 @@ export type DriveStats = {
   drivesThisWeek: number;
   totalMinutes: number;
   streakDays: number;
+  totalDrives: number;
+  favoriteStationId: string | null;
 };
 
 // One drive runs at a time, so the open drive is simply the last logged event.
@@ -63,6 +65,16 @@ export async function getDriveStats(): Promise<DriveStats> {
 
   const drivesThisWeek = log.filter((e) => e.ts >= weekAgo).length;
   const totalMinutes = log.reduce((sum, e) => sum + (e.minutes ?? 0), 0);
+  const totalDrives = log.length;
+
+  // Favourite = the most-driven station.
+  const counts: Record<string, number> = {};
+  for (const e of log) counts[e.stationId] = (counts[e.stationId] ?? 0) + 1;
+  let favoriteStationId: string | null = null;
+  let max = 0;
+  for (const [id, c] of Object.entries(counts)) {
+    if (c > max) { max = c; favoriteStationId = id; }
+  }
 
   // Streak: consecutive days with at least one drive. A quiet today doesn't
   // break it yet — the chain only snaps once a full day is missed.
@@ -75,5 +87,5 @@ export async function getDriveStats(): Promise<DriveStats> {
     cursor.setDate(cursor.getDate() - 1);
   }
 
-  return { drivesThisWeek, totalMinutes, streakDays };
+  return { drivesThisWeek, totalMinutes, streakDays, totalDrives, favoriteStationId };
 }

@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Circle as SvgCircle, Path } from 'react-native-svg';
 import {
   Animated, Dimensions, Easing, ImageBackground, Modal, PanResponder, ScrollView, StyleSheet,
   Text, TouchableOpacity, useWindowDimensions, View,
@@ -48,6 +48,12 @@ const VINYL_TRACKS = [
   { id: 'A4', title: 'Glass & Chrome',   artist: 'Low Glow',       duration: '5:02' },
 ] as const;
 
+/** '#RRGGBB' → 'rgba(r,g,b,a)' — for animated colour interpolation. */
+function withAlpha(hex: string, a: number): string {
+  const h = hex.replace('#', '');
+  return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`;
+}
+
 function parseTrackMs(d: string): number {
   const [m, s] = d.split(':').map(Number);
   return (m * 60 + s) * 1000;
@@ -91,9 +97,10 @@ type NoteItem = {
 const NOTE_ICONS = ['music-note-eighth', 'music-note-quarter', 'music-note-sixteenth', 'music'];
 let _noteId = 0;
 
-function FloatingNotes({ playing, containerSize, recordRadius, scrubbing, scrubDir }: {
+function FloatingNotes({ playing, containerSize, recordRadius, scrubbing, scrubDir, color = '#C8860A' }: {
   playing: boolean; containerSize: number; recordRadius: number;
   scrubbing: boolean; scrubDir: 'fwd' | 'bwd' | null;
+  color?: string;
 }) {
   const [notes, setNotes] = useState<NoteItem[]>([]);
 
@@ -141,7 +148,7 @@ function FloatingNotes({ playing, containerSize, recordRadius, scrubbing, scrubD
             transform: [{ translateX: tx }, { translateY: ty }, { scale }],
             opacity,
           }}>
-            <MaterialCommunityIcons name={note.icon as any} size={note.size} color="#C8860A" />
+            <MaterialCommunityIcons name={note.icon as any} size={note.size} color={color} />
           </Animated.View>
         );
       })}
@@ -150,12 +157,9 @@ function FloatingNotes({ playing, containerSize, recordRadius, scrubbing, scrubD
 }
 
 // ── Vinyl disc — clean bold design ───────────────────────────────────────────
-function VinylDisc({ size, spin, showLabel = false }: { size: number; spin: Animated.AnimatedInterpolation<string>; showLabel?: boolean }) {
+function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: number; spin: Animated.AnimatedInterpolation<string>; accent?: string; showLabel?: boolean }) {
   const cSize = Math.min(80, size * 0.30);
   const cR    = cSize / 2;
-  const grooveRadii = [
-    size * 0.34, size * 0.38, size * 0.41, size * 0.44, size * 0.46, size * 0.48,
-  ];
 
   const cx = size / 2;
   const r  = size / 2;
@@ -164,31 +168,35 @@ function VinylDisc({ size, spin, showLabel = false }: { size: number; spin: Anim
     <Animated.View style={{
       width: size, height: size,
       borderRadius: size / 2,
-      backgroundColor: '#0a0a0a',
       overflow: 'hidden',
       transform: [{ rotate: spin }],
     }}>
-      {/* Groove rings — 6 subtle concentric circles */}
-      {grooveRadii.map((gr, i) => (
-        <View key={i} style={{
-          position: 'absolute',
-          width: gr * 2, height: gr * 2, borderRadius: gr,
-          borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.06)',
-          top: size / 2 - gr, left: size / 2 - gr,
-        }} />
-      ))}
-
-      {/* Light reflections — both inside spinning view so they rotate with record */}
+      {/* Clear pressing — glassy tint, sunlit accent rim, pressed grooves */}
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
-        {/* Primary reflection — bright, top-right quadrant */}
+        {/* Glass body — barely-there so the scene glows through */}
+        <SvgCircle cx={cx} cy={cx} r={r - 1} fill="rgba(255,255,255,0.05)" />
+        {/* Sunlit rim — bright accent edge with a soft inner falloff */}
+        <SvgCircle cx={cx} cy={cx} r={r - 2} fill="none" stroke={accent} strokeWidth={2.6} />
+        <SvgCircle cx={cx} cy={cx} r={r - 5.5} fill="none" stroke={accent} strokeOpacity={0.35} strokeWidth={5} />
+        {/* Outer groove band catching the light */}
+        <SvgCircle cx={cx} cy={cx} r={r * 0.82} fill="none" stroke={accent} strokeOpacity={0.10} strokeWidth={r * 0.22} />
+        {/* Fine pressed grooves */}
+        {[0.56, 0.62, 0.68, 0.73, 0.78, 0.86, 0.90].map((f, i) => (
+          <SvgCircle key={i} cx={cx} cy={cx} r={r * f} fill="none" stroke={accent} strokeOpacity={i % 2 ? 0.24 : 0.14} strokeWidth={0.8} />
+        ))}
+      </Svg>
+
+      {/* Light reflections — inside spinning view so the spin reads on clear vinyl */}
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+        {/* Primary reflection — soft, top-right quadrant */}
         <Path
           d={`M ${cx} ${cx} L ${size} 0 A ${r} ${r} 0 0 1 ${size} ${cx} Z`}
-          fill="rgba(255,255,255,0.22)"
+          fill="rgba(255,255,255,0.10)"
         />
         {/* Secondary reflection — dimmer, bottom-left quadrant, 180° opposite */}
         <Path
           d={`M ${cx} ${cx} L 0 ${size} A ${r} ${r} 0 0 1 0 ${cx} Z`}
-          fill="rgba(255,255,255,0.10)"
+          fill="rgba(255,255,255,0.05)"
         />
       </Svg>
 
@@ -213,11 +221,13 @@ function VinylDisc({ size, spin, showLabel = false }: { size: number; spin: Anim
 
 // ── Tonearm (shared between preview and fullscreen) ───────────────────────────
 function Tonearm({
-  armLen, armW, headW, headH, pivotX, pivotY, rotation,
+  armLen, armW, headW, headH, pivotX, pivotY, rotation, color = '#222222',
 }: {
   armLen: number; armW: number; headW: number; headH: number;
   pivotX: number; pivotY: number;
   rotation: Animated.AnimatedInterpolation<string>;
+  /** Solid mood colour for the arm + headshell. */
+  color?: string;
 }) {
   const cwW = Math.max(16, armW * 2.2);
   const cwH = Math.max(10, armW * 1.4);
@@ -258,20 +268,20 @@ function Tonearm({
           borderRadius: 4,
           borderWidth: 1, borderColor: '#3a3a3a',
         }} />
-        {/* Arm body */}
-        <View style={{ position: 'absolute', top: 0, left: 0, width: armW, height: armLen - headH, backgroundColor: '#222222', borderRadius: 3 }} />
+        {/* Arm body — solid mood colour */}
+        <View style={{ position: 'absolute', top: 0, left: 0, width: armW, height: armLen - headH, backgroundColor: color, borderRadius: 3 }} />
         {/* Highlight stripe */}
-        <View style={{ position: 'absolute', top: 8, left: 1.5, width: 1.5, height: armLen - headH - 16, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 1 }} />
-        {/* Headshell — wide flat block */}
+        <View style={{ position: 'absolute', top: 8, left: 1.5, width: 1.5, height: armLen - headH - 16, backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 1 }} />
+        {/* Headshell — wide flat block, mood colour */}
         <View style={{
           position: 'absolute', bottom: 0,
           left: -(headW / 2 - armW / 2),
           width: headW, height: headH,
-          backgroundColor: '#181818',
+          backgroundColor: color,
           borderRadius: 3,
-          borderWidth: 1, borderColor: '#333',
+          borderWidth: 1, borderColor: 'rgba(0,0,0,0.35)',
         }}>
-          <View style={{ position: 'absolute', top: 3, left: 3, right: 3, height: headH - 10, backgroundColor: '#242424', borderRadius: 2 }} />
+          <View style={{ position: 'absolute', top: 3, left: 3, right: 3, height: headH - 10, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 2 }} />
           {/* Stylus shank */}
           <View style={{ position: 'absolute', bottom: -6, left: headW / 2 - 1.5, width: 3, height: 7, backgroundColor: '#CCC', borderRadius: 1 }} />
           {/* Needle bright tip */}
@@ -291,7 +301,7 @@ function Tonearm({
 
 // ── Fullscreen turntable hero ─────────────────────────────────────────────────
 function TurntableHero({
-  platSize, spin, tonearmAnim, glowOpacity, ringShimmer, raysSpin, labelRotate, playing, panHandlers, scrubbing, scrubDir,
+  platSize, spin, tonearmAnim, glowOpacity, ringShimmer, raysSpin, labelRotate, playing, panHandlers, scrubbing, scrubDir, accent = V.gold, labelText = 'NIGHT RUN FM',
 }: {
   platSize: number;
   spin: Animated.AnimatedInterpolation<string>;
@@ -304,6 +314,10 @@ function TurntableHero({
   panHandlers: any;
   scrubbing: boolean;
   scrubDir: 'fwd' | 'bwd' | null;
+  /** Station mood colour — rim, ring, rays, notes and tonearm all take it. */
+  accent?: string;
+  /** Station name printed on the red centre label. */
+  labelText?: string;
 }) {
   const recSize  = platSize * 0.865;
   const armLen   = platSize * 0.70;
@@ -324,17 +338,17 @@ function TurntableHero({
         position: 'absolute',
         width: platSize * 0.92, height: platSize * 0.32,
         borderRadius: platSize * 0.46,
-        backgroundColor: V.glow,
+        backgroundColor: accent,
         bottom: -platSize * 0.04, left: platSize * 0.04,
         opacity: glowOpacity,
       }} />
       <SparkleField size={platSize} />
-      {/* Turntable body — dark rectangular plinth behind the platter */}
+      {/* Turntable body — translucent plinth so the scene stays visible */}
       <View style={{
         position: 'absolute',
         width: platSize * 0.92,
         height: platSize * 0.66,
-        backgroundColor: '#111111',
+        backgroundColor: 'rgba(17,17,17,0.45)',
         borderRadius: 20,
         top: platSize * 0.17,
         left: platSize * 0.04,
@@ -348,7 +362,7 @@ function TurntableHero({
       }} />
       {/* Platter disc — pan responder applied here for record scrub */}
       <View {...panHandlers} style={[th.platter, { width: platSize, height: platSize, borderRadius: platSize / 2, position: 'absolute', top: 0, left: 0 }]}>
-        <VinylDisc size={recSize} spin={spin} />
+        <VinylDisc size={recSize} spin={spin} accent={accent} />
       </View>
       {/* Disco light rays — rotate at half record speed */}
       <Animated.View style={{
@@ -362,7 +376,7 @@ function TurntableHero({
             position: 'absolute',
             width: 2, height: rayLen,
             left: recSize / 2 - 1, top: 0,
-            backgroundColor: V.gold, opacity: 0.06,
+            backgroundColor: accent, opacity: 0.06,
             transform: [
               { translateY: rayPivot },
               { rotate: `${i * 45}deg` },
@@ -371,14 +385,14 @@ function TurntableHero({
           }} />
         ))}
       </Animated.View>
-      {/* Single thick pulsing gold ring — color interpolated, not opacity */}
+      {/* Single thick pulsing mood ring — color interpolated, not opacity */}
       <Animated.View style={{
         position: 'absolute',
         width: recSize + 20, height: recSize + 20, borderRadius: (recSize + 20) / 2,
         borderWidth: 10,
         borderColor: ringShimmer.interpolate({
           inputRange: [0.6, 1.0],
-          outputRange: ['rgba(200,134,10,0.6)', 'rgba(200,134,10,1.0)'],
+          outputRange: [withAlpha(accent, 0.6), withAlpha(accent, 1)],
         }),
         top: (platSize - recSize - 20) / 2, left: (platSize - recSize - 20) / 2,
       }} />
@@ -398,20 +412,21 @@ function TurntableHero({
           }}>
             <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 1.2 }}>COLUMBIA</Text>
             <Text style={{ position: 'absolute', top: cR * 0.50, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: Math.max(8, cSize * 0.145), fontWeight: '800', letterSpacing: 0.4 }}>CRUISE FM</Text>
-            <Text style={{ position: 'absolute', top: cR * 1.22, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: Math.max(4, cSize * 0.075), letterSpacing: 0.4 }}>NIGHT RUN FM</Text>
+            <Text style={{ position: 'absolute', top: cR * 1.22, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: Math.max(4, cSize * 0.075), letterSpacing: 0.4 }} numberOfLines={1}>{labelText}</Text>
             <View style={{ position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', top: cR - 3, left: cR - 3 }} />
           </Animated.View>
         );
       })()}
       {/* Floating music notes */}
-      <FloatingNotes playing={playing} containerSize={platSize} recordRadius={recSize / 2} scrubbing={scrubbing} scrubDir={scrubDir} />
-      <Tonearm armLen={armLen} armW={armW} headW={headW} headH={headH} pivotX={pivotX} pivotY={pivotY} rotation={armRot} />
+      <FloatingNotes playing={playing} containerSize={platSize} recordRadius={recSize / 2} scrubbing={scrubbing} scrubDir={scrubDir} color={accent} />
+      <Tonearm armLen={armLen} armW={armW} headW={headW} headH={headH} pivotX={pivotX} pivotY={pivotY} rotation={armRot} color={accent} />
     </View>
   );
 }
 const th = StyleSheet.create({
   platter: {
-    backgroundColor: V.platter, borderWidth: 1.5, borderColor: V.platBorder,
+    // Translucent — the blurred station scene shows through the clear pressing.
+    backgroundColor: 'rgba(16,16,16,0.38)', borderWidth: 1.5, borderColor: V.platBorder,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.8, shadowRadius: 18, elevation: 14,
   },
@@ -907,6 +922,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
               platSize={platSize} spin={spin} tonearmAnim={tonearmVal} glowOpacity={glowOpacity}
               ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={labelRotate} playing={playing}
               panHandlers={recordPanRef.panHandlers} scrubbing={isScrubbing} scrubDir={scrubDir}
+              accent={station.eqColors?.[1] ?? V.gold}
+              labelText={station.name.toUpperCase()}
             />
           </View>
 

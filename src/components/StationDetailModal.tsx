@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  ImageBackground,
   Modal,
   PanResponder,
   Platform,
@@ -20,7 +19,9 @@ import * as Haptics from 'expo-haptics';
 import { type Station } from '@/constants/stations';
 import { Cruise } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
+import { StationBackdrop } from '@/components/StationBackdrop';
 import { useTheme } from '@/context/ThemeContext';
+import { useMotion } from '@/context/MotionContext';
 import { isSpotifyConnected, getUserPlaylists } from '@/utils/spotify';
 import {
   getStationPlaylist,
@@ -64,6 +65,7 @@ type Props = {
 export function StationDetailModal({ station, visible, onClose, onStartDrive, isPro }: Props) {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { dataSaver } = useMotion();
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
   const [selectedMode, setSelectedMode] = useState('cassette');
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
@@ -106,14 +108,8 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
     <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
       <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
 
-        {/* Full-bleed blurred station image — fills the entire background */}
-        <ImageBackground
-          source={station.image}
-          style={StyleSheet.absoluteFill}
-          imageStyle={{ width: '100%', height: '100%' }}
-          blurRadius={3.5}
-          resizeMode="cover"
-        />
+        {/* Full-bleed blurred station background — motion is a Premium unlock */}
+        <StationBackdrop station={station} blurRadius={3.5} motionAllowed={isPro && !dataSaver} />
         {/* Smooth multi-stop fade: clear scene up top, melts into dark
             behind the controls — no visible seam anywhere. */}
         <LinearGradient

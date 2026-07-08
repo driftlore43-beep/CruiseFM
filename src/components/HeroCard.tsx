@@ -1,10 +1,12 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ImageBackground, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Cruise } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
+import { StationBackdrop } from '@/components/StationBackdrop';
 import { WelcomeCueLine } from '@/components/WelcomeMessage';
+import { useMotion } from '@/context/MotionContext';
 import type { Station } from '@/constants/stations';
 
 function triggerHaptic() {
@@ -25,6 +27,7 @@ type HeroCardProps = {
 };
 
 export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start Drive', driverName = 'Night Driver' }: HeroCardProps) {
+  const { dataSaver } = useMotion();
   const handleStart = () => {
     triggerHaptic();
     onStartDrive();
@@ -35,14 +38,9 @@ export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start
   return (
     <View style={styles.cardShadow}>
       <View style={styles.card}>
-        {/* Tonight's pick, full bleed — the hero is a scene, not a box */}
-        <ImageBackground
-          source={station.image}
-          style={StyleSheet.absoluteFill}
-          imageStyle={{ width: '100%', height: '100%' }}
-          blurRadius={2}
-          resizeMode="cover"
-        />
+        {/* Tonight's pick, full bleed — the hero always animates (a taste of
+            motion for everyone), unless Data Saver forces stills */}
+        <StationBackdrop station={station} blurRadius={2} motionAllowed={!dataSaver} />
         {/* Dark fade so the copy stays readable over any photo */}
         <LinearGradient
           colors={[

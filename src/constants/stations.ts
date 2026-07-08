@@ -15,6 +15,8 @@ export type Station = {
   eqColors?: [string, string, string];
   glowColor: string;
   image: ImageSourcePropType;
+  /** Optional looping motion background (animated WebP). Falls back to `image`. */
+  motion?: ImageSourcePropType;
   icon: string;
   iconBg: string;
   bestTime: string;
@@ -137,6 +139,7 @@ export const STATIONS: Station[] = [
     eqColors: ['#FFC24C', '#FF7A48', '#D84C8A'],
     glowColor: '#8a3a05',
     image: require('../../assets/stations/sunset.jpg'),
+    motion: require('../../assets/stations/sunset-motion.webp'),
     icon: '🌇',
     iconBg: '#5a2800',
     bestTime: 'Sunset',

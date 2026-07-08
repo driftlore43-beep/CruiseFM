@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { useTheme } from '@/context/ThemeContext';
+import { useMotion } from '@/context/MotionContext';
 import { ThemeGenerator } from '@/components/ThemeGenerator';
 import { PLATFORMS, PlatformId, getSavedPlatform } from '@/utils/musicPlatform';
 import { PlatformSelector } from '@/components/PlatformSelector';
@@ -99,6 +100,7 @@ function useMusicPlatformInfo() {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { dataSaver, setDataSaver } = useMotion();
   const { name: platformName, color: platformColor, refresh: refreshPlatform } = useMusicPlatformInfo();
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [themeGenVisible, setThemeGenVisible] = useState(false);
@@ -215,6 +217,24 @@ export default function ProfileScreen() {
             <View style={[styles.themeColorDot, { backgroundColor: theme.accentColor, shadowColor: theme.accentColor }]} />
             <Text style={styles.settingsArrow}>›</Text>
           </Pressable>
+
+          {/* Data Saver toggle — forces still backgrounds for everyone */}
+          <View style={[styles.settingsRow, styles.settingsBorder]}>
+            <View style={styles.platformRowLeft}>
+              <IconChip icon="motion-play-outline" size={34} />
+              <View>
+                <Text style={styles.settingsLabel}>Data Saver</Text>
+                <Text style={styles.dataSaverSub}>Still backgrounds · less battery & data</Text>
+              </View>
+            </View>
+            <Switch
+              value={dataSaver}
+              onValueChange={setDataSaver}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: theme.accentColor }}
+              thumbColor="#fff"
+              ios_backgroundColor="rgba(255,255,255,0.18)"
+            />
+          </View>
 
           {/* Music Platform row */}
           <Pressable
@@ -359,6 +379,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.85, shadowRadius: 4, elevation: 2,
   },
   platformRowName: { color: Cruise.textSecondary, fontSize: 12, fontWeight: '500' },
+  dataSaverSub: { color: Cruise.textSecondary, fontSize: 11.5, marginTop: 2 },
   themeRowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   themeColorDot: {
     width: 10, height: 10, borderRadius: 5, marginRight: 4,

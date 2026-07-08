@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Cruise } from '@/constants/theme';
 import { ThemeProvider as CruiseThemeProvider, useTheme } from '@/context/ThemeContext';
+import { MotionProvider } from '@/context/MotionContext';
 import { PlatformSelector, usePlatformSelector } from '@/components/PlatformSelector';
 import { setPlatformSkipped } from '@/utils/musicPlatform';
 
@@ -35,7 +36,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={DarkTheme}>
       <CruiseThemeProvider>
-        <AppShell />
+        <MotionProvider>
+          <AppShell />
+        </MotionProvider>
       </CruiseThemeProvider>
     </ThemeProvider>
   );

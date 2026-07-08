@@ -343,23 +343,6 @@ function TurntableHero({
         opacity: glowOpacity,
       }} />
       <SparkleField size={platSize} />
-      {/* Turntable body — translucent plinth so the scene stays visible */}
-      <View style={{
-        position: 'absolute',
-        width: platSize * 0.92,
-        height: platSize * 0.66,
-        backgroundColor: 'rgba(17,17,17,0.45)',
-        borderRadius: 20,
-        top: platSize * 0.17,
-        left: platSize * 0.04,
-        borderWidth: 1,
-        borderColor: '#222222',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.9,
-        shadowRadius: 18,
-        elevation: 12,
-      }} />
       {/* Platter disc — pan responder applied here for record scrub */}
       <View {...panHandlers} style={[th.platter, { width: platSize, height: platSize, borderRadius: platSize / 2, position: 'absolute', top: 0, left: 0 }]}>
         <VinylDisc size={recSize} spin={spin} accent={accent} />

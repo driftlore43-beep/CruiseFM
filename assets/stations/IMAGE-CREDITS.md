@@ -75,14 +75,14 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 - Risk: **Low** — licensed source; no prominent trademarks.
 - Status: ✅ OK / cleared
 
-### 🟡 coastal.jpg — "Coastal FM"
-- In frame: winding coastal road at dusk, ocean on the left. No cars/brands. Recomposed 2026-07-08
-  (cropped ~28% off the right hillside to lean into the ocean).
-- Type (best guess): real photograph.
-- Source: _STILL TO CONFIRM_ (Unsplash/Pexels? or Pinterest?)
-- License: _TO CONFIRM_
-- Risk: **Low** on trademarks — but if it came from Pinterest it is **uncleared copyright**.
-- Status: ⚠️ CONFIRM SOURCE — the only remaining un-sourced image.
+### ✅ coastal.jpg — "Coastal FM"
+- In frame: winding coastal road at dusk, ocean on the left. No cars/brands. Rebuilt from the
+  clean high-res Pexels source 2026-07-08 and cropped ~28% off the right hillside to lean into the ocean.
+- Type: real photograph.
+- Source: Pexels — sergei, photo id 35768861 (file pexels-sergei-35768861.jpg, 2026-07-08).
+- License: **Pexels License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; no trademarks in frame.
+- Status: ✅ OK / cleared
 
 ### ✅ tunnel.jpg — "Tunnel FM"
 - In frame: motion-blur drive through a lit road tunnel, distant unidentifiable car.
@@ -98,11 +98,12 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 
 ---
 
-## Replace-first priority
-1. Confirm the source of **coastal.jpg** (Unsplash/Pexels or Pinterest?) — the ONLY image left to clear. 🟡
+## Status: ✅ ALL CLEARED (8 of 8) — 2026-07-08
+Every built-in station background is now a licensed Unsplash or Pexels photo (free commercial use).
+No 🔴 high-risk / AI / Pinterest images remain. Keep this file updated if any art is swapped later.
 
-**Cleared so far:** rain-drive, after-midnight, cars-coffee, sunset, night-run, tunnel (Unsplash) +
-mountain (Pexels) — all 2026-07-08. ✅  7 of 8 cleared. No 🔴 high-risk images remain.
+- Unsplash: rain-drive, after-midnight, cars-coffee, sunset, night-run, tunnel
+- Pexels: mountain, coastal
 
 ## Notes
 - Custom stations created by users bring their own art — out of scope here.

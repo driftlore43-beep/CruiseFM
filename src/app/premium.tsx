@@ -15,7 +15,7 @@ const FEATURES: { icon: keyof typeof MaterialCommunityIcons.glyphMap; title: str
   {
     icon: 'album',
     title: 'Premium Music Modes',
-    desc: 'Vinyl, Retro Radio, iPod Classic and the Circular Wave orb — the richest ways to drive.',
+    desc: 'Vinyl, Retro Radio and the Circular Wave orb — the richest ways to drive.',
   },
   {
     icon: 'palette',
@@ -38,7 +38,7 @@ const COMPARISON: { label: string; free: boolean; premium: boolean }[] = [
   { label: 'Cassette & Equalizer modes', free: true,  premium: true },
   { label: 'Basic playback controls',    free: true,  premium: true },
   { label: 'Badges & achievements',      free: true,  premium: true },
-  { label: 'Vinyl, Radio, iPod & Orb',   free: false, premium: true },
+  { label: 'Vinyl, Radio & Orb modes',   free: false, premium: true },
   { label: 'All premium mood themes',    free: false, premium: true },
   { label: 'Unlimited custom playlists', free: false, premium: true },
   { label: 'Future premium modes',       free: false, premium: true },

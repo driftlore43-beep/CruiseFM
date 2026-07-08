@@ -18,7 +18,7 @@ function triggerHaptic() {
 
 type HeroCardProps = {
   onStartDrive: () => void;
-  /** e.g. "Tonight's pick: Sunset FM" or "Night Run FM · iPod mode" */
+  /** e.g. "Tonight's pick: Sunset FM" or "Night Run FM · Vinyl mode" */
   cueLabel: string;
   /** The station the button will launch — its photo becomes the hero scene. */
   station: Station;

@@ -16,7 +16,6 @@ import { EqualizerFullscreen } from '@/components/EqualizerMode';
 import { CassetteFullscreen } from '@/components/CassetteMode';
 import { VinylFullscreen } from '@/components/VinylMode';
 import { RetroRadioFullscreen } from '@/components/RetroRadioMode';
-import { IpodClassicFullscreen } from '@/components/IpodMode';
 import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
 import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
 import { GlossSheen } from '@/components/GlossSheen';
@@ -222,17 +221,6 @@ export default function ModesScreen() {
           />
         </AnimatedCard>
 
-        <AnimatedCard scrollY={scrollY} onPress={() => open('ipod', !isPro)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="iPod Classic Mode"
-            desc="A silver click-wheel classic — spin the wheel, flip through the menu, hit play."
-            icon="ipod"
-            gradient={['#6b6b72', '#4a4a50', '#2a2a2e']}
-            locked={!isPro}
-            premium
-          />
-        </AnimatedCard>
-
         <AnimatedCard scrollY={scrollY} onPress={() => open('waves', false)} style={{ marginBottom: 14 }}>
           <CompactModeCard
             title="Sound Waves Mode"
@@ -260,7 +248,6 @@ export default function ModesScreen() {
       <CassetteFullscreen visible={activeMode === 'cassette'} onClose={() => setActiveMode(null)} />
       <VinylFullscreen visible={activeMode === 'vinyl'} onClose={() => setActiveMode(null)} />
       <RetroRadioFullscreen visible={activeMode === 'radio'} onClose={() => setActiveMode(null)} />
-      <IpodClassicFullscreen visible={activeMode === 'ipod'} onClose={() => setActiveMode(null)} />
       <SoundWaveFullscreen visible={activeMode === 'waves'} onClose={() => setActiveMode(null)} />
       <CircularWaveFullscreen visible={activeMode === 'orb'} onClose={() => setActiveMode(null)} />
     </View>

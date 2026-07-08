@@ -72,7 +72,7 @@ function HorizonScene({ phase, amp, eq }: { phase: number; amp: number; eq: [str
   });
 
   return (
-    <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet">
+    <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
       <Defs>
         <SvgGradient id="hzSun" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor={eq[0]} />

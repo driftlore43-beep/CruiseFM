@@ -68,28 +68,29 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 - Status: ✅ OK / cleared
 
 ### ✅ mountain.jpg — "Mountain Pass FM"
-- In frame: snowy mountain road, guardrail. No cars/brands.
+- In frame: snow-capped alpine peak above a dusk road; a distant oncoming car (small, no visible badge/plate).
 - Type: real photograph.
-- Source: Unsplash or Pexels free image (per owner, 2026-07-08) — _pin exact URL when convenient_.
-- License: Unsplash License / Pexels License (both free commercial use).
-- Risk: **Low** — free-licensed source; no trademarks in frame.
-- Status: ✅ OK / cleared (exact source URL still worth recording)
+- Source: Pexels — igorsix, photo id 31900784 (file pexels-igorsix-31900784.jpg, 2026-07-08).
+- License: **Pexels License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; no prominent trademarks.
+- Status: ✅ OK / cleared
 
 ### 🟡 coastal.jpg — "Coastal FM"
-- In frame: winding coastal road at dusk. No cars/brands.
+- In frame: winding coastal road at dusk, ocean on the left. No cars/brands. Recomposed 2026-07-08
+  (cropped ~28% off the right hillside to lean into the ocean).
 - Type (best guess): real photograph.
-- Source: _TO CONFIRM_ (Unsplash/Pexels? or Pinterest?)
+- Source: _STILL TO CONFIRM_ (Unsplash/Pexels? or Pinterest?)
 - License: _TO CONFIRM_
 - Risk: **Low** on trademarks — but if it came from Pinterest it is **uncleared copyright**.
-- Status: ⚠️ CONFIRM SOURCE
+- Status: ⚠️ CONFIRM SOURCE — the only remaining un-sourced image.
 
-### 🟡 tunnel.jpg — "Tunnel FM"
-- In frame: motion-blur road tunnel, distant unidentifiable car.
-- Type (best guess): real photograph.
-- Source: _TO CONFIRM_
-- License: _TO CONFIRM_
-- Risk: **Low** on trademarks — confirm it's a licensed/stock photo, not Pinterest.
-- Status: ⚠️ CONFIRM SOURCE
+### ✅ tunnel.jpg — "Tunnel FM"
+- In frame: motion-blur drive through a lit road tunnel, distant unidentifiable car.
+- Type: real photograph.
+- Source: Unsplash — photo-1766083639765-1c9462495e68 (2026-07-08).
+- License: **Unsplash License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; nothing identifiable in frame.
+- Status: ✅ OK / cleared
 
 ### (disabled) sunset-motion.webp
 - Old Sunset FM motion clip, currently unused. Same clearance rule applies if re-enabled.
@@ -98,11 +99,10 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 ---
 
 ## Replace-first priority
-1. Confirm sources for **coastal.jpg** / **tunnel.jpg** (are these off Pinterest?) 🟡
+1. Confirm the source of **coastal.jpg** (Unsplash/Pexels or Pinterest?) — the ONLY image left to clear. 🟡
 
-**Cleared so far:** rain-drive, after-midnight, cars-coffee, sunset, night-run (Unsplash) + mountain
-(Unsplash/Pexels free, per owner) — all 2026-07-08. ✅
-Only coastal.jpg and tunnel.jpg still need their source confirmed. No 🔴 high-risk images remain.
+**Cleared so far:** rain-drive, after-midnight, cars-coffee, sunset, night-run, tunnel (Unsplash) +
+mountain (Pexels) — all 2026-07-08. ✅  7 of 8 cleared. No 🔴 high-risk images remain.
 
 ## Notes
 - Custom stations created by users bring their own art — out of scope here.

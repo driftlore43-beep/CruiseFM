@@ -6,6 +6,7 @@ import {
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Rect as SvgRect, Circle as SvgCircle, Line as SvgLine, Path as SvgPath, Text as SvgText } from 'react-native-svg';
 import { Fonts } from '@/constants/theme';
 import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
@@ -262,171 +263,116 @@ const pb = StyleSheet.create({
 });
 
 // ── Reel component — static disc, rotation applied by parent wrapper ──────────
-function Reel({ size }: { size: number }) {
-  const hubR   = size * 0.18;
-  const innerR = hubR + size * 0.025;
-  const outerR = size * 0.43;
-  const spokeL = outerR - innerR;
-  const spokeW = Math.max(3, size * 0.08);   // thick, clearly visible
-  // Each spoke's own center is (outerR + innerR)/2 above the reel center.
-  // Rotating around reel center = translateY by that offset, rotate, translate back.
-  const pivotY = (outerR + innerR) / 2;
-
+// A spinning neon reel hub — cog spokes radiating from a glowing centre.
+function NeonReelHub({ size, color }: { size: number; color: string }) {
+  const c = 50;
+  const teeth = [0, 45, 90, 135, 180, 225, 270, 315];
   return (
-    <View style={{ width: size, height: size }}>
-      {/* Outer disc */}
-      <View style={[sr.reelOuter, { width: size, height: size, borderRadius: size / 2, borderColor: C.reelMid }]} />
-      {/* Groove ring */}
-      <View style={[StyleSheet.absoluteFill, sr.centered]}>
-        <View style={{ width: size * 0.86, height: size * 0.86, borderRadius: size * 0.43, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', position: 'absolute' }} />
-      </View>
-      {/* 3 spokes at 120° — amber, thick, obvious */}
-      {[0, 120, 240].map((deg) => (
-        <View key={deg} style={{
-          position: 'absolute',
-          width: spokeW,
-          height: spokeL,
-          left: (size - spokeW) / 2,
-          top: size / 2 - outerR,
-          backgroundColor: '#C8860A',
-          borderRadius: spokeW / 2,
-          transform: [
-            { translateY: pivotY },
-            { rotate: `${deg}deg` },
-            { translateY: -pivotY },
-          ],
-        }} />
-      ))}
-      {/* Hub */}
-      <View style={[StyleSheet.absoluteFill, sr.centered]}>
-        <View style={{ width: hubR * 2 + size * 0.1, height: hubR * 2 + size * 0.1, borderRadius: hubR + size * 0.05, backgroundColor: C.reelDark, borderWidth: 1.5, borderColor: C.hub, position: 'absolute' }} />
-        <View style={{ width: hubR * 1.4, height: hubR * 1.4, borderRadius: hubR * 0.7, backgroundColor: C.hub, position: 'absolute' }} />
-        <View style={{ width: hubR * 0.55, height: hubR * 0.55, borderRadius: hubR * 0.275, backgroundColor: C.hubLight, position: 'absolute' }} />
-      </View>
-    </View>
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <SvgCircle cx={c} cy={c} r={20} fill="none" stroke={color} strokeOpacity={0.3} strokeWidth={7} />
+      <SvgCircle cx={c} cy={c} r={20} fill="none" stroke={color} strokeWidth={2.4} />
+      {teeth.map((a) => {
+        const rad = (a * Math.PI) / 180;
+        return (
+          <SvgLine
+            key={a}
+            x1={c + Math.cos(rad) * 20} y1={c + Math.sin(rad) * 20}
+            x2={c + Math.cos(rad) * 42} y2={c + Math.sin(rad) * 42}
+            stroke={color} strokeWidth={3} strokeLinecap="round"
+          />
+        );
+      })}
+      <SvgCircle cx={c} cy={c} r={6} fill={color} />
+    </Svg>
   );
 }
-const sr = StyleSheet.create({
-  reelOuter: { backgroundColor: C.reelDark, borderWidth: 1.5 },
-  centered:  { alignItems: 'center', justifyContent: 'center' },
-});
 
-// ── Animated tape line — moving dots simulate tape feeding left ───────────────
-const TAPE_DOT_SPACING = 13;
-const TAPE_DOT_W = 3;
-const TAPE_DOT_COUNT = 14; // enough to fill any width + bleed off edges
-
-function AnimatedTapeLine({
-  tapeFlow,
-  playing,
-}: {
-  tapeFlow: Animated.Value;
-  playing: boolean;
-}) {
-  // tapeFlow 0→1: dots shift left by one spacing, then loop
-  const translateX = tapeFlow.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -TAPE_DOT_SPACING],
-  });
-
+// A small neon "×" screw mark.
+function Cross({ cx, cy, r = 4.5, color }: { cx: number; cy: number; r?: number; color: string }) {
   return (
-    <View style={atl.track}>
-      {/* Tape base */}
-      <View style={atl.base} />
-      {/* Moving highlight dots (tape feed illusion) */}
-      {playing && (
-        <Animated.View style={[atl.dotRow, { transform: [{ translateX }] }]}>
-          {Array.from({ length: TAPE_DOT_COUNT }, (_, i) => (
-            <View key={i} style={atl.dot} />
-          ))}
-        </Animated.View>
-      )}
-    </View>
+    <>
+      <SvgLine x1={cx - r} y1={cy - r} x2={cx + r} y2={cy + r} stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <SvgLine x1={cx - r} y1={cy + r} x2={cx + r} y2={cy - r} stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </>
   );
 }
-const atl = StyleSheet.create({
-  track:  { flex: 1, height: 3, overflow: 'hidden', justifyContent: 'center' },
-  base:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: C.tape, borderRadius: 1.5 },
-  dotRow: { position: 'absolute', flexDirection: 'row', left: -TAPE_DOT_SPACING },
-  dot: {
-    width: TAPE_DOT_W, height: TAPE_DOT_W, borderRadius: TAPE_DOT_W / 2,
-    backgroundColor: C.tapeLight,
-    opacity: 0.75,
-    marginRight: TAPE_DOT_SPACING - TAPE_DOT_W,
-  },
-});
 
-// ── Cassette body ─────────────────────────────────────────────────────────────
+// ── Neon cassette body — a transparent outline that glows to the mood colour ───
+const VB_W = 340;
+const VB_H = 210;
+
 function CassetteBody({
-  size, leftSpin, rightSpin, playing, progress, tapeFlow,
+  size, leftSpin, rightSpin,
+  color = '#FF3DF0', accent = '#33E1FF',
+  songName = 'YOUR SONG NAME', artist = 'CRUISE FM', timeText = '00:00',
 }: {
   size: number;
   leftSpin: Animated.AnimatedInterpolation<string>;
   rightSpin: Animated.AnimatedInterpolation<string>;
-  playing: boolean; progress: Animated.Value;
-  tapeFlow: Animated.Value;
+  playing?: boolean;
+  progress?: Animated.Value;
+  tapeFlow?: Animated.Value;
+  color?: string; accent?: string;
+  songName?: string; artist?: string; timeText?: string;
 }) {
-  const W = size;
-  const H = size * 0.62;
-  // Ensure reels are at least 80px so spin is clearly visible
-  const reelSize = Math.max(80, W * 0.29);
-  const leftScale  = progress.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1.12] });
-  const rightScale = progress.interpolate({ inputRange: [0, 1], outputRange: [1.12, 0.88] });
+  const scale = size / VB_W;
+  const H = size * (VB_H / VB_W);
+  const LX = 118, RX = 224, RY = 122;
+  const leftReelPx = 92 * scale;
+  const rightReelPx = 72 * scale;
 
   return (
-    <View style={[cb.body, { width: W, height: H, borderRadius: W * 0.04 }]}>
-      <View style={[StyleSheet.absoluteFill, { borderRadius: W * 0.04, backgroundColor: C.body }]} />
-      <View style={[cb.stripe, { height: H * 0.07, backgroundColor: C.stripeThin, top: 0, borderTopLeftRadius: W * 0.04, borderTopRightRadius: W * 0.04 }]} />
-      <View style={[cb.stripe, { height: H * 0.18, backgroundColor: C.stripe, top: H * 0.07 }]} />
-      <View style={[cb.stripe, { height: H * 0.05, backgroundColor: C.stripeThin, top: H * 0.25 }]} />
-      <View style={[cb.labelArea, { top: H * 0.05, left: W * 0.1, right: W * 0.1, height: H * 0.26, borderRadius: W * 0.015 }]}>
-        <Text style={[cb.labelTitle, { fontFamily: Fonts.mono, fontSize: W * 0.065 }]}>CRUISE FM</Text>
-        <View style={cb.labelLine} />
-        <Text style={[cb.labelSide, { fontFamily: Fonts.mono, fontSize: W * 0.038 }]}>SIDE A</Text>
+    <View style={{ width: size, height: H, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ shadowColor: color, shadowOpacity: 0.55, shadowRadius: 16, shadowOffset: { width: 0, height: 0 } }}>
+        <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`}>
+          {/* Body outline — soft wide glow under a crisp line */}
+          <SvgRect x={8} y={8} width={324} height={194} rx={20} fill="none" stroke={color} strokeOpacity={0.22} strokeWidth={9} />
+          <SvgRect x={8} y={8} width={324} height={194} rx={20} fill="none" stroke={color} strokeWidth={2.4} />
+
+          {/* Header label box (accent hue) */}
+          <SvgRect x={30} y={26} width={280} height={42} rx={11} fill="none" stroke={accent} strokeOpacity={0.2} strokeWidth={6} />
+          <SvgRect x={30} y={26} width={280} height={42} rx={11} fill="none" stroke={accent} strokeWidth={1.5} />
+          <SvgRect x={42} y={37} width={18} height={18} rx={2} fill="none" stroke={color} strokeWidth={1.6} />
+          <SvgText x={188} y={45} fill={accent} textAnchor="middle" fontSize={11} fontWeight="700" fontFamily={Fonts.mono}>{songName}</SvgText>
+          <SvgText x={300} y={60} fill={accent} textAnchor="end" fontSize={8} fontWeight="700" fontFamily={Fonts.mono} opacity={0.85}>{artist}</SvgText>
+
+          {/* Reel window */}
+          <SvgRect x={66} y={86} width={208} height={72} rx={6} fill="none" stroke={color} strokeOpacity={0.16} strokeWidth={6} />
+          <SvgRect x={66} y={86} width={208} height={72} rx={6} fill="none" stroke={color} strokeWidth={1.4} />
+
+          {/* Static reel outer rings */}
+          <SvgCircle cx={LX} cy={RY} r={46} fill="none" stroke={color} strokeOpacity={0.18} strokeWidth={7} />
+          <SvgCircle cx={LX} cy={RY} r={46} fill="none" stroke={color} strokeWidth={2} />
+          <SvgCircle cx={RX} cy={RY} r={36} fill="none" stroke={color} strokeOpacity={0.18} strokeWidth={7} />
+          <SvgCircle cx={RX} cy={RY} r={36} fill="none" stroke={color} strokeWidth={2} />
+
+          {/* Timer */}
+          <SvgText x={170} y={178} fill={accent} textAnchor="middle" fontSize={13} fontWeight="700" fontFamily={Fonts.mono}>{timeText}</SvgText>
+
+          {/* Corner + edge screws */}
+          <Cross cx={26} cy={24} color={accent} />
+          <Cross cx={314} cy={24} color={accent} />
+          <Cross cx={26} cy={186} color={accent} />
+          <Cross cx={314} cy={186} color={accent} />
+          <Cross cx={170} cy={18} r={4} color={accent} />
+
+          {/* Bottom access door + buttons */}
+          <SvgPath d="M112 184 L228 184 L216 200 L124 200 Z" fill="none" stroke={color} strokeWidth={1.5} />
+          <SvgRect x={150} y={188} width={16} height={9} rx={3} fill="none" stroke={color} strokeWidth={1.3} />
+          <SvgRect x={174} y={188} width={16} height={9} rx={3} fill="none" stroke={color} strokeWidth={1.3} />
+        </Svg>
       </View>
-      <View style={[cb.window, { top: H * 0.33, left: W * 0.06, right: W * 0.06, height: H * 0.46, borderRadius: W * 0.025 }]}>
-        <View style={[cb.tapeSpan, { top: '62%' }]}>
-          <View style={[cb.guidePin, { width: W * 0.025, height: W * 0.025, borderRadius: W * 0.0125 }]} />
-          <AnimatedTapeLine tapeFlow={tapeFlow} playing={playing} />
-          <View style={[cb.guidePin, { width: W * 0.025, height: W * 0.025, borderRadius: W * 0.0125 }]} />
-        </View>
-        <View style={[StyleSheet.absoluteFill, cb.reelRow]}>
-          <Animated.View style={{ transform: [{ rotate: leftSpin }, { scale: leftScale as any }] }}>
-            <Reel size={reelSize} />
-          </Animated.View>
-          <Animated.View style={{ transform: [{ rotate: rightSpin }, { scale: rightScale as any }] }}>
-            <Reel size={reelSize} />
-          </Animated.View>
-        </View>
-      </View>
-      <View style={[cb.bottomRow, { bottom: H * 0.04 }]}>
-        <View style={[cb.hole, { width: W * 0.038, height: W * 0.038, borderRadius: W * 0.019 }]} />
-        <Text style={[cb.bottomText, { fontFamily: Fonts.mono, fontSize: W * 0.032 }]}>TYPE II · 90 MIN</Text>
-        <View style={[cb.hole, { width: W * 0.038, height: W * 0.038, borderRadius: W * 0.019 }]} />
-      </View>
-      {[0.15, 0.85].map((x) => (
-        <View key={x} style={[cb.punchHole, { left: W * x - W * 0.02, bottom: H * 0.15, width: W * 0.04, height: W * 0.04, borderRadius: W * 0.02 }]} />
-      ))}
-      <View style={[StyleSheet.absoluteFill, { borderRadius: W * 0.04, borderWidth: 1.5, borderColor: C.bodyShad }]} pointerEvents="none" />
+
+      {/* Spinning neon reels overlaid on the wells */}
+      <Animated.View style={{ position: 'absolute', width: leftReelPx, height: leftReelPx, left: LX * scale - leftReelPx / 2, top: RY * scale - leftReelPx / 2, transform: [{ rotate: leftSpin }] }}>
+        <NeonReelHub size={leftReelPx} color={color} />
+      </Animated.View>
+      <Animated.View style={{ position: 'absolute', width: rightReelPx, height: rightReelPx, left: RX * scale - rightReelPx / 2, top: RY * scale - rightReelPx / 2, transform: [{ rotate: rightSpin }] }}>
+        <NeonReelHub size={rightReelPx} color={color} />
+      </Animated.View>
     </View>
   );
 }
-const cb = StyleSheet.create({
-  body: { overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.7, shadowRadius: 20, elevation: 18 },
-  stripe: { position: 'absolute', left: 0, right: 0 },
-  labelArea: { position: 'absolute', backgroundColor: C.label, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: C.bodyShad },
-  labelTitle: { color: C.labelText, fontWeight: '800', letterSpacing: 3 },
-  labelLine:  { width: '70%', height: 1, backgroundColor: 'rgba(58,26,0,0.25)' },
-  labelSide:  { color: C.labelText, fontWeight: '700', letterSpacing: 2, opacity: 0.7 },
-  window: { position: 'absolute', backgroundColor: 'rgba(10,5,0,0.82)', borderWidth: 1, borderColor: C.brownDark, overflow: 'hidden' },
-  reelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: '8%' },
-  tapeSpan: { position: 'absolute', left: '8%', right: '8%', flexDirection: 'row', alignItems: 'center' },
-  guidePin: { backgroundColor: C.tapeLight, borderWidth: 0.5, borderColor: C.tape },
-  bottomRow: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: '8%' },
-  hole:      { backgroundColor: C.brownDark, borderWidth: 1, borderColor: '#1A0A00' },
-  bottomText: { color: C.brown, fontWeight: '700', letterSpacing: 2 },
-  punchHole: { position: 'absolute', backgroundColor: C.brownDark, borderWidth: 1, borderColor: '#1A0A00' },
-});
 
 // ── Amber progress bar (Spotify-style) ───────────────────────────────────────
 function AmberProgressBar({ progress }: { progress: Animated.Value }) {
@@ -490,6 +436,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const [shuffle,     setShuffle]     = useState(false);
   const [repeat,      setRepeat]      = useState(false);
   const [showTracks,  setShowTracks]  = useState(false);
+  const [elapsedTxt,  setElapsedTxt]  = useState('00:00');
   const showTracksAnim = useRef(new Animated.Value(0)).current;
   const playBtnScale = useRef(new Animated.Value(1)).current;
 
@@ -544,6 +491,20 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
   useEffect(() => {
     const id = progress.addListener(({ value }) => { progressValue.current = value; });
+    return () => progress.removeListener(id);
+  }, []);
+
+  // Ticking cassette counter — update only when the whole second changes.
+  const lastSecRef = useRef(-1);
+  useEffect(() => {
+    const id = progress.addListener(({ value }) => {
+      const totalMs = parseTrackMs(SIDE_A_TRACKS[activeTrackRef.current].duration);
+      const s = Math.floor((value * totalMs) / 1000);
+      if (s !== lastSecRef.current) {
+        lastSecRef.current = s;
+        setElapsedTxt(`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`);
+      }
+    });
     return () => progress.removeListener(id);
   }, []);
 
@@ -661,7 +622,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   };
 
   // Glow: 0.3 → 0.6 range, gentle amber pulse
-  const glowOpacity = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.6] });
+  const glowOpacity = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.16, 0.34] });
   const glowScale   = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] });
 
   const topPad    = Math.max(insets.top, 20);
@@ -675,6 +636,9 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   // Plain JSX, not an inline component — an inline component remounts the
   // blurred image on every render (background twitching).
   const currentEq = STATIONS.find((s) => s.id === activeId)?.eqColors;
+  // Neon glow tracks the station's mood: brightest eq stop = body, first stop = accent.
+  const neonColor  = currentEq?.[2] ?? '#FF3DF0';
+  const neonAccent = currentEq?.[0] ?? '#33E1FF';
   const background = (
     <>
       <ImageBackground
@@ -686,11 +650,11 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
       />
       <LinearGradient
         colors={[
-          'rgba(2,2,12,0.20)',
-          'rgba(2,2,12,0.15)',
-          'rgba(2,2,12,0.30)',
-          'rgba(2,2,12,0.46)',
-          'rgba(2,2,12,0.58)',
+          'rgba(2,2,10,0.55)',
+          'rgba(2,2,10,0.48)',
+          'rgba(2,2,10,0.60)',
+          'rgba(2,2,10,0.72)',
+          'rgba(2,2,10,0.82)',
         ]}
         locations={[0, 0.4, 0.65, 0.85, 1]}
         start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
@@ -789,12 +753,13 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             {/* Right column — cassette */}
             <View style={[ls.rightCol, { paddingRight: safeR }]}>
               <Animated.View style={[fs.glowOrb, {
+                backgroundColor: neonColor,
                 width: cassetteW * 0.9, height: cassetteH * 1.4,
                 borderRadius: cassetteW * 0.45,
-                opacity: playing ? glowOpacity : 0.2,
+                opacity: playing ? glowOpacity : 0.12,
                 transform: [{ scale: glowScale }],
               }]} />
-              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} playing={playing} progress={progress} tapeFlow={tapeFlow} />
+              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={currentTrack.title} artist={currentTrack.artist} timeText={elapsedTxt} />
             </View>
           </View>
         </View>
@@ -838,13 +803,14 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
           {/* Cassette hero — flex:1 so it grows to fill available space */}
           <View style={[fs.cassetteWrap, { flex: 1 }]}>
             <Animated.View style={[fs.glowOrb, {
+              backgroundColor: neonColor,
               width: cassetteW * 0.85, height: cassetteH * 1.3,
               borderRadius: cassetteW * 0.42,
-              opacity: playing ? glowOpacity : 0.2,
+              opacity: playing ? glowOpacity : 0.12,
               transform: [{ scale: glowScale }],
             }]} />
             <TouchableOpacity onPress={togglePlay} activeOpacity={0.92}>
-              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} playing={playing} progress={progress} tapeFlow={tapeFlow} />
+              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={currentTrack.title} artist={currentTrack.artist} timeText={elapsedTxt} />
             </TouchableOpacity>
           </View>
 
@@ -1024,13 +990,13 @@ export function CassettePreview() {
   return (
     <View style={pv.shell}>
       <TouchableOpacity onPress={handleOpen} activeOpacity={0.9} style={pv.scene}>
-        <LinearGradient colors={['#2A1200', '#1a0f00', '#0D0700']} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={['#0c0c16', '#0a0a12', '#060609']} style={StyleSheet.absoluteFill} />
         <View style={pv.glow} />
         <View style={pv.tapHint}>
           <Ionicons name="play" size={9} color={C.textFaint} />
           <Text style={[pv.tapHintText, { fontFamily: Fonts.mono }]}>tap to open</Text>
         </View>
-        <CassetteBody size={275} leftSpin={leftSpin} rightSpin={rightSpin} playing={active} progress={progress} tapeFlow={tapeFlow} />
+        <CassetteBody size={275} leftSpin={leftSpin} rightSpin={rightSpin} color="#FF3DF0" accent="#33E1FF" songName="YOUR SONG NAME" artist="CRUISE FM" timeText="00:00" />
         {OWNER_MODE && (
           <View style={pv.devBadge} pointerEvents="none">
             <Text style={pv.devBadgeText}>DEV</Text>
@@ -1043,7 +1009,7 @@ export function CassettePreview() {
             <Text style={pv.title}>Cassette Mode</Text>
             <View style={pv.badge}><Text style={pv.badgeText}>PREMIUM</Text></View>
           </View>
-          <Text style={pv.sub}>Vintage warm. Reels spin. The tape feeds through.</Text>
+          <Text style={pv.sub}>Transparent neon. Reels spin. Glows to your mood.</Text>
         </View>
         {!OWNER_MODE && (
           <View style={[pv.unlockBtn, { marginTop: 'auto' }]}>
@@ -1080,7 +1046,7 @@ const fs = StyleSheet.create({
   trackArtist: { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 },
 
   cassetteWrap: { alignItems: 'center', gap: 10 },
-  glowOrb:     { position: 'absolute', backgroundColor: C.amber, alignSelf: 'center' },
+  glowOrb:     { position: 'absolute', alignSelf: 'center' },
 
   playlistBtn: {
     marginTop: 20, marginHorizontal: 28, paddingVertical: 12,
@@ -1160,7 +1126,7 @@ const pv = StyleSheet.create({
   },
   scene:         { height: 260, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   bottomSection: { minHeight: 160 },
-  glow:  { position: 'absolute', width: 240, height: 120, borderRadius: 120, backgroundColor: 'rgba(200,134,10,0.28)' },
+  glow:  { position: 'absolute', width: 240, height: 130, borderRadius: 120, backgroundColor: 'rgba(255,61,240,0.16)' },
   tapHint: {
     position: 'absolute', top: 12, right: 12,
     flexDirection: 'row', alignItems: 'center', gap: 4,

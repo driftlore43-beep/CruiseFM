@@ -32,13 +32,16 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 - Risk: **Low** — licensed source, nothing identifiable in frame.
 - Status: ✅ OK / cleared
 
-### 🔴 cars-coffee.jpg — "Cars & Coffee FM"
-- In frame: red **BMW E30 with the BMW roundel logo clearly visible**, German licence plate "M ST 6505", café table.
-- Type (best guess): AI-generated.
-- Source: _TO CONFIRM_
-- License: _TO CONFIRM_
-- Risk: **High** — explicit BMW trademark, front and centre; plate visible.
-- Status: ❌ NEEDS REVIEW / likely replace
+### 🟡 cars-coffee.jpg — "Cars & Coffee FM"
+- In frame: a convoy of supercars (McLaren, Lamborghini, Porsche, BMW M, Corvette, AMG) on a forest road.
+- Type: real photograph.
+- Source: Unsplash — photo-1738824152917-f96d449e55ad (2026-07-08).
+- License: **Unsplash License** (free commercial use, no attribution required).
+- Risk: **Low–Medium** — copyright cleared (licensed). Contains many car brands, but as an
+  incidental editorial "car meet" scene, not a single logo used as a marketing hero — much
+  lower risk than the previous single-BMW image. No single brand is featured/endorsed.
+- Status: ✅ Cleared copyright; brand marks are incidental. (If you want zero trademark exposure,
+  swap for a scene without prominent front badges — but this is a reasonable editorial use.)
 
 ### ✅ rain-drive.jpg — "Rain Drive FM"
 - In frame: rainy neon Tokyo (Shinjuku) street at night, wet reflections. Incidental storefront signage only.
@@ -95,11 +98,11 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 ---
 
 ## Replace-first priority
-1. **cars-coffee.jpg** (BMW logo + plate) 🔴
-2. Confirm sources for **coastal.jpg** / **tunnel.jpg** (are these off Pinterest?) 🟡
-3. Decide on the AI set (night-run, sunset, mountain) — confirm the tool's terms allow commercial use, or regenerate/replace 🟠
+1. Confirm sources for **coastal.jpg** / **tunnel.jpg** (are these off Pinterest?) 🟡
+2. Decide on the AI set (night-run, sunset, mountain) — confirm the tool's terms allow commercial use, or regenerate/replace 🟠
 
-**Cleared so far:** rain-drive.jpg, after-midnight.jpg (both Unsplash, 2026-07-08). ✅
+**Cleared so far:** rain-drive.jpg, after-midnight.jpg, cars-coffee.jpg (all Unsplash, 2026-07-08). ✅
+No 🔴 high-risk images remain.
 
 ## Notes
 - Custom stations created by users bring their own art — out of scope here.

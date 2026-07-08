@@ -376,14 +376,16 @@ function HeadUnit({
       <View style={hu.ctrlRow}>
         {([
           { lbl: 'DISP', a: 'disp' as const },
-          { lbl: '◀◀',  a: 'prev' as const },
-          { lbl: '▶',   a: 'play' as const },
-          { lbl: '▶▶',  a: 'next' as const },
-          { lbl: 'SRC',  a: 'src'  as const },
-        ]).map(({ lbl, a }) => (
-          <TouchableOpacity key={lbl} onPress={() => onCtrlPress(a)}
-            style={[hu.ctrlBtn, a === 'play' && hu.ctrlBtnPlay]} activeOpacity={0.65}>
-            <Text style={[hu.ctrlText, a === 'play' && hu.ctrlTextPlay]}>{lbl}</Text>
+          { icon: 'play-back' as const, a: 'prev' as const },
+          { icon: 'play' as const, a: 'play' as const },
+          { icon: 'play-forward' as const, a: 'next' as const },
+          { lbl: 'SRC', a: 'src' as const },
+        ]).map((item) => (
+          <TouchableOpacity key={item.a} onPress={() => onCtrlPress(item.a)}
+            style={[hu.ctrlBtn, item.a === 'play' && hu.ctrlBtnPlay]} activeOpacity={0.65}>
+            {'icon' in item
+              ? <Ionicons name={item.icon} size={13} color={item.a === 'play' ? R.cyan : R.amber} />
+              : <Text style={hu.ctrlText}>{item.lbl}</Text>}
           </TouchableOpacity>
         ))}
       </View>
@@ -1179,7 +1181,8 @@ export function RetroRadioPreview() {
       <View style={styles.cyanGlow} />
 
       <View style={styles.tapHint}>
-        <Text style={styles.tapHintText}>{OWNER_MODE ? '▶ tap to open' : isActive ? '⏸ tap to stop' : '▶ tap to play'}</Text>
+        <Ionicons name={!OWNER_MODE && isActive ? 'pause' : 'play'} size={9} color="rgba(255,255,255,0.45)" />
+        <Text style={styles.tapHintText}>{OWNER_MODE ? 'tap to open' : isActive ? 'tap to stop' : 'tap to play'}</Text>
       </View>
 
       <View style={styles.unit}>
@@ -1214,8 +1217,8 @@ export function RetroRadioPreview() {
                     <Animated.View key={i} style={[styles.signalBar, { height: h, opacity: i === 3 ? signalAnim : (i < 3 ? 1 : 0.35) }]} />
                   ))}
                 </View>
-                <Text style={styles.iconText}>✦</Text>
-                <Text style={styles.iconText}>♪</Text>
+                <MaterialCommunityIcons name="star-four-points" size={8} color="#CC8800" />
+                <MaterialCommunityIcons name="music-note" size={8} color="#CC8800" />
               </View>
               <View style={styles.scanlines} pointerEvents="none" />
             </View>
@@ -1227,9 +1230,17 @@ export function RetroRadioPreview() {
         </View>
 
         <View style={styles.controlRow}>
-          {['DISP', '◁◁', '▶', '▷▷', 'SRC'].map((label) => (
-            <View key={label} style={[styles.ctrlBtn, label === '▶' && styles.ctrlBtnPlay]}>
-              <Text style={[styles.ctrlText, label === '▶' && styles.ctrlTextPlay]}>{label}</Text>
+          {([
+            { lbl: 'DISP' },
+            { icon: 'play-back' as const },
+            { icon: 'play' as const, play: true },
+            { icon: 'play-forward' as const },
+            { lbl: 'SRC' },
+          ]).map((item, idx) => (
+            <View key={idx} style={[styles.ctrlBtn, ('play' in item) && styles.ctrlBtnPlay]}>
+              {'icon' in item
+                ? <Ionicons name={item.icon} size={9} color={'play' in item ? R.cyan : R.amber} />
+                : <Text style={styles.ctrlText}>{item.lbl}</Text>}
             </View>
           ))}
         </View>
@@ -1260,6 +1271,7 @@ const styles = StyleSheet.create({
   },
   tapHint: {
     position: 'absolute', top: 10, right: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
   },

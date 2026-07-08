@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Cruise } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
+import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -252,7 +253,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const [activeStation, setActiveStation] = useState(stationId ?? 'night-run');
   const [shuffle,       setShuffle]       = useState(false);
   const [repeat,        setRepeat]        = useState(false);
-  const [platform,      setPlatform]      = useState<{ name: string; color: string; emoji: string } | null>(null);
+  const [platform,      setPlatform]      = useState<{ id: PlatformId; name: string; color: string } | null>(null);
   const [dimmed,        setDimmed]        = useState(false);
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
   const [showPlaylist,  setShowPlaylist]  = useState(false);
@@ -288,7 +289,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     getSavedPlatform().then((id) => {
       if (id && id !== 'none') {
         const p = PLATFORMS[id as Exclude<PlatformId, 'none'>];
-        if (p) setPlatform({ name: p.name, color: p.color, emoji: p.emoji });
+        if (p) setPlatform({ id: id as PlatformId, name: p.name, color: p.color });
       } else { setPlatform(null); }
     });
     slideY.setValue(SCREEN_H);
@@ -481,7 +482,8 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           <Animated.View
             style={[ls.safeBanner, { opacity: bannerOpacity, top: Math.max(insets.top, 8) }]}
             pointerEvents="none">
-            <Text style={ls.safeBannerText}>🚗  Drive safe — keep eyes on the road</Text>
+            <MaterialCommunityIcons name="steering" size={14} color="rgba(255,255,255,0.75)" />
+            <Text style={ls.safeBannerText}>Drive safe — keep eyes on the road</Text>
           </Animated.View>
 
           {/* Dim button — top left */}
@@ -554,7 +556,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
                   style={ls.lsPlatformRow}
                   onPress={() => openMusicPlatform(currentStation.name)}
                   activeOpacity={0.7}>
-                  <Text style={ls.lsPlatformEmoji}>{platform.emoji}</Text>
+                  <PlatformIcon id={platform.id} size={14} color={platform.color} />
                   <Text style={[ls.lsPlatformText, { color: platform.color }]}>
                     {platform.name}
                   </Text>
@@ -741,7 +743,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             </ScrollView>
             {platform && (
               <TouchableOpacity style={fs.sheetPlatformRow} onPress={() => openMusicPlatform(currentStation.name)} activeOpacity={0.75}>
-                <Text style={fs.sheetPlatformEmoji}>{platform.emoji}</Text>
+                <PlatformIcon id={platform.id} size={14} color={platform.color} />
                 <Text style={[fs.sheetPlatformText, { color: platform.color }]}>Open in {platform.name}</Text>
                 <Ionicons name="arrow-forward" size={13} color={platform.color} style={{ opacity: 0.7 }} />
               </TouchableOpacity>
@@ -782,7 +784,8 @@ export function EqualizerModeCard() {
         <View style={card.glowCyan} pointerEvents="none" />
         <View style={card.glowPink} pointerEvents="none" />
         <View style={card.tapHint}>
-          <Text style={card.tapHintText}>▶ tap to open</Text>
+          <Ionicons name="play" size={9} color="rgba(255,255,255,0.4)" />
+          <Text style={card.tapHintText}>tap to open</Text>
         </View>
         <Bars values={cardValues} barW={CARD_BAR_W} maxH={MAX_H} gaps={CARD_GAPS} bgColor="#111111" />
       </TouchableOpacity>
@@ -813,7 +816,8 @@ export function EqualizerModePreview() {
       <View style={card.glowCyan} pointerEvents="none" />
       <View style={card.glowPink} pointerEvents="none" />
       <View style={card.tapHint}>
-        <Text style={card.tapHintText}>{active ? '⏸ tap to stop' : '▶ tap to play'}</Text>
+        <Ionicons name={active ? 'pause' : 'play'} size={9} color="rgba(255,255,255,0.4)" />
+        <Text style={card.tapHintText}>{active ? 'tap to stop' : 'tap to play'}</Text>
       </View>
       <Bars values={values} barW={CARD_BAR_W} maxH={MAX_H} gaps={CARD_GAPS} bgColor="#111111" />
     </TouchableOpacity>
@@ -843,6 +847,7 @@ const card = StyleSheet.create({
   },
   tapHint: {
     position: 'absolute', top: 12, right: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
   },
@@ -1197,6 +1202,9 @@ const ls = StyleSheet.create({
     position: 'absolute',
     alignSelf: 'center',
     zIndex: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     backgroundColor: 'rgba(0,0,0,0.65)',
     borderRadius: 20,
     paddingHorizontal: 16,

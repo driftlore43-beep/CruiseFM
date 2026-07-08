@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -47,9 +48,10 @@ function stationById(id: string): Station {
 function SkipBanner({ onDismiss }: { onDismiss: () => void }) {
   return (
     <View style={styles.banner}>
-      <Text style={styles.bannerText}>🎵  Connect your music platform in Profile → Settings</Text>
+      <Ionicons name="musical-notes" size={16} color="rgba(255,255,255,0.75)" />
+      <Text style={styles.bannerText}>Connect your music platform in Profile settings</Text>
       <Pressable onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Text style={styles.bannerClose}>✕</Text>
+        <Ionicons name="close" size={16} color="rgba(255,255,255,0.4)" />
       </Pressable>
     </View>
   );

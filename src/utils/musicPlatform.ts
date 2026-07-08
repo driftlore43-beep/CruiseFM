@@ -9,7 +9,6 @@ export type PlatformId = 'spotify' | 'appleMusic' | 'youtubeMusic' | 'amazonMusi
 export type Platform = {
   name: string;
   color: string;
-  emoji: string;
   getUrl: (query: string) => string;
   webUrl: (query: string) => string;
 };
@@ -18,35 +17,30 @@ export const PLATFORMS: Record<Exclude<PlatformId, 'none'>, Platform> = {
   spotify: {
     name: 'Spotify',
     color: '#1DB954',
-    emoji: '🟢',
     getUrl: (q) => `spotify:search:${q} driving playlist`,
     webUrl: (q) => `https://open.spotify.com/search/${encodeURIComponent(q)}`,
   },
   appleMusic: {
     name: 'Apple Music',
     color: '#FC3C44',
-    emoji: '🎵',
     getUrl: (q) => `music://music.apple.com/search?term=${encodeURIComponent(q)}`,
     webUrl: (q) => `https://music.apple.com/search?term=${encodeURIComponent(q)}`,
   },
   youtubeMusic: {
     name: 'YouTube Music',
     color: '#FF0000',
-    emoji: '▶️',
     getUrl: (q) => `https://music.youtube.com/search?q=${encodeURIComponent(q)}+driving+playlist`,
     webUrl: (q) => `https://music.youtube.com/search?q=${encodeURIComponent(q)}`,
   },
   amazonMusic: {
     name: 'Amazon Music',
     color: '#00A8E0',
-    emoji: '🔵',
     getUrl: (q) => `amznmp3://search?q=${encodeURIComponent(q)}`,
     webUrl: (q) => `https://music.amazon.com/search/${encodeURIComponent(q)}`,
   },
   tidal: {
     name: 'Tidal',
     color: '#CBCBCB',
-    emoji: '⚫',
     getUrl: (q) => `tidal://search?q=${encodeURIComponent(q)}`,
     webUrl: (q) => `https://tidal.com/search?q=${encodeURIComponent(q)}`,
   },

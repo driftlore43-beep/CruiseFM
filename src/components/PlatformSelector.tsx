@@ -1,7 +1,7 @@
-import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlossSheen } from '@/components/GlossSheen';
-import { TidalLogo } from '@/components/icons/TidalLogo';
+import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -22,32 +22,12 @@ import {
 } from '@/utils/musicPlatform';
 import { Cruise } from '@/constants/theme';
 
-const NONE_ENTRY = { id: 'none' as PlatformId, name: 'None / Other', color: '#666666', emoji: '⊘' };
+const NONE_ENTRY = { id: 'none' as PlatformId, name: 'None / Other', color: '#666666' };
 
 const PLATFORM_ENTRIES = [
   ...Object.entries(PLATFORMS).map(([id, p]) => ({ id: id as PlatformId, ...p })),
   NONE_ENTRY,
 ];
-
-// Real brand marks for this sheet only — bold and white, sitting on each
-// platform's tinted chip.
-type IconDef = { family: 'FontAwesome' | 'MaterialCommunityIcons'; name: string };
-const PLATFORM_ICONS: Partial<Record<PlatformId, IconDef>> = {
-  spotify:      { family: 'FontAwesome', name: 'spotify' },
-  appleMusic:   { family: 'FontAwesome', name: 'apple' },
-  youtubeMusic: { family: 'FontAwesome', name: 'youtube-play' },
-  amazonMusic:  { family: 'FontAwesome', name: 'amazon' },
-  none:         { family: 'MaterialCommunityIcons', name: 'close-thick' },
-};
-
-function PlatformIcon({ id, size = 18 }: { id: PlatformId; size?: number }) {
-  if (id === 'tidal') return <TidalLogo size={size + 2} color="#fff" />;
-  const def = PLATFORM_ICONS[id]!;
-  if (def.family === 'FontAwesome') {
-    return <FontAwesome name={def.name as any} size={size} color="#fff" />;
-  }
-  return <MaterialCommunityIcons name={def.name as any} size={size + 2} color="#fff" />;
-}
 
 type Props = {
   visible: boolean;
@@ -146,7 +126,7 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
               onPress={handleClose}
               style={styles.closeBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={styles.closeBtnText}>✕</Text>
+              <Ionicons name="close" size={16} color="rgba(255,255,255,0.6)" />
             </TouchableOpacity>
           </View>
 
@@ -205,7 +185,7 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
                   {/* Checkmark on selection */}
                   {isSelected && (
                     <View style={[styles.checkCircle, { backgroundColor: platform.color }]}>
-                      <Text style={styles.checkMark}>✓</Text>
+                      <MaterialCommunityIcons name="check" size={12} color="#fff" />
                     </View>
                   )}
                 </Pressable>

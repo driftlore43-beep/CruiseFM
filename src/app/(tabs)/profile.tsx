@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
@@ -152,7 +152,8 @@ export default function ProfileScreen() {
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFill}
             />
-            <Text style={[styles.planText, { color: theme.accentColor }]}>✦ FREE PLAN</Text>
+            <MaterialCommunityIcons name="star-four-points" size={11} color={theme.accentColor} />
+            <Text style={[styles.planText, { color: theme.accentColor }]}>FREE PLAN</Text>
           </View>
         </View>
 
@@ -215,7 +216,7 @@ export default function ProfileScreen() {
               </View>
             </View>
             <View style={[styles.themeColorDot, { backgroundColor: theme.accentColor, shadowColor: theme.accentColor }]} />
-            <Text style={styles.settingsArrow}>›</Text>
+            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
           </Pressable>
 
           {/* Data Saver toggle — forces still backgrounds for everyone */}
@@ -257,7 +258,7 @@ export default function ProfileScreen() {
                 )}
               </View>
             </View>
-            <Text style={styles.settingsArrow}>›</Text>
+            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
           </Pressable>
 
           {/* Spotify Connect row */}
@@ -272,7 +273,7 @@ export default function ProfileScreen() {
                 <IconChip icon={item.icon} size={34} />
                 <Text style={styles.settingsLabel}>{item.label}</Text>
               </View>
-              <Text style={styles.settingsArrow}>›</Text>
+              <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
             </Pressable>
           ))}
         </View>
@@ -319,6 +320,7 @@ const styles = StyleSheet.create({
     borderRadius: 20, overflow: 'hidden',
     paddingHorizontal: 14, paddingVertical: 5,
     borderWidth: 1, borderColor: 'rgba(155,95,255,0.4)',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
   },
   planText: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
   statsCard: {

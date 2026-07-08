@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,7 +52,7 @@ export function PlaylistSheet({
         {loading ? (
           <ActivityIndicator color={SPOTIFY_GREEN} style={{ marginVertical: 32 }} />
         ) : !connected ? (
-          <Text style={ps.empty}>Connect Spotify in Profile → Settings to add your own playlists.</Text>
+          <Text style={ps.empty}>Connect Spotify in Profile settings to add your own playlists.</Text>
         ) : playlists.length === 0 ? (
           <Text style={ps.empty}>No playlists found in your Spotify library.</Text>
         ) : (
@@ -61,7 +62,7 @@ export function PlaylistSheet({
               return (
                 <Pressable key={pl.uri} style={[ps.row, active && ps.rowActive]} onPress={() => onPick(pl)}>
                   <Text style={[ps.rowText, active && { color: SPOTIFY_GREEN }]} numberOfLines={1}>{pl.name}</Text>
-                  {active && <Text style={ps.check}>✓</Text>}
+                  {active && <MaterialCommunityIcons name="check" size={15} color={SPOTIFY_GREEN} style={ps.check} />}
                 </Pressable>
               );
             })}

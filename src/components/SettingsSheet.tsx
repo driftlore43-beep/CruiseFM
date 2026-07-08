@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
@@ -181,7 +182,8 @@ function ReferBody() {
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <Text style={{ fontSize: 30, color: Cruise.violetLight }}>✦</Text>
+      <MaterialCommunityIcons name="star-four-points" size={30} color={Cruise.violetLight} style={{ marginBottom: 4 }} />
+
       <Text style={styles.referTitle}>Share the drive.</Text>
       <Text style={styles.referSub}>
         Know someone who'd love turning their playlists into a mood station? Send them Cruise FM.

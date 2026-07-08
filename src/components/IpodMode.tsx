@@ -98,7 +98,7 @@ function MenuView({ selected, artwork, station, onPick }: { selected: number; ar
                 />
               )}
               <Text style={[lcd.menuText, active && lcd.menuTextActive]} numberOfLines={1}>{item}</Text>
-              {active && <Text style={lcd.menuChevron}>›</Text>}
+              {active && <Ionicons name="chevron-forward" size={13} color="#fff" />}
             </TouchableOpacity>
           );
         })}

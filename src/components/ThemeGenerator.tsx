@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CardStyle, CruiseTheme, DEFAULT_THEME, FontStyle, useTheme } from '@/context/ThemeContext';
@@ -84,7 +84,7 @@ function PreviewCard({ draft }: { draft: CruiseTheme }) {
           <Text style={[pv.sub, { color: draft.accentColor, fontFamily: font }]}>88.7 · Midnight Drive</Text>
         </View>
         <View style={[pv.playBtn, { backgroundColor: draft.accentColor, shadowColor: draft.accentColor }]}>
-          <Text style={pv.playIcon}>▶</Text>
+          <Ionicons name="play" size={13} color="#fff" style={pv.playIcon} />
         </View>
       </View>
     </View>
@@ -226,7 +226,7 @@ export function ThemeGenerator({ visible, onClose }: { visible: boolean; onClose
             <Text style={tg.title}>Make Cruise FM yours</Text>
           </View>
           <Pressable onPress={onClose} style={tg.closeBtn} hitSlop={8}>
-            <Text style={tg.closeBtnText}>✕</Text>
+            <Ionicons name="close" size={16} color="rgba(255,255,255,0.7)" />
           </Pressable>
         </View>
 
@@ -349,8 +349,9 @@ export function ThemeGenerator({ visible, onClose }: { visible: boolean; onClose
                   shadowColor: draft.accentColor,
                   opacity: pressed ? 0.85 : 1 },
               ]}>
+              {saved_ && <MaterialCommunityIcons name="check" size={16} color="#fff" />}
               <Text style={tg.saveBtnText}>
-                {saved_ ? '✓  Theme Saved!' : 'Save My Theme'}
+                {saved_ ? 'Theme Saved!' : 'Save My Theme'}
               </Text>
             </Pressable>
           </Animated.View>
@@ -364,7 +365,8 @@ export function ThemeGenerator({ visible, onClose }: { visible: boolean; onClose
 
         {/* Toast */}
         <Animated.View style={[tg.toast, { opacity: toastOpacity }]} pointerEvents="none">
-          <Text style={tg.toastText}>Theme saved! ✓</Text>
+          <Text style={tg.toastText}>Theme saved!</Text>
+          <MaterialCommunityIcons name="check" size={14} color="#fff" />
         </Animated.View>
       </View>
     </Modal>
@@ -389,13 +391,15 @@ const tg = StyleSheet.create({
   previewWrap:  { gap: 8 },
   previewLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '700', letterSpacing: 2.5, marginLeft: 4 },
   saveBtn:      {
-    borderRadius: 14, paddingVertical: 16, alignItems: 'center',
+    borderRadius: 14, paddingVertical: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.55, shadowRadius: 16, elevation: 10,
   },
   saveBtnText:  { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
   resetText:    { color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '500' },
   toast:        {
     position: 'absolute', bottom: 100, alignSelf: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: '#1a1a2e', borderRadius: 20,
     paddingHorizontal: 20, paddingVertical: 10,
     borderWidth: 1, borderColor: 'rgba(123,56,224,0.35)',

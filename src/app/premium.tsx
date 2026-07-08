@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,24 +11,24 @@ const AMBER      = '#F59E0B';
 const AMBER_SOFT = 'rgba(245,158,11,0.14)';
 const AMBER_LINE = 'rgba(245,158,11,0.35)';
 
-const FEATURES: { emoji: string; title: string; desc: string }[] = [
+const FEATURES: { icon: keyof typeof MaterialCommunityIcons.glyphMap; title: string; desc: string }[] = [
   {
-    emoji: '💿',
+    icon: 'album',
     title: 'Premium Music Modes',
     desc: 'Vinyl, Retro Radio, iPod Classic and the Circular Wave orb — the richest ways to drive.',
   },
   {
-    emoji: '🎨',
+    icon: 'palette',
     title: 'Visual Mood Themes',
     desc: 'Every premium mood palette, plus unique imagery and colour.',
   },
   {
-    emoji: '🎵',
+    icon: 'playlist-music',
     title: 'Unlimited Playlists',
     desc: 'Build as many custom stations as your drives demand.',
   },
   {
-    emoji: '✦',
+    icon: 'star-four-points',
     title: 'Future Premium Additions',
     desc: 'New modes and moods, added over time — always included.',
   },
@@ -43,8 +44,16 @@ const COMPARISON: { label: string; free: boolean; premium: boolean }[] = [
   { label: 'Future premium modes',       free: false, premium: true },
 ];
 
-function tick(on: boolean) {
-  return on ? '✓' : '–';
+function TickCell({ on, amber }: { on: boolean; amber?: boolean }) {
+  return (
+    <View style={styles.compareIconCell}>
+      <MaterialCommunityIcons
+        name={on ? 'check' : 'minus'}
+        size={16}
+        color={on ? (amber ? AMBER : 'rgba(255,255,255,0.85)') : 'rgba(255,255,255,0.25)'}
+      />
+    </View>
+  );
 }
 
 export default function PremiumScreen() {
@@ -67,7 +76,7 @@ export default function PremiumScreen() {
 
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <Pressable style={[styles.closeBtn, { top: insets.top + 8 }]} onPress={() => router.back()} hitSlop={12}>
-          <Text style={styles.closeBtnText}>✕</Text>
+          <Ionicons name="close" size={17} color="rgba(255,255,255,0.6)" />
         </Pressable>
 
         <ScrollView
@@ -77,7 +86,7 @@ export default function PremiumScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.crestWrap}>
-              <Text style={styles.crest}>✦</Text>
+              <MaterialCommunityIcons name="star-four-points" size={28} color={AMBER} />
             </View>
             <Text style={styles.title}>Cruise FM Premium</Text>
             <Text style={styles.subtitle}>Unlock the full driving atmosphere.</Text>
@@ -88,7 +97,7 @@ export default function PremiumScreen() {
             {FEATURES.map((f) => (
               <View key={f.title} style={styles.featureCard}>
                 <View style={styles.featureIconWrap}>
-                  <Text style={styles.featureIcon}>{f.emoji}</Text>
+                  <MaterialCommunityIcons name={f.icon} size={22} color="#fff" />
                 </View>
                 <View style={styles.featureText}>
                   <Text style={styles.featureTitle}>{f.title}</Text>
@@ -111,8 +120,8 @@ export default function PremiumScreen() {
                 key={row.label}
                 style={[styles.compareRow, i < COMPARISON.length - 1 && styles.compareRowBorder]}>
                 <Text style={styles.compareCell}>{row.label}</Text>
-                <Text style={[styles.compareCol, row.free ? styles.yes : styles.no]}>{tick(row.free)}</Text>
-                <Text style={[styles.compareCol, row.premium ? styles.yesAmber : styles.no]}>{tick(row.premium)}</Text>
+                <TickCell on={row.free} />
+                <TickCell on={row.premium} amber />
               </View>
             ))}
           </View>
@@ -168,7 +177,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
   },
-  closeBtnText: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '600' },
   content: { paddingHorizontal: 22, paddingTop: 48 },
 
   header: { alignItems: 'center', marginBottom: 32 },
@@ -179,7 +187,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 18,
   },
-  crest: { fontSize: 26, color: AMBER },
   title: {
     color: '#fff', fontSize: 27, fontWeight: '700',
     letterSpacing: 0.2, marginBottom: 8, textAlign: 'center',
@@ -202,7 +209,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: AMBER_LINE,
     alignItems: 'center', justifyContent: 'center',
   },
-  featureIcon: { fontSize: 22 },
   featureText: { flex: 1, gap: 3 },
   featureTitle: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
   featureDesc: { color: 'rgba(255,255,255,0.5)', fontSize: 12.5, lineHeight: 18 },
@@ -228,9 +234,7 @@ const styles = StyleSheet.create({
   compareFeatureHead: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   compareCol: { width: 58, textAlign: 'center', fontSize: 14, fontWeight: '700' },
   compareColHead: { color: 'rgba(255,255,255,0.4)', fontSize: 11, letterSpacing: 0.5 },
-  yes: { color: 'rgba(255,255,255,0.85)' },
-  yesAmber: { color: AMBER },
-  no: { color: 'rgba(255,255,255,0.25)' },
+  compareIconCell: { width: 58, alignItems: 'center' },
 
   priceRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 4 },
   price: { color: '#fff', fontSize: 34, fontWeight: '800' },

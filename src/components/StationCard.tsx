@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Cruise } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
@@ -174,7 +174,7 @@ function ListCard({ station, onPress }: { station: Station; onPress?: () => void
             {platformColor && (
               <View style={[styles.platformDot, { backgroundColor: platformColor }]} />
             )}
-            <Text style={styles.chevron}>›</Text>
+            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
           </View>
         </View>
 

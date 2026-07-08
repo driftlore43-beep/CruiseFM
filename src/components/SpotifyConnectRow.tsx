@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -52,7 +53,7 @@ function SpotifyConnectRowNative() {
       </View>
       {loading
         ? <ActivityIndicator size="small" color={SPOTIFY_GREEN} />
-        : <Text style={styles.arrow}>›</Text>
+        : <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.3)" />
       }
     </Pressable>
   );

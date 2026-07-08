@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
 import { StationCard } from '@/components/StationCard';
@@ -200,7 +200,7 @@ export default function StationsScreen() {
                 <View key={station.id} style={styles.lockedWrapper}>
                   <StationCard station={station} />
                   <View style={styles.lockOverlay}>
-                    <Text style={styles.lockIcon}>🔒</Text>
+                    <Ionicons name="lock-closed" size={20} color="#fff" style={styles.lockIcon} />
                     <Text style={styles.lockText}>Unlock with Premium</Text>
                   </View>
                 </View>
@@ -303,7 +303,7 @@ function CustomStationCard({ station }: { station: CustomStation }) {
           <View style={[styles.myBadge, { backgroundColor: station.color + '22', borderColor: station.color + '55' }]}>
             <Text style={[styles.myBadgeText, { color: station.color }]}>MINE</Text>
           </View>
-          <Text style={styles.customChevron}>›</Text>
+          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
         </View>
       </View>
     </Pressable>

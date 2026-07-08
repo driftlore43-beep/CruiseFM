@@ -10,6 +10,7 @@ import { Fonts } from '@/constants/theme';
 import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
+import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -180,7 +181,8 @@ function StationSwitcher({
               onPress={() => onSelect(s.id)}
               activeOpacity={0.7}
               style={[ss.pill, active && ss.pillActive]}>
-              <Text style={ss.pillIcon}>{s.icon}</Text>
+              <MaterialCommunityIcons name={s.iconName as any} size={15} color="#fff" style={ss.pillIcon} />
+
               <Text
                 style={[ss.pillText, { fontFamily: Fonts.mono }, active && ss.pillTextActive]}
                 numberOfLines={1}>
@@ -220,7 +222,7 @@ function PlatformButton({
   platform,
   onPress,
 }: {
-  platform: { name: string; color: string; emoji: string } | null;
+  platform: { id: PlatformId; name: string; color: string } | null;
   onPress: () => void;
 }) {
   if (!platform) return null;
@@ -228,9 +230,9 @@ function PlatformButton({
     <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={pb.btn}>
       {/* Aged border effect — outer ring slightly lighter */}
       <View style={[StyleSheet.absoluteFill, pb.aged]} pointerEvents="none" />
-      <Text style={pb.emoji}>{platform.emoji}</Text>
+      <PlatformIcon id={platform.id} size={14} />
       <Text style={[pb.text, { fontFamily: Fonts.mono }]}>
-        ▶  Play on {platform.name}
+        Play on {platform.name}
       </Text>
     </TouchableOpacity>
   );
@@ -484,7 +486,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const [playing,     setPlaying]     = useState(false);
   const [activeId,    setActiveId]    = useState(stationId ?? 'night-run');
   const [activeTrack, setActiveTrack] = useState(1);   // A2 default (index 1)
-  const [platform,    setPlatform]    = useState<{ name: string; color: string; emoji: string } | null>(null);
+  const [platform,    setPlatform]    = useState<{ id: PlatformId; name: string; color: string } | null>(null);
   const [shuffle,     setShuffle]     = useState(false);
   const [repeat,      setRepeat]      = useState(false);
   const [showTracks,  setShowTracks]  = useState(false);
@@ -625,7 +627,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     getSavedPlatform().then((id) => {
       if (id && id !== 'none') {
         const p = PLATFORMS[id as Exclude<PlatformId, 'none'>];
-        if (p) setPlatform({ name: p.name, color: p.color, emoji: p.emoji });
+        if (p) setPlatform({ id: id as PlatformId, name: p.name, color: p.color });
       } else { setPlatform(null); }
     });
     slideY.setValue(SCREEN_H);
@@ -960,7 +962,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
           {platform && (
             <TouchableOpacity style={fs.sheetPlatformRow} onPress={() => openMusicPlatform(station.name)} activeOpacity={0.75}>
-              <Text style={fs.sheetPlatformEmoji}>{platform.emoji}</Text>
+              <PlatformIcon id={platform.id} size={14} color={platform.color} />
               <Text style={[fs.sheetPlatformText, { color: platform.color }]}>Open in {platform.name}</Text>
               <Ionicons name="arrow-forward" size={13} color={platform.color} style={{ opacity: 0.7 }} />
             </TouchableOpacity>
@@ -1025,7 +1027,8 @@ export function CassettePreview() {
         <LinearGradient colors={['#2A1200', '#1a0f00', '#0D0700']} style={StyleSheet.absoluteFill} />
         <View style={pv.glow} />
         <View style={pv.tapHint}>
-          <Text style={[pv.tapHintText, { fontFamily: Fonts.mono }]}>▶ tap to open</Text>
+          <Ionicons name="play" size={9} color={C.textFaint} />
+          <Text style={[pv.tapHintText, { fontFamily: Fonts.mono }]}>tap to open</Text>
         </View>
         <CassetteBody size={275} leftSpin={leftSpin} rightSpin={rightSpin} playing={active} progress={progress} tapeFlow={tapeFlow} />
         {OWNER_MODE && (
@@ -1044,7 +1047,8 @@ export function CassettePreview() {
         </View>
         {!OWNER_MODE && (
           <View style={[pv.unlockBtn, { marginTop: 'auto' }]}>
-            <Text style={pv.unlockText}>🔒 Unlock Premium</Text>
+            <Ionicons name="lock-closed" size={14} color={C.amber} />
+            <Text style={pv.unlockText}>Unlock Premium</Text>
           </View>
         )}
       </View>
@@ -1159,6 +1163,7 @@ const pv = StyleSheet.create({
   glow:  { position: 'absolute', width: 240, height: 120, borderRadius: 120, backgroundColor: 'rgba(200,134,10,0.28)' },
   tapHint: {
     position: 'absolute', top: 12, right: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(240,222,176,0.07)',
     borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
   },
@@ -1183,7 +1188,8 @@ const pv = StyleSheet.create({
   unlockBtn: {
     marginHorizontal: 16, marginBottom: 16,
     backgroundColor: 'rgba(204,102,0,0.2)', borderRadius: 10,
-    paddingVertical: 11, alignItems: 'center',
+    paddingVertical: 11,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
     borderWidth: 1, borderColor: 'rgba(204,102,0,0.35)',
   },
   unlockText: { color: C.amber, fontSize: 14, fontWeight: '600' },

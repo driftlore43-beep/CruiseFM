@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -33,9 +34,10 @@ export default function AuthRedirect() {
   return (
     <View style={styles.root}>
       {status === 'working' && <ActivityIndicator size="large" color="#1DB954" />}
+      {status === 'done' && <Ionicons name="checkmark-circle" size={26} color="#1DB954" />}
       <Text style={styles.text}>
         {status === 'working' && 'Connecting Spotify…'}
-        {status === 'done' && 'Spotify connected ✓'}
+        {status === 'done' && 'Spotify connected'}
         {status === 'failed' && 'Could not connect Spotify'}
       </Text>
     </View>

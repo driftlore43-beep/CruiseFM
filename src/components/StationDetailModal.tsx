@@ -1,3 +1,4 @@
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -129,7 +130,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
           <View style={styles.pillBar} />
         </View>
         <Pressable style={[styles.closeBtn, { top: topPad }]} onPress={handleClose} hitSlop={12}>
-          <Text style={styles.closeBtnText}>✕</Text>
+          <Ionicons name="close" size={16} color="rgba(255,255,255,0.85)" />
         </Pressable>
 
         <ScrollView
@@ -147,7 +148,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
           <Pressable
             style={({ pressed }) => [styles.playlistBtn, pressed && { opacity: 0.85 }]}
             onPress={() => setShowPicker(true)}>
-            <Text style={styles.playlistBtnIcon}>♫</Text>
+            <MaterialCommunityIcons name="music" size={20} color={SPOTIFY_GREEN} style={styles.playlistBtnIcon} />
             <View style={{ flex: 1 }}>
               <Text style={styles.playlistBtnText}>
                 {linked ? linked.name : 'Add your playlist'}
@@ -156,7 +157,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
                 {linked ? 'Tap to change' : 'Drop in your own Spotify playlist'}
               </Text>
             </View>
-            <Text style={styles.playlistBtnArrow}>{linked ? '✎' : '＋'}</Text>
+            <MaterialCommunityIcons name={linked ? 'pencil' : 'plus'} size={18} color={SPOTIFY_GREEN} />
           </Pressable>
 
           {/* Mode picker */}
@@ -176,7 +177,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
                   onPress={() => unlocked && setSelectedMode(mode.id)}>
                   {mode.pro && <GlossSheen />}
                   <Text style={[styles.modeLabel, active && styles.modeLabelActive]}>{mode.label}</Text>
-                  {!unlocked && <Text style={styles.modeLockIcon}>🔒</Text>}
+                  {!unlocked && <Ionicons name="lock-closed" size={12} color="rgba(255,255,255,0.7)" style={styles.modeLockIcon} />}
                   {mode.pro && unlocked && (
                     <View style={styles.proBadge}><Text style={styles.proBadgeText}>PRO</Text></View>
                   )}
@@ -194,7 +195,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.startGradient}>
               <Text style={styles.startBtnText}>Start Drive</Text>
-              <Text style={styles.startBtnArrow}>→</Text>
+              <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.9)" />
             </LinearGradient>
           </Pressable>
 
@@ -260,7 +261,7 @@ function PlaylistPicker({
           <ActivityIndicator color={SPOTIFY_GREEN} style={{ marginVertical: 32 }} />
         ) : !connected ? (
           <Text style={styles.pickerEmpty}>
-            Connect Spotify in Profile → Settings to add your own playlists.
+            Connect Spotify in Profile settings to add your own playlists.
           </Text>
         ) : playlists.length === 0 ? (
           <Text style={styles.pickerEmpty}>No playlists found in your Spotify library.</Text>
@@ -276,7 +277,7 @@ function PlaylistPicker({
                   <Text style={[styles.pickerRowText, active && { color: SPOTIFY_GREEN }]} numberOfLines={1}>
                     {pl.name}
                   </Text>
-                  {active && <Text style={styles.pickerCheck}>✓</Text>}
+                  {active && <MaterialCommunityIcons name="check" size={15} color={SPOTIFY_GREEN} style={styles.pickerCheck} />}
                 </Pressable>
               );
             })}

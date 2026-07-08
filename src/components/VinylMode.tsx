@@ -12,6 +12,7 @@ import { OWNER_MODE } from '@/constants/config';
 import { Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
+import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -84,10 +85,10 @@ function SparkleField({ size }: { size: number }) {
 
 // ── Floating music notes ──────────────────────────────────────────────────────
 type NoteItem = {
-  id: number; x: number; y: number; char: string;
+  id: number; x: number; y: number; icon: string;
   size: number; driftX: number; anim: Animated.Value;
 };
-const NOTE_CHARS = ['♩', '♪', '♫', '♬'];
+const NOTE_ICONS = ['music-note-eighth', 'music-note-quarter', 'music-note-sixteenth', 'music'];
 let _noteId = 0;
 
 function FloatingNotes({ playing, containerSize, recordRadius, scrubbing, scrubDir }: {
@@ -108,7 +109,7 @@ function FloatingNotes({ playing, containerSize, recordRadius, scrubbing, scrubD
         id,
         x:      containerSize / 2 + Math.cos(angle) * recordRadius,
         y:      containerSize / 2 + Math.sin(angle) * recordRadius,
-        char:   NOTE_CHARS[Math.floor(Math.random() * NOTE_CHARS.length)],
+        icon:   NOTE_ICONS[Math.floor(Math.random() * NOTE_ICONS.length)],
         size:   12 + Math.random() * 8,
         driftX: bwd ? (-10 + Math.random() * 20) * -1 : -30 + Math.random() * 60,
         anim,
@@ -135,14 +136,13 @@ function FloatingNotes({ playing, containerSize, recordRadius, scrubbing, scrubD
         const opacity = note.anim.interpolate({ inputRange: [0, 0.08, 0.8, 1], outputRange: [0, 0.9, 0.6, 0] });
         const scale   = note.anim.interpolate({ inputRange: [0, 1], outputRange: [1, bwd ? 1.4 : 0.4] });
         return (
-          <Animated.Text key={note.id} style={{
+          <Animated.View key={note.id} style={{
             position: 'absolute', left: note.x, top: note.y,
-            fontSize: note.size, color: '#C8860A',
             transform: [{ translateX: tx }, { translateY: ty }, { scale }],
             opacity,
           }}>
-            {note.char}
-          </Animated.Text>
+            <MaterialCommunityIcons name={note.icon as any} size={note.size} color="#C8860A" />
+          </Animated.View>
         );
       })}
     </View>
@@ -504,7 +504,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const [playing,       setPlaying]       = useState(false);
   const [activeId,      setActiveId]      = useState(stationId ?? 'night-run');
   const [activeTrack,   setActiveTrack]   = useState(0);
-  const [platform,      setPlatform]      = useState<{ name: string; color: string; emoji: string } | null>(null);
+  const [platform,      setPlatform]      = useState<{ id: PlatformId; name: string; color: string } | null>(null);
   const [isScrubbing,   setIsScrubbing]   = useState(false);
   const [scrubDir,      setScrubDir]      = useState<'fwd' | 'bwd' | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
@@ -770,7 +770,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     if (!visible) return;
     if (stationId) setActiveId(stationId);
     getSavedPlatform().then((id) => {
-      if (id && id !== 'none') { const p = PLATFORMS[id as Exclude<PlatformId, 'none'>]; if (p) setPlatform({ name: p.name, color: p.color, emoji: p.emoji }); } else setPlatform(null);
+      if (id && id !== 'none') { const p = PLATFORMS[id as Exclude<PlatformId, 'none'>]; if (p) setPlatform({ id: id as PlatformId, name: p.name, color: p.color }); } else setPlatform(null);
     });
     slideY.setValue(SCREEN_H); setPlaying(true); setActiveTrack(0);
     progress.setValue(0); progressValue.current = 0; setCurrentTimeMs(0);
@@ -874,14 +874,16 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
         {/* Scrub indicator — center overlay, fades 1s after release */}
         <Animated.View pointerEvents="none" style={[fs.scrubIndicatorWrap, { opacity: scrubIndicatorAnim }]}>
-          <View style={fs.scrubIndicatorBox}>
-            <Text style={fs.scrubIndicatorText}>
-              {(() => {
-                const deltaSec = Math.round((currentTimeMs - scrubStartPosRef.current) / 1000);
-                return deltaSec >= 0 ? `▶▶  +${deltaSec}s` : `◀◀  ${deltaSec}s`;
-              })()}
-            </Text>
-          </View>
+          {(() => {
+            const deltaSec = Math.round((currentTimeMs - scrubStartPosRef.current) / 1000);
+            const fwd = deltaSec >= 0;
+            return (
+              <View style={fs.scrubIndicatorBox}>
+                <Ionicons name={fwd ? 'play-forward' : 'play-back'} size={14} color={V.gold} />
+                <Text style={fs.scrubIndicatorText}>{fwd ? `+${deltaSec}s` : `${deltaSec}s`}</Text>
+              </View>
+            );
+          })()}
         </Animated.View>
 
         {/* Floating header */}
@@ -1046,8 +1048,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           {platform && (
             <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
               <TouchableOpacity onPress={() => openMusicPlatform(station.name)} activeOpacity={0.75} style={fs.platformBtn}>
-                <Text style={fs.platformEmoji}>{platform.emoji}</Text>
-                <Text style={[fs.platformText, { fontFamily: Fonts.mono }]}>▶  Play on {platform.name}</Text>
+                <PlatformIcon id={platform.id} size={14} />
+                <Text style={[fs.platformText, { fontFamily: Fonts.mono }]}>Play on {platform.name}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1100,7 +1102,7 @@ const fs = StyleSheet.create({
   platformText: { color: V.textDim, fontSize: 13, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' },
 
   scrubIndicatorWrap: { position: 'absolute', left: 0, right: 0, top: '50%', alignItems: 'center', zIndex: 200 },
-  scrubIndicatorBox:  { backgroundColor: 'rgba(0,0,0,0.78)', borderRadius: 20, paddingHorizontal: 18, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(200,150,10,0.5)' },
+  scrubIndicatorBox:  { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(0,0,0,0.78)', borderRadius: 20, paddingHorizontal: 18, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(200,150,10,0.5)' },
   scrubIndicatorText: { color: V.gold, fontSize: 11, fontWeight: '700', letterSpacing: 2.5 },
 });
 
@@ -1151,7 +1153,8 @@ export function VinylModePreview() {
     <TouchableOpacity onPress={handlePress} activeOpacity={0.9} style={pv.scene}>
       <View style={pv.glowOrb} />
       <View style={pv.tapHint}>
-        <Text style={pv.tapHintText}>▶ tap to open</Text>
+        <Ionicons name="play" size={9} color="rgba(255,255,255,0.4)" />
+        <Text style={pv.tapHintText}>tap to open</Text>
       </View>
 
       {/* Shared positioning container — tonearm sits here, static, while platter spins */}
@@ -1185,6 +1188,7 @@ const pv = StyleSheet.create({
   },
   tapHint: {
     position: 'absolute', top: 10, right: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
   },

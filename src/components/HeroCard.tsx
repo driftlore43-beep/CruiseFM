@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -83,7 +84,7 @@ export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start
               style={StyleSheet.absoluteFill}
             />
             <GlossSheen radius={18} />
-            <Text style={styles.startBtnIcon}>▶</Text>
+            <Ionicons name="play" size={17} color="#fff" style={styles.startBtnIcon} />
             <Text style={styles.startBtnText}>{buttonLabel}</Text>
           </Pressable>
         </View>

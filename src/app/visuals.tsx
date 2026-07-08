@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
@@ -112,7 +113,8 @@ function VisualCard({
         <Text style={styles.visualSub}>{subtitle}</Text>
       </View>
       <Pressable style={styles.unlockBtn}>
-        <Text style={styles.unlockText}>🔒 Unlock Premium</Text>
+        <Ionicons name="lock-closed" size={14} color={Cruise.violetLight} />
+        <Text style={styles.unlockText}>Unlock Premium</Text>
       </Pressable>
     </View>
   );
@@ -209,7 +211,10 @@ const styles = StyleSheet.create({
     backgroundColor: Cruise.violetDim,
     borderRadius: 10,
     paddingVertical: 11,
+    flexDirection: 'row',
+    gap: 7,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   unlockText: {
     color: Cruise.violetLight,

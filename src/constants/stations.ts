@@ -139,7 +139,8 @@ export const STATIONS: Station[] = [
     eqColors: ['#FFC24C', '#FF7A48', '#D84C8A'],
     glowColor: '#8a3a05',
     image: require('../../assets/stations/sunset.jpg'),
-    motion: require('../../assets/stations/sunset-motion.webp'),
+    // motion: temporarily disabled — new still artwork used everywhere until a
+    // fresh motion clip is made for it. Old clip kept at assets/stations/sunset-motion.webp.
     icon: 'weather-sunset',
     iconBg: '#5a2800',
     bestTime: 'Sunset',

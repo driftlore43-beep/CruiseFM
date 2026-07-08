@@ -121,7 +121,7 @@ export const STATIONS: Station[] = [
     image: require('../../assets/stations/after-midnight.jpg'),
     icon: 'star-four-points',
     iconBg: '#16162a',
-    bestTime: 'After midnight',
+    bestTime: 'After hours',
     duration: '1.5 hr mix',
     trackCount: 22,
     spotifyUrl: 'https://open.spotify.com/search/after+midnight+drive+playlist',

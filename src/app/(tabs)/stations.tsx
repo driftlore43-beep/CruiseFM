@@ -37,7 +37,7 @@ const POETRY = [
 
 // Time-flavoured tagline for the station currently "on air".
 const ON_AIR_LINES: Record<string, string> = {
-  'after-midnight': 'After midnight — the road is all yours.',
+  'after-midnight': 'After hours — the road is all yours.',
   'mountain-pass':  'Morning air — take the high road.',
   'coastal':        'Midday light — the coast is clear.',
   'sunset':         'Golden hour — catch it while it lasts.',

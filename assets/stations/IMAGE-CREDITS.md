@@ -51,13 +51,13 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 - Risk: **Low** — licensed source; storefront signs are incidental street scenery.
 - Status: ✅ OK / cleared
 
-### 🟠 night-run.jpg — "Night Run FM"
-- In frame: sports car (rear), coastal highway, city skyline, stars.
-- Type (best guess): AI-generated.
-- Source: _TO CONFIRM_ (original PNG was in Downloads: b54ee25b-…​.png)
-- License: _TO CONFIRM_
-- Risk: **Medium** — generic car silhouette but AI rights unclear.
-- Status: ⚠️ VERIFY
+### ✅ night-run.jpg — "Night Run FM"
+- In frame: black coupe in a moody orange-lit underground car park. Car has aftermarket decals (a "POLEPOSITION" side graphic + an Instagram-handle sticker) — incidental to the depicted vehicle.
+- Type: real photograph.
+- Source: Unsplash — photo-1583102397498-aaf0e4cc58db (2026-07-08).
+- License: **Unsplash License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; the decals are part of the depicted modified car (editorial), not used as marketing.
+- Status: ✅ OK / cleared
 
 ### ✅ sunset.jpg — "Sunset FM"
 - In frame: a car silhouetted at a golden-hour overlook, city lights and mountains below. Car in shadow — no visible logo or plate.
@@ -67,13 +67,13 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 - Risk: **Low** — licensed source; car is a dark silhouette with no identifiable branding.
 - Status: ✅ OK / cleared
 
-### 🟠 mountain.jpg — "Mountain Pass FM"
+### ✅ mountain.jpg — "Mountain Pass FM"
 - In frame: snowy mountain road, guardrail. No cars/brands.
-- Type (best guess): AI-generated (surreal road/rail).
-- Source: _TO CONFIRM_
-- License: _TO CONFIRM_
-- Risk: **Medium** — no trademarks; AI rights unclear.
-- Status: ⚠️ VERIFY
+- Type: real photograph.
+- Source: Unsplash or Pexels free image (per owner, 2026-07-08) — _pin exact URL when convenient_.
+- License: Unsplash License / Pexels License (both free commercial use).
+- Risk: **Low** — free-licensed source; no trademarks in frame.
+- Status: ✅ OK / cleared (exact source URL still worth recording)
 
 ### 🟡 coastal.jpg — "Coastal FM"
 - In frame: winding coastal road at dusk. No cars/brands.
@@ -99,10 +99,10 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 
 ## Replace-first priority
 1. Confirm sources for **coastal.jpg** / **tunnel.jpg** (are these off Pinterest?) 🟡
-2. Decide on the AI set (night-run, mountain) — confirm the tool's terms allow commercial use, or regenerate/replace 🟠
 
-**Cleared so far:** rain-drive.jpg, after-midnight.jpg, cars-coffee.jpg, sunset.jpg (all Unsplash, 2026-07-08). ✅
-No 🔴 high-risk images remain.
+**Cleared so far:** rain-drive, after-midnight, cars-coffee, sunset, night-run (Unsplash) + mountain
+(Unsplash/Pexels free, per owner) — all 2026-07-08. ✅
+Only coastal.jpg and tunnel.jpg still need their source confirmed. No 🔴 high-risk images remain.
 
 ## Notes
 - Custom stations created by users bring their own art — out of scope here.

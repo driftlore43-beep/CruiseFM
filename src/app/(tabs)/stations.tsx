@@ -11,6 +11,7 @@ import { StationDetailModal } from '@/components/StationDetailModal';
 import { EqualizerFullscreen } from '@/components/EqualizerMode';
 import { VinylFullscreen } from '@/components/VinylMode';
 import { CassetteFullscreen } from '@/components/CassetteMode';
+import { HorizonFullscreen } from '@/components/HorizonMode';
 import { RetroRadioFullscreen } from '@/components/RetroRadioMode';
 import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
 import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
@@ -255,6 +256,11 @@ export default function StationsScreen() {
       />
       <RetroRadioFullscreen
         visible={activeMode === 'radio'}
+        onClose={closeMode}
+        stationId={activeStationId}
+      />
+      <HorizonFullscreen
+        visible={activeMode === 'horizon'}
         onClose={closeMode}
         stationId={activeStationId}
       />

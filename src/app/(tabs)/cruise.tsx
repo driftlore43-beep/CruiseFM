@@ -6,6 +6,7 @@ import { useFocusEffect } from 'expo-router';
 
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
+import { HorizonFullscreen } from '@/components/HorizonMode';
 import { HeroCard } from '@/components/HeroCard';
 import { StationCard } from '@/components/StationCard';
 import { StationDetailModal } from '@/components/StationDetailModal';
@@ -35,6 +36,7 @@ const MODE_LABELS: Record<string, string> = {
   equalizer: 'Equalizer',
   vinyl: 'Vinyl',
   radio: 'Retro Radio',
+  horizon: 'Horizon',
   waves: 'Sound Waves',
   orb: 'Circular EQ',
 };
@@ -166,6 +168,7 @@ export default function CruiseScreen() {
       <VinylFullscreen visible={activeMode === 'vinyl'} onClose={closeMode} stationId={activeStationId} />
       <CassetteFullscreen visible={activeMode === 'cassette'} onClose={closeMode} stationId={activeStationId} />
       <RetroRadioFullscreen visible={activeMode === 'radio'} onClose={closeMode} stationId={activeStationId} />
+      <HorizonFullscreen visible={activeMode === 'horizon'} onClose={closeMode} stationId={activeStationId} />
       <SoundWaveFullscreen visible={activeMode === 'waves'} onClose={closeMode} stationId={activeStationId} />
       <CircularWaveFullscreen visible={activeMode === 'orb'} onClose={closeMode} stationId={activeStationId} />
     </SafeAreaView>

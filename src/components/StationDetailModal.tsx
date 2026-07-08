@@ -50,6 +50,7 @@ const MODES: Mode[] = [
   { id: 'equalizer', label: 'Equalizer',   pro: false },
   { id: 'vinyl',     label: 'Vinyl',       pro: true  },
   { id: 'radio',     label: 'Retro Radio', pro: true  },
+  { id: 'horizon',   label: 'Horizon',     pro: true  },
   { id: 'waves',     label: 'Sound Waves', pro: false },
   { id: 'orb',       label: 'Circular EQ', pro: true  },
 ];

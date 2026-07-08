@@ -45,7 +45,7 @@ const RADIO_STATIONS: Array<{ id: StationKey; name: string; freq: number; taglin
   { id: 'rain-drive',     name: 'Rain Drive FM',    freq: 91.3,  tagline: 'Wet roads, warm sound' },
   { id: 'coastal',        name: 'Coastal FM',       freq: 93.5,  tagline: 'Salt air and open lanes' },
   { id: 'mountain-pass',  name: 'Mountain Pass FM', freq: 96.1,  tagline: 'High altitude frequencies' },
-  { id: 'after-midnight', name: 'After Midnight FM',freq: 99.4,  tagline: 'When the city finally sleeps' },
+  { id: 'after-midnight', name: 'After Hours FM',   freq: 99.4,  tagline: 'When the city finally sleeps' },
   { id: 'sunset',         name: 'Sunset FM',        freq: 103.7, tagline: 'Golden hour, open throttle' },
 ];
 

@@ -109,7 +109,7 @@ export const STATIONS: Station[] = [
   },
   {
     id: 'after-midnight',
-    name: 'After Midnight FM',
+    name: 'After Hours FM',
     tagline: 'When the world is asleep. And the road belongs to you.',
     tags: ['late night', 'solitude'],
     premium: false,

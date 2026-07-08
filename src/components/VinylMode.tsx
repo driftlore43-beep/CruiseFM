@@ -164,6 +164,18 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
   const cx = size / 2;
   const r  = size / 2;
 
+  // Point on the disc at `deg` degrees, `rad` px from centre — for glass highlights.
+  const pt = (deg: number, rad: number) => {
+    const a = (deg * Math.PI) / 180;
+    return `${cx + rad * Math.cos(a)} ${cx + rad * Math.sin(a)}`;
+  };
+  // Pie wedge between two angles (sheen sector).
+  const wedge = (a1: number, a2: number, rad: number) =>
+    `M ${cx} ${cx} L ${pt(a1, rad)} A ${rad} ${rad} 0 0 1 ${pt(a2, rad)} Z`;
+  // Arc along the rim (specular glint).
+  const rimArc = (a1: number, a2: number, rad: number) =>
+    `M ${pt(a1, rad)} A ${rad} ${rad} 0 0 1 ${pt(a2, rad)}`;
+
   return (
     <Animated.View style={{
       width: size, height: size,
@@ -174,7 +186,7 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
       {/* Clear pressing — glassy tint, sunlit accent rim, pressed grooves */}
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
         {/* Glass body — barely-there so the scene glows through */}
-        <SvgCircle cx={cx} cy={cx} r={r - 1} fill="rgba(255,255,255,0.05)" />
+        <SvgCircle cx={cx} cy={cx} r={r - 1} fill="rgba(255,255,255,0.08)" />
         {/* Sunlit rim — bright accent edge with a soft inner falloff */}
         <SvgCircle cx={cx} cy={cx} r={r - 2} fill="none" stroke={accent} strokeWidth={2.6} />
         <SvgCircle cx={cx} cy={cx} r={r - 5.5} fill="none" stroke={accent} strokeOpacity={0.35} strokeWidth={5} />
@@ -186,18 +198,19 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
         ))}
       </Svg>
 
-      {/* Light reflections — inside spinning view so the spin reads on clear vinyl */}
+      {/* Glass highlights — inside spinning view so the spin reads on clear vinyl */}
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
-        {/* Primary reflection — soft, top-right quadrant */}
-        <Path
-          d={`M ${cx} ${cx} L ${size} 0 A ${r} ${r} 0 0 1 ${size} ${cx} Z`}
-          fill="rgba(255,255,255,0.10)"
-        />
-        {/* Secondary reflection — dimmer, bottom-left quadrant, 180° opposite */}
-        <Path
-          d={`M ${cx} ${cx} L 0 ${size} A ${r} ${r} 0 0 1 0 ${cx} Z`}
-          fill="rgba(255,255,255,0.05)"
-        />
+        {/* Broad sheen — top-right, with a hot streak inside it */}
+        <Path d={wedge(-85, -20, r)} fill="rgba(255,255,255,0.12)" />
+        <Path d={wedge(-68, -52, r)} fill="rgba(255,255,255,0.16)" />
+        {/* Opposite sheen — dimmer, with its own faint streak */}
+        <Path d={wedge(95, 160, r)} fill="rgba(255,255,255,0.07)" />
+        <Path d={wedge(112, 126, r)} fill="rgba(255,255,255,0.10)" />
+        {/* Specular rim glints — bright glass edge catching the light */}
+        <Path d={rimArc(-150, -95, r - 3)} stroke="rgba(255,255,255,0.65)" strokeWidth={2} strokeLinecap="round" fill="none" />
+        <Path d={rimArc(25, 60, r - 3)} stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} strokeLinecap="round" fill="none" />
+        {/* Inner glass ring highlight */}
+        <SvgCircle cx={cx} cy={cx} r={r * 0.50} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth={1} />
       </Svg>
 
       {/* Center label — rendered inside disc when showLabel=true (preview card) */}
@@ -333,15 +346,6 @@ function TurntableHero({
 
   return (
     <View style={{ width: platSize, height: platSize }}>
-      {/* Ambient glow */}
-      <Animated.View style={{
-        position: 'absolute',
-        width: platSize * 0.92, height: platSize * 0.32,
-        borderRadius: platSize * 0.46,
-        backgroundColor: accent,
-        bottom: -platSize * 0.04, left: platSize * 0.04,
-        opacity: glowOpacity,
-      }} />
       <SparkleField size={platSize} />
       {/* Platter disc — pan responder applied here for record scrub */}
       <View {...panHandlers} style={[th.platter, { width: platSize, height: platSize, borderRadius: platSize / 2, position: 'absolute', top: 0, left: 0 }]}>

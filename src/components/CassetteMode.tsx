@@ -288,7 +288,7 @@ function NeonReelHub({ size, color }: { size: number; color: string }) {
 }
 
 // A small neon "×" screw mark.
-function Cross({ cx, cy, r = 4.5, color }: { cx: number; cy: number; r?: number; color: string }) {
+function Cross({ cx, cy, r = 2.8, color }: { cx: number; cy: number; r?: number; color: string }) {
   return (
     <>
       <SvgLine x1={cx - r} y1={cy - r} x2={cx + r} y2={cy + r} stroke={color} strokeWidth={1.8} strokeLinecap="round" />
@@ -323,21 +323,18 @@ function CassetteBody({
 
   return (
     <View style={{ width: size, height: H, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ shadowColor: color, shadowOpacity: 0.55, shadowRadius: 16, shadowOffset: { width: 0, height: 0 } }}>
+      <View>
         <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`}>
-          {/* Body outline — soft wide glow under a crisp line */}
-          <SvgRect x={8} y={8} width={324} height={194} rx={20} fill="none" stroke={color} strokeOpacity={0.22} strokeWidth={9} />
+          {/* Body outline — crisp neon line */}
           <SvgRect x={8} y={8} width={324} height={194} rx={20} fill="none" stroke={color} strokeWidth={2.4} />
 
           {/* Header label box (accent hue) */}
-          <SvgRect x={30} y={26} width={280} height={42} rx={11} fill="none" stroke={accent} strokeOpacity={0.2} strokeWidth={6} />
           <SvgRect x={30} y={26} width={280} height={42} rx={11} fill="none" stroke={accent} strokeWidth={1.5} />
           <SvgRect x={42} y={37} width={18} height={18} rx={2} fill="none" stroke={color} strokeWidth={1.6} />
           <SvgText x={188} y={45} fill={accent} textAnchor="middle" fontSize={11} fontWeight="700" fontFamily={Fonts.mono}>{songName}</SvgText>
           <SvgText x={300} y={60} fill={accent} textAnchor="end" fontSize={8} fontWeight="700" fontFamily={Fonts.mono} opacity={0.85}>{artist}</SvgText>
 
           {/* Reel window */}
-          <SvgRect x={66} y={86} width={208} height={72} rx={6} fill="none" stroke={color} strokeOpacity={0.16} strokeWidth={6} />
           <SvgRect x={66} y={86} width={208} height={72} rx={6} fill="none" stroke={color} strokeWidth={1.4} />
 
           {/* Static reel outer rings */}
@@ -354,7 +351,7 @@ function CassetteBody({
           <Cross cx={314} cy={24} color={accent} />
           <Cross cx={26} cy={186} color={accent} />
           <Cross cx={314} cy={186} color={accent} />
-          <Cross cx={170} cy={18} r={4} color={accent} />
+          <Cross cx={170} cy={18} r={2.5} color={accent} />
 
           {/* Bottom access door + buttons */}
           <SvgPath d="M112 184 L228 184 L216 200 L124 200 Z" fill="none" stroke={color} strokeWidth={1.5} />

@@ -24,13 +24,13 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 
 ## Inventory (as of 2026-07-08)
 
-### 🔴 after-midnight.jpg — "After Hours FM"
-- In frame: black sports car with **Porsche 911 trade dress**, neon "CAFÉ NOIR" signage, wet lot.
-- Type (best guess): AI-generated.
-- Source: _TO CONFIRM_
-- License: _TO CONFIRM_
-- Risk: **High** — 911 body shape is protected trade dress; car is prominent.
-- Status: ❌ NEEDS REVIEW / likely replace
+### ✅ after-midnight.jpg — "After Hours FM"
+- In frame: foggy empty road at night under teal streetlights. No cars, people, or brands.
+- Type: real photograph.
+- Source: Unsplash — photo-1668532071261-a57720bcbdb7 (2026-07-08).
+- License: **Unsplash License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source, nothing identifiable in frame.
+- Status: ✅ OK / cleared
 
 ### 🔴 cars-coffee.jpg — "Cars & Coffee FM"
 - In frame: red **BMW E30 with the BMW roundel logo clearly visible**, German licence plate "M ST 6505", café table.
@@ -96,11 +96,10 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 
 ## Replace-first priority
 1. **cars-coffee.jpg** (BMW logo + plate) 🔴
-2. **after-midnight.jpg** (Porsche 911 trade dress) 🔴
-3. Confirm sources for **coastal.jpg** / **tunnel.jpg** (are these off Pinterest?) 🟡
-4. Decide on the AI set (night-run, sunset, mountain) — confirm the tool's terms allow commercial use, or regenerate/replace 🟠
+2. Confirm sources for **coastal.jpg** / **tunnel.jpg** (are these off Pinterest?) 🟡
+3. Decide on the AI set (night-run, sunset, mountain) — confirm the tool's terms allow commercial use, or regenerate/replace 🟠
 
-**Cleared so far:** rain-drive.jpg (Unsplash, 2026-07-08). ✅
+**Cleared so far:** rain-drive.jpg, after-midnight.jpg (both Unsplash, 2026-07-08). ✅
 
 ## Notes
 - Custom stations created by users bring their own art — out of scope here.

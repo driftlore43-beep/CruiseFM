@@ -48,6 +48,12 @@ const VINYL_TRACKS = [
   { id: 'A4', title: 'Glass & Chrome',   artist: 'Low Glow',       duration: '5:02' },
 ] as const;
 
+// Which eqColors stop the vinyl accent uses per station (default 1 = mid).
+// Sunset picks stop 2 — its dusk pink — instead of the orange mid stop.
+const VINYL_ACCENT_STOP: Record<string, number> = {
+  sunset: 2,
+};
+
 /** '#RRGGBB' → 'rgba(r,g,b,a)' — for animated colour interpolation. */
 function withAlpha(hex: string, a: number): string {
   const h = hex.replace('#', '');
@@ -909,7 +915,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
               platSize={platSize} spin={spin} tonearmAnim={tonearmVal} glowOpacity={glowOpacity}
               ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={labelRotate} playing={playing}
               panHandlers={recordPanRef.panHandlers} scrubbing={isScrubbing} scrubDir={scrubDir}
-              accent={station.eqColors?.[1] ?? V.gold}
+              accent={station.eqColors?.[VINYL_ACCENT_STOP[station.id] ?? 1] ?? V.gold}
               labelText={station.name.toUpperCase()}
             />
           </View>

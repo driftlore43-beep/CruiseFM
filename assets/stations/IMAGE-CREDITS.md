@@ -59,13 +59,13 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 - Risk: **Medium** — generic car silhouette but AI rights unclear.
 - Status: ⚠️ VERIFY
 
-### 🟠 sunset.jpg — "Sunset FM"
-- In frame: synthwave/pixel-art sunset, palm-lined road. No real brands.
-- Type (best guess): AI / digital illustration.
-- Source: _TO CONFIRM_
-- License: _TO CONFIRM_
-- Risk: **Medium** — no trademarks, but if AI-made you may not *own* it and rights depend on the tool.
-- Status: ⚠️ VERIFY
+### ✅ sunset.jpg — "Sunset FM"
+- In frame: a car silhouetted at a golden-hour overlook, city lights and mountains below. Car in shadow — no visible logo or plate.
+- Type: real photograph.
+- Source: Unsplash — photo-1602719501161-e0b16098314d (2026-07-08).
+- License: **Unsplash License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; car is a dark silhouette with no identifiable branding.
+- Status: ✅ OK / cleared
 
 ### 🟠 mountain.jpg — "Mountain Pass FM"
 - In frame: snowy mountain road, guardrail. No cars/brands.
@@ -99,9 +99,9 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 
 ## Replace-first priority
 1. Confirm sources for **coastal.jpg** / **tunnel.jpg** (are these off Pinterest?) 🟡
-2. Decide on the AI set (night-run, sunset, mountain) — confirm the tool's terms allow commercial use, or regenerate/replace 🟠
+2. Decide on the AI set (night-run, mountain) — confirm the tool's terms allow commercial use, or regenerate/replace 🟠
 
-**Cleared so far:** rain-drive.jpg, after-midnight.jpg, cars-coffee.jpg (all Unsplash, 2026-07-08). ✅
+**Cleared so far:** rain-drive.jpg, after-midnight.jpg, cars-coffee.jpg, sunset.jpg (all Unsplash, 2026-07-08). ✅
 No 🔴 high-risk images remain.
 
 ## Notes

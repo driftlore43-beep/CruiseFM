@@ -10,7 +10,7 @@ import type { Station } from '@/constants/stations';
  */
 export function StationBackdrop({
   station,
-  blurRadius = 3.5,
+  blurRadius = 2.5,
   motionAllowed = false,
 }: {
   station: Station;

@@ -74,7 +74,7 @@ function OnAirBanner({ station, onPress }: { station: Station; onPress: () => vo
           source={station.image}
           style={StyleSheet.absoluteFill}
           imageStyle={{ width: '100%', height: '100%' }}
-          blurRadius={1.5}
+          blurRadius={1}
           resizeMode="cover"
         />
         <LinearGradient

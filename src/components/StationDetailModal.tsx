@@ -110,7 +110,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
       <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
 
         {/* Full-bleed blurred station background — motion is a Premium unlock */}
-        <StationBackdrop station={station} blurRadius={3.5} motionAllowed={isPro && !dataSaver} />
+        <StationBackdrop station={station} blurRadius={1.5} motionAllowed={isPro && !dataSaver} />
         {/* Smooth multi-stop fade: clear scene up top, melts into dark
             behind the controls — no visible seam anywhere. */}
         <LinearGradient

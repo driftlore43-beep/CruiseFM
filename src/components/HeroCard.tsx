@@ -41,7 +41,7 @@ export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start
       <View style={styles.card}>
         {/* Tonight's pick, full bleed — the hero always animates (a taste of
             motion for everyone), unless Data Saver forces stills */}
-        <StationBackdrop station={station} blurRadius={2} motionAllowed={!dataSaver} />
+        <StationBackdrop station={station} blurRadius={1.2} motionAllowed={!dataSaver} />
         {/* Dark fade so the copy stays readable over any photo */}
         <LinearGradient
           colors={[

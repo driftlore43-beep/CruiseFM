@@ -162,7 +162,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
           source={station.image}
           style={StyleSheet.absoluteFill}
           imageStyle={{ width: '100%', height: '100%' }}
-          blurRadius={3.5}
+          blurRadius={2.5}
           resizeMode="cover"
         />
         <LinearGradient

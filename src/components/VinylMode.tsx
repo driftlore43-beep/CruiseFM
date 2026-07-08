@@ -849,7 +849,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           source={station.image}
           style={StyleSheet.absoluteFill}
           imageStyle={{ width: '100%', height: '100%' }}
-          blurRadius={3.5}
+          blurRadius={2.5}
           resizeMode="cover"
         />
         <LinearGradient

@@ -242,12 +242,12 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
               {/* Wireframe mesh — every system's strands, all reacting at once */}
               {GROUPS.map((g, gi) =>
                 Array.from({ length: g.layers }).map((_, l) => (
-                  <Path key={`${gi}-${l}`} d={wavePath(phase, g, l, amp)} stroke="url(#swStroke)" strokeWidth={1.1} fill="none" strokeOpacity={0.15} strokeLinecap="round" />
+                  <Path key={`${gi}-${l}`} d={wavePath(phase, g, l, amp)} stroke="url(#swStroke)" strokeWidth={1.4} fill="none" strokeOpacity={0.34} strokeLinecap="round" />
                 ))
               )}
               {/* Bright core strand of each system */}
               {GROUPS.map((g, gi) => (
-                <Path key={`core-${gi}`} d={wavePath(phase, g, (g.layers - 1) / 2, amp)} stroke="url(#swStroke)" strokeWidth={gi === 0 ? 2 : 1.5} fill="none" strokeOpacity={gi === 0 ? 0.95 : 0.7} strokeLinecap="round" />
+                <Path key={`core-${gi}`} d={wavePath(phase, g, (g.layers - 1) / 2, amp)} stroke="url(#swStroke)" strokeWidth={gi === 0 ? 2.6 : 2} fill="none" strokeOpacity={gi === 0 ? 1 : 0.88} strokeLinecap="round" />
               ))}
             </Svg>
           </View>

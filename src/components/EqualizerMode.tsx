@@ -25,6 +25,7 @@ import { STATIONS } from '@/constants/stations';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useNowPlaying } from '@/context/NowPlayingContext';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -249,7 +250,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
   const fsValues = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(FS_MIN_H))).current;
 
-  const [playing,       setPlaying]       = useState(true);
+  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
   const [activeStation, setActiveStation] = useState(stationId ?? 'night-run');
   const [shuffle,       setShuffle]       = useState(false);
   const [repeat,        setRepeat]        = useState(false);
@@ -459,7 +460,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const CloseBtn = ({ style }: { style?: object }) => (
     <Animated.View style={[fs.closeBtnWrap, style, { transform: [{ scale: closePulse }] }]}>
       <TouchableOpacity style={fs.closeBtn} onPress={handleClose} activeOpacity={0.8}>
-        <Ionicons name="close" size={22} color="#ffffff" />
+        <Ionicons name="chevron-down" size={24} color="#ffffff" />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -724,7 +725,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               {STATIONS.map((s) => (
                 <TouchableOpacity
                   key={s.id}
-                  onPress={() => { setActiveStation(s.id); closePlaylist(); }}
+                  onPress={() => { setActiveStation(s.id); npSetStation(s.id); closePlaylist(); }}
                   style={[fs.stationPill, s.id === activeStation && fs.stationPillActive]}
                   activeOpacity={0.75}>
                   <LinearGradient

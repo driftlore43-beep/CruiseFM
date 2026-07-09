@@ -13,6 +13,7 @@ import { STATIONS } from '@/constants/stations';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useNowPlaying } from '@/context/NowPlayingContext';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -426,7 +427,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const { width: winW, height: winH } = useWindowDimensions();
   const isLandscape = winW > winH;
 
-  const [playing,     setPlaying]     = useState(false);
+  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
   const [activeId,    setActiveId]    = useState(stationId ?? 'night-run');
   const [activeTrack, setActiveTrack] = useState(1);   // A2 default (index 1)
   const [platform,    setPlatform]    = useState<{ id: PlatformId; name: string; color: string } | null>(null);
@@ -597,16 +598,15 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   }, [visible]);
 
   const handleClose = () => {
-    setPlaying(false);
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
   const spotify = useSpotifyPlayback(visible);
 
-  const togglePlay = () => setPlaying((p) => {
-    if (p) spotify.pause(); else spotify.play();
-    return !p;
-  });
+  const togglePlay = () => {
+    if (playing) spotify.pause(); else spotify.play();
+    setPlaying(!playing);
+  };
 
   const toggleTracks = () => {
     if (showTracks) {
@@ -683,7 +683,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             style={[fs.closeBtn, { top: Math.max(insets.top, 8) + 2, right: safeR + 14 }]}
             onPress={handleClose}
             hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}>
-            <Ionicons name="close" size={17} color={C.textDim} />
+            <Ionicons name="chevron-down" size={20} color={C.textDim} />
           </TouchableOpacity>
 
           <View style={{ flex: 1, flexDirection: 'row' }}>
@@ -872,6 +872,9 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             </TouchableOpacity>
           </View>
 
+          {/* Station switcher — flip to any mood */}
+          <StationSwitcher activeId={activeId} onSelect={(id) => { setActiveId(id); npSetStation(id); }} />
+
           {/* PLAYLIST BUTTON */}
           <TouchableOpacity onPress={toggleTracks} style={fs.playlistBtn} activeOpacity={0.7}>
             <Ionicons name="musical-notes-outline" size={14} color={C.textDim} />
@@ -907,7 +910,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             {STATIONS.map((s) => (
               <TouchableOpacity
                 key={s.id}
-                onPress={() => { setActiveId(s.id); toggleTracks(); }}
+                onPress={() => { setActiveId(s.id); npSetStation(s.id); toggleTracks(); }}
                 style={[fs.stationPill, s.id === activeId && fs.stationPillActive]}
                 activeOpacity={0.75}>
                 <LinearGradient

@@ -13,6 +13,7 @@ import { STATIONS } from '@/constants/stations';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useNowPlaying } from '@/context/NowPlayingContext';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -170,7 +171,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const accent = eq[1];
 
   const spotify = useSpotifyPlayback(visible);
-  const [playing, setPlaying] = useState(false);
+  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
   const [elapsedMs, setElapsedMs] = useState(0);
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
@@ -239,6 +240,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
       else {
         snapRaf.current = 0;
         setActiveId(station.id);
+        npSetStation(station.id);
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
     };
@@ -282,20 +284,20 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     setActiveId(id);
     setFreq(STATION_FREQS[id] ?? 92.1);
     slideY.setValue(SCREEN_H);
-    setPlaying(false); progress.setValue(0); setElapsedMs(0);
+    progress.setValue(0); setElapsedMs(0);
+    if (playingRef.current) startProgress(0);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
     return () => { progressAnim.current?.stop(); cancelSnap(); };
   }, [visible]);
 
   const handleClose = () => {
-    setPlaying(false);
     progressAnim.current?.stop();
     cancelSnap();
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
   const resetTrack = () => { progress.setValue(0); setElapsedMs(0); };
-  const togglePlay = () => setPlaying((p) => { if (p) spotify.pause(); else spotify.play(); return !p; });
+  const togglePlay = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
 
   const title = spotify.track?.title ?? 'Neon Autobahn';
   const artist = spotify.track?.artist ?? 'Cruise FM';
@@ -341,7 +343,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
         <View style={[fs.topBar, { top: topPad + 14 }]}>
           <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>TUNER</Text>
           <TouchableOpacity style={fs.closeBtn} onPress={handleClose} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}>
-            <Ionicons name="close" size={17} color="rgba(255,255,255,0.5)" />
+            <Ionicons name="chevron-down" size={20} color="rgba(255,255,255,0.6)" />
           </TouchableOpacity>
         </View>
 

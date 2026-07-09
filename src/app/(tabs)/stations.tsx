@@ -8,19 +8,13 @@ import { useFocusEffect } from 'expo-router';
 import { StationCard } from '@/components/StationCard';
 import { CreateStationModal } from '@/components/CreateStationModal';
 import { StationDetailModal } from '@/components/StationDetailModal';
-import { EqualizerFullscreen } from '@/components/EqualizerMode';
-import { VinylFullscreen } from '@/components/VinylMode';
-import { CassetteFullscreen } from '@/components/CassetteMode';
-import { HorizonFullscreen } from '@/components/HorizonMode';
-import { TunerFullscreen } from '@/components/TunerMode';
-import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
-import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
 import { GlossSheen } from '@/components/GlossSheen';
+import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, Fonts, TAB_SAFE_INSET } from '@/constants/theme';
 import { STATIONS, type Station } from '@/constants/stations';
 import { OWNER_MODE } from '@/constants/config';
 import { loadCustomStations, type CustomStation } from '@/utils/customStations';
-import { recordDriveStart, recordDriveEnd } from '@/utils/driveStats';
+import { recordDriveStart } from '@/utils/driveStats';
 import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
 
 const FREE_CUSTOM_LIMIT = 3;
@@ -115,8 +109,7 @@ export default function StationsScreen() {
   const [customStations, setCustomStations] = useState<CustomStation[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
-  const [activeMode, setActiveMode] = useState<string | null>(null);
-  const [activeStationId, setActiveStationId] = useState<string | undefined>(undefined);
+  const np = useNowPlaying();
   const insets = useSafeAreaInsets();
 
   const [onAirStation, setOnAirStation] = useState<Station>(() => stationById(defaultStationForNow()));
@@ -136,12 +129,6 @@ export default function StationsScreen() {
 
   const free = STATIONS.filter((s) => !s.premium);
   const premium = STATIONS.filter((s) => s.premium);
-
-  // Closing a mode banks the drive's minutes into the stats log.
-  const closeMode = () => {
-    setActiveMode(null);
-    recordDriveEnd();
-  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -230,49 +217,12 @@ export default function StationsScreen() {
         onStartDrive={(mode) => {
           if (selectedStation) {
             saveLastCruise({ stationId: selectedStation.id, mode });
-            setActiveStationId(selectedStation.id);
             recordDriveStart(selectedStation.id);
+            np.open(mode, selectedStation.id);
           }
           setSelectedStation(null);
-          setActiveMode(mode);
         }}
         isPro={IS_PRO}
-      />
-
-      <EqualizerFullscreen
-        visible={activeMode === 'equalizer'}
-        onClose={closeMode}
-        stationId={activeStationId}
-      />
-      <VinylFullscreen
-        visible={activeMode === 'vinyl'}
-        onClose={closeMode}
-        stationId={activeStationId}
-      />
-      <CassetteFullscreen
-        visible={activeMode === 'cassette'}
-        onClose={closeMode}
-        stationId={activeStationId}
-      />
-      <TunerFullscreen
-        visible={activeMode === 'radio'}
-        onClose={closeMode}
-        stationId={activeStationId}
-      />
-      <HorizonFullscreen
-        visible={activeMode === 'horizon'}
-        onClose={closeMode}
-        stationId={activeStationId}
-      />
-      <SoundWaveFullscreen
-        visible={activeMode === 'waves'}
-        onClose={closeMode}
-        stationId={activeStationId}
-      />
-      <CircularWaveFullscreen
-        visible={activeMode === 'orb'}
-        onClose={closeMode}
-        stationId={activeStationId}
       />
     </SafeAreaView>
   );

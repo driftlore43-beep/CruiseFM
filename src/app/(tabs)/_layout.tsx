@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NowPlayingHost } from '@/components/NowPlayingHost';
 import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -109,14 +110,18 @@ function FloatingTabBar({
 
 export default function TabLayout() {
   return (
-    <Tabs
-      tabBar={(props) => <FloatingTabBar state={props.state} navigation={props.navigation} />}
-      screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="cruise"  options={{ title: 'Cruise' }} />
-      <Tabs.Screen name="stations" options={{ title: 'Stations' }} />
-      <Tabs.Screen name="modes"   options={{ title: 'Modes' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
-    </Tabs>
+    <>
+      <Tabs
+        tabBar={(props) => <FloatingTabBar state={props.state} navigation={props.navigation} />}
+        screenOptions={{ headerShown: false }}>
+        <Tabs.Screen name="cruise"  options={{ title: 'Cruise' }} />
+        <Tabs.Screen name="stations" options={{ title: 'Stations' }} />
+        <Tabs.Screen name="modes"   options={{ title: 'Modes' }} />
+        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      </Tabs>
+      {/* One home for every mode fullscreen + the Spotify-style mini-player */}
+      <NowPlayingHost />
+    </>
   );
 }
 

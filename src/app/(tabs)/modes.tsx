@@ -12,14 +12,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
-import { EqualizerFullscreen } from '@/components/EqualizerMode';
-import { CassetteFullscreen } from '@/components/CassetteMode';
-import { HorizonFullscreen } from '@/components/HorizonMode';
-import { VinylFullscreen } from '@/components/VinylMode';
-import { TunerFullscreen } from '@/components/TunerMode';
-import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
-import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
 import { GlossSheen } from '@/components/GlossSheen';
+import { useNowPlaying } from '@/context/NowPlayingContext';
 import { OWNER_MODE } from '@/constants/config';
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
 
@@ -142,13 +136,13 @@ function CompactModeCard({
 export default function ModesScreen() {
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
-  const [activeMode, setActiveMode] = useState<string | null>(null);
+  const np = useNowPlaying();
 
   const isPro = OWNER_MODE;
 
   function open(mode: string, locked: boolean) {
     if (locked) { router.push('/premium'); return; }
-    setActiveMode(mode);
+    np.open(mode);
   }
 
   return (
@@ -256,13 +250,6 @@ export default function ModesScreen() {
 
       </Animated.ScrollView>
 
-      <EqualizerFullscreen visible={activeMode === 'equalizer'} onClose={() => setActiveMode(null)} />
-      <CassetteFullscreen visible={activeMode === 'cassette'} onClose={() => setActiveMode(null)} />
-      <VinylFullscreen visible={activeMode === 'vinyl'} onClose={() => setActiveMode(null)} />
-      <TunerFullscreen visible={activeMode === 'radio'} onClose={() => setActiveMode(null)} />
-      <HorizonFullscreen visible={activeMode === 'horizon'} onClose={() => setActiveMode(null)} />
-      <SoundWaveFullscreen visible={activeMode === 'waves'} onClose={() => setActiveMode(null)} />
-      <CircularWaveFullscreen visible={activeMode === 'orb'} onClose={() => setActiveMode(null)} />
     </View>
   );
 }

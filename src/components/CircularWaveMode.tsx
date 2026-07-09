@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, ImageBackground, Modal,
+  Animated, Dimensions, Easing, ImageBackground, Modal, ScrollView,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
@@ -12,6 +12,7 @@ import { STATIONS } from '@/constants/stations';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useNowPlaying } from '@/context/NowPlayingContext';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -61,11 +62,12 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   const { width: winW, height: winH } = useWindowDimensions();
   const topPad = Math.max(insets.top, 20);
 
-  const station = STATIONS.find((s) => s.id === stationId) ?? STATIONS[0];
+  const [activeId, setActiveId] = useState(stationId ?? 'night-run');
+  const station = STATIONS.find((s) => s.id === activeId) ?? STATIONS[0];
   const spotify = useSpotifyPlayback(visible);
   const eq = station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF'];
 
-  const [playing, setPlaying] = useState(false);
+  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
   const [elapsedMs, setElapsedMs] = useState(0);
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
@@ -126,20 +128,21 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
 
   useEffect(() => {
     if (!visible) return;
+    if (stationId) setActiveId(stationId);
     slideY.setValue(SCREEN_H);
-    setPlaying(false); progress.setValue(0); setElapsedMs(0); ampRef.current = 0.55;
+    progress.setValue(0); setElapsedMs(0); ampRef.current = playingRef.current ? 1 : 0.55;
+    if (playingRef.current) startProgress(0);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
     return () => progressAnim.current?.stop();
   }, [visible]);
 
   const handleClose = () => {
-    setPlaying(false);
     progressAnim.current?.stop();
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
   const resetTrack = () => { progress.setValue(0); setElapsedMs(0); };
-  const togglePlay = () => setPlaying((p) => { if (p) spotify.pause(); else spotify.play(); return !p; });
+  const togglePlay = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
 
   const title = spotify.track?.title ?? 'Neon Autobahn';
   const artist = spotify.track?.artist ?? 'Cruise FM';
@@ -186,7 +189,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
         <View style={[fs.topBar, { top: topPad + 14 }]}>
           <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>CIRCULAR EQ</Text>
           <TouchableOpacity style={fs.closeBtn} onPress={handleClose} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}>
-            <Ionicons name="close" size={17} color="rgba(255,255,255,0.5)" />
+            <Ionicons name="chevron-down" size={20} color="rgba(255,255,255,0.6)" />
           </TouchableOpacity>
         </View>
 
@@ -264,8 +267,29 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
             </TouchableOpacity>
           </View>
 
+          {/* Station switcher — every mood re-colours the ring */}
+          <ScrollView
+            horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 16 }}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+            {STATIONS.map((s) => {
+              const active = s.id === activeId;
+              return (
+                <TouchableOpacity
+                  key={s.id}
+                  onPress={() => { setActiveId(s.id); npSetStation(s.id); }}
+                  activeOpacity={0.75}
+                  style={[fs.pill, active && { borderColor: eq[1], backgroundColor: eq[1] + '26' }]}>
+                  <MaterialCommunityIcons name={s.iconName as any} size={13} color={active ? '#ffffff' : 'rgba(255,255,255,0.55)'} />
+                  <Text style={[fs.pillText, active && { color: '#ffffff', fontWeight: '800' }]} numberOfLines={1}>
+                    {s.name.replace(' FM', '')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
           {/* Playlist */}
-          <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.playlistBtn} activeOpacity={0.75}>
+          <TouchableOpacity onPress={() => setShowPicker(true)} style={[fs.playlistBtn, { marginTop: 14 }]} activeOpacity={0.75}>
             <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.6)" />
             <Text style={[fs.playlistBtnText, { fontFamily: Fonts.mono }]} numberOfLines={1}>
               {linked ? linked.name.toUpperCase() : 'ADD PLAYLIST'}
@@ -322,4 +346,11 @@ const fs = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
   playlistBtnText: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  pillText: { color: 'rgba(255,255,255,0.6)', fontSize: 11.5, fontWeight: '600', maxWidth: 92 },
 });

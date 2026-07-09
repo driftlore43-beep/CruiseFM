@@ -12,6 +12,7 @@ import { STATIONS } from '@/constants/stations';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useNowPlaying } from '@/context/NowPlayingContext';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -140,7 +141,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const spotify = useSpotifyPlayback(visible);
   const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
 
-  const [playing, setPlaying] = useState(false);
+  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
   const [elapsedMs, setElapsedMs] = useState(0);
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
@@ -206,19 +207,19 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
     if (!visible) return;
     if (stationId) setActiveId(stationId);
     slideY.setValue(SCREEN_H);
-    setPlaying(false); progress.setValue(0); setElapsedMs(0); ampRef.current = 0.5;
+    progress.setValue(0); setElapsedMs(0); ampRef.current = playingRef.current ? 1 : 0.5;
+    if (playingRef.current) startProgress(0);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
     return () => progressAnim.current?.stop();
   }, [visible]);
 
   const handleClose = () => {
-    setPlaying(false);
     progressAnim.current?.stop();
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
   const resetTrack = () => { progress.setValue(0); setElapsedMs(0); };
-  const togglePlay = () => setPlaying((p) => { if (p) spotify.pause(); else spotify.play(); return !p; });
+  const togglePlay = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
 
   const title = spotify.track?.title ?? 'Neon Autobahn';
   const artist = spotify.track?.artist ?? 'Cruise FM';
@@ -255,7 +256,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
         <View style={[fs.topBar, { top: topPad + 14 }]}>
           <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>HORIZON</Text>
           <TouchableOpacity style={fs.closeBtn} onPress={handleClose} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}>
-            <Ionicons name="close" size={17} color="rgba(255,255,255,0.5)" />
+            <Ionicons name="chevron-down" size={20} color="rgba(255,255,255,0.6)" />
           </TouchableOpacity>
         </View>
 
@@ -323,7 +324,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
               return (
                 <TouchableOpacity
                   key={s.id}
-                  onPress={() => setActiveId(s.id)}
+                  onPress={() => { setActiveId(s.id); npSetStation(s.id); }}
                   activeOpacity={0.75}
                   style={[fs.pill, active && { borderColor: eq[1], backgroundColor: eq[1] + '26' }]}>
                   <MaterialCommunityIcons name={s.iconName as any} size={13} color={active ? '#ffffff' : 'rgba(255,255,255,0.55)'} />

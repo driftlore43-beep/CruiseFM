@@ -14,6 +14,9 @@ import { STATIONS } from '@/constants/stations';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useNowPlaying } from '@/context/NowPlayingContext';
+import { PlaylistSheet } from '@/components/PlaylistSheet';
+import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -513,7 +516,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
 
-  const [playing,       setPlaying]       = useState(false);
+  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
   const [activeId,      setActiveId]      = useState(stationId ?? 'night-run');
   const [activeTrack,   setActiveTrack]   = useState(0);
   const [platform,      setPlatform]      = useState<{ id: PlatformId; name: string; color: string } | null>(null);
@@ -523,6 +526,12 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const [shuffle,       setShuffle]       = useState(false);
   const [repeat,        setRepeat]        = useState(false);
   const [showTracks,    setShowTracks]    = useState(false);
+  const [linked,        setLinked]        = useState<LinkedPlaylist | null>(null);
+  const [showPicker,    setShowPicker]    = useState(false);
+
+  useEffect(() => {
+    if (visible) getStationPlaylist(activeId).then(setLinked);
+  }, [visible, activeId]);
 
   const spinValue      = useRef(new Animated.Value(0)).current;
   const labelSpin      = useRef(new Animated.Value(0)).current;
@@ -794,7 +803,6 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   }, [visible]);
 
   const handleClose = () => {
-    setPlaying(false);
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
@@ -902,7 +910,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         <View style={[fs.floatingTop, { top: topPad + 4, zIndex: 10 }]}>
           <View style={fs.dragPill} />
           <TouchableOpacity style={[fs.closeBtn, { position: 'absolute', right: 22, top: 0 }]} onPress={handleClose} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}>
-            <Ionicons name="close" size={17} color={V.textDim} />
+            <Ionicons name="chevron-down" size={20} color={V.textDim} />
           </TouchableOpacity>
         </View>
 
@@ -952,7 +960,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             </TouchableOpacity>
             <Animated.View style={{ transform: [{ scale: playBtnScale }] }}>
               <TouchableOpacity
-                onPress={() => setPlaying((p) => { if (p) spotify.pause(); else spotify.play(); return !p; })}
+                onPress={() => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); }}
                 onPressIn={() => Animated.spring(playBtnScale, { toValue: 1.05, useNativeDriver: true, speed: 40, bounciness: 4 }).start()}
                 onPressOut={() => Animated.spring(playBtnScale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 4 }).start()}
                 style={fs.playBtn} activeOpacity={0.9}>
@@ -974,76 +982,14 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             </TouchableOpacity>
           </View>
 
-          {/* Playlist button */}
-          <TouchableOpacity
-            onPress={() => {
-              const next = !showTracks;
-              setShowTracks(next);
-              drawerY.setValue(0);
-              Animated.timing(showTracksAnim, { toValue: next ? 1 : 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-            }}
-            style={fs.tracksBtn}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="musical-notes-outline" size={14} color={V.textDim} />
-            <Text style={[fs.tracksBtnText, { fontFamily: Fonts.mono }]}>PLAYLIST</Text>
-            <Ionicons name={showTracks ? 'chevron-up' : 'chevron-down'} size={14} color={V.textDim} />
-          </TouchableOpacity>
-
-        </View>
-
-        {/* Dark overlay — tap to close drawer */}
-        {showTracks && (
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            onPress={() => {
-              setShowTracks(false);
-              Animated.timing(showTracksAnim, { toValue: 0, duration: 250, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(() => drawerY.setValue(0));
-            }}
-            activeOpacity={1}
-          />
-        )}
-
-        {/* Bottom sheet — track list */}
-        <Animated.View
-          {...drawerPanRef.panHandlers}
-          style={[fs.bottomSheet, {
-            transform: [
-              { translateY: showTracksAnim.interpolate({ inputRange: [0, 1], outputRange: [winH * 0.52, 0] }) },
-              { translateY: drawerY },
-            ],
-            height: winH * 0.50,
-          }]}
-        >
-          <View style={fs.sheetHandle} />
-          {/* Sheet header row */}
-          <View style={fs.sheetHeader}>
-            <Text style={[fs.sheetTitle, { fontFamily: Fonts.mono }]}>PLAYLIST</Text>
-            <TouchableOpacity
-              onPress={() => {
-                setShowTracks(false);
-                Animated.timing(showTracksAnim, { toValue: 0, duration: 250, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(() => drawerY.setValue(0));
-              }}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-              <Ionicons name="close" size={20} color={V.textDim} />
-            </TouchableOpacity>
-          </View>
-          <TrackList activeIdx={activeTrack} onSelect={(i) => {
-            setActiveTrack(i);
-            setShowTracks(false);
-            Animated.timing(showTracksAnim, { toValue: 0, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(() => drawerY.setValue(0));
-          }} />
-
-          {/* Change station */}
-          <View style={{ paddingHorizontal: 24, paddingTop: 14 }}>
-            <Text style={{ color: '#ffffff', fontSize: 10.5, fontWeight: '800', letterSpacing: 3, marginBottom: 8 }}>CHANGE STATION</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 10, paddingVertical: 4 }}>
+          {/* Station switcher — every mood re-skins the pressing */}
+          <ScrollView
+            horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 16 }}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}>
             {STATIONS.map((s) => (
               <TouchableOpacity
                 key={s.id}
-                onPress={() => { setActiveId(s.id); setShowTracks(false); Animated.timing(showTracksAnim, { toValue: 0, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(() => drawerY.setValue(0)); }}
+                onPress={() => { setActiveId(s.id); npSetStation(s.id); }}
                 style={[fs.stationPill, s.id === activeId && fs.stationPillActive]}
                 activeOpacity={0.75}>
                 <LinearGradient
@@ -1059,15 +1005,29 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             ))}
           </ScrollView>
 
-          {platform && (
-            <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
-              <TouchableOpacity onPress={() => openMusicPlatform(station.name)} activeOpacity={0.75} style={fs.platformBtn}>
-                <PlatformIcon id={platform.id} size={14} />
-                <Text style={[fs.platformText, { fontFamily: Fonts.mono }]}>Play on {platform.name}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </Animated.View>
+          {/* Playlist */}
+          <TouchableOpacity onPress={() => setShowPicker(true)} style={[fs.tracksBtn, { marginTop: 14 }]} activeOpacity={0.7}>
+            <Ionicons name="musical-notes-outline" size={14} color={V.textDim} />
+            <Text style={[fs.tracksBtnText, { fontFamily: Fonts.mono }]} numberOfLines={1}>
+              {linked ? linked.name.toUpperCase() : 'ADD PLAYLIST'}
+            </Text>
+            <Ionicons name="chevron-up" size={14} color={V.textDim} />
+          </TouchableOpacity>
+
+        </View>
+
+        {showPicker && (
+          <PlaylistSheet
+            stationName={station.name}
+            current={linked}
+            onClose={() => setShowPicker(false)}
+            onPick={async (pl) => {
+              await setStationPlaylist(activeId, pl);
+              setLinked(pl);
+              setShowPicker(false);
+            }}
+          />
+        )}
 
       </Animated.View>
     </Modal>

@@ -6,17 +6,11 @@ import { useFocusEffect } from 'expo-router';
 
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
-import { HorizonFullscreen } from '@/components/HorizonMode';
 import { HeroCard } from '@/components/HeroCard';
 import { StationCard } from '@/components/StationCard';
 import { StationDetailModal } from '@/components/StationDetailModal';
-import { EqualizerFullscreen } from '@/components/EqualizerMode';
-import { VinylFullscreen } from '@/components/VinylMode';
-import { CassetteFullscreen } from '@/components/CassetteMode';
-import { TunerFullscreen } from '@/components/TunerMode';
-import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
-import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
 import { OWNER_MODE } from '@/constants/config';
+import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
 import { RECOMMENDED_IDS, STATIONS, type Station } from '@/constants/stations';
 import { getPlatformSkipped } from '@/utils/musicPlatform';
@@ -26,7 +20,7 @@ import {
   defaultStationForNow,
   type LastCruise,
 } from '@/utils/lastCruise';
-import { recordDriveStart, recordDriveEnd } from '@/utils/driveStats';
+import { recordDriveStart } from '@/utils/driveStats';
 import { isSpotifyConnected, startPlayback } from '@/utils/spotify';
 
 const recommended = STATIONS.filter((s) => RECOMMENDED_IDS.includes(s.id));
@@ -60,9 +54,8 @@ function SkipBanner({ onDismiss }: { onDismiss: () => void }) {
 
 export default function CruiseScreen() {
   const insets = useSafeAreaInsets();
+  const np = useNowPlaying();
   const [showBanner, setShowBanner] = useState(false);
-  const [activeMode, setActiveMode] = useState<string | null>(null);
-  const [activeStationId, setActiveStationId] = useState<string | undefined>(undefined);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   // One smart hero: it becomes your last cruise if you have one, otherwise
   // tonight's time-of-day pick. Scene, cue and button all track it.
@@ -88,7 +81,6 @@ export default function CruiseScreen() {
   async function launchCruise(cruise: LastCruise) {
     await saveLastCruise(cruise);
     setLastCruise(cruise);
-    setActiveStationId(cruise.stationId);
     recordDriveStart(cruise.stationId);
 
     if (await isSpotifyConnected()) {
@@ -96,15 +88,8 @@ export default function CruiseScreen() {
       // yank the user to Spotify — just open the visual.
       await startPlayback().catch(() => {});
     }
-    // iPod mode was retired — resume any old saved iPod cruise in Equalizer.
-    setActiveMode(cruise.mode === 'ipod' ? 'equalizer' : cruise.mode);
+    np.open(cruise.mode, cruise.stationId);
   }
-
-  // Closing a mode banks the drive's minutes, then the strip refreshes.
-  const closeMode = () => {
-    setActiveMode(null);
-    recordDriveEnd().then(() => setStatsKey((k) => k + 1));
-  };
 
   const heroCruise: LastCruise = lastCruise ?? { stationId: tonightPick.id, mode: 'equalizer' };
   const heroStation = stationById(heroCruise.stationId);
@@ -155,22 +140,13 @@ export default function CruiseScreen() {
             const cruise = { stationId: selectedStation.id, mode };
             saveLastCruise(cruise);
             setLastCruise(cruise);
-            setActiveStationId(selectedStation.id);
             recordDriveStart(selectedStation.id);
+            np.open(mode, selectedStation.id);
           }
           setSelectedStation(null);
-          setActiveMode(mode);
         }}
         isPro={OWNER_MODE}
       />
-
-      <EqualizerFullscreen visible={activeMode === 'equalizer'} onClose={closeMode} stationId={activeStationId} />
-      <VinylFullscreen visible={activeMode === 'vinyl'} onClose={closeMode} stationId={activeStationId} />
-      <CassetteFullscreen visible={activeMode === 'cassette'} onClose={closeMode} stationId={activeStationId} />
-      <TunerFullscreen visible={activeMode === 'radio'} onClose={closeMode} stationId={activeStationId} />
-      <HorizonFullscreen visible={activeMode === 'horizon'} onClose={closeMode} stationId={activeStationId} />
-      <SoundWaveFullscreen visible={activeMode === 'waves'} onClose={closeMode} stationId={activeStationId} />
-      <CircularWaveFullscreen visible={activeMode === 'orb'} onClose={closeMode} stationId={activeStationId} />
     </SafeAreaView>
   );
 }

@@ -24,6 +24,9 @@ import { Cruise } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
+import { MoodSheet } from '@/components/MoodSheet';
+import { PlaylistSheet } from '@/components/PlaylistSheet';
+import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 
@@ -257,8 +260,9 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const [platform,      setPlatform]      = useState<{ id: PlatformId; name: string; color: string } | null>(null);
   const [dimmed,        setDimmed]        = useState(false);
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
-  const [showPlaylist,  setShowPlaylist]  = useState(false);
-  const playlistAnim = useRef(new Animated.Value(0)).current;
+  const [showMood,      setShowMood]      = useState(false);
+  const [showPicker,    setShowPicker]    = useState(false);
+  const [linked,        setLinked]        = useState<LinkedPlaylist | null>(null);
   const playBtnScale   = useRef(new Animated.Value(1)).current;
   const progress       = useRef(new Animated.Value(0)).current;
   const progressAnimRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -408,14 +412,9 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const topPad    = Math.max(insets.top, 20);
   const bottomPad = Math.max(insets.bottom, 24) + 20;
 
-  // ── Playlist sheet ────────────────────────────────────────────────────────
-  const openPlaylist = () => {
-    setShowPlaylist(true);
-    Animated.spring(playlistAnim, { toValue: 1, tension: 55, friction: 13, useNativeDriver: true }).start();
-  };
-  const closePlaylist = () => {
-    Animated.timing(playlistAnim, { toValue: 0, duration: 220, easing: Easing.out(Easing.ease), useNativeDriver: true }).start(() => setShowPlaylist(false));
-  };
+  useEffect(() => {
+    if (visible) getStationPlaylist(activeStation).then(setLinked);
+  }, [visible, activeStation]);
 
   // ── Swipe-down to dismiss (portrait) ─────────────────────────────────────
   const dismissPan = useRef(PanResponder.create({
@@ -700,56 +699,40 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             </TouchableOpacity>
           </View>
 
-          {/* Playlist button */}
-          <TouchableOpacity onPress={openPlaylist} style={fs.playlistBtn} activeOpacity={0.7}>
-            <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.45)" />
-            <Text style={fs.playlistBtnText}>PLAYLIST</Text>
-            <Ionicons name="chevron-up" size={14} color="rgba(255,255,255,0.45)" />
-          </TouchableOpacity>
+          {/* Left-aligned action pills — keep the bars the focus */}
+          <View style={fs.actionRow}>
+            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
+              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
+              <Text style={fs.actionPillBold}>Change Mood</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
+              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
+              <Text style={fs.actionPillText} numberOfLines={1}>
+                {linked ? linked.name : 'Add Playlist'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
         </View>
 
-        {/* Overlay tap to close sheet */}
-        {showPlaylist && (
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closePlaylist} activeOpacity={1} />
-        )}
+        <MoodSheet
+          visible={showMood}
+          activeId={activeStation}
+          onSelect={(id) => { setActiveStation(id); npSetStation(id); setShowMood(false); }}
+          onClose={() => setShowMood(false)}
+        />
 
-        {/* Playlist / station sheet */}
-        {showPlaylist && (
-          <Animated.View style={[fs.playlistSheet, {
-            transform: [{ translateY: playlistAnim.interpolate({ inputRange: [0, 1], outputRange: [SCREEN_H * 0.55, 0] }) }],
-          }]}>
-            <View style={fs.sheetHandle} />
-            <Text style={fs.sheetTitle}>CHANGE STATION</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 10, paddingVertical: 8 }}>
-              {STATIONS.map((s) => (
-                <TouchableOpacity
-                  key={s.id}
-                  onPress={() => { setActiveStation(s.id); npSetStation(s.id); closePlaylist(); }}
-                  style={[fs.stationPill, s.id === activeStation && fs.stationPillActive]}
-                  activeOpacity={0.75}>
-                  <LinearGradient
-                    colors={s.cardGradient}
-                    start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <MaterialCommunityIcons name={s.iconName as any} size={16} color="#ffffff" />
-                  <Text
-                    style={[fs.stationPillText, s.id === activeStation && fs.stationPillTextActive]}
-                    numberOfLines={1}>
-                    {s.name.replace(' FM', '')}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            {platform && (
-              <TouchableOpacity style={fs.sheetPlatformRow} onPress={() => openMusicPlatform(currentStation.name)} activeOpacity={0.75}>
-                <PlatformIcon id={platform.id} size={14} color={platform.color} />
-                <Text style={[fs.sheetPlatformText, { color: platform.color }]}>Open in {platform.name}</Text>
-                <Ionicons name="arrow-forward" size={13} color={platform.color} style={{ opacity: 0.7 }} />
-              </TouchableOpacity>
-            )}
-          </Animated.View>
+        {showPicker && (
+          <PlaylistSheet
+            stationName={currentStation.name}
+            current={linked}
+            onClose={() => setShowPicker(false)}
+            onPick={async (pl) => {
+              await setStationPlaylist(activeStation, pl);
+              setLinked(pl);
+              setShowPicker(false);
+            }}
+          />
         )}
 
       </Animated.View>
@@ -1034,6 +1017,17 @@ const fs = StyleSheet.create({
     marginBottom: 4,
   },
 
+  // ── Action pills ──────────────────────────────────────────────────────────
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22 },
+  actionPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    maxWidth: '58%',
+  },
+  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
+  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
   // ── Playlist button ───────────────────────────────────────────────────────
   playlistBtn: {
     marginTop: 20,

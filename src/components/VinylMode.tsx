@@ -16,6 +16,7 @@ import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
+import { MoodSheet } from '@/components/MoodSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -528,6 +529,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const [showTracks,    setShowTracks]    = useState(false);
   const [linked,        setLinked]        = useState<LinkedPlaylist | null>(null);
   const [showPicker,    setShowPicker]    = useState(false);
+  const [showMood,      setShowMood]      = useState(false);
 
   useEffect(() => {
     if (visible) getStationPlaylist(activeId).then(setLinked);
@@ -982,39 +984,28 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             </TouchableOpacity>
           </View>
 
-          {/* Station switcher — every mood re-skins the pressing */}
-          <ScrollView
-            horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 16 }}
-            contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}>
-            {STATIONS.map((s) => (
-              <TouchableOpacity
-                key={s.id}
-                onPress={() => { setActiveId(s.id); npSetStation(s.id); }}
-                style={[fs.stationPill, s.id === activeId && fs.stationPillActive]}
-                activeOpacity={0.75}>
-                <LinearGradient
-                  colors={s.cardGradient}
-                  start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <MaterialCommunityIcons name={s.iconName as any} size={16} color="#ffffff" />
-                <Text style={[{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600', maxWidth: 80 }, s.id === activeId && { color: '#ffffff', fontWeight: '800' }]} numberOfLines={1}>
-                  {s.name.replace(' FM', '')}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Playlist */}
-          <TouchableOpacity onPress={() => setShowPicker(true)} style={[fs.tracksBtn, { marginTop: 14 }]} activeOpacity={0.7}>
-            <Ionicons name="musical-notes-outline" size={14} color={V.textDim} />
-            <Text style={[fs.tracksBtnText, { fontFamily: Fonts.mono }]} numberOfLines={1}>
-              {linked ? linked.name.toUpperCase() : 'ADD PLAYLIST'}
-            </Text>
-            <Ionicons name="chevron-up" size={14} color={V.textDim} />
-          </TouchableOpacity>
+          {/* Left-aligned action pills — keep the record the focus */}
+          <View style={fs.actionRow}>
+            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
+              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
+              <Text style={fs.actionPillBold}>Change Mood</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
+              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
+              <Text style={fs.actionPillText} numberOfLines={1}>
+                {linked ? linked.name : 'Add Playlist'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
         </View>
+
+        <MoodSheet
+          visible={showMood}
+          activeId={activeId}
+          onSelect={(id) => { setActiveId(id); npSetStation(id); setShowMood(false); }}
+          onClose={() => setShowMood(false)}
+        />
 
         {showPicker && (
           <PlaylistSheet
@@ -1058,6 +1049,16 @@ const fs = StyleSheet.create({
 
   tracksBtn:     { marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: V.surfaceBorder, flexDirection: 'row', alignItems: 'center', gap: 8 },
   tracksBtnText: { color: V.textDim, fontSize: 9, fontWeight: '700', letterSpacing: 3 },
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22 },
+  actionPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    maxWidth: '58%',
+  },
+  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
+  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
   stationPill: {
     flexDirection: 'row', alignItems: 'center', gap: 7,
     paddingHorizontal: 14, height: 42,

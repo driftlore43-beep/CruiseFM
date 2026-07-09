@@ -433,9 +433,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const [platform,    setPlatform]    = useState<{ id: PlatformId; name: string; color: string } | null>(null);
   const [shuffle,     setShuffle]     = useState(false);
   const [repeat,      setRepeat]      = useState(false);
-  const [showTracks,  setShowTracks]  = useState(false);
   const [elapsedTxt,  setElapsedTxt]  = useState('00:00');
-  const showTracksAnim = useRef(new Animated.Value(0)).current;
   const playBtnScale = useRef(new Animated.Value(1)).current;
 
   // ── Animated values ─────────────────────────────────────────────────────────
@@ -606,16 +604,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const togglePlay = () => {
     if (playing) spotify.pause(); else spotify.play();
     setPlaying(!playing);
-  };
-
-  const toggleTracks = () => {
-    if (showTracks) {
-      Animated.timing(showTracksAnim, { toValue: 0, duration: 200, easing: Easing.out(Easing.ease), useNativeDriver: true }).start(() => setShowTracks(false));
-    } else {
-      setShowTracks(true);
-      showTracksAnim.setValue(0);
-      Animated.timing(showTracksAnim, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-    }
   };
 
   // Glow: 0.3 → 0.6 range, gentle amber pulse
@@ -872,45 +860,14 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             </TouchableOpacity>
           </View>
 
-          {/* Station switcher — flip to any mood */}
-          <StationSwitcher activeId={activeId} onSelect={(id) => { setActiveId(id); npSetStation(id); }} />
-
-          {/* PLAYLIST BUTTON */}
-          <TouchableOpacity onPress={toggleTracks} style={fs.playlistBtn} activeOpacity={0.7}>
-            <Ionicons name="musical-notes-outline" size={14} color={C.textDim} />
-            <Text style={[fs.playlistBtnText, { fontFamily: Fonts.mono }]}>PLAYLIST</Text>
-            <Ionicons name={showTracks ? 'chevron-up' : 'chevron-down'} size={14} color={C.textDim} />
-          </TouchableOpacity>
-
-        </View>
-
-        {/* Overlay */}
-        {showTracks && (
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            onPress={toggleTracks}
-            activeOpacity={1}
-          />
-        )}
-
-        {/* Playlist bottom sheet — tracks + station switcher + platform */}
-        <Animated.View style={[fs.playlistSheet, {
-          transform: [{ translateY: showTracksAnim.interpolate({ inputRange: [0, 1], outputRange: [SCREEN_H * 0.6, 0] }) }],
-        }]}>
-          <View style={fs.sheetHandle} />
-          <Text style={[fs.sheetTitle, { fontFamily: Fonts.mono }]}>PLAYLIST</Text>
-
-          <TrackList activeIdx={activeTrack} onSelect={(i) => { setActiveTrack(i); toggleTracks(); }} />
-
-          {/* Station switcher inside sheet */}
-          <View style={{ marginTop: 16, paddingHorizontal: 22 }}>
-            <Text style={{ color: '#ffffff', fontSize: 10.5, fontWeight: '800', letterSpacing: 3 }}>CHANGE STATION</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 10, paddingVertical: 8 }}>
+          {/* Station switcher — coloured pills, every mood re-skins the tape */}
+          <ScrollView
+            horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 16 }}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}>
             {STATIONS.map((s) => (
               <TouchableOpacity
                 key={s.id}
-                onPress={() => { setActiveId(s.id); npSetStation(s.id); toggleTracks(); }}
+                onPress={() => { setActiveId(s.id); npSetStation(s.id); }}
                 style={[fs.stationPill, s.id === activeId && fs.stationPillActive]}
                 activeOpacity={0.75}>
                 <LinearGradient
@@ -926,14 +883,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             ))}
           </ScrollView>
 
-          {platform && (
-            <TouchableOpacity style={fs.sheetPlatformRow} onPress={() => openMusicPlatform(station.name)} activeOpacity={0.75}>
-              <PlatformIcon id={platform.id} size={14} color={platform.color} />
-              <Text style={[fs.sheetPlatformText, { color: platform.color }]}>Open in {platform.name}</Text>
-              <Ionicons name="arrow-forward" size={13} color={platform.color} style={{ opacity: 0.7 }} />
-            </TouchableOpacity>
-          )}
-        </Animated.View>
+        </View>
 
       </Animated.View>
     </Modal>

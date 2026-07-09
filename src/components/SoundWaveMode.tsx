@@ -170,6 +170,18 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
   const glowTint = eq[1] + '26';
   const amp = ampRef.current;
 
+  // Rhythmic pulse — a ~112 BPM thump (sharp attack, quick decay) with an
+  // accented downbeat every bar. Fades in with play energy so idle stays calm.
+  // Note: playback is remote (Spotify), so this is a musical-feeling pulse,
+  // not true beat detection — the app never receives the audio signal.
+  const BPM = 112;
+  const beats = (phase / 1.7) * (BPM / 60);
+  const beatIdx = Math.floor(beats);
+  const accent = beatIdx % 4 === 0 ? 1 : 0.68;
+  const energy = Math.min(1, Math.max(0, (amp - 0.5) / 0.5));
+  const pulse = Math.exp(-(beats - beatIdx) * 4.5) * accent * energy;
+  const ampEff = amp * (1 + 0.32 * pulse);
+
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[{ flex: 1, backgroundColor: '#05060f' }, { transform: [{ translateY: slideY }] }]}>
@@ -242,12 +254,12 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
               {/* Wireframe mesh — every system's strands, all reacting at once */}
               {GROUPS.map((g, gi) =>
                 Array.from({ length: g.layers }).map((_, l) => (
-                  <Path key={`${gi}-${l}`} d={wavePath(phase, g, l, amp)} stroke="url(#swStroke)" strokeWidth={1.4} fill="none" strokeOpacity={0.34} strokeLinecap="round" />
+                  <Path key={`${gi}-${l}`} d={wavePath(phase, g, l, ampEff)} stroke="url(#swStroke)" strokeWidth={1.4} fill="none" strokeOpacity={0.34} strokeLinecap="round" />
                 ))
               )}
               {/* Bright core strand of each system */}
               {GROUPS.map((g, gi) => (
-                <Path key={`core-${gi}`} d={wavePath(phase, g, (g.layers - 1) / 2, amp)} stroke="url(#swStroke)" strokeWidth={gi === 0 ? 2.6 : 2} fill="none" strokeOpacity={gi === 0 ? 1 : 0.88} strokeLinecap="round" />
+                <Path key={`core-${gi}`} d={wavePath(phase, g, (g.layers - 1) / 2, ampEff)} stroke="url(#swStroke)" strokeWidth={gi === 0 ? 2.6 : 2} fill="none" strokeOpacity={gi === 0 ? 1 : 0.88} strokeLinecap="round" />
               ))}
             </Svg>
           </View>

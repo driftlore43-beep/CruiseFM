@@ -52,11 +52,11 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 - Status: ✅ OK / cleared
 
 ### ✅ night-run.jpg — "Night Run FM"
-- In frame: black coupe in a moody orange-lit underground car park. Car has aftermarket decals (a "POLEPOSITION" side graphic + an Instagram-handle sticker) — incidental to the depicted vehicle.
+- In frame: night city skyline glowing against a dark sky, tree silhouettes below. No cars, people or brands. (Replaced the garage-coupe photo 2026-07-09 — the car cluttered the visualiser backdrops.)
 - Type: real photograph.
-- Source: Unsplash — photo-1583102397498-aaf0e4cc58db (2026-07-08).
+- Source: Unsplash — photo-1667754248024-e1e03e60eb72 (2026-07-09).
 - License: **Unsplash License** (free commercial use, no attribution required).
-- Risk: **Low** — licensed source; the decals are part of the depicted modified car (editorial), not used as marketing.
+- Risk: **Low** — licensed source; nothing identifiable in frame.
 - Status: ✅ OK / cleared
 
 ### ✅ sunset.jpg — "Sunset FM"

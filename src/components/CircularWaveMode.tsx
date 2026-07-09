@@ -5,7 +5,7 @@ import {
   Animated, Dimensions, Easing, ImageBackground, Modal,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { STATIONS } from '@/constants/stations';
@@ -15,21 +15,14 @@ import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 
 const SCREEN_H = Dimensions.get('window').height;
 
-// Orb geometry (SVG viewBox units)
+// Ring geometry (SVG viewBox units)
 const VB = 300;
 const CX = VB / 2;
 const CY = VB / 2;
-const R0 = 86;          // sphere radius / inner ring
-const MAXLEN = 46;      // outward EQ bar length
+const R0 = 102;         // hollow ring radius — the bars' base circle
+const MAXLEN = 40;      // outward EQ bar length at full burst
+const MINLEN = 3;       // resting bars read as chunky dots
 const NBARS = 64;
-
-// Static latitude rings (flattened → wireframe-globe look)
-const LAT = [-0.82, -0.55, -0.28, 0, 0.28, 0.55, 0.82].map((f) => {
-  const off = R0 * f;
-  const rx = Math.sqrt(Math.max(1, R0 * R0 - off * off));
-  return { cy: off, rx, ry: rx * 0.2 };
-});
-const NMERID = 6;       // rotating meridians
 
 const DEMO_DURATION_MS = 214000; // 3:34
 
@@ -48,12 +41,14 @@ function spectrum(a: number, phase: number): number {
   );
 }
 
-// All outward bars as one path.
-function orbBars(phase: number, amp: number): string {
+// All outward bars as one path. Peaks are sharpened so the ring reads as
+// resting dots with wave bursts sweeping around it (reference-clip look).
+function ringBars(phase: number, amp: number): string {
   let d = '';
   for (let i = 0; i < NBARS; i++) {
-    const a = (i / NBARS) * Math.PI * 2 + phase * 0.22;   // slow rotation
-    const len = MAXLEN * amp * Math.max(0.12, spectrum(a, phase));
+    const a = (i / NBARS) * Math.PI * 2;
+    const burst = Math.pow(Math.max(0, spectrum(a, phase)), 2.6);
+    const len = MINLEN + MAXLEN * amp * burst;
     const c = Math.cos(a), s = Math.sin(a);
     d += `M${(CX + R0 * c).toFixed(1)} ${(CY + R0 * s).toFixed(1)}L${(CX + (R0 + len) * c).toFixed(1)} ${(CY + (R0 + len) * s).toFixed(1)}`;
   }
@@ -151,7 +146,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   const fill = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
   const glowTint = eq[1] + '26';
   const amp = ampRef.current;
-  const orbSize = Math.min(winW * 0.94, winH * 0.47, 400);
+  const orbSize = Math.min(winW * 1.02, winH * 0.54, 460);
 
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
@@ -213,36 +208,16 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
                   <Stop offset="1" stopColor={eq[2]} />
                 </RadialGradient>
                 <RadialGradient id="cwCore" cx="0.5" cy="0.5" r="0.5">
-                  <Stop offset="0" stopColor={eq[1]} stopOpacity="0.30" />
-                  <Stop offset="0.7" stopColor={eq[2]} stopOpacity="0.10" />
+                  <Stop offset="0" stopColor={eq[1]} stopOpacity="0.16" />
+                  <Stop offset="0.7" stopColor={eq[2]} stopOpacity="0.07" />
                   <Stop offset="1" stopColor={eq[2]} stopOpacity="0" />
-                </RadialGradient>
-                {/* Spherical shading — lit upper-left, shadowed lower-right */}
-                <RadialGradient id="cwSphere" cx="0.36" cy="0.30" r="0.85">
-                  <Stop offset="0" stopColor="#EAF3FF" stopOpacity="0.22" />
-                  <Stop offset="0.5" stopColor={eq[1]} stopOpacity="0.10" />
-                  <Stop offset="1" stopColor="#01030f" stopOpacity="0.44" />
                 </RadialGradient>
               </Defs>
 
-              {/* Outer halo */}
+              {/* Soft halo so the ring reads over the scene — centre stays hollow */}
               <Circle cx={CX} cy={CY} r={R0 + MAXLEN} fill="url(#cwCore)" />
-              {/* Shaded sphere body */}
-              <Circle cx={CX} cy={CY} r={R0} fill="url(#cwSphere)" />
-              {/* Latitude rings (flattened → globe) */}
-              {LAT.map((l, i) => (
-                <Ellipse key={`lat${i}`} cx={CX} cy={CY + l.cy} rx={l.rx} ry={l.ry} stroke={eq[1]} strokeOpacity={0.16} strokeWidth={0.9} fill="none" />
-              ))}
-              {/* Rotating meridians (spin the sphere) */}
-              {Array.from({ length: NMERID }).map((_, k) => {
-                const th = (k / NMERID) * Math.PI + phase * 0.6;
-                const rx = Math.max(1, Math.abs(R0 * Math.cos(th)));
-                return <Ellipse key={`mer${k}`} cx={CX} cy={CY} rx={rx} ry={R0} stroke={eq[1]} strokeOpacity={0.15} strokeWidth={0.9} fill="none" />;
-              })}
-              {/* Rim */}
-              <Circle cx={CX} cy={CY} r={R0} stroke={eq[0]} strokeOpacity={0.55} strokeWidth={1.4} fill="none" />
-              {/* EQ bars radiating from the surface */}
-              <Path d={orbBars(phase, amp)} stroke="url(#cwStroke)" strokeWidth={2.4} strokeOpacity={0.95} fill="none" strokeLinecap="round" />
+              {/* Chunky EQ dashes — resting dots with bursts sweeping the ring */}
+              <Path d={ringBars(phase, amp)} stroke="url(#cwStroke)" strokeWidth={5} strokeOpacity={0.97} fill="none" strokeLinecap="round" />
             </Svg>
           </View>
 

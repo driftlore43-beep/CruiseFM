@@ -18,8 +18,7 @@ const SCREEN_H = Dimensions.get('window').height;
 // Waveform geometry (SVG viewBox units — scales to fit)
 const VB_W = 360;
 const VB_H = 240;
-const LAYERS = 16;
-const POINTS = 48;
+const POINTS = 56;
 
 const DEMO_DURATION_MS = 214000; // 3:34
 
@@ -28,24 +27,42 @@ function formatMs(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-// ── One flowing waveform line ───────────────────────────────────────────────────
-function wavePath(phase: number, layer: number, amp: number): string {
-  const cx = VB_W / 2;
+// ── Independent wave systems — each cluster has its own home, speed & motion ──
+// Three overlapping wireframe waves (reference: layered mesh with a tall centre
+// spike and smaller clusters either side), all sharing one horizontal core line.
+type WaveGroup = {
+  cx: number;      // cluster centre along the width (0..1)
+  k: number;       // envelope tightness — higher = narrower cluster
+  speed: number;   // phase speed multiplier
+  dir: 1 | -1;     // travel direction
+  f1: number; f2: number; f3: number;  // harmonic frequencies
+  layers: number;  // mesh strands in this system
+};
+const GROUPS: WaveGroup[] = [
+  { cx: 0.50, k: 5.6, speed: 1.00, dir: 1,  f1: 2.3, f2: 5.7, f3: 11.0, layers: 7 },
+  { cx: 0.29, k: 7.2, speed: 1.45, dir: -1, f1: 3.1, f2: 7.3, f3: 13.0, layers: 6 },
+  { cx: 0.73, k: 6.4, speed: 0.75, dir: 1,  f1: 1.9, f2: 4.9, f3:  9.0, layers: 6 },
+];
+
+// One strand of one wave system.
+function wavePath(phase: number, g: WaveGroup, layer: number, amp: number): string {
   const cy = VB_H / 2;
-  const lp = (layer - (LAYERS - 1) / 2) * 0.17;              // per-layer phase spread → woven mesh
-  const layerAmp = amp * (1 - Math.abs(layer - (LAYERS - 1) / 2) / LAYERS * 0.8);
+  const lp = (layer - (g.layers - 1) / 2) * 0.24;            // strand spread → wireframe mesh
+  const layerAmp = amp * (1 - (Math.abs(layer - (g.layers - 1) / 2) / g.layers) * 0.75);
+  const ph = phase * g.speed * g.dir;
   const xs: number[] = [];
   const ys: number[] = [];
   for (let i = 0; i <= POINTS; i++) {
     const t = i / POINTS;
     const x = t * VB_W;
-    const nx = (x - cx) / (VB_W * 0.5);
-    const env = Math.exp(-nx * nx * 3.0);                    // amplitude bulge in the centre
+    const dx = (t - g.cx) * g.k;
+    const env = Math.exp(-dx * dx);                          // this system's own bulge
     const wob =
-      Math.sin(t * Math.PI * 2 * 2.3 + phase + lp) * 0.7 +
-      Math.sin(t * Math.PI * 2 * 3.7 + phase * 1.35 + lp * 1.4) * 0.3;
+      Math.sin(t * Math.PI * 2 * g.f1 + ph + lp) * 0.55 +
+      Math.sin(t * Math.PI * 2 * g.f2 - ph * 1.3 + lp * 1.4) * 0.30 +
+      Math.sin(t * Math.PI * 2 * g.f3 + ph * 0.7 - lp) * 0.15;
     xs.push(x);
-    ys.push(cy + wob * env * layerAmp * VB_H * 0.44);
+    ys.push(cy + wob * env * layerAmp * VB_H * 0.78);        // amplified peaks
   }
   // Smooth through the points with quadratic curves (midpoint method) → silky line.
   let d = `M${xs[0].toFixed(1)} ${ys[0].toFixed(1)}`;
@@ -222,12 +239,16 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
               {/* Soft central glow */}
               <Ellipse cx={VB_W / 2} cy={VB_H / 2} rx={VB_W * 0.46} ry={VB_H * 0.34} fill="url(#swGlow)" />
 
-              {/* Woven layers */}
-              {Array.from({ length: LAYERS }).map((_, l) => (
-                <Path key={l} d={wavePath(phase, l, amp)} stroke="url(#swStroke)" strokeWidth={1.1} fill="none" strokeOpacity={0.14} strokeLinecap="round" />
+              {/* Wireframe mesh — every system's strands, all reacting at once */}
+              {GROUPS.map((g, gi) =>
+                Array.from({ length: g.layers }).map((_, l) => (
+                  <Path key={`${gi}-${l}`} d={wavePath(phase, g, l, amp)} stroke="url(#swStroke)" strokeWidth={1.1} fill="none" strokeOpacity={0.15} strokeLinecap="round" />
+                ))
+              )}
+              {/* Bright core strand of each system */}
+              {GROUPS.map((g, gi) => (
+                <Path key={`core-${gi}`} d={wavePath(phase, g, (g.layers - 1) / 2, amp)} stroke="url(#swStroke)" strokeWidth={gi === 0 ? 2 : 1.5} fill="none" strokeOpacity={gi === 0 ? 0.95 : 0.7} strokeLinecap="round" />
               ))}
-              {/* Bright core strand */}
-              <Path d={wavePath(phase, (LAYERS - 1) / 2, amp)} stroke="url(#swStroke)" strokeWidth={2} fill="none" strokeOpacity={0.95} strokeLinecap="round" />
             </Svg>
           </View>
 

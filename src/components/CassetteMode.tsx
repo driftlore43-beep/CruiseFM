@@ -12,6 +12,9 @@ import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
+import { MoodSheet } from '@/components/MoodSheet';
+import { PlaylistSheet } from '@/components/PlaylistSheet';
+import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 
@@ -434,6 +437,9 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const [shuffle,     setShuffle]     = useState(false);
   const [repeat,      setRepeat]      = useState(false);
   const [elapsedTxt,  setElapsedTxt]  = useState('00:00');
+  const [showMood,    setShowMood]    = useState(false);
+  const [showPicker,  setShowPicker]  = useState(false);
+  const [linked,      setLinked]      = useState<LinkedPlaylist | null>(null);
   const playBtnScale = useRef(new Animated.Value(1)).current;
 
   // ── Animated values ─────────────────────────────────────────────────────────
@@ -598,6 +604,10 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const handleClose = () => {
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
+
+  useEffect(() => {
+    if (visible) getStationPlaylist(activeId).then(setLinked);
+  }, [visible, activeId]);
 
   const spotify = useSpotifyPlayback(visible);
 
@@ -860,30 +870,41 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             </TouchableOpacity>
           </View>
 
-          {/* Station switcher — coloured pills, every mood re-skins the tape */}
-          <ScrollView
-            horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 16 }}
-            contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}>
-            {STATIONS.map((s) => (
-              <TouchableOpacity
-                key={s.id}
-                onPress={() => { setActiveId(s.id); npSetStation(s.id); }}
-                style={[fs.stationPill, s.id === activeId && fs.stationPillActive]}
-                activeOpacity={0.75}>
-                <LinearGradient
-                  colors={s.cardGradient}
-                  start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <MaterialCommunityIcons name={s.iconName as any} size={16} color="#ffffff" />
-                <Text style={[fs.stationPillText, s.id === activeId && { color: '#ffffff', fontWeight: '800' }]} numberOfLines={1}>
-                  {s.name.replace(' FM', '')}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {/* Left-aligned action pills — keeps the tape the focus */}
+          <View style={fs.actionRow}>
+            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
+              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
+              <Text style={fs.actionPillBold}>Change Mood</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
+              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
+              <Text style={fs.actionPillText} numberOfLines={1}>
+                {linked ? linked.name : 'Add Playlist'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
         </View>
+
+        <MoodSheet
+          visible={showMood}
+          activeId={activeId}
+          onSelect={(id) => { setActiveId(id); npSetStation(id); setShowMood(false); }}
+          onClose={() => setShowMood(false)}
+        />
+
+        {showPicker && (
+          <PlaylistSheet
+            stationName={station.name}
+            current={linked}
+            onClose={() => setShowPicker(false)}
+            onPick={async (pl) => {
+              await setStationPlaylist(activeId, pl);
+              setLinked(pl);
+              setShowPicker(false);
+            }}
+          />
+        )}
 
       </Animated.View>
     </Modal>
@@ -1005,6 +1026,18 @@ const fs = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9,
   },
   playlistBtnText: { color: C.textDim, fontSize: 10, fontWeight: '700', letterSpacing: 2.5 },
+  actionRow: {
+    flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22,
+  },
+  actionPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    maxWidth: '58%',
+  },
+  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
+  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
 
   playlistSheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,

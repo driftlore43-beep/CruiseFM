@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, ImageBackground, Modal,
+  Animated, Dimensions, Easing, ImageBackground, Modal, ScrollView,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, Line, LinearGradient as SvgGradient, Mask, Rect, RadialGradient, Stop } from 'react-native-svg';
@@ -135,7 +135,8 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const { height: winH } = useWindowDimensions();
   const topPad = Math.max(insets.top, 20);
 
-  const station = STATIONS.find((s) => s.id === stationId) ?? STATIONS[0];
+  const [activeId, setActiveId] = useState(stationId ?? 'night-run');
+  const station = STATIONS.find((s) => s.id === activeId) ?? STATIONS[0];
   const spotify = useSpotifyPlayback(visible);
   const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
 
@@ -203,6 +204,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
 
   useEffect(() => {
     if (!visible) return;
+    if (stationId) setActiveId(stationId);
     slideY.setValue(SCREEN_H);
     setPlaying(false); progress.setValue(0); setElapsedMs(0); ampRef.current = 0.5;
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
@@ -259,10 +261,31 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
 
         {/* Content */}
         <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>
-          <View style={{ alignItems: 'center', gap: 3, paddingHorizontal: 32, paddingBottom: 10 }}>
+          <View style={{ alignItems: 'center', gap: 3, paddingHorizontal: 32, paddingBottom: 8 }}>
             <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 }}>PLAYING FROM</Text>
             <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>{station.name}</Text>
           </View>
+
+          {/* Station switcher — every mood re-colours the whole horizon */}
+          <ScrollView
+            horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingVertical: 4 }}>
+            {STATIONS.map((s) => {
+              const active = s.id === activeId;
+              return (
+                <TouchableOpacity
+                  key={s.id}
+                  onPress={() => setActiveId(s.id)}
+                  activeOpacity={0.75}
+                  style={[fs.pill, active && { borderColor: eq[1], backgroundColor: eq[1] + '26' }]}>
+                  <MaterialCommunityIcons name={s.iconName as any} size={13} color={active ? '#ffffff' : 'rgba(255,255,255,0.55)'} />
+                  <Text style={[fs.pillText, active && { color: '#ffffff', fontWeight: '800' }]} numberOfLines={1}>
+                    {s.name.replace(' FM', '')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
 
           {/* Outrun scene */}
           <View style={{ flex: 1 }}>
@@ -370,4 +393,11 @@ const fs = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
   playlistBtnText: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  pillText: { color: 'rgba(255,255,255,0.6)', fontSize: 11.5, fontWeight: '600', maxWidth: 92 },
 });

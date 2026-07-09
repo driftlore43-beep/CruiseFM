@@ -261,31 +261,10 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
 
         {/* Content */}
         <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>
-          <View style={{ alignItems: 'center', gap: 3, paddingHorizontal: 32, paddingBottom: 8 }}>
+          <View style={{ alignItems: 'center', gap: 3, paddingHorizontal: 32, paddingBottom: 10 }}>
             <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 }}>PLAYING FROM</Text>
             <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>{station.name}</Text>
           </View>
-
-          {/* Station switcher — every mood re-colours the whole horizon */}
-          <ScrollView
-            horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
-            contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingVertical: 4 }}>
-            {STATIONS.map((s) => {
-              const active = s.id === activeId;
-              return (
-                <TouchableOpacity
-                  key={s.id}
-                  onPress={() => setActiveId(s.id)}
-                  activeOpacity={0.75}
-                  style={[fs.pill, active && { borderColor: eq[1], backgroundColor: eq[1] + '26' }]}>
-                  <MaterialCommunityIcons name={s.iconName as any} size={13} color={active ? '#ffffff' : 'rgba(255,255,255,0.55)'} />
-                  <Text style={[fs.pillText, active && { color: '#ffffff', fontWeight: '800' }]} numberOfLines={1}>
-                    {s.name.replace(' FM', '')}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
 
           {/* Outrun scene */}
           <View style={{ flex: 1 }}>
@@ -335,8 +314,29 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             </TouchableOpacity>
           </View>
 
+          {/* Station switcher — every mood re-colours the whole horizon */}
+          <ScrollView
+            horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 16 }}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+            {STATIONS.map((s) => {
+              const active = s.id === activeId;
+              return (
+                <TouchableOpacity
+                  key={s.id}
+                  onPress={() => setActiveId(s.id)}
+                  activeOpacity={0.75}
+                  style={[fs.pill, active && { borderColor: eq[1], backgroundColor: eq[1] + '26' }]}>
+                  <MaterialCommunityIcons name={s.iconName as any} size={13} color={active ? '#ffffff' : 'rgba(255,255,255,0.55)'} />
+                  <Text style={[fs.pillText, active && { color: '#ffffff', fontWeight: '800' }]} numberOfLines={1}>
+                    {s.name.replace(' FM', '')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
           {/* Playlist */}
-          <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.playlistBtn} activeOpacity={0.75}>
+          <TouchableOpacity onPress={() => setShowPicker(true)} style={[fs.playlistBtn, { marginTop: 14 }]} activeOpacity={0.75}>
             <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.6)" />
             <Text style={[fs.playlistBtnText, { fontFamily: Fonts.mono }]} numberOfLines={1}>
               {linked ? linked.name.toUpperCase() : 'ADD PLAYLIST'}

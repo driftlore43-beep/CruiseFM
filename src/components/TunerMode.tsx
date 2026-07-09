@@ -36,6 +36,9 @@ const STATION_FREQS: Record<string, number> = {
 
 const DEMO_DURATION_MS = 214000; // 3:34
 
+// Classic broadcast-studio red for the ON AIR lamp.
+const ON_AIR_RED = '#FF3B30';
+
 function formatMs(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -354,8 +357,8 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
             {/* ON AIR chip */}
             <View style={{ alignItems: 'center', marginBottom: 6, opacity: 0.25 + lock * 0.75 }}>
-              <View style={[fs.onAirChip, { borderColor: accent + '88', backgroundColor: accent + '1e' }]}>
-                <View style={[fs.onAirDot, { backgroundColor: lock > 0.9 ? accent : 'rgba(255,255,255,0.25)' }]} />
+              <View style={[fs.onAirChip, { borderColor: ON_AIR_RED + '99', backgroundColor: ON_AIR_RED + '26' }]}>
+                <View style={[fs.onAirDot, { backgroundColor: lock > 0.9 ? ON_AIR_RED : 'rgba(255,255,255,0.25)' }]} />
                 <Text style={[fs.onAirText, { fontFamily: Fonts.mono, color: lock > 0.9 ? '#fff' : 'rgba(255,255,255,0.5)' }]}>
                   {lock > 0.9 ? 'ON AIR' : 'TUNING'}
                 </Text>

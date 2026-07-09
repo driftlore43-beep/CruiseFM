@@ -29,7 +29,7 @@ function formatHours(totalMinutes: number): string {
 }
 
 const PREMIUM_ITEMS: { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; sub: string }[] = [
-  { icon: 'album',            label: 'Premium Music Modes', sub: 'Vinyl, Radio, Horizon & Orb' },
+  { icon: 'album',            label: 'Premium Music Modes', sub: 'Vinyl, Tuner, Horizon & Orb' },
   { icon: 'palette',          label: 'Visual Mood Themes',  sub: 'All premium palettes & imagery' },
   { icon: 'playlist-music',   label: 'Unlimited Playlists', sub: 'Build as many stations as you like' },
   { icon: 'star-four-points', label: 'Future Additions',    sub: 'New modes & moods, always included' },

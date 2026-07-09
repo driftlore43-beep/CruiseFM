@@ -144,7 +144,7 @@ export default function VisualsScreen() {
         </VisualCard>
 
         <VisualCard
-          title="Retro Radio"
+          title="Tuner"
           subtitle="Old-school frequency dial. Glowing amber numbers.">
           <FreqDisplay />
         </VisualCard>

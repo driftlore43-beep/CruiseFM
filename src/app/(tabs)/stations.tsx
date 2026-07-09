@@ -12,7 +12,7 @@ import { EqualizerFullscreen } from '@/components/EqualizerMode';
 import { VinylFullscreen } from '@/components/VinylMode';
 import { CassetteFullscreen } from '@/components/CassetteMode';
 import { HorizonFullscreen } from '@/components/HorizonMode';
-import { RetroRadioFullscreen } from '@/components/RetroRadioMode';
+import { TunerFullscreen } from '@/components/TunerMode';
 import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
 import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
 import { GlossSheen } from '@/components/GlossSheen';
@@ -254,7 +254,7 @@ export default function StationsScreen() {
         onClose={closeMode}
         stationId={activeStationId}
       />
-      <RetroRadioFullscreen
+      <TunerFullscreen
         visible={activeMode === 'radio'}
         onClose={closeMode}
         stationId={activeStationId}

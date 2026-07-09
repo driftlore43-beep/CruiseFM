@@ -13,7 +13,7 @@ import { StationDetailModal } from '@/components/StationDetailModal';
 import { EqualizerFullscreen } from '@/components/EqualizerMode';
 import { VinylFullscreen } from '@/components/VinylMode';
 import { CassetteFullscreen } from '@/components/CassetteMode';
-import { RetroRadioFullscreen } from '@/components/RetroRadioMode';
+import { TunerFullscreen } from '@/components/TunerMode';
 import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
 import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
 import { OWNER_MODE } from '@/constants/config';
@@ -35,7 +35,7 @@ const MODE_LABELS: Record<string, string> = {
   cassette: 'Cassette',
   equalizer: 'Equalizer',
   vinyl: 'Vinyl',
-  radio: 'Retro Radio',
+  radio: 'Tuner',
   horizon: 'Horizon',
   waves: 'Sound Waves',
   orb: 'Circular EQ',
@@ -167,7 +167,7 @@ export default function CruiseScreen() {
       <EqualizerFullscreen visible={activeMode === 'equalizer'} onClose={closeMode} stationId={activeStationId} />
       <VinylFullscreen visible={activeMode === 'vinyl'} onClose={closeMode} stationId={activeStationId} />
       <CassetteFullscreen visible={activeMode === 'cassette'} onClose={closeMode} stationId={activeStationId} />
-      <RetroRadioFullscreen visible={activeMode === 'radio'} onClose={closeMode} stationId={activeStationId} />
+      <TunerFullscreen visible={activeMode === 'radio'} onClose={closeMode} stationId={activeStationId} />
       <HorizonFullscreen visible={activeMode === 'horizon'} onClose={closeMode} stationId={activeStationId} />
       <SoundWaveFullscreen visible={activeMode === 'waves'} onClose={closeMode} stationId={activeStationId} />
       <CircularWaveFullscreen visible={activeMode === 'orb'} onClose={closeMode} stationId={activeStationId} />

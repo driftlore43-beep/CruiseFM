@@ -16,7 +16,7 @@ import { EqualizerFullscreen } from '@/components/EqualizerMode';
 import { CassetteFullscreen } from '@/components/CassetteMode';
 import { HorizonFullscreen } from '@/components/HorizonMode';
 import { VinylFullscreen } from '@/components/VinylMode';
-import { RetroRadioFullscreen } from '@/components/RetroRadioMode';
+import { TunerFullscreen } from '@/components/TunerMode';
 import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
 import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
 import { GlossSheen } from '@/components/GlossSheen';
@@ -213,9 +213,9 @@ export default function ModesScreen() {
 
         <AnimatedCard scrollY={scrollY} onPress={() => open('radio', !isPro)} style={{ marginBottom: 14 }}>
           <CompactModeCard
-            title="Retro FM Radio Mode"
-            desc="Glowing frequency dial and a satisfying weighted tuner slider."
-            icon="radio"
+            title="Tuner Mode"
+            desc="Drag the dial — glide between moods and lock onto a station."
+            icon="radio-tower"
             gradient={['#6a3ae0', '#3a6aa8', '#1a8a9a']}
             locked={!isPro}
             premium
@@ -259,7 +259,7 @@ export default function ModesScreen() {
       <EqualizerFullscreen visible={activeMode === 'equalizer'} onClose={() => setActiveMode(null)} />
       <CassetteFullscreen visible={activeMode === 'cassette'} onClose={() => setActiveMode(null)} />
       <VinylFullscreen visible={activeMode === 'vinyl'} onClose={() => setActiveMode(null)} />
-      <RetroRadioFullscreen visible={activeMode === 'radio'} onClose={() => setActiveMode(null)} />
+      <TunerFullscreen visible={activeMode === 'radio'} onClose={() => setActiveMode(null)} />
       <HorizonFullscreen visible={activeMode === 'horizon'} onClose={() => setActiveMode(null)} />
       <SoundWaveFullscreen visible={activeMode === 'waves'} onClose={() => setActiveMode(null)} />
       <CircularWaveFullscreen visible={activeMode === 'orb'} onClose={() => setActiveMode(null)} />

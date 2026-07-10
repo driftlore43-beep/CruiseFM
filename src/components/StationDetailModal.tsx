@@ -140,9 +140,6 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
         <View style={[styles.dragPill, { top: topPad - 8 }]}>
           <View style={styles.pillBar} />
         </View>
-        <Pressable style={[styles.closeBtn, { top: topPad }]} onPress={handleClose} hitSlop={12}>
-          <Ionicons name="close" size={16} color="rgba(255,255,255,0.85)" />
-        </Pressable>
 
         {/* Custom stations: their icon becomes the hero, glowing in their colour */}
         {custom && (
@@ -374,14 +371,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#02020c' },
   dragPill: { position: 'absolute', alignSelf: 'center', zIndex: 10, alignItems: 'center' },
   pillBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.4)' },
-  closeBtn: {
-    position: 'absolute', right: 20, zIndex: 10,
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
-  },
-  closeBtnText: { color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: '600' },
   content: { paddingHorizontal: 24 },
 
   // ── Custom-station chrome ──

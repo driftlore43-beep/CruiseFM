@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, Modal, ScrollView,
+  Animated, Dimensions, Easing, Modal, PanResponder, ScrollView,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
@@ -145,6 +145,19 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
+  // Swipe down anywhere to drop back to the mini-player — the one exit
+  // gesture shared by every mode (the mini-player's X ends the music).
+  const dismissPan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.4,
+    onPanResponderMove: (_, g) => { if (g.dy > 0) slideY.setValue(g.dy); },
+    onPanResponderRelease: (_, g) => {
+      if (g.dy > 120 || g.vy > 0.8) handleClose();
+      else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+    },
+  })).current;
+
+
   const resetTrack = () => { progress.setValue(0); setElapsedMs(0); };
   const togglePlay = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
 
@@ -157,7 +170,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
 
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
-      <Animated.View style={[{ flex: 1, backgroundColor: '#04060f' }, { transform: [{ translateY: slideY }] }]}>
+      <Animated.View style={[{ flex: 1, backgroundColor: '#04060f' }, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
 
         {/* Blurred station background */}
         <StationBackdrop station={station} blurRadius={2.5} />
@@ -186,9 +199,6 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
         {/* Top bar */}
         <View style={[fs.topBar, { top: topPad + 14 }]}>
           <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>CIRCULAR EQ</Text>
-          <TouchableOpacity style={fs.closeBtn} onPress={handleClose} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}>
-            <Ionicons name="chevron-down" size={20} color="rgba(255,255,255,0.6)" />
-          </TouchableOpacity>
         </View>
 
         {/* Content */}

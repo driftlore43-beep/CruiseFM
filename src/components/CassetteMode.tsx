@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, Modal, ScrollView, StyleSheet,
+  Animated, Dimensions, Easing, Modal, PanResponder, ScrollView, StyleSheet,
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -607,6 +607,19 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
+  // Swipe down anywhere to drop back to the mini-player — the one exit
+  // gesture shared by every mode (the mini-player's X ends the music).
+  const dismissPan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.4,
+    onPanResponderMove: (_, g) => { if (g.dy > 0) slideY.setValue(g.dy); },
+    onPanResponderRelease: (_, g) => {
+      if (g.dy > 120 || g.vy > 0.8) handleClose();
+      else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+    },
+  })).current;
+
+
   useEffect(() => {
     if (visible) getStationPlaylist(activeId).then(setLinked);
   }, [visible, activeId]);
@@ -669,16 +682,10 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
     return (
       <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
-        <View style={[fs.container, { backgroundColor: C.bg }]}>
+        <View style={[fs.container, { backgroundColor: C.bg }]} {...dismissPan.panHandlers}>
           {background}
           <GrainOverlay />
 
-          <TouchableOpacity
-            style={[fs.closeBtn, { top: Math.max(insets.top, 8) + 2, right: safeR + 14 }]}
-            onPress={handleClose}
-            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}>
-            <Ionicons name="chevron-down" size={20} color={C.textDim} />
-          </TouchableOpacity>
 
           <View style={{ flex: 1, flexDirection: 'row' }}>
             {/* Left column */}
@@ -761,7 +768,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   // ── Portrait ───────────────────────────────────────────────────────────────
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
-      <Animated.View style={[fs.container, { backgroundColor: C.bg, transform: [{ translateY: slideY }] }]}>
+      <Animated.View style={[fs.container, { backgroundColor: C.bg, transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
         {background}
         <GrainOverlay />
 
@@ -775,12 +782,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
         {/* Floating chrome */}
         <View style={[fs.floatingTop, { top: topPad + 8, zIndex: 10 }]}>
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
-          <TouchableOpacity
-            style={[fs.closeBtn, { position: 'absolute', right: 22, top: 0 }]}
-            onPress={handleClose}
-            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}>
-            <Ionicons name="close" size={17} color={C.textDim} />
-          </TouchableOpacity>
         </View>
 
         <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: bottomPad }}>

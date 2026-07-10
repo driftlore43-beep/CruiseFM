@@ -450,14 +450,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     </>
   );
 
-  // ── Shared close button ───────────────────────────────────────────────────
-  const CloseBtn = ({ style }: { style?: object }) => (
-    <Animated.View style={[fs.closeBtnWrap, style, { transform: [{ scale: closePulse }] }]}>
-      <TouchableOpacity style={fs.closeBtn} onPress={handleClose} activeOpacity={0.8}>
-        <Ionicons name="chevron-down" size={24} color="#ffffff" />
-      </TouchableOpacity>
-    </Animated.View>
-  );
 
   // ─────────────────────────────────────────────────────────────────────────
   // LANDSCAPE LAYOUT
@@ -470,7 +462,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
     return (
       <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
-        <View style={ls.container}>
+        <View style={ls.container} {...dismissPan.panHandlers}>
           {background}
 
           {/* Safety banner — fades out after 3s */}
@@ -493,8 +485,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             />
           </TouchableOpacity>
 
-          {/* X button — top right */}
-          <CloseBtn style={{ position: 'absolute', top: Math.max(insets.top, 8) + 2, right: safeRight + 14, zIndex: 20 }} />
 
           {/* Two-column row */}
           <View style={ls.columns}>
@@ -611,7 +601,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
         </View>
 
         {/* Close button — fixed top right, always visible */}
-        <CloseBtn style={{ position: 'absolute', top: topPad + 10, right: 20, zIndex: 30 }} />
 
         {/* Content */}
         <View style={[fs.content, { paddingTop: topPad + 52, paddingBottom: bottomPad }]}>

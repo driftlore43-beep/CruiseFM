@@ -907,9 +907,6 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         {/* Floating header */}
         <View style={[fs.floatingTop, { top: topPad + 4, zIndex: 10 }]}>
           <View style={fs.dragPill} />
-          <TouchableOpacity style={[fs.closeBtn, { position: 'absolute', right: 22, top: 0 }]} onPress={handleClose} hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}>
-            <Ionicons name="chevron-down" size={20} color={V.textDim} />
-          </TouchableOpacity>
         </View>
 
         <View style={{ flex: 1, paddingTop: topPad + 52, alignItems: 'center' }}>

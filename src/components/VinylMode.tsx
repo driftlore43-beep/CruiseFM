@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OWNER_MODE } from '@/constants/config';
 import { Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
+import { resolveAnyStation } from '@/utils/customStations';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
@@ -808,7 +809,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
-  const station      = STATIONS.find((s) => s.id === activeId) ?? STATIONS[0];
+  const station      = resolveAnyStation(activeId);
   const currentTrack = VINYL_TRACKS[activeTrack];
   const spotify = useSpotifyPlayback(visible);
   const platSize     = Math.min(winW * 0.9, winH * 0.46);

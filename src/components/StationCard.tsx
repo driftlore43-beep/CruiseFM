@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Cruise } from '@/constants/theme';
@@ -44,11 +44,11 @@ async function handleStartDrive(stationName: string) {
 }
 
 // ── Landscape postcard for the horizontal recommended strip (250 × 150) ───────
-// Photo-first: the station's scene runs sharp and full-bleed; the mood colour
-// lives in the glow around the card and the tinted tag chip, not on the photo.
+// Accent-first: the card wears the station's own accent palette (eqColors) as
+// a vivid diagonal gradient under the glass finish.
 function CompactCard({ station, onPress }: { station: Station; onPress?: () => void }) {
   const platformColor = usePlatformColor();
-  const tagTint = station.eqColors?.[1] ?? '#ffffff';
+  const accents = station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF'];
   return (
     <Pressable
       style={({ pressed }) => [
@@ -61,12 +61,17 @@ function CompactCard({ station, onPress }: { station: Station; onPress?: () => v
       {/* Clip everything to the rounded rect */}
       <View style={styles.compactCard}>
 
-        {/* The scene itself — sharp, untinted */}
-        <Image source={station.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        {/* The station's accent palette, full strength */}
+        <LinearGradient
+          colors={accents}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
 
         {/* Bottom scrim for the name */}
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.62)']}
+          colors={['transparent', 'rgba(0,0,0,0.60)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.compactOverlay}
@@ -92,7 +97,7 @@ function CompactCard({ station, onPress }: { station: Station; onPress?: () => v
               {station.tags.slice(0, 1).map((tag) => (
                 <View
                   key={tag}
-                  style={[styles.tag, { backgroundColor: tagTint + '30', borderWidth: 1, borderColor: tagTint + '55' }]}>
+                  style={[styles.tag, { backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.30)' }]}>
                   <Text style={styles.tagText}>{tag}</Text>
                 </View>
               ))}

@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { type Station } from '@/constants/stations';
+import { type CustomStation } from '@/utils/customStations';
 import { Cruise } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
 import { StationBackdrop } from '@/components/StationBackdrop';
@@ -56,14 +57,17 @@ const MODES: Mode[] = [
 ];
 
 type Props = {
-  station: Station | null;
+  station: Station | CustomStation | null;
   visible: boolean;
   onClose: () => void;
   onStartDrive: (mode: string) => void;
   isPro: boolean;
+  /** Custom stations only — owner powers behind the corner menu. */
+  onEdit?: () => void;
+  onDelete?: () => void;
 };
 
-export function StationDetailModal({ station, visible, onClose, onStartDrive, isPro }: Props) {
+export function StationDetailModal({ station, visible, onClose, onStartDrive, isPro, onEdit, onDelete }: Props) {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { dataSaver } = useMotion();
@@ -71,10 +75,14 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const [selectedMode, setSelectedMode] = useState('cassette');
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (visible) {
       setSelectedMode('cassette');
+      setShowMenu(false);
+      setConfirmDelete(false);
       if (station) getStationPlaylist(station.id).then(setLinked);
       Animated.spring(slideY, { toValue: 0, useNativeDriver: true, bounciness: 3 }).start();
     }
@@ -104,13 +112,16 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   if (!station) return null;
 
   const topPad = insets.top + 12;
+  const isCustom = !station.image;
+  const custom = isCustom ? (station as CustomStation) : null;
+  const needsPlaylist = isCustom && !linked;
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
       <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
 
         {/* Full-bleed blurred station background — motion is a Premium unlock */}
-        <StationBackdrop station={station} blurRadius={1.5} motionAllowed={isPro && !dataSaver} />
+        <StationBackdrop station={station as Station} blurRadius={1.5} motionAllowed={isPro && !dataSaver} />
         {/* Smooth multi-stop fade: clear scene up top, melts into dark
             behind the controls — no visible seam anywhere. */}
         <LinearGradient
@@ -133,6 +144,64 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
           <Ionicons name="close" size={16} color="rgba(255,255,255,0.85)" />
         </Pressable>
 
+        {/* Custom stations: their icon becomes the hero, glowing in their colour */}
+        {custom && (
+          <View style={[styles.customHero, { top: SCREEN_H * 0.16 }]} pointerEvents="none">
+            <View
+              style={[
+                styles.customHeroIcon,
+                { backgroundColor: custom.iconBg, borderColor: custom.color, shadowColor: custom.color },
+              ]}>
+              {/^[a-z]/.test(custom.icon) ? (
+                <MaterialCommunityIcons name={custom.icon as any} size={52} color="#fff" />
+              ) : (
+                <Text style={{ fontSize: 46 }}>{custom.icon}</Text>
+              )}
+            </View>
+            <View style={[styles.mineBadge, { borderColor: custom.color + '88', backgroundColor: custom.color + '26' }]}>
+              <Text style={[styles.mineBadgeText, { color: '#fff' }]}>MY STATION</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Owner menu (custom stations only) */}
+        {custom && (onEdit || onDelete) && (
+          <Pressable
+            style={[styles.menuBtn, { top: topPad }]}
+            onPress={() => { setShowMenu((v) => !v); setConfirmDelete(false); }}
+            hitSlop={12}>
+            <Ionicons name="ellipsis-horizontal" size={16} color="rgba(255,255,255,0.85)" />
+          </Pressable>
+        )}
+        {showMenu && (
+          <>
+            <Pressable style={styles.menuBackdrop} onPress={() => { setShowMenu(false); setConfirmDelete(false); }} />
+            <View style={[styles.menuSheet, { top: topPad + 42 }]}>
+              {onEdit && (
+                <Pressable style={styles.menuRow} onPress={() => { setShowMenu(false); onEdit(); }}>
+                  <MaterialCommunityIcons name="pencil-outline" size={16} color="#fff" />
+                  <Text style={styles.menuRowText}>Edit station</Text>
+                </Pressable>
+              )}
+              {onEdit && onDelete && <View style={styles.menuDivider} />}
+              {onDelete && (
+                <Pressable
+                  style={styles.menuRow}
+                  onPress={() => {
+                    if (!confirmDelete) { setConfirmDelete(true); return; }
+                    setShowMenu(false);
+                    onDelete();
+                  }}>
+                  <MaterialCommunityIcons name="trash-can-outline" size={16} color="#FF5C5C" />
+                  <Text style={[styles.menuRowText, { color: '#FF5C5C' }]}>
+                    {confirmDelete ? 'Tap again to delete' : 'Delete station'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </>
+        )}
+
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[styles.content, { paddingTop: topPad + 40, paddingBottom: insets.bottom + 28 }]}
@@ -146,7 +215,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
 
           {/* Add your playlist */}
           <Pressable
-            style={({ pressed }) => [styles.playlistBtn, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.playlistBtn, needsPlaylist && styles.playlistBtnHero, pressed && { opacity: 0.85 }]}
             onPress={() => setShowPicker(true)}>
             <MaterialCommunityIcons name="music" size={20} color={SPOTIFY_GREEN} style={styles.playlistBtnIcon} />
             <View style={{ flex: 1 }}>
@@ -154,7 +223,11 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
                 {linked ? linked.name : 'Add your playlist'}
               </Text>
               <Text style={styles.playlistBtnSub}>
-                {linked ? 'Tap to change' : 'Drop in your own Spotify playlist'}
+                {linked
+                  ? 'Tap to change'
+                  : needsPlaylist
+                    ? 'Give your station its sound'
+                    : 'Drop in your own Spotify playlist'}
               </Text>
             </View>
             <MaterialCommunityIcons name={linked ? 'pencil' : 'plus'} size={18} color={SPOTIFY_GREEN} />
@@ -188,10 +261,19 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
 
           {/* Start Drive */}
           <Pressable
-            style={({ pressed }) => [styles.startBtn, { shadowColor: theme.accentColor }, pressed && { opacity: 0.9 }]}
+            style={({ pressed }) => [
+              styles.startBtn,
+              { shadowColor: needsPlaylist ? 'transparent' : theme.accentColor },
+              needsPlaylist && styles.startBtnQuiet,
+              pressed && { opacity: 0.9 },
+            ]}
             onPress={handleStartDrive}>
             <LinearGradient
-              colors={[theme.accentColor, darken(theme.accentColor, 0.35)]}
+              colors={
+                needsPlaylist
+                  ? ['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.09)']
+                  : [theme.accentColor, darken(theme.accentColor, 0.35)]
+              }
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.startGradient}>
               <Text style={styles.startBtnText}>Start Drive</Text>
@@ -301,6 +383,45 @@ const styles = StyleSheet.create({
   },
   closeBtnText: { color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: '600' },
   content: { paddingHorizontal: 24 },
+
+  // ── Custom-station chrome ──
+  customHero: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 14, zIndex: 5 },
+  customHeroIcon: {
+    width: 108, height: 108, borderRadius: 54,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5,
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 30, elevation: 14,
+  },
+  mineBadge: {
+    borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1,
+  },
+  mineBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 2 },
+  menuBtn: {
+    position: 'absolute', left: 20, zIndex: 10,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+  },
+  menuBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 19 },
+  menuSheet: {
+    position: 'absolute', left: 20, zIndex: 20,
+    minWidth: 190, borderRadius: 14, paddingVertical: 4,
+    backgroundColor: 'rgba(16,16,30,0.97)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 18, elevation: 16,
+  },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  menuRowText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  menuDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: 10 },
+  playlistBtnHero: {
+    backgroundColor: 'rgba(29,185,84,0.30)',
+    borderColor: SPOTIFY_GREEN,
+    paddingVertical: 20,
+    shadowColor: SPOTIFY_GREEN,
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 16, elevation: 10,
+  },
+  startBtnQuiet: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' },
 
   stationName: {
     color: '#fff', fontSize: 40, fontWeight: '800',

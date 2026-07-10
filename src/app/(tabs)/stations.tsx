@@ -13,7 +13,7 @@ import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, Fonts, TAB_SAFE_INSET } from '@/constants/theme';
 import { STATIONS, type Station } from '@/constants/stations';
 import { OWNER_MODE } from '@/constants/config';
-import { loadCustomStations, type CustomStation } from '@/utils/customStations';
+import { deleteCustomStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
 import { recordDriveStart } from '@/utils/driveStats';
 import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
 
@@ -108,7 +108,8 @@ function DialDivider({ label, freq }: { label: string; freq: string }) {
 export default function StationsScreen() {
   const [customStations, setCustomStations] = useState<CustomStation[]>([]);
   const [showCreate, setShowCreate] = useState(false);
-  const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  const [selectedStation, setSelectedStation] = useState<Station | CustomStation | null>(null);
+  const [editingStation, setEditingStation] = useState<CustomStation | null>(null);
   const np = useNowPlaying();
   const insets = useSafeAreaInsets();
 
@@ -163,7 +164,7 @@ export default function StationsScreen() {
           <>
             <DialDivider label="MY STATIONS" freq="87.9" />
             {customStations.map((station) => (
-              <CustomStationCard key={station.id} station={station} />
+              <CustomStationCard key={station.id} station={station} onPress={() => setSelectedStation(station)} />
             ))}
           </>
         )}
@@ -200,10 +201,16 @@ export default function StationsScreen() {
 
       <CreateStationModal
         visible={showCreate}
-        onClose={() => setShowCreate(false)}
+        onClose={() => { setShowCreate(false); setEditingStation(null); }}
         onCreated={(s) => {
           setCustomStations((prev) => [...prev, s]);
           setShowCreate(false);
+        }}
+        editing={editingStation}
+        onUpdated={(s) => {
+          setCustomStations((prev) => prev.map((x) => (x.id === s.id ? s : x)));
+          setShowCreate(false);
+          setEditingStation(null);
         }}
         existingCount={customStations.length}
         maxFree={FREE_CUSTOM_LIMIT}
@@ -223,14 +230,26 @@ export default function StationsScreen() {
           setSelectedStation(null);
         }}
         isPro={IS_PRO}
+        onEdit={() => {
+          const c = selectedStation as CustomStation;
+          setSelectedStation(null);
+          setEditingStation(c);
+          setShowCreate(true);
+        }}
+        onDelete={async () => {
+          if (selectedStation) await deleteCustomStation(selectedStation.id);
+          setSelectedStation(null);
+          fetchCustom();
+        }}
       />
     </SafeAreaView>
   );
 }
 
-function CustomStationCard({ station }: { station: CustomStation }) {
+function CustomStationCard({ station, onPress }: { station: CustomStation; onPress: () => void }) {
   return (
     <Pressable
+      onPress={onPress}
       style={({ pressed }) => [
         styles.customCard,
         { shadowColor: station.glowColor },

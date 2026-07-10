@@ -11,6 +11,7 @@ import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
 import { TunerFullscreen } from '@/components/TunerMode';
 import { VinylFullscreen } from '@/components/VinylMode';
 import { STATIONS } from '@/constants/stations';
+import { resolveAnyStation } from '@/utils/customStations';
 import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
@@ -34,7 +35,7 @@ function MiniPlayer() {
 
   if (!visible || !np.session) return null;
 
-  const station = STATIONS.find((s) => s.id === np.session!.stationId) ?? STATIONS[0];
+  const station = resolveAnyStation(np.session!.stationId);
   const meta = MODE_META[np.session.mode] ?? { label: 'Now Playing', icon: 'music' };
   const bottom =
     (Platform.OS === 'ios' ? Math.max(insets.bottom, TAB_BAR_BOTTOM) : TAB_BAR_BOTTOM) +

@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Cruise } from '@/constants/theme';
-import { saveCustomStation, type CustomStation } from '@/utils/customStations';
+import { saveCustomStation, updateCustomStation, type CustomStation } from '@/utils/customStations';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -59,9 +59,12 @@ type Props = {
   existingCount: number;
   maxFree: number;
   isPro: boolean;
+  /** When set, the sheet opens pre-filled and saves back over this station. */
+  editing?: CustomStation | null;
+  onUpdated?: (station: CustomStation) => void;
 };
 
-export function CreateStationModal({ visible, onClose, onCreated, existingCount, maxFree, isPro }: Props) {
+export function CreateStationModal({ visible, onClose, onCreated, existingCount, maxFree, isPro, editing, onUpdated }: Props) {
   const insets = useSafeAreaInsets();
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
 
@@ -75,9 +78,15 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
   // transform on the sheet stops iOS Safari from focusing the text inputs.
   const [settled, setSettled] = useState(false);
 
-  const atLimit = !isPro && existingCount >= maxFree;
+  const atLimit = !editing && !isPro && existingCount >= maxFree;
 
   function handleShow() {
+    if (editing) {
+      setName(editing.name);
+      setTagline(editing.tagline === 'My custom station' ? '' : editing.tagline);
+      setSelectedIcon(editing.icon);
+      setSelectedPalette(PALETTES.find((pal) => pal.color === editing.color) ?? PALETTES[0]);
+    }
     setSettled(false);
     Animated.spring(slideY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start(
       () => setSettled(true),
@@ -105,7 +114,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
     if (!trimName) { setError('Give your station a name.'); return; }
     setSaving(true);
     const station: CustomStation = {
-      id: `custom-${Date.now()}`,
+      id: editing ? editing.id : `custom-${Date.now()}`,
       name: trimName,
       tagline: tagline.trim() || 'My custom station',
       tags: [],
@@ -123,9 +132,15 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
       spotifyUrl: `https://open.spotify.com/search/${encodeURIComponent(trimName)}`,
       appleMusicUrl: `https://music.apple.com/search?term=${encodeURIComponent(trimName)}`,
     };
-    await saveCustomStation(station);
-    setSaving(false);
-    onCreated(station);
+    if (editing) {
+      await updateCustomStation(station);
+      setSaving(false);
+      onUpdated?.(station);
+    } else {
+      await saveCustomStation(station);
+      setSaving(false);
+      onCreated(station);
+    }
     handleHide();
   }
 
@@ -147,7 +162,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
             !settled && { transform: [{ translateY: slideY }] },
           ]}>
           <View style={styles.handle} />
-          <Text style={styles.sheetTitle}>Create station</Text>
+          <Text style={styles.sheetTitle}>{editing ? 'Edit station' : 'Create station'}</Text>
 
           {atLimit && (
             <View style={styles.limitBanner}>
@@ -227,7 +242,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
               style={[styles.saveBtn, { backgroundColor: selectedPalette.color }, (atLimit || saving) && styles.saveBtnDisabled]}
               onPress={atLimit ? undefined : handleSave}
               disabled={atLimit || saving}>
-              <Text style={styles.saveBtnText}>{saving ? 'Saving…' : atLimit ? 'Upgrade to Pro' : 'Create station'}</Text>
+              <Text style={styles.saveBtnText}>{saving ? 'Saving…' : atLimit ? 'Upgrade to Pro' : editing ? 'Save changes' : 'Create station'}</Text>
             </Pressable>
           </ScrollView>
         </Animated.View>

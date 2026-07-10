@@ -1,4 +1,5 @@
 import { Image as ExpoImage } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ImageBackground, StyleSheet } from 'react-native';
 
 import type { Station } from '@/constants/stations';
@@ -7,6 +8,7 @@ import type { Station } from '@/constants/stations';
  * Full-bleed station background. If the station has a looping `motion` clip
  * (animated WebP) it plays that via expo-image, with the static photo as an
  * instant placeholder; otherwise it renders the plain blurred photo.
+ * Custom stations have no photo — they get their chosen palette instead.
  */
 export function StationBackdrop({
   station,
@@ -18,6 +20,15 @@ export function StationBackdrop({
   /** Gate for the looping clip (premium + not Data Saver). Hero passes true. */
   motionAllowed?: boolean;
 }) {
+  if (!station.image) {
+    return (
+      <LinearGradient
+        colors={station.gradientColors}
+        start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+    );
+  }
   if (station.motion && motionAllowed) {
     return (
       <ExpoImage

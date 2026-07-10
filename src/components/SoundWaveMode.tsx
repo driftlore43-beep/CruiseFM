@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { MoodSheet } from '@/components/MoodSheet';
 import { STATIONS } from '@/constants/stations';
+import { resolveAnyStation } from '@/utils/customStations';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
@@ -84,7 +85,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
   const topPad = Math.max(insets.top, 20);
 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
-  const station = STATIONS.find((s) => s.id === activeId) ?? STATIONS[0];
+  const station = resolveAnyStation(activeId);
   const spotify = useSpotifyPlayback(visible);
   const eq = station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF'];
 

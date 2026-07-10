@@ -10,6 +10,7 @@ import Svg, { Rect as SvgRect, Circle as SvgCircle, Line as SvgLine, Path as Svg
 import { Fonts } from '@/constants/theme';
 import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
+import { resolveAnyStation } from '@/utils/customStations';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { MoodSheet } from '@/components/MoodSheet';
@@ -512,7 +513,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
   useEffect(() => { activeTrackRef.current = activeTrack; }, [activeTrack]);
 
-  const station      = STATIONS.find((s) => s.id === activeId) ?? STATIONS[0];
+  const station      = resolveAnyStation(activeId);
   const currentTrack = SIDE_A_TRACKS[activeTrack];
 
   // ── Start secondary animations (tape flow, glow, progress) ──────────────────
@@ -626,11 +627,11 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const cassetteH = cassetteW * 0.62;
 
 
-  const stationImg = STATIONS.find((s) => s.id === activeId)?.image ?? STATIONS[0].image;
+  const stationImg = resolveAnyStation(activeId).image;
 
   // Plain JSX, not an inline component — an inline component remounts the
   // blurred image on every render (background twitching).
-  const currentEq = STATIONS.find((s) => s.id === activeId)?.eqColors;
+  const currentEq = resolveAnyStation(activeId).eqColors;
   // Neon glow tracks the station's mood: brightest eq stop = body, first stop = accent.
   const neonColor  = currentEq?.[2] ?? '#FF3DF0';
   const neonAccent = currentEq?.[0] ?? '#33E1FF';

@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Cruise } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
+import { resolveAnyStation } from '@/utils/customStations';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { MoodSheet } from '@/components/MoodSheet';
@@ -274,7 +275,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const bannerOpacity = useRef(new Animated.Value(0)).current;
   const origBrightness = useRef(1);
 
-  const currentStation = STATIONS.find((s) => s.id === activeStation) ?? STATIONS[0];
+  const currentStation = resolveAnyStation(activeStation);
 
   // ── Dynamic landscape bar geometry (computed every render from window dims) ──
   const lsRightW   = winW * 0.56;

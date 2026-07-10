@@ -10,6 +10,7 @@ import Svg, { Circle, Line, Rect, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { STATIONS } from '@/constants/stations';
+import { resolveAnyStation } from '@/utils/customStations';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
@@ -165,7 +166,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const freqRef = useRef(freq);
   useEffect(() => { freqRef.current = freq; }, [freq]);
 
-  const lockedStation = STATIONS.find((s) => s.id === activeId) ?? STATIONS[0];
+  const lockedStation = resolveAnyStation(activeId);
   const { station: nearest, lock } = nearestStation(freq);
   const eq = (nearest.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
   const accent = eq[1];

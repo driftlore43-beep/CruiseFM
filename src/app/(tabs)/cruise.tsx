@@ -21,6 +21,7 @@ import {
   type LastCruise,
 } from '@/utils/lastCruise';
 import { recordDriveStart } from '@/utils/driveStats';
+import { loadCustomStations, resolveAnyStation } from '@/utils/customStations';
 import { isSpotifyConnected, startPlayback } from '@/utils/spotify';
 
 const recommended = STATIONS.filter((s) => RECOMMENDED_IDS.includes(s.id));
@@ -36,7 +37,8 @@ const MODE_LABELS: Record<string, string> = {
 };
 
 function stationById(id: string): Station {
-  return STATIONS.find((s) => s.id === id) ?? STATIONS[0];
+  // Includes the user's own creations (cache primed on focus below).
+  return resolveAnyStation(id);
 }
 
 function SkipBanner({ onDismiss }: { onDismiss: () => void }) {
@@ -73,7 +75,7 @@ export default function CruiseScreen() {
       let active = true;
       setTonightPick(stationById(defaultStationForNow()));
       setStatsKey((k) => k + 1);
-      loadLastCruise().then((last) => { if (active) setLastCruise(last); });
+      loadCustomStations().then(() => loadLastCruise()).then((last) => { if (active) setLastCruise(last); });
       return () => { active = false; };
     }, []),
   );

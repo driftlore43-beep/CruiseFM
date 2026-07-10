@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Svg, { Circle as SvgCircle, Path } from 'react-native-svg';
 import {
-  Animated, Dimensions, Easing, ImageBackground, Modal, PanResponder, ScrollView, StyleSheet,
+  Animated, Dimensions, Easing, Modal, PanResponder, ScrollView, StyleSheet,
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import { OWNER_MODE } from '@/constants/config';
 import { Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
+import { StationBackdrop } from '@/components/StationBackdrop';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
@@ -868,13 +869,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
       <Animated.View style={[fs.container, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
-        <ImageBackground
-          source={station.image}
-          style={StyleSheet.absoluteFill}
-          imageStyle={{ width: '100%', height: '100%' }}
-          blurRadius={2.5}
-          resizeMode="cover"
-        />
+        <StationBackdrop station={station} blurRadius={2.5} />
         <LinearGradient
           colors={[
             'rgba(2,2,12,0.20)',
@@ -1027,7 +1022,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 }
 
 const fs = StyleSheet.create({
-  container:    { flex: 1 },
+  container:    { flex: 1, backgroundColor: '#05060f' },
   floatingTop:  { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: 22 },
   dragPill:     { width: 34, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.18)', marginBottom: 10 },
   modeLabel:    { color: V.violet, fontSize: 9, fontWeight: '700', letterSpacing: 4, textTransform: 'uppercase' },

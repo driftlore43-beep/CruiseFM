@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, ImageBackground, Modal, PanResponder, Platform,
+  Animated, Dimensions, Easing, Modal, PanResponder, Platform,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import Svg, { Circle, Line, Rect, Text as SvgText } from 'react-native-svg';
@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
+import { StationBackdrop } from '@/components/StationBackdrop';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
@@ -311,13 +312,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
       <Animated.View style={[{ flex: 1, backgroundColor: '#05060f' }, { transform: [{ translateY: slideY }] }]}>
 
         {/* Locked station scene, darkened; mood tint follows the needle */}
-        <ImageBackground
-          source={lockedStation.image}
-          style={StyleSheet.absoluteFill}
-          imageStyle={{ width: '100%', height: '100%' }}
-          blurRadius={2.5}
-          resizeMode="cover"
-        />
+        <StationBackdrop station={lockedStation} blurRadius={2.5} />
         <LinearGradient
           colors={[
             'rgba(3,4,16,0.62)', 'rgba(3,4,16,0.55)', 'rgba(3,4,16,0.62)',

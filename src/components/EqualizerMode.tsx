@@ -7,7 +7,6 @@ import {
   Animated,
   Dimensions,
   Easing,
-  ImageBackground,
   Modal,
   PanResponder,
   Platform,
@@ -23,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Cruise } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
+import { StationBackdrop } from '@/components/StationBackdrop';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { MoodSheet } from '@/components/MoodSheet';
@@ -434,13 +434,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   // every progress tick — that was the background "twitching".
   const background = (
     <>
-      <ImageBackground
-        source={currentStation.image}
-        style={StyleSheet.absoluteFill}
-        imageStyle={{ width: '100%', height: '100%' }}
-        blurRadius={2.5}
-        resizeMode="cover"
-      />
+      <StationBackdrop station={currentStation} blurRadius={2.5} />
       <LinearGradient
         colors={[
           'rgba(2,2,12,0.20)',

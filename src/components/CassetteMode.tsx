@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, ImageBackground, Modal, ScrollView, StyleSheet,
+  Animated, Dimensions, Easing, Modal, ScrollView, StyleSheet,
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { Fonts } from '@/constants/theme';
 import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
+import { StationBackdrop } from '@/components/StationBackdrop';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { MoodSheet } from '@/components/MoodSheet';
@@ -637,13 +638,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const neonAccent = currentEq?.[0] ?? '#33E1FF';
   const background = (
     <>
-      <ImageBackground
-        source={stationImg}
-        style={StyleSheet.absoluteFill}
-        imageStyle={{ width: '100%', height: '100%' }}
-        blurRadius={2.5}
-        resizeMode="cover"
-      />
+      <StationBackdrop station={resolveAnyStation(activeId)} blurRadius={2.5} />
       <LinearGradient
         colors={[
           'rgba(2,2,10,0.55)',

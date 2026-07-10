@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, ImageBackground, Modal, ScrollView,
+  Animated, Dimensions, Easing, Modal, ScrollView,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, Line, LinearGradient as SvgGradient, Mask, Rect, RadialGradient, Stop } from 'react-native-svg';
@@ -11,6 +11,7 @@ import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { MoodSheet } from '@/components/MoodSheet';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
+import { StationBackdrop } from '@/components/StationBackdrop';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
@@ -233,13 +234,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
       <Animated.View style={[{ flex: 1, backgroundColor: '#05060f' }, { transform: [{ translateY: slideY }] }]}>
 
         {/* Blurred station background — darkened hard so the scene reads like dusk */}
-        <ImageBackground
-          source={station.image}
-          style={StyleSheet.absoluteFill}
-          imageStyle={{ width: '100%', height: '100%' }}
-          blurRadius={2.5}
-          resizeMode="cover"
-        />
+        <StationBackdrop station={station} blurRadius={2.5} />
         <LinearGradient
           colors={[
             'rgba(3,4,16,0.72)', 'rgba(3,4,16,0.62)', 'rgba(3,4,16,0.68)',

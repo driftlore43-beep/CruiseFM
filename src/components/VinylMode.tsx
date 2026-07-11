@@ -549,6 +549,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const drawerY             = useRef(new Animated.Value(0)).current;
 
   const spinRef           = useRef<any>(null);
+  const speedAnimRef      = useRef<Animated.CompositeAnimation | null>(null);
   const labelSpinRef      = useRef<any>(null);
   const isSpinning        = useRef(false);
   const pulseLoopRef      = useRef<Animated.CompositeAnimation | null>(null);
@@ -694,12 +695,16 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     return () => progress.removeListener(id);
   }, []);
 
-  // Spin — never reset value while playing; guard against double-start
+  // One slow revolution (~23 rpm) — relaxed, not a fast blur.
+  const SPIN_MS = 2600;
+
+  // Steady loop — never reset value while playing; guard against double-start.
   const startSpin = () => {
+    speedAnimRef.current?.stop(); speedAnimRef.current = null;
     if (isSpinning.current) return;
     isSpinning.current = true;
     spinRef.current = Animated.loop(
-      Animated.timing(spinValue, { toValue: 1, duration: 2000, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(spinValue, { toValue: 1, duration: SPIN_MS, easing: Easing.linear, useNativeDriver: true })
     );
     spinRef.current.start((result: { finished: boolean }) => {
       if (result.finished) {
@@ -711,6 +716,43 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const stopSpin = () => {
     isSpinning.current = false;
     spinRef.current?.stop();
+    speedAnimRef.current?.stop(); speedAnimRef.current = null;
+  };
+
+  // Ease up to speed on play, then hand off to the steady loop.
+  const spinUp = () => {
+    speedAnimRef.current?.stop();
+    if (isSpinning.current) return;
+    isSpinning.current = true;   // claim it so the safety net won't barge in mid-ramp
+    const from = spinCurrentRef.current;
+    spinValue.setValue(from);
+    speedAnimRef.current = Animated.timing(spinValue, {
+      toValue: from + 0.28, duration: 900, easing: Easing.in(Easing.cubic), useNativeDriver: true,
+    });
+    speedAnimRef.current.start(({ finished }) => {
+      speedAnimRef.current = null;
+      isSpinning.current = false;
+      if (finished && playingRef.current) {
+        spinValue.setValue((((from + 0.28) % 1) + 1) % 1);
+        startSpin();
+      }
+    });
+  };
+
+  // Coast down to a smooth halt on pause instead of a hard stop.
+  const coastToStop = () => {
+    spinRef.current?.stop();
+    speedAnimRef.current?.stop();
+    isSpinning.current = false;
+    const from = spinCurrentRef.current;
+    spinValue.setValue(from);
+    speedAnimRef.current = Animated.timing(spinValue, {
+      toValue: from + 0.5, duration: 1600, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+    });
+    speedAnimRef.current.start(({ finished }) => {
+      speedAnimRef.current = null;
+      if (finished) spinValue.setValue((((from + 0.5) % 1) + 1) % 1);
+    });
   };
 
   const startLabelSpin = () => {
@@ -723,20 +765,18 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
   useEffect(() => {
     if (playing) {
-      startSpin();
-      startLabelSpin();
+      spinUp();
       shimmerLoopRef.current = Animated.loop(Animated.sequence([
         Animated.timing(ringShimmer, { toValue: 1.0, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
         Animated.timing(ringShimmer, { toValue: 0.6, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
       ]));
       shimmerLoopRef.current.start();
     } else {
-      stopSpin();
-      stopLabelSpin();
+      coastToStop();
       shimmerLoopRef.current?.stop();
       ringShimmer.setValue(0.6);
     }
-    return () => { stopSpin(); stopLabelSpin(); shimmerLoopRef.current?.stop(); };
+    return () => { stopSpin(); shimmerLoopRef.current?.stop(); };
   }, [playing]);
 
   // Safety net — restart spin if it stopped unexpectedly
@@ -920,7 +960,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           <View style={fs.turntableWrap}>
             <TurntableHero
               platSize={platSize} spin={spin} tonearmAnim={tonearmVal} glowOpacity={glowOpacity}
-              ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={labelRotate} playing={playing}
+              ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={spin} playing={playing}
               panHandlers={recordPanRef.panHandlers} scrubbing={isScrubbing} scrubDir={scrubDir}
               accent={VINYL_ACCENTS[station.id] ?? station.eqColors?.[1] ?? V.gold}
               labelText={station.name.toUpperCase()}

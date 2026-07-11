@@ -161,7 +161,7 @@ function ListCard({ station, onPress }: { station: Station; onPress?: () => void
               <Text style={styles.name} numberOfLines={1}>{station.name}</Text>
               {station.premium && (
                 <View style={styles.premiumBadge}>
-                  <Text style={styles.premiumText}>PRO</Text>
+                  <Text style={styles.premiumText}>PREMIUM</Text>
                 </View>
               )}
             </View>

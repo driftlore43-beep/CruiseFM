@@ -9,6 +9,8 @@ import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { useTheme } from '@/context/ThemeContext';
 import { useMotion } from '@/context/MotionContext';
+import { useEntitlements } from '@/context/EntitlementsContext';
+import { OWNER_MODE } from '@/constants/config';
 import { ThemeGenerator } from '@/components/ThemeGenerator';
 import { PLATFORMS, PlatformId, getSavedPlatform } from '@/utils/musicPlatform';
 import { PlatformSelector } from '@/components/PlatformSelector';
@@ -101,6 +103,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { dataSaver, setDataSaver } = useMotion();
+  const { devFreePreview, setDevFreePreview } = useEntitlements();
   const { name: platformName, color: platformColor, refresh: refreshPlatform } = useMusicPlatformInfo();
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [themeGenVisible, setThemeGenVisible] = useState(false);
@@ -212,7 +215,7 @@ export default function ProfileScreen() {
               <IconChip icon="palette" size={34} />
               <Text style={styles.settingsLabel}>Custom Theme</Text>
               <View style={[styles.proBadge, { backgroundColor: theme.accentColor + '22', borderColor: theme.accentColor + '55' }]}>
-                <Text style={[styles.proBadgeText, { color: theme.accentColor }]}>PRO</Text>
+                <Text style={[styles.proBadgeText, { color: theme.accentColor }]}>PREMIUM</Text>
               </View>
             </View>
             <View style={[styles.themeColorDot, { backgroundColor: theme.accentColor, shadowColor: theme.accentColor }]} />
@@ -263,6 +266,26 @@ export default function ProfileScreen() {
 
           {/* Spotify Connect row */}
           <SpotifyConnectRow />
+
+          {/* Dev-only: see every lock, shimmer and preview as a free user would */}
+          {OWNER_MODE && (
+            <View style={[styles.settingsRow, styles.settingsBorder]}>
+              <View style={styles.platformRowLeft}>
+                <IconChip icon="eye-outline" size={34} />
+                <View>
+                  <Text style={styles.settingsLabel}>Free-user preview</Text>
+                  <Text style={styles.dataSaverSub}>Dev only · view the app without Premium</Text>
+                </View>
+              </View>
+              <Switch
+                value={devFreePreview}
+                onValueChange={setDevFreePreview}
+                trackColor={{ false: 'rgba(255,255,255,0.18)', true: theme.accentColor }}
+                thumbColor="#fff"
+                ios_backgroundColor="rgba(255,255,255,0.18)"
+              />
+            </View>
+          )}
 
           {SETTINGS_ITEMS.map((item, i) => (
             <Pressable

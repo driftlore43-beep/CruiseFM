@@ -60,7 +60,7 @@ type Props = {
   station: Station | CustomStation | null;
   visible: boolean;
   onClose: () => void;
-  onStartDrive: (mode: string) => void;
+  onStartDrive: (mode: string, preview: boolean) => void;
   isPro: boolean;
   /** Custom stations only — owner powers behind the corner menu. */
   onEdit?: () => void;
@@ -104,9 +104,12 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 300, useNativeDriver: true }).start(onClose);
   }
 
+  const selectedIsLocked = !isPro && !!MODES.find((m) => m.id === selectedMode)?.pro;
+
   function handleStartDrive() {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onStartDrive(selectedMode);
+    // Locked mode selected? Launch it anyway as a free preview.
+    onStartDrive(selectedMode, selectedIsLocked);
   }
 
   if (!station) return null;
@@ -244,12 +247,12 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
                     active && { backgroundColor: theme.accentColor + '40', borderColor: theme.accentColor },
                     !unlocked && styles.modeBtnLocked,
                   ]}
-                  onPress={() => unlocked && setSelectedMode(mode.id)}>
+                  onPress={() => setSelectedMode(mode.id)}>
                   {mode.pro && <GlossSheen />}
                   <Text style={[styles.modeLabel, active && styles.modeLabelActive]}>{mode.label}</Text>
                   {!unlocked && <Ionicons name="lock-closed" size={12} color="rgba(255,255,255,0.7)" style={styles.modeLockIcon} />}
                   {mode.pro && unlocked && (
-                    <View style={styles.proBadge}><Text style={styles.proBadgeText}>PRO</Text></View>
+                    <View style={styles.proBadge}><Text style={styles.proBadgeText}>PREMIUM</Text></View>
                   )}
                 </Pressable>
               );
@@ -273,7 +276,9 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
               }
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.startGradient}>
-              <Text style={styles.startBtnText}>Start Drive</Text>
+              <Text style={styles.startBtnText}>
+                {selectedIsLocked ? `Preview ${MODES.find((m) => m.id === selectedMode)?.label}` : 'Start Drive'}
+              </Text>
               <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.9)" />
             </LinearGradient>
           </Pressable>

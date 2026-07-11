@@ -698,20 +698,26 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   // One slow revolution (~23 rpm) — relaxed, not a fast blur.
   const SPIN_MS = 2600;
 
-  // Steady loop — never reset value while playing; guard against double-start.
+  // Steady loop. Each cycle is a FULL revolution measured from wherever the
+  // record currently sits — a plain Animated.loop(0→1) only spins correctly
+  // when starting at 0; after a pause/scrub it would animate just the
+  // leftover sliver and snap back, which looked like the spin dying.
   const startSpin = () => {
     speedAnimRef.current?.stop(); speedAnimRef.current = null;
     if (isSpinning.current) return;
     isSpinning.current = true;
-    spinRef.current = Animated.loop(
-      Animated.timing(spinValue, { toValue: 1, duration: SPIN_MS, easing: Easing.linear, useNativeDriver: true })
-    );
-    spinRef.current.start((result: { finished: boolean }) => {
-      if (result.finished) {
-        isSpinning.current = false;
-        if (playingRef.current) startSpin();
-      }
-    });
+    const run = () => {
+      const from = ((spinCurrentRef.current % 1) + 1) % 1;
+      spinValue.setValue(from);
+      spinRef.current = Animated.timing(spinValue, {
+        toValue: from + 1, duration: SPIN_MS, easing: Easing.linear, useNativeDriver: true,
+      });
+      spinRef.current.start((result: { finished: boolean }) => {
+        if (result.finished && playingRef.current && isSpinning.current) run();
+        else isSpinning.current = false;
+      });
+    };
+    run();
   };
   const stopSpin = () => {
     isSpinning.current = false;

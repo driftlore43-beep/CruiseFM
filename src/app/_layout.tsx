@@ -5,6 +5,7 @@ import { Cruise } from '@/constants/theme';
 import { ThemeProvider as CruiseThemeProvider, useTheme } from '@/context/ThemeContext';
 import { MotionProvider } from '@/context/MotionContext';
 import { NowPlayingProvider } from '@/context/NowPlayingContext';
+import { EntitlementsProvider } from '@/context/EntitlementsContext';
 import { PlatformSelector, usePlatformSelector } from '@/components/PlatformSelector';
 import { setPlatformSkipped } from '@/utils/musicPlatform';
 
@@ -38,9 +39,11 @@ export default function RootLayout() {
     <ThemeProvider value={DarkTheme}>
       <CruiseThemeProvider>
         <MotionProvider>
-          <NowPlayingProvider>
-            <AppShell />
-          </NowPlayingProvider>
+          <EntitlementsProvider>
+            <NowPlayingProvider>
+              <AppShell />
+            </NowPlayingProvider>
+          </EntitlementsProvider>
         </MotionProvider>
       </CruiseThemeProvider>
     </ThemeProvider>

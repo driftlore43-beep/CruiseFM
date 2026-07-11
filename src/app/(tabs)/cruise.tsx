@@ -9,7 +9,7 @@ import { EqualizerHeader } from '@/components/EqualizerHeader';
 import { HeroCard } from '@/components/HeroCard';
 import { StationCard } from '@/components/StationCard';
 import { StationDetailModal } from '@/components/StationDetailModal';
-import { OWNER_MODE } from '@/constants/config';
+import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
 import { RECOMMENDED_IDS, STATIONS, type Station } from '@/constants/stations';
@@ -57,6 +57,7 @@ function SkipBanner({ onDismiss }: { onDismiss: () => void }) {
 export default function CruiseScreen() {
   const insets = useSafeAreaInsets();
   const np = useNowPlaying();
+  const { isPro } = useEntitlements();
   const [showBanner, setShowBanner] = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   // One smart hero: it becomes your last cruise if you have one, otherwise
@@ -137,17 +138,20 @@ export default function CruiseScreen() {
         station={selectedStation}
         visible={!!selectedStation}
         onClose={() => setSelectedStation(null)}
-        onStartDrive={(mode) => {
+        onStartDrive={(mode, preview) => {
           if (selectedStation) {
-            const cruise = { stationId: selectedStation.id, mode };
-            saveLastCruise(cruise);
-            setLastCruise(cruise);
-            recordDriveStart(selectedStation.id);
-            np.open(mode, selectedStation.id);
+            if (!preview) {
+              // A taste shouldn't overwrite the saved cruise or count as a drive.
+              const cruise = { stationId: selectedStation.id, mode };
+              saveLastCruise(cruise);
+              setLastCruise(cruise);
+              recordDriveStart(selectedStation.id);
+            }
+            np.open(mode, selectedStation.id, { preview });
           }
           setSelectedStation(null);
         }}
-        isPro={OWNER_MODE}
+        isPro={isPro}
       />
     </SafeAreaView>
   );

@@ -10,11 +10,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 
 import { GlossSheen } from '@/components/GlossSheen';
+import { PremiumShimmer } from '@/components/PremiumShimmer';
 import { useNowPlaying } from '@/context/NowPlayingContext';
-import { OWNER_MODE } from '@/constants/config';
+import { useEntitlements } from '@/context/EntitlementsContext';
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
 
 // ── Spinning cassette reel (featured card visual) ─────────────────────────────
@@ -120,6 +120,7 @@ function CompactModeCard({
     <View style={styles.compactCard}>
       <LinearGradient colors={gradient} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
       {premium && <GlossSheen radius={18} />}
+      {locked && <PremiumShimmer />}
       <View style={styles.compactIconWrap}>
         <MaterialCommunityIcons name={icon as any} size={22} color="#fff" />
       </View>
@@ -138,11 +139,11 @@ export default function ModesScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const np = useNowPlaying();
 
-  const isPro = OWNER_MODE;
+  const { isPro } = useEntitlements();
 
   function open(mode: string, locked: boolean) {
-    if (locked) { router.push('/premium'); return; }
-    np.open(mode);
+    // Locked modes give a free taste — the gate handles the upsell after.
+    np.open(mode, undefined, { preview: locked });
   }
 
   return (

@@ -9,16 +9,16 @@ import { StationCard } from '@/components/StationCard';
 import { CreateStationModal } from '@/components/CreateStationModal';
 import { StationDetailModal } from '@/components/StationDetailModal';
 import { GlossSheen } from '@/components/GlossSheen';
+import { PremiumShimmer } from '@/components/PremiumShimmer';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, Fonts, TAB_SAFE_INSET } from '@/constants/theme';
 import { STATIONS, type Station } from '@/constants/stations';
-import { OWNER_MODE } from '@/constants/config';
+import { useEntitlements } from '@/context/EntitlementsContext';
 import { deleteCustomStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
 import { recordDriveStart } from '@/utils/driveStats';
 import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
 
 const FREE_CUSTOM_LIMIT = 3;
-const IS_PRO = OWNER_MODE;
 
 // One line of road poetry per visit, rotating on each focus.
 const POETRY = [
@@ -111,6 +111,7 @@ export default function StationsScreen() {
   const [selectedStation, setSelectedStation] = useState<Station | CustomStation | null>(null);
   const [editingStation, setEditingStation] = useState<CustomStation | null>(null);
   const np = useNowPlaying();
+  const { isPro } = useEntitlements();
   const insets = useSafeAreaInsets();
 
   const [onAirStation, setOnAirStation] = useState<Station>(() => stationById(defaultStationForNow()));
@@ -177,12 +178,13 @@ export default function StationsScreen() {
           <>
             <DialDivider label="PREMIUM" freq="101.3" />
             {premium.map((station) =>
-              OWNER_MODE ? (
+              isPro ? (
                 <StationCard key={station.id} station={station} onPress={() => setSelectedStation(station)} />
               ) : (
                 <View key={station.id} style={styles.lockedWrapper}>
                   <StationCard station={station} />
                   <View style={styles.lockOverlay}>
+                    <PremiumShimmer />
                     <Ionicons name="lock-closed" size={20} color="#fff" style={styles.lockIcon} />
                     <Text style={styles.lockText}>Unlock with Premium</Text>
                   </View>
@@ -209,22 +211,25 @@ export default function StationsScreen() {
         }}
         existingCount={customStations.length}
         maxFree={FREE_CUSTOM_LIMIT}
-        isPro={IS_PRO}
+        isPro={isPro}
       />
 
       <StationDetailModal
         station={selectedStation}
         visible={!!selectedStation}
         onClose={() => setSelectedStation(null)}
-        onStartDrive={(mode) => {
+        onStartDrive={(mode, preview) => {
           if (selectedStation) {
-            saveLastCruise({ stationId: selectedStation.id, mode });
-            recordDriveStart(selectedStation.id);
-            np.open(mode, selectedStation.id);
+            if (!preview) {
+              // A taste shouldn't overwrite the saved cruise or count as a drive.
+              saveLastCruise({ stationId: selectedStation.id, mode });
+              recordDriveStart(selectedStation.id);
+            }
+            np.open(mode, selectedStation.id, { preview });
           }
           setSelectedStation(null);
         }}
-        isPro={IS_PRO}
+        isPro={isPro}
         onEdit={() => {
           const c = selectedStation as CustomStation;
           setSelectedStation(null);

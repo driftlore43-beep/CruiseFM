@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 
 import { recordDriveEnd } from '@/utils/driveStats';
 
-export type NowPlayingSession = { mode: string; stationId: string };
+export type NowPlayingSession = { mode: string; stationId: string; preview?: boolean };
 
 type NowPlayingCtx = {
   /** The active drive (mode + station), or null when nothing is up. */
@@ -12,8 +12,9 @@ type NowPlayingCtx = {
   /** Shared play state so the fullscreen and mini-player stay in sync. */
   playing: boolean;
   setPlaying: (p: boolean) => void;
-  /** Start (or replace) a session and show its fullscreen. */
-  open: (mode: string, stationId?: string) => void;
+  /** Start (or replace) a session and show its fullscreen. Pass
+   * `{ preview: true }` for a free-user taste of a locked mode. */
+  open: (mode: string, stationId?: string, opts?: { preview?: boolean }) => void;
   /** Keep the session (and the music) but drop to the mini-player. */
   minimize: () => void;
   /** Bring the fullscreen back for the current session. */
@@ -31,10 +32,10 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const [expanded, setExpanded] = useState(false);
   const [playing, setPlaying] = useState(false);
 
-  const open = useCallback((mode: string, stationId: string = 'night-run') => {
+  const open = useCallback((mode: string, stationId: string = 'night-run', opts?: { preview?: boolean }) => {
     // iPod mode was retired — any old saved iPod cruise resumes in Equalizer.
     const m = mode === 'ipod' ? 'equalizer' : mode;
-    setSession({ mode: m, stationId });
+    setSession({ mode: m, stationId, preview: opts?.preview });
     setExpanded(true);
     setPlaying(true);
   }, []);

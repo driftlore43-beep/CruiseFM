@@ -5,7 +5,7 @@ import {
   Animated, Dimensions, Easing, Modal, PanResponder, ScrollView,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
-import Svg, { Defs, Ellipse, LinearGradient as SvgGradient, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Defs, Ellipse, G, LinearGradient as SvgGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { MoodSheet } from '@/components/MoodSheet';
@@ -31,42 +31,50 @@ function formatMs(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-// ── Independent wave systems — each cluster has its own home, speed & motion ──
-// Three overlapping wireframe waves (reference: layered mesh with a tall centre
-// spike and smaller clusters either side), all sharing one horizontal core line.
+// ── One wave field, three bulges — everything moves together ─────────────────
+// A single travelling wave (shared speed, direction and harmonics) passing
+// through three amplitude bulges: a tall centre and two smaller shoulders.
+// The clusters differ only in position and height, so the whole surface
+// rises, falls and drifts as one — no competing motions.
 type WaveGroup = {
-  cx: number;      // cluster centre along the width (0..1)
-  k: number;       // envelope tightness — higher = narrower cluster
-  speed: number;   // phase speed multiplier
-  dir: 1 | -1;     // travel direction
-  f1: number; f2: number; f3: number;  // harmonic frequencies
-  layers: number;  // mesh strands in this system
+  cx: number;      // bulge centre along the width (0..1)
+  k: number;       // envelope tightness — higher = narrower bulge
+  scale: number;   // bulge height relative to the centre one
+  layers: number;  // mesh strands in this bulge
 };
 const GROUPS: WaveGroup[] = [
-  { cx: 0.50, k: 5.6, speed: 1.00, dir: 1,  f1: 2.3, f2: 5.7, f3: 11.0, layers: 7 },
-  { cx: 0.29, k: 7.2, speed: 1.45, dir: -1, f1: 3.1, f2: 7.3, f3: 13.0, layers: 6 },
-  { cx: 0.73, k: 6.4, speed: 0.75, dir: 1,  f1: 1.9, f2: 4.9, f3:  9.0, layers: 6 },
+  { cx: 0.50, k: 3.6, scale: 1.00, layers: 7 },
+  { cx: 0.24, k: 6.2, scale: 0.55, layers: 5 },
+  { cx: 0.76, k: 6.2, scale: 0.60, layers: 5 },
 ];
+// Shared harmonics — all travel the same direction at gently different rates,
+// so the shape morphs organically while clearly flowing one way.
+const F1 = 2.3, F2 = 5.7, F3 = 11.0;
+// One tempo for the whole field — the anim loop and beat pulse both use it.
+const PHASE_SPEED = 1.2;
 
-// One strand of one wave system.
+// One strand of the shared wave, shaped by its bulge's envelope.
 function wavePath(phase: number, g: WaveGroup, layer: number, amp: number): string {
   const cy = VB_H / 2;
   const lp = (layer - (g.layers - 1) / 2) * 0.24;            // strand spread → wireframe mesh
-  const layerAmp = amp * (1 - (Math.abs(layer - (g.layers - 1) / 2) / g.layers) * 0.75);
-  const ph = phase * g.speed * g.dir;
+  const layerAmp = amp * g.scale * (1 - (Math.abs(layer - (g.layers - 1) / 2) / g.layers) * 0.75);
   const xs: number[] = [];
   const ys: number[] = [];
   for (let i = 0; i <= POINTS; i++) {
     const t = i / POINTS;
     const x = t * VB_W;
     const dx = (t - g.cx) * g.k;
-    const env = Math.exp(-dx * dx);                          // this system's own bulge
+    const env = Math.exp(-dx * dx);                          // this bulge's envelope
     const wob =
-      Math.sin(t * Math.PI * 2 * g.f1 + ph + lp) * 0.55 +
-      Math.sin(t * Math.PI * 2 * g.f2 - ph * 1.3 + lp * 1.4) * 0.30 +
-      Math.sin(t * Math.PI * 2 * g.f3 + ph * 0.7 - lp) * 0.15;
+      Math.sin(t * Math.PI * 2 * F1 + phase + lp) * 0.55 +
+      Math.sin(t * Math.PI * 2 * F2 + phase * 1.35 + lp * 1.4) * 0.30 +
+      Math.sin(t * Math.PI * 2 * F3 + phase * 0.7 - lp) * 0.15;
     xs.push(x);
-    ys.push(cy + wob * env * layerAmp * VB_H * 0.78);        // amplified peaks
+    // Amplified peaks, soft-compressed near the canvas edge (tanh) so the
+    // tallest spikes round off gracefully instead of clipping flat.
+    const raw = wob * env * layerAmp * VB_H * 0.78;
+    const lim = VB_H * 0.46;
+    ys.push(cy + lim * Math.tanh(raw / lim));
   }
   // Smooth through the points with quadratic curves (midpoint method) → silky line.
   let d = `M${xs[0].toFixed(1)} ${ys[0].toFixed(1)}`;
@@ -126,7 +134,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
         last = now;
         const target = playingRef.current ? 1 : 0.5;
         ampRef.current += (target - ampRef.current) * 0.08;
-        setPhase(((now - start) / 1000) * 1.7);
+        setPhase(((now - start) / 1000) * PHASE_SPEED);
       }
       raf = requestAnimationFrame(tick);
     };
@@ -195,7 +203,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
   // Note: playback is remote (Spotify), so this is a musical-feeling pulse,
   // not true beat detection — the app never receives the audio signal.
   const BPM = 112;
-  const beats = (phase / 1.7) * (BPM / 60);
+  const beats = (phase / PHASE_SPEED) * (BPM / 60);
   const beatIdx = Math.floor(beats);
   const accent = beatIdx % 4 === 0 ? 1 : 0.68;
   const energy = Math.min(1, Math.max(0, (amp - 0.5) / 0.5));
@@ -262,16 +270,26 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
               {/* Soft central glow */}
               <Ellipse cx={VB_W / 2} cy={VB_H / 2} rx={VB_W * 0.46} ry={VB_H * 0.34} fill="url(#swGlow)" />
 
-              {/* Wireframe mesh — every system's strands, all reacting at once */}
+              {/* Wireframe mesh — a whisper of texture behind the ribbons */}
               {GROUPS.map((g, gi) =>
                 Array.from({ length: g.layers }).map((_, l) => (
-                  <Path key={`${gi}-${l}`} d={wavePath(phase, g, l, ampEff)} stroke="url(#swStroke)" strokeWidth={1.4} fill="none" strokeOpacity={0.34} strokeLinecap="round" />
+                  <Path key={`${gi}-${l}`} d={wavePath(phase, g, l, ampEff)} stroke="url(#swStroke)" strokeWidth={1} fill="none" strokeOpacity={0.15} strokeLinecap="round" />
                 ))
               )}
-              {/* Bright core strand of each system */}
-              {GROUPS.map((g, gi) => (
-                <Path key={`core-${gi}`} d={wavePath(phase, g, (g.layers - 1) / 2, ampEff)} stroke="url(#swStroke)" strokeWidth={gi === 0 ? 2.6 : 2} fill="none" strokeOpacity={gi === 0 ? 1 : 0.88} strokeLinecap="round" />
-              ))}
+              {/* Neon ribbons — wide colour halo, mid glow, bright core.
+                  Layered strokes fake a light bloom (react-native-svg has no
+                  blur filter); the halo swells with the beat pulse. */}
+              {GROUPS.map((g, gi) => {
+                const d = wavePath(phase, g, (g.layers - 1) / 2, ampEff);
+                const main = gi === 0;
+                return (
+                  <G key={`ribbon-${gi}`}>
+                    <Path d={d} stroke={eq[1]} strokeWidth={main ? 14 : 10} fill="none" strokeOpacity={0.10 + 0.08 * pulse} strokeLinecap="round" />
+                    <Path d={d} stroke="url(#swStroke)" strokeWidth={main ? 5.5 : 4} fill="none" strokeOpacity={main ? 0.34 : 0.26} strokeLinecap="round" />
+                    <Path d={d} stroke="url(#swStroke)" strokeWidth={main ? 2.8 : 2.2} fill="none" strokeOpacity={main ? 1 : 0.9} strokeLinecap="round" />
+                  </G>
+                );
+              })}
             </Svg>
           </View>
 

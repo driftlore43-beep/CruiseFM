@@ -28,7 +28,7 @@ const SUN_CX = VB_W / 2;
 const SUN_R = 86;
 const SUN_CY = HORIZON_Y - SUN_R * 0.42;  // sun sits low, rising out of the horizon
 const H_LINES = 11;             // rolling horizontal grid lines
-const V_RAYS = 13;              // static rays fanning from the vanishing point
+const V_RAYS = 15;              // static rays fanning from the vanishing point
 
 const DEMO_DURATION_MS = 214000; // 3:34
 
@@ -69,10 +69,13 @@ function HorizonScene({ phase, amp, eq }: { phase: number; amp: number; eq: [str
     };
   });
 
-  // Rays fan out from the vanishing point to points beyond the bottom corners.
+  // Rays fan from the vanishing point, spaced evenly by viewing angle (real
+  // perspective): the outermost rays flatten toward the horizon, so the grid
+  // reaches the side edges all the way up — no bare corners.
+  const RAY_SPREAD = (85 * Math.PI) / 180;   // ±85° either side of straight down
   const rays = Array.from({ length: V_RAYS }, (_, i) => {
-    const t = i / (V_RAYS - 1);
-    return SUN_CX + (t - 0.5) * VB_W * 3.4;
+    const a = (i / (V_RAYS - 1) - 0.5) * 2 * RAY_SPREAD;
+    return SUN_CX + Math.tan(a) * (VB_H + 30 - HORIZON_Y);
   });
 
   return (

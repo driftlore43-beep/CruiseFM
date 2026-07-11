@@ -148,13 +148,8 @@ export default function StationsScreen() {
               style={({ pressed }) => [styles.createBtn, pressed && styles.pressed]}
               onPress={() => setShowCreate(true)}
               hitSlop={6}>
-              <LinearGradient
-                colors={['rgba(255,45,150,0.55)', 'rgba(142,36,170,0.50)', 'rgba(58,16,110,0.55)']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <GlossSheen radius={22} />
-              <MaterialCommunityIcons name="plus" size={22} color="#fff" />
+              <GlossSheen radius={17} />
+              <Text style={styles.createBtnText}>Create</Text>
             </Pressable>
           </View>
           <OnAirBanner station={onAirStation} onPress={() => setSelectedStation(onAirStation)} />
@@ -401,20 +396,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  // Small clear glass pill — quiet until you need it.
   createBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 17,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    shadowColor: Cruise.violet,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 8,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  createBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   scroll: { flex: 1 },
   content: {

@@ -205,10 +205,12 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
   const BPM = 112;
   const beats = (phase / PHASE_SPEED) * (BPM / 60);
   const beatIdx = Math.floor(beats);
-  const accent = beatIdx % 4 === 0 ? 1 : 0.68;
+  const accent = beatIdx % 4 === 0 ? 1 : 0.7;
   const energy = Math.min(1, Math.max(0, (amp - 0.5) / 0.5));
-  const pulse = Math.exp(-(beats - beatIdx) * 4.5) * accent * energy;
-  const ampEff = amp * (1 + 0.32 * pulse);
+  // Softer attack + much gentler swell — a subtle sway, not a hard thump
+  // (it's a musical-feeling pulse, not real beat sync, so keep it understated).
+  const pulse = Math.exp(-(beats - beatIdx) * 3.2) * accent * energy;
+  const ampEff = amp * (1 + 0.12 * pulse);
 
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>

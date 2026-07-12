@@ -48,12 +48,11 @@ function barHeights(phase: number, amp: number): number[] {
   const out: number[] = [];
   for (let i = 0; i < NBARS; i++) {
     const t = i / (NBARS - 1);
-    // Loud clusters that drift slowly across the width — a centre peak plus
-    // two smaller shoulders, like the reference waveform.
+    // Tall central peak with two smaller symmetric shoulders, drifting gently.
     const env =
-      1.00 * gauss(t, 0.24 + 0.05 * Math.sin(phase * 0.33), 0.085) +
-      0.82 * gauss(t, 0.50 + 0.045 * Math.sin(phase * 0.27 + 1.3), 0.070) +
-      0.55 * gauss(t, 0.75 + 0.04 * Math.sin(phase * 0.21 + 2.1), 0.095) +
+      1.00 * gauss(t, 0.50 + 0.03 * Math.sin(phase * 0.31), 0.080) +
+      0.60 * gauss(t, 0.30 + 0.03 * Math.sin(phase * 0.27 + 1.3), 0.075) +
+      0.60 * gauss(t, 0.70 + 0.03 * Math.sin(phase * 0.23 + 2.1), 0.075) +
       0.12; // floor so quiet stretches still show baseline dots
     // Lively per-bar spectrum jitter.
     const jit = 0.42 + 0.58 * Math.abs(
@@ -229,9 +228,9 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
             <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>{station.name}</Text>
           </View>
 
-          {/* Waveform */}
-          <View style={{ flex: 1, justifyContent: 'center' }}>
-            <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet">
+          {/* Waveform — sits low in its area so the bars read grounded */}
+          <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: 12 }}>
+            <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMax meet">
               <Defs>
                 {/* Each bar takes the full gradient top→bottom (bright cap, mood base) */}
                 <SvgGradient id="swBar" x1="0" y1="0" x2="0" y2="1">

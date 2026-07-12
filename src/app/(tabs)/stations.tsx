@@ -496,6 +496,7 @@ const styles = StyleSheet.create({
   lockOverlay: {
     ...StyleSheet.absoluteFill,
     borderRadius: 16,
+    overflow: 'hidden',          // clip the shimmer sweep to the card's rounded rect
     backgroundColor: 'rgba(8, 15, 51, 0.75)',
     alignItems: 'center',
     justifyContent: 'center',

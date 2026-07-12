@@ -96,7 +96,9 @@ export const STATIONS: Station[] = [
     gradientColors: ['#021a15', '#0d4a3a', '#000000'],
     cardGradient: ['#30b095', '#2e6476', '#1b414b'],
     iconName: 'image-filter-hdr',
-    eqColors: ['#8FE8C8', '#3FA88A', '#4FA8D8'],
+    // Pure white — the teal/green mood blended into the snowy mountain photo,
+    // so every mode's visualiser reads clean white against it.
+    eqColors: ['#FFFFFF', '#F2F6FF', '#FFFFFF'],
     glowColor: '#0d4a3a',
     image: require('../../assets/stations/mountain.jpg'),
     icon: 'image-filter-hdr',

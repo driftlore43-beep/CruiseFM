@@ -1,11 +1,11 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing, Modal, PanResponder, ScrollView,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
-import Svg, { Defs, Ellipse, G, LinearGradient as SvgGradient, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Defs, Ellipse, LinearGradient as SvgGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { MoodSheet } from '@/components/MoodSheet';
@@ -31,60 +31,37 @@ function formatMs(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-// ── One wave field, three bulges — everything moves together ─────────────────
-// A single travelling wave (shared speed, direction and harmonics) passing
-// through three amplitude bulges: a tall centre and two smaller shoulders.
-// The clusters differ only in position and height, so the whole surface
-// rises, falls and drifts as one — no competing motions.
-type WaveGroup = {
-  cx: number;      // bulge centre along the width (0..1)
-  k: number;       // envelope tightness — higher = narrower bulge
-  scale: number;   // bulge height relative to the centre one
-  layers: number;  // mesh strands in this bulge
-};
-const GROUPS: WaveGroup[] = [
-  { cx: 0.50, k: 3.6, scale: 1.00, layers: 7 },
-  { cx: 0.24, k: 6.2, scale: 0.55, layers: 5 },
-  { cx: 0.76, k: 6.2, scale: 0.60, layers: 5 },
-];
-// Shared harmonics — all travel the same direction at gently different rates,
-// so the shape morphs organically while clearly flowing one way.
-const F1 = 2.3, F2 = 5.7, F3 = 11.0;
-// One tempo for the whole field — the anim loop and beat pulse both use it.
+// ── Audio-bar spectrum ────────────────────────────────────────────────────────
+// A row of rounded bars along a centre baseline (with a soft mirrored
+// reflection). A few slowly drifting amplitude clusters give it the shape of a
+// real waveform; per-bar jitter makes the bars dance while it plays.
+const NBARS = 60;
 const PHASE_SPEED = 1.2;
 
-// One strand of the shared wave, shaped by its bulge's envelope.
-function wavePath(phase: number, g: WaveGroup, layer: number, amp: number): string {
-  const cy = VB_H / 2;
-  const lp = (layer - (g.layers - 1) / 2) * 0.24;            // strand spread → wireframe mesh
-  const layerAmp = amp * g.scale * (1 - (Math.abs(layer - (g.layers - 1) / 2) / g.layers) * 0.75);
-  const xs: number[] = [];
-  const ys: number[] = [];
-  for (let i = 0; i <= POINTS; i++) {
-    const t = i / POINTS;
-    const x = t * VB_W;
-    const dx = (t - g.cx) * g.k;
-    const env = Math.exp(-dx * dx);                          // this bulge's envelope
-    const wob =
-      Math.sin(t * Math.PI * 2 * F1 + phase + lp) * 0.55 +
-      Math.sin(t * Math.PI * 2 * F2 + phase * 1.35 + lp * 1.4) * 0.30 +
-      Math.sin(t * Math.PI * 2 * F3 + phase * 0.7 - lp) * 0.15;
-    xs.push(x);
-    // Amplified peaks, soft-compressed near the canvas edge (tanh) so the
-    // tallest spikes round off gracefully instead of clipping flat.
-    const raw = wob * env * layerAmp * VB_H * 0.78;
-    const lim = VB_H * 0.46;
-    ys.push(cy + lim * Math.tanh(raw / lim));
+function gauss(x: number, mu: number, sig: number): number {
+  const d = (x - mu) / sig;
+  return Math.exp(-0.5 * d * d);
+}
+
+// Heights (0..~1.1) for every bar at this moment.
+function barHeights(phase: number, amp: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < NBARS; i++) {
+    const t = i / (NBARS - 1);
+    // Loud clusters that drift slowly across the width — a centre peak plus
+    // two smaller shoulders, like the reference waveform.
+    const env =
+      1.00 * gauss(t, 0.24 + 0.05 * Math.sin(phase * 0.33), 0.085) +
+      0.82 * gauss(t, 0.50 + 0.045 * Math.sin(phase * 0.27 + 1.3), 0.070) +
+      0.55 * gauss(t, 0.75 + 0.04 * Math.sin(phase * 0.21 + 2.1), 0.095) +
+      0.12; // floor so quiet stretches still show baseline dots
+    // Lively per-bar spectrum jitter.
+    const jit = 0.42 + 0.58 * Math.abs(
+      Math.sin(i * 0.7 + phase * 2.4) * 0.6 + Math.sin(i * 1.9 - phase * 1.7) * 0.4,
+    );
+    out.push(Math.min(1.15, env * jit) * amp);
   }
-  // Smooth through the points with quadratic curves (midpoint method) → silky line.
-  let d = `M${xs[0].toFixed(1)} ${ys[0].toFixed(1)}`;
-  for (let i = 1; i < xs.length - 1; i++) {
-    const mx = (xs[i] + xs[i + 1]) / 2;
-    const my = (ys[i] + ys[i + 1]) / 2;
-    d += ` Q${xs[i].toFixed(1)} ${ys[i].toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)}`;
-  }
-  d += ` L${xs[xs.length - 1].toFixed(1)} ${ys[ys.length - 1].toFixed(1)}`;
-  return d;
+  return out;
 }
 
 // ── Fullscreen modal ────────────────────────────────────────────────────────────
@@ -256,42 +233,39 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
           <View style={{ flex: 1, justifyContent: 'center' }}>
             <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid meet">
               <Defs>
-                <SvgGradient id="swStroke" x1="0" y1="0" x2="1" y2="0">
-                  <Stop offset="0" stopColor={eq[2]} />
-                  <Stop offset="0.28" stopColor={eq[1]} />
-                  <Stop offset="0.5" stopColor="#EAF3FF" />
-                  <Stop offset="0.72" stopColor={eq[1]} />
+                {/* Each bar takes the full gradient top→bottom (bright cap, mood base) */}
+                <SvgGradient id="swBar" x1="0" y1="0" x2="0" y2="1">
+                  <Stop offset="0" stopColor="#EAF3FF" />
+                  <Stop offset="0.35" stopColor={eq[0]} />
                   <Stop offset="1" stopColor={eq[2]} />
                 </SvgGradient>
                 <RadialGradient id="swGlow" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
-                  <Stop offset="0" stopColor={eq[0]} stopOpacity="0.30" />
+                  <Stop offset="0" stopColor={eq[0]} stopOpacity="0.28" />
                   <Stop offset="1" stopColor={eq[0]} stopOpacity="0" />
                 </RadialGradient>
               </Defs>
 
               {/* Soft central glow */}
-              <Ellipse cx={VB_W / 2} cy={VB_H / 2} rx={VB_W * 0.46} ry={VB_H * 0.34} fill="url(#swGlow)" />
+              <Ellipse cx={VB_W / 2} cy={VB_H / 2} rx={VB_W * 0.46} ry={VB_H * 0.30} fill="url(#swGlow)" />
 
-              {/* Wireframe mesh — a whisper of texture behind the ribbons */}
-              {GROUPS.map((g, gi) =>
-                Array.from({ length: g.layers }).map((_, l) => (
-                  <Path key={`${gi}-${l}`} d={wavePath(phase, g, l, ampEff)} stroke="url(#swStroke)" strokeWidth={1} fill="none" strokeOpacity={0.15} strokeLinecap="round" />
-                ))
-              )}
-              {/* Neon ribbons — wide colour halo, mid glow, bright core.
-                  Layered strokes fake a light bloom (react-native-svg has no
-                  blur filter); the halo swells with the beat pulse. */}
-              {GROUPS.map((g, gi) => {
-                const d = wavePath(phase, g, (g.layers - 1) / 2, ampEff);
-                const main = gi === 0;
-                return (
-                  <G key={`ribbon-${gi}`}>
-                    <Path d={d} stroke={eq[1]} strokeWidth={main ? 14 : 10} fill="none" strokeOpacity={0.10 + 0.08 * pulse} strokeLinecap="round" />
-                    <Path d={d} stroke="url(#swStroke)" strokeWidth={main ? 5.5 : 4} fill="none" strokeOpacity={main ? 0.34 : 0.26} strokeLinecap="round" />
-                    <Path d={d} stroke="url(#swStroke)" strokeWidth={main ? 2.8 : 2.2} fill="none" strokeOpacity={main ? 1 : 0.9} strokeLinecap="round" />
-                  </G>
-                );
-              })}
+              {(() => {
+                const cy = VB_H / 2;
+                const slot = VB_W / NBARS;
+                const barW = slot * 0.5;
+                const rx = barW / 2;
+                const maxUp = VB_H * 0.40;
+                return barHeights(phase, ampEff).map((h, i) => {
+                  const x = i * slot + (slot - barW) / 2;
+                  const up = Math.max(barW, h * maxUp);   // shortest reads as a dot
+                  const down = up * 0.42;                 // fainter mirror
+                  return (
+                    <Fragment key={i}>
+                      <Rect x={x} y={cy - 2 - up} width={barW} height={up} rx={rx} ry={rx} fill="url(#swBar)" opacity={0.95} />
+                      <Rect x={x} y={cy + 2} width={barW} height={down} rx={rx} ry={rx} fill="url(#swBar)" opacity={0.26} />
+                    </Fragment>
+                  );
+                });
+              })()}
             </Svg>
           </View>
 

@@ -5,6 +5,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
+import { PaywallShowcase } from '@/components/PaywallShowcase';
 import { Cruise } from '@/constants/theme';
 
 const AMBER      = '#F59E0B';
@@ -85,12 +86,12 @@ export default function PremiumScreen() {
 
           {/* Header */}
           <View style={styles.header}>
-            <View style={styles.crestWrap}>
-              <MaterialCommunityIcons name="star-four-points" size={28} color={AMBER} />
-            </View>
             <Text style={styles.title}>Cruise FM Premium</Text>
             <Text style={styles.subtitle}>Unlock the full driving atmosphere.</Text>
           </View>
+
+          {/* The premium modes, moving — sell the vibe before the words. */}
+          <PaywallShowcase />
 
           {/* Feature cards */}
           <View style={styles.featureList}>
@@ -179,14 +180,7 @@ const styles = StyleSheet.create({
   },
   content: { paddingHorizontal: 22, paddingTop: 48 },
 
-  header: { alignItems: 'center', marginBottom: 32 },
-  crestWrap: {
-    width: 64, height: 64, borderRadius: 32,
-    backgroundColor: AMBER_SOFT,
-    borderWidth: 1, borderColor: AMBER_LINE,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 18,
-  },
+  header: { alignItems: 'center', marginBottom: 22 },
   title: {
     color: '#fff', fontSize: 27, fontWeight: '700',
     letterSpacing: 0.2, marginBottom: 8, textAlign: 'center',

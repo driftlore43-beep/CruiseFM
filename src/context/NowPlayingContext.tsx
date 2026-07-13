@@ -32,8 +32,9 @@ type NowPlayingCtx = {
   playing: boolean;
   setPlaying: (p: boolean) => void;
   /** Start (or replace) a session and show its fullscreen. Pass
-   * `{ preview: true }` for a free-user taste of a locked mode. */
-  open: (mode: string, stationId?: string, opts?: { preview?: boolean }) => void;
+   * `{ preview: true }` for a free-user taste of a locked mode, or
+   * `{ paused: true }` to open idle until the user presses play. */
+  open: (mode: string, stationId?: string, opts?: { preview?: boolean; paused?: boolean }) => void;
   /** Keep the session (and the music) but drop to the mini-player. */
   minimize: () => void;
   /** Bring the fullscreen back for the current session. */
@@ -53,15 +54,16 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef<NowPlayingSession | null>(null);
   useEffect(() => { sessionRef.current = session; }, [session]);
 
-  const open = useCallback((mode: string, stationId: string = 'night-run', opts?: { preview?: boolean }) => {
+  const open = useCallback((mode: string, stationId: string = 'night-run', opts?: { preview?: boolean; paused?: boolean }) => {
     // iPod mode was retired — any old saved iPod cruise resumes in Equalizer.
     const m = mode === 'ipod' ? 'equalizer' : mode;
     setSession({ mode: m, stationId, preview: opts?.preview });
     setExpanded(true);
-    setPlaying(true);
+    setPlaying(!opts?.paused);
     // Every drive tries to get music going — the station's linked playlist
-    // if it has one, otherwise resume whatever was playing.
-    playStationMusic(stationId);
+    // if it has one, otherwise resume whatever was playing. A paused open
+    // leaves Spotify alone until the user presses play.
+    if (!opts?.paused) playStationMusic(stationId);
   }, []);
 
   const minimize = useCallback(() => setExpanded(false), []);

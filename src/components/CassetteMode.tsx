@@ -597,7 +597,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
       } else { setPlatform(null); }
     });
     slideY.setValue(SCREEN_H);
-    setPlaying(true);
+    // Play state belongs to the session — a Modes-tab browse opens paused.
     progress.setValue(0);
     progressValue.current = 0;
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();

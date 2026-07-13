@@ -300,8 +300,9 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
       } else { setPlatform(null); }
     });
     slideY.setValue(SCREEN_H);
-    setPlaying(true);
-    startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
+    // Respect the session's play state — a browse from the Modes tab opens
+    // paused, so the bars hold still until the user presses play.
+    if (playing) startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
     // Pulse the close button once to draw attention
     closePulse.setValue(1);

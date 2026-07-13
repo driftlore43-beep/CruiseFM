@@ -777,7 +777,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     getSavedPlatform().then((id) => {
       if (id && id !== 'none') { const p = PLATFORMS[id as Exclude<PlatformId, 'none'>]; if (p) setPlatform({ id: id as PlatformId, name: p.name, color: p.color }); } else setPlatform(null);
     });
-    slideY.setValue(SCREEN_H); setPlaying(true); setActiveTrack(0);
+    // Play state belongs to the session — a Modes-tab browse opens paused.
+    slideY.setValue(SCREEN_H); setActiveTrack(0);
     progress.setValue(0); progressValue.current = 0; setCurrentTimeMs(0);
     setShowTracks(false); showTracksAnim.setValue(0);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();

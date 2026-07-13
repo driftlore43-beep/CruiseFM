@@ -143,7 +143,8 @@ export default function ModesScreen() {
 
   function open(mode: string, locked: boolean) {
     // Locked modes give a free taste — the gate handles the upsell after.
-    np.open(mode, undefined, { preview: locked });
+    // Browsing modes opens them idle; previews auto-play so the taste moves.
+    np.open(mode, undefined, { preview: locked, paused: !locked });
   }
 
   return (

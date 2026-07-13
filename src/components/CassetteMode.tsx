@@ -12,6 +12,7 @@ import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { FloatingNotes } from '@/components/FloatingNotes';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { MoodSheet } from '@/components/MoodSheet';
@@ -804,6 +805,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             <TouchableOpacity onPress={togglePlay} activeOpacity={0.92}>
               <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={currentTrack.title} artist={currentTrack.artist} timeText={elapsedTxt} />
             </TouchableOpacity>
+            <FloatingNotes playing={playing} color={neonColor} />
           </View>
 
           {/* Song title — bottom-left, Spotify style */}

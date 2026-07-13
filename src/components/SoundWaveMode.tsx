@@ -12,6 +12,7 @@ import { MoodSheet } from '@/components/MoodSheet';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { FloatingNotes } from '@/components/FloatingNotes';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
@@ -266,6 +267,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
                 });
               })()}
             </Svg>
+            <FloatingNotes playing={playing} color={eq[0]} />
           </View>
 
           {/* Song title */}

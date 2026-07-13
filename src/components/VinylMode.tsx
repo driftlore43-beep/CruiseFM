@@ -13,6 +13,7 @@ import { Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { FloatingNotes } from '@/components/FloatingNotes';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
@@ -101,73 +102,6 @@ function SparkleField({ size }: { size: number }) {
       {dots.map((d) => (
         <View key={d.key} style={{ position: 'absolute', left: d.left, top: d.top, width: d.sz, height: d.sz, borderRadius: d.sz / 2, backgroundColor: V.gold, opacity: d.op }} />
       ))}
-    </View>
-  );
-}
-
-// ── Floating music notes ──────────────────────────────────────────────────────
-type NoteItem = {
-  id: number; x: number; y: number; icon: string;
-  size: number; driftX: number; anim: Animated.Value;
-};
-const NOTE_ICONS = ['music-note-eighth', 'music-note-quarter', 'music-note-sixteenth', 'music'];
-let _noteId = 0;
-
-function FloatingNotes({ playing, containerSize, recordRadius, scrubbing, scrubDir, color = '#C8860A' }: {
-  playing: boolean; containerSize: number; recordRadius: number;
-  scrubbing: boolean; scrubDir: 'fwd' | 'bwd' | null;
-  color?: string;
-}) {
-  const [notes, setNotes] = useState<NoteItem[]>([]);
-
-  useEffect(() => {
-    if (!playing) { setNotes([]); return; }
-    const interval = scrubbing && scrubDir === 'fwd' ? 300 : 800;
-    const spawn = () => {
-      const angle = Math.random() * Math.PI * 2;
-      const id    = _noteId++;
-      const anim  = new Animated.Value(0);
-      const bwd   = scrubbing && scrubDir === 'bwd';
-      const note: NoteItem = {
-        id,
-        x:      containerSize / 2 + Math.cos(angle) * recordRadius,
-        y:      containerSize / 2 + Math.sin(angle) * recordRadius,
-        icon:   NOTE_ICONS[Math.floor(Math.random() * NOTE_ICONS.length)],
-        size:   12 + Math.random() * 8,
-        driftX: bwd ? (-10 + Math.random() * 20) * -1 : -30 + Math.random() * 60,
-        anim,
-      };
-      setNotes((prev) => [...prev, note]);
-      const tyEnd = bwd ? 60 : (scrubbing ? -160 : -120);
-      const dur   = bwd ? 1400 : 2000;
-      Animated.timing(anim, { toValue: 1, duration: dur, easing: Easing.out(Easing.quad), useNativeDriver: true }).start(() => {
-        setNotes((prev) => prev.filter((n) => n.id !== id));
-      });
-    };
-    spawn();
-    const timer = setInterval(spawn, interval);
-    return () => { clearInterval(timer); };
-  }, [playing, scrubbing, scrubDir, containerSize, recordRadius]);
-
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {notes.map((note) => {
-        const bwd   = scrubbing && scrubDir === 'bwd';
-        const tyEnd = bwd ? 60 : (scrubbing ? -160 : -120);
-        const ty      = note.anim.interpolate({ inputRange: [0, 1], outputRange: [0, tyEnd] });
-        const tx      = note.anim.interpolate({ inputRange: [0, 1], outputRange: [0, note.driftX] });
-        const opacity = note.anim.interpolate({ inputRange: [0, 0.08, 0.8, 1], outputRange: [0, 0.9, 0.6, 0] });
-        const scale   = note.anim.interpolate({ inputRange: [0, 1], outputRange: [1, bwd ? 1.4 : 0.4] });
-        return (
-          <Animated.View key={note.id} style={{
-            position: 'absolute', left: note.x, top: note.y,
-            transform: [{ translateX: tx }, { translateY: ty }, { scale }],
-            opacity,
-          }}>
-            <MaterialCommunityIcons name={note.icon as any} size={note.size} color={color} />
-          </Animated.View>
-        );
-      })}
     </View>
   );
 }
@@ -421,7 +355,7 @@ function TurntableHero({
         );
       })()}
       {/* Floating music notes */}
-      <FloatingNotes playing={playing} containerSize={platSize} recordRadius={recSize / 2} scrubbing={scrubbing} scrubDir={scrubDir} color={accent} />
+      <FloatingNotes playing={playing} emitter="ring" ringRadius={recSize / 2} scrubbing={scrubbing} scrubDir={scrubDir} color={accent} />
       <Tonearm armLen={armLen} armW={armW} headW={headW} headH={headH} pivotX={pivotX} pivotY={pivotY} rotation={armRot} color={accent} />
     </View>
   );

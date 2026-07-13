@@ -12,6 +12,7 @@ import { MoodSheet } from '@/components/MoodSheet';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { FloatingNotes } from '@/components/FloatingNotes';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
@@ -210,6 +211,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
 
           {/* Orb */}
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: orbSize, height: orbSize }}>
             <Svg width={orbSize} height={orbSize} viewBox={`0 0 ${VB} ${VB}`}>
               <Defs>
                 <RadialGradient id="cwStroke" cx="0.5" cy="0.5" r="0.5">
@@ -230,6 +232,8 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
               {/* Chunky EQ dashes — resting dots with bursts sweeping the ring */}
               <Path d={ringBars(phase, amp)} stroke="url(#cwStroke)" strokeWidth={5} strokeOpacity={0.97} fill="none" strokeLinecap="round" />
             </Svg>
+            <FloatingNotes playing={playing} emitter="ring" color={eq[0]} />
+            </View>
           </View>
 
           {/* Song title */}

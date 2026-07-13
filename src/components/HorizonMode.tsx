@@ -12,6 +12,7 @@ import { MoodSheet } from '@/components/MoodSheet';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { FloatingNotes } from '@/components/FloatingNotes';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
@@ -281,6 +282,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
           {/* Outrun scene */}
           <View style={{ flex: 1 }}>
             <HorizonScene phase={phase} amp={ampRef.current} eq={eq} />
+            <FloatingNotes playing={playing} color={eq[1]} />
           </View>
 
           {/* Song title */}

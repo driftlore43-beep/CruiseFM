@@ -23,6 +23,7 @@ import { Cruise } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { FloatingNotes } from '@/components/FloatingNotes';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { MoodSheet } from '@/components/MoodSheet';
@@ -562,6 +563,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
                 bgColor="#060612"
                 colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
               />
+              <FloatingNotes playing={playing} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
             </View>
 
           </View>
@@ -624,6 +626,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               bgColor="transparent"
               colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
             />
+            <FloatingNotes playing={playing} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
           </View>
 
           {/* Song title — bottom-left, Spotify style */}

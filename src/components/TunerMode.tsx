@@ -12,6 +12,7 @@ import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { FloatingNotes } from '@/components/FloatingNotes';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
@@ -390,6 +391,8 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             <View style={{ marginTop: 10 }}>
               <DialRuler freq={freq} width={winW} color={accent} lock={lock} />
               <StaticNoise width={winW} height={116} phase={phase} opacity={offAir * 0.55} />
+              {/* Notes only flow once the needle locks onto a station */}
+              <FloatingNotes playing={playing && lock > 0.9} color={accent} />
             </View>
 
             <Text style={[fs.dragHint, { fontFamily: Fonts.mono }]}>DRAG TO TUNE</Text>

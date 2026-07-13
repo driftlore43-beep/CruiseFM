@@ -1,6 +1,25 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { recordDriveEnd } from '@/utils/driveStats';
+import { isSpotifyConnected, startPlayback } from '@/utils/spotify';
+import { getStationPlaylist } from '@/utils/stationPlaylists';
+
+/**
+ * Kick Spotify toward this station's sound. If the user linked a playlist to
+ * the station it starts playing; otherwise (unless onlyIfLinked) we just
+ * resume whatever they had going. Fire-and-forget: no device / not connected
+ * simply means the visuals run without us touching the music.
+ */
+async function playStationMusic(stationId: string, opts?: { onlyIfLinked?: boolean }) {
+  try {
+    if (!(await isSpotifyConnected())) return;
+    const linked = await getStationPlaylist(stationId);
+    if (!linked && opts?.onlyIfLinked) return;
+    await startPlayback(linked?.uri);
+  } catch {
+    // never let a playback hiccup break the drive
+  }
+}
 
 export type NowPlayingSession = { mode: string; stationId: string; preview?: boolean };
 
@@ -31,6 +50,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<NowPlayingSession | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const sessionRef = useRef<NowPlayingSession | null>(null);
+  useEffect(() => { sessionRef.current = session; }, [session]);
 
   const open = useCallback((mode: string, stationId: string = 'night-run', opts?: { preview?: boolean }) => {
     // iPod mode was retired — any old saved iPod cruise resumes in Equalizer.
@@ -38,13 +59,21 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     setSession({ mode: m, stationId, preview: opts?.preview });
     setExpanded(true);
     setPlaying(true);
+    // Every drive tries to get music going — the station's linked playlist
+    // if it has one, otherwise resume whatever was playing.
+    playStationMusic(stationId);
   }, []);
 
   const minimize = useCallback(() => setExpanded(false), []);
   const expand = useCallback(() => setExpanded(true), []);
 
   const setStationId = useCallback((stationId: string) => {
-    setSession((s) => (s ? { ...s, stationId } : s));
+    const current = sessionRef.current;
+    if (!current || current.stationId === stationId) return;
+    setSession({ ...current, stationId });
+    // Retuning mid-drive (Tuner lock-on, Change Mood) switches the music
+    // too — but only when the new station actually has a linked playlist.
+    playStationMusic(stationId, { onlyIfLinked: true });
   }, []);
 
   const stop = useCallback(() => {

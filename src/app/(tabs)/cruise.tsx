@@ -22,7 +22,6 @@ import {
 } from '@/utils/lastCruise';
 import { recordDriveStart } from '@/utils/driveStats';
 import { loadCustomStations, resolveAnyStation } from '@/utils/customStations';
-import { isSpotifyConnected, startPlayback } from '@/utils/spotify';
 
 const recommended = STATIONS.filter((s) => RECOMMENDED_IDS.includes(s.id));
 
@@ -85,12 +84,7 @@ export default function CruiseScreen() {
     await saveLastCruise(cruise);
     setLastCruise(cruise);
     recordDriveStart(cruise.stationId);
-
-    if (await isSpotifyConnected()) {
-      // Resume only if Spotify already has a live device. If not, we do NOT
-      // yank the user to Spotify — just open the visual.
-      await startPlayback().catch(() => {});
-    }
+    // np.open also kicks Spotify toward the station's linked playlist.
     np.open(cruise.mode, cruise.stationId);
   }
 

@@ -3,10 +3,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Platform, Pressable, Share, StyleSheet, Switch, Text, View } from 'react-native';
+import { Image, Modal, Platform, Pressable, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { SettingsInfoRow, SettingsPageShell, SettingsSection } from '@/components/SettingsPageShell';
+import { GlossSheen } from '@/components/GlossSheen';
 import { Cruise } from '@/constants/theme';
+import { DEFAULT_DRIVER_NAME, getDriverName, setDriverName } from '@/utils/driverName';
 
 export type SettingsPage = 'account' | 'notifications' | 'privacy' | 'about' | 'refer';
 
@@ -38,10 +40,35 @@ export function SettingsSheet({ page, onClose }: { page: SettingsPage | null; on
 
 // ── Account ──────────────────────────────────────────────────────────────────
 function AccountBody() {
+  const [name, setName] = useState('');
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    getDriverName().then((n) => { setName(n); setLoaded(true); });
+  }, []);
+
+  const commit = (value: string) => {
+    setName(value);
+    setDriverName(value); // empty falls back to the default next load
+  };
+
   return (
     <>
       <SettingsSection label="PROFILE">
-        <SettingsInfoRow label="Display Name" value="Night Driver" />
+        <View style={[styles.nameRow, styles.nameRowBorder]}>
+          <Text style={styles.nameRowLabel}>Display Name</Text>
+          <TextInput
+            value={loaded ? name : ''}
+            onChangeText={commit}
+            placeholder={DEFAULT_DRIVER_NAME}
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            style={styles.nameInput}
+            maxLength={24}
+            returnKeyType="done"
+            selectionColor={Cruise.violetLight}
+          />
+          <MaterialCommunityIcons name="pencil-outline" size={15} color="rgba(255,255,255,0.4)" />
+        </View>
         <SettingsInfoRow label="Email" value="Not connected" />
         <SettingsInfoRow label="Plan" value="Free" last />
       </SettingsSection>
@@ -74,6 +101,8 @@ function ToggleRow({
         onValueChange={onChange}
         trackColor={{ false: 'rgba(255,255,255,0.15)', true: Cruise.violet }}
         thumbColor="#fff"
+        ios_backgroundColor="rgba(255,255,255,0.15)"
+        {...({ activeThumbColor: '#fff' } as object)}
       />
     </View>
   );
@@ -170,8 +199,37 @@ const SHARE_MESSAGE =
   "I've been using Cruise FM to turn my Spotify playlists into a proper driving experience — mood stations, cinematic visual modes, the works. Worth a try: https://cruisefm.app";
 
 function ReferBody() {
+  const [copied, setCopied] = useState(false);
+
   async function handleShare() {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (Platform.OS === 'web') {
+      // Browsers: native share sheet where supported (phones), otherwise
+      // copy the message so the button always does something.
+      const nav: any = typeof navigator !== 'undefined' ? navigator : null;
+      if (nav?.share) {
+        try { await nav.share({ text: SHARE_MESSAGE }); } catch { /* dismissed */ }
+        return;
+      }
+      let ok = false;
+      try { await nav?.clipboard?.writeText(SHARE_MESSAGE); ok = true; } catch { /* blocked */ }
+      if (!ok && typeof document !== 'undefined') {
+        // Legacy copy path for browsers that deny the clipboard API.
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = SHARE_MESSAGE;
+          document.body.appendChild(ta);
+          ta.select();
+          ok = document.execCommand('copy');
+          ta.remove();
+        } catch { /* nothing more we can do */ }
+      }
+      if (ok) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2200);
+      }
+      return;
+    }
     try {
       await Share.share({ message: SHARE_MESSAGE });
     } catch {
@@ -186,6 +244,7 @@ function ReferBody() {
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+      <GlossSheen radius={20} />
       <MaterialCommunityIcons name="star-four-points" size={30} color={Cruise.violetLight} style={{ marginBottom: 4 }} />
 
       <Text style={styles.referTitle}>Share the drive.</Text>
@@ -193,7 +252,17 @@ function ReferBody() {
         Know someone who'd love turning their playlists into a mood station? Send them Cruise FM.
       </Text>
       <Pressable style={({ pressed }) => [styles.shareBtn, pressed && { opacity: 0.88 }]} onPress={handleShare}>
-        <Text style={styles.shareBtnText}>Share Cruise FM</Text>
+        <LinearGradient
+          colors={['rgba(155,95,255,0.30)', 'rgba(123,56,224,0.16)']}
+          start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <MaterialCommunityIcons
+          name={copied ? 'check' : 'share-variant'}
+          size={16}
+          color="#fff"
+        />
+        <Text style={styles.shareBtnText}>{copied ? 'Link copied' : 'Share Cruise FM'}</Text>
       </Pressable>
     </View>
   );
@@ -217,8 +286,21 @@ const styles = StyleSheet.create({
   referTitle: { color: '#fff', fontSize: 21, fontWeight: '800', textAlign: 'center' },
   referSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13.5, lineHeight: 19, textAlign: 'center', marginBottom: 6 },
   shareBtn: {
-    backgroundColor: Cruise.violet, borderRadius: 14, paddingVertical: 15, paddingHorizontal: 28,
-    shadowColor: Cruise.violet, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 14, elevation: 8,
+    // Premium glass: transparent violet with a bright rim, not a solid fill.
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 14, paddingVertical: 15, paddingHorizontal: 28, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(155,95,255,0.65)',
+    shadowColor: Cruise.violet, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 14, elevation: 8,
   },
   shareBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  nameRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, paddingVertical: 8,
+  },
+  nameRowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  nameRowLabel: { color: '#fff', fontSize: 14.5, fontWeight: '600', flex: 1 },
+  nameInput: {
+    color: Cruise.violetLight, fontSize: 14, fontWeight: '600',
+    textAlign: 'right', minWidth: 120, paddingVertical: 8,
+  },
 });

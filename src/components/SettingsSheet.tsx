@@ -3,7 +3,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
-import { Modal, Platform, Pressable, Share, StyleSheet, Switch, Text, View } from 'react-native';
+import { Image, Modal, Platform, Pressable, Share, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { SettingsInfoRow, SettingsPageShell, SettingsSection } from '@/components/SettingsPageShell';
 import { Cruise } from '@/constants/theme';
@@ -140,7 +140,11 @@ function AboutBody() {
   return (
     <>
       <View style={{ alignItems: 'center', gap: 12, marginBottom: 28 }}>
-        {/* App logo goes here once the final mark is ready. */}
+        <Image
+          source={require('../../assets/images/logo-mark.png')}
+          style={{ width: 84, height: 84 }}
+          resizeMode="contain"
+        />
         <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 2 }}>CRUISE FM</Text>
         <Text style={styles.aboutTagline}>
           Spotify organises by artist and genre. Cruise FM organises by how a drive feels.

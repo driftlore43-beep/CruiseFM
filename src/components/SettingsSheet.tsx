@@ -8,9 +8,12 @@ import { Image, Modal, Platform, Pressable, Share, StyleSheet, Switch, Text, Tex
 import { SettingsInfoRow, SettingsPageShell, SettingsSection } from '@/components/SettingsPageShell';
 import { GlossSheen } from '@/components/GlossSheen';
 import { Cruise } from '@/constants/theme';
+import { PRIVACY_POLICY, TERMS_OF_SERVICE, type LegalDoc } from '@/constants/legal';
 import { DEFAULT_DRIVER_NAME, getDriverName, setDriverName } from '@/utils/driverName';
 
-export type SettingsPage = 'account' | 'notifications' | 'privacy' | 'about' | 'refer';
+export type SettingsPage =
+  | 'account' | 'notifications' | 'privacy' | 'about' | 'refer'
+  | 'privacyPolicy' | 'terms';
 
 const TITLES: Record<SettingsPage, string> = {
   account: 'Account Settings',
@@ -18,23 +21,51 @@ const TITLES: Record<SettingsPage, string> = {
   privacy: 'Privacy',
   about: 'About Cruise FM',
   refer: 'Refer a Friend',
+  privacyPolicy: 'Privacy Policy',
+  terms: 'Terms of Service',
 };
 
 // ── Full-screen settings modal — presented over the current screen so there's
 // no route change to swipe-back from (which on web reset the tab to home). ──
 export function SettingsSheet({ page, onClose }: { page: SettingsPage | null; onClose: () => void }) {
+  // Sub-page navigation (Privacy → Privacy Policy / Terms) stays inside the
+  // sheet: back returns to the parent page, not to the profile.
+  const [sub, setSub] = useState<SettingsPage | null>(null);
+  useEffect(() => { if (page == null) setSub(null); }, [page]);
+
+  const active = sub ?? page;
+  const handleBack = () => { if (sub) setSub(null); else onClose(); };
+
   return (
-    <Modal visible={page != null} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      {page && (
-        <SettingsPageShell title={TITLES[page]} onBack={onClose}>
-          {page === 'account' && <AccountBody />}
-          {page === 'notifications' && <NotificationsBody />}
-          {page === 'privacy' && <PrivacyBody />}
-          {page === 'about' && <AboutBody />}
-          {page === 'refer' && <ReferBody />}
+    <Modal visible={page != null} transparent animationType="slide" onRequestClose={handleBack} statusBarTranslucent>
+      {active && (
+        <SettingsPageShell title={TITLES[active]} onBack={handleBack}>
+          {active === 'account' && <AccountBody />}
+          {active === 'notifications' && <NotificationsBody />}
+          {active === 'privacy' && <PrivacyBody onOpen={setSub} />}
+          {active === 'about' && <AboutBody />}
+          {active === 'refer' && <ReferBody />}
+          {active === 'privacyPolicy' && <LegalBody doc={PRIVACY_POLICY} />}
+          {active === 'terms' && <LegalBody doc={TERMS_OF_SERVICE} />}
         </SettingsPageShell>
       )}
     </Modal>
+  );
+}
+
+// ── Legal documents (shared renderer) ───────────────────────────────────────
+function LegalBody({ doc }: { doc: LegalDoc }) {
+  return (
+    <>
+      <Text style={styles.legalUpdated}>Last updated {doc.updated}</Text>
+      <Text style={styles.legalIntro}>{doc.intro}</Text>
+      {doc.sections.map((s) => (
+        <View key={s.heading} style={{ marginBottom: 18 }}>
+          <Text style={styles.legalHeading}>{s.heading}</Text>
+          <Text style={styles.legalBody}>{s.body}</Text>
+        </View>
+      ))}
+    </>
   );
 }
 
@@ -140,7 +171,7 @@ function NotificationsBody() {
 }
 
 // ── Privacy ──────────────────────────────────────────────────────────────────
-function PrivacyBody() {
+function PrivacyBody({ onOpen }: { onOpen: (p: SettingsPage) => void }) {
   return (
     <>
       <SettingsSection label="WHAT WE STORE">
@@ -157,8 +188,14 @@ function PrivacyBody() {
         <SettingsInfoRow label="Analytics" value="None" last />
       </SettingsSection>
       <SettingsSection label="LEGAL">
-        <SettingsInfoRow label="Privacy Policy" value="Coming soon" />
-        <SettingsInfoRow label="Terms of Service" value="Coming soon" last />
+        <Pressable style={[styles.legalRow, styles.legalRowBorder]} onPress={() => onOpen('privacyPolicy')}>
+          <Text style={styles.legalRowLabel}>Privacy Policy</Text>
+          <MaterialCommunityIcons name="chevron-right" size={18} color="rgba(255,255,255,0.5)" />
+        </Pressable>
+        <Pressable style={styles.legalRow} onPress={() => onOpen('terms')}>
+          <Text style={styles.legalRowLabel}>Terms of Service</Text>
+          <MaterialCommunityIcons name="chevron-right" size={18} color="rgba(255,255,255,0.5)" />
+        </Pressable>
       </SettingsSection>
     </>
   );
@@ -303,4 +340,17 @@ const styles = StyleSheet.create({
     color: Cruise.violetLight, fontSize: 14, fontWeight: '600',
     textAlign: 'right', minWidth: 120, paddingVertical: 8,
   },
+  legalRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 15,
+  },
+  legalRowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  legalRowLabel: { color: '#fff', fontSize: 14.5, fontWeight: '600' },
+  legalUpdated: {
+    color: 'rgba(255,255,255,0.4)', fontSize: 11.5, fontWeight: '600',
+    letterSpacing: 0.4, marginBottom: 14,
+  },
+  legalIntro: { color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 21, marginBottom: 22 },
+  legalHeading: { color: '#fff', fontSize: 14.5, fontWeight: '700', marginBottom: 5 },
+  legalBody: { color: 'rgba(255,255,255,0.65)', fontSize: 13, lineHeight: 20 },
 });

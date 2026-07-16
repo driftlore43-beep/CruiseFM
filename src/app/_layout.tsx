@@ -7,6 +7,7 @@ import { MotionProvider } from '@/context/MotionContext';
 import { NowPlayingProvider } from '@/context/NowPlayingContext';
 import { EntitlementsProvider } from '@/context/EntitlementsContext';
 import { PlatformSelector, usePlatformSelector } from '@/components/PlatformSelector';
+import { BrandIntro } from '@/components/BrandIntro';
 import { setPlatformSkipped } from '@/utils/musicPlatform';
 
 function AppShell() {
@@ -30,6 +31,8 @@ function AppShell() {
         visible={platformSelector.visible}
         onDismiss={handleDismiss}
       />
+      {/* Animated splash hand-off — sits above everything, then lifts away. */}
+      <BrandIntro />
     </View>
   );
 }

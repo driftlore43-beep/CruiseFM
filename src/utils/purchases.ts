@@ -39,7 +39,11 @@ export function initPurchases(): void {
 }
 
 function entitledFrom(customerInfo: any): boolean {
-  return !!customerInfo?.entitlements?.active?.[PREMIUM_ENTITLEMENT];
+  const active = customerInfo?.entitlements?.active ?? {};
+  // Cruise FM has a single paid tier, so ANY active entitlement means
+  // Premium — this shrugs off dashboard naming ("premium" vs "Premium"
+  // vs the auto-created "CruiseFM Pro").
+  return !!active[PREMIUM_ENTITLEMENT] || Object.keys(active).length > 0;
 }
 
 /** Does this user currently have an active Premium subscription? */

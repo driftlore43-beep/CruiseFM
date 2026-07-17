@@ -20,6 +20,9 @@ const ANSWER_WINDOW_MS = 2 * 60 * 1000;
  * ignoring it quietly pauses the drive clock — the music and visuals carry
  * on, but the parked hours stop inflating Drives/Time Cruised/streaks.
  * Any later playback touch resumes the clock from that moment.
+ *
+ * The clock also rides the play state: paused music means a paused drive
+ * clock, so a drive left paused overnight banks nothing either.
  */
 export function DriveCheckCard() {
   const np = useNowPlaying();
@@ -32,9 +35,17 @@ export function DriveCheckCard() {
   const stationId = np.session?.stationId;
   const mode = np.session?.mode;
 
-  // Any sign of life while the clock is paused brings it straight back.
+  // The drive clock rides the play state: pause banks what's counted so
+  // far and stops the clock; play starts it again.
   useEffect(() => {
-    if (!suspendedRef.current) return;
+    if (!np.session) return;
+    if (np.playing) resumeDriveClock();
+    else suspendDriveClock(Date.now()).catch(() => {});
+  }, [np.playing, np.session]);
+
+  // Any sign of life while the music runs brings a card-paused clock back.
+  useEffect(() => {
+    if (!suspendedRef.current || !np.playing) return;
     suspendedRef.current = false;
     resumeDriveClock();
   }, [np.activityTick, np.playing, np.expanded, stationId, mode]);

@@ -9,7 +9,7 @@ A premium driving-companion app (React Native / Expo SDK 56, Expo Router). Users
 The owner does not code — describe changes in plain English, Claude implements everything. Keep explanations non-technical.
 
 ## Product decisions (fixed)
-- Monetisation: £2.99/mo subscription, 7-day free trial (RevenueCat planned, not integrated)
+- Monetisation: £2.99/mo subscription, 7-day free trial (RevenueCat SDK wired: sandbox test_ key in config.ts, entitlement "premium", safe no-op on web/old builds via src/utils/purchases.ts; real goog_ key + Play Console product still pending)
 - FREE tier: Cassette + Equalizer modes, basic playback, limited custom stations (3), badges
 - PREMIUM: Vinyl + Retro Radio modes, all mood themes, unlimited playlists, future additions
 - Never premium: offline listening, badges, founder cosmetics, seasonal themes
@@ -34,4 +34,4 @@ The owner does not code — describe changes in plain English, Claude implements
 
 ## Current state / next steps
 - DONE: all visuals unified, Spotify OAuth working on Android build, playback wired into all 4 modes (untested on device yet)
-- NEXT: test playback on Android build → then make Start Drive play the station's LINKED playlist URI (stationPlaylists.ts already stores it) → then RevenueCat paywall (wire "Unlock Premium" button)
+- NEXT: test playback on Android build → new EAS build (picks up react-native-purchases; batch Sentry into it — owner has an account, DSN not yet provided) → owner creates "premium" entitlement in RevenueCat dashboard → Google Play Console account + £2.99 product → swap test_ key for goog_ key

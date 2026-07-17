@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { useActivityPing } from '@/context/NowPlayingContext';
+
 import {
   isSpotifyConnected,
   getCurrentTrack,
@@ -59,14 +61,16 @@ export function useSpotifyPlayback(visible: boolean) {
   }, [visible]);
 
   // Fire-and-forget controls; refresh shortly after so the title catches up.
+  // Each one is also a sign of life for the "Are you driving?" check.
+  const ping = useActivityPing();
   const after = () => setTimeout(() => refreshRef.current(), 700);
 
   return {
     connected,
     track,
-    play: () => { startPlayback().catch(() => {}); after(); },
-    pause: () => { spotifyPause().catch(() => {}); after(); },
-    next: () => { skipNext().catch(() => {}); after(); },
-    prev: () => { skipPrev().catch(() => {}); after(); },
+    play: () => { ping(); startPlayback().catch(() => {}); after(); },
+    pause: () => { ping(); spotifyPause().catch(() => {}); after(); },
+    next: () => { ping(); skipNext().catch(() => {}); after(); },
+    prev: () => { ping(); skipPrev().catch(() => {}); after(); },
   };
 }

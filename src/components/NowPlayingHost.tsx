@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlossSheen } from '@/components/GlossSheen';
 
 import { CassetteFullscreen } from '@/components/CassetteMode';
+import { DriveCheckCard } from '@/components/DriveCheckCard';
 import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
 import { EqualizerFullscreen } from '@/components/EqualizerMode';
 import { HorizonFullscreen } from '@/components/HorizonMode';
@@ -203,6 +204,7 @@ export function NowPlayingHost() {
       {mode === 'orb' && <CircularWaveFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       <MiniPlayer />
       <PreviewGate />
+      <DriveCheckCard />
     </>
   );
 }

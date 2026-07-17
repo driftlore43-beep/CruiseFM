@@ -22,6 +22,8 @@ The owner does not code — describe changes in plain English, Claude implements
 - `src/components/StationDetailModal.tsx` — station page: full-bleed image, Add your playlist (Spotify picker), mode picker, Start Drive
 - `src/constants/stations.ts` — 8 stations; each has cardGradient (muted card preview), eqColors (equalizer bar palette), iconName (white MCI icon)
 - `src/utils/spotify.ts` — OAuth PKCE + playback API; `useSpotifyPlayback.ts` — live play/pause/skip + 5s now-playing poll used by all modes; `stationPlaylists.ts` — per-station linked playlist (AsyncStorage); `lastCruise.ts` — resume logic
+- `src/components/DriveCheckCard.tsx` — "Are you driving?" honesty check: 45 min of untouched playback → card; ignored for 2 min → drive clock pauses (driveStats suspend/resume) until the next playback touch. Playback controls signal life via activityPing in NowPlayingContext
+- `website/index.html` — self-contained waitlist landing page (Formspree form ID still a placeholder)
 - Credentials in `.env` (EXPO_PUBLIC_SPOTIFY_*) — gitignored, copy manually between machines
 
 ## Gotchas learned the hard way

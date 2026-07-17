@@ -43,6 +43,10 @@ type NowPlayingCtx = {
   setStationId: (stationId: string) => void;
   /** End the session entirely (mini-player ✕) — banks the drive. */
   stop: () => void;
+  /** Bumps whenever the user touches a playback control — the
+   * "Are you driving?" check watches this for signs of life. */
+  activityTick: number;
+  activityPing: () => void;
 };
 
 const Ctx = createContext<NowPlayingCtx | null>(null);
@@ -50,7 +54,14 @@ const Ctx = createContext<NowPlayingCtx | null>(null);
 export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<NowPlayingSession | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const [playing, setPlaying] = useState(false);
+  const [playing, setPlayingRaw] = useState(false);
+  const [activityTick, setActivityTick] = useState(0);
+  const activityPing = useCallback(() => setActivityTick((t) => t + 1), []);
+  // Every play/pause is also a sign of life for the drive check.
+  const setPlaying = useCallback((p: boolean) => {
+    setPlayingRaw(p);
+    setActivityTick((t) => t + 1);
+  }, []);
   const sessionRef = useRef<NowPlayingSession | null>(null);
   useEffect(() => { sessionRef.current = session; }, [session]);
 
@@ -86,8 +97,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop }),
-    [session, expanded, playing, open, minimize, expand, setStationId, stop],
+    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing }),
+    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -97,4 +108,12 @@ export function useNowPlaying(): NowPlayingCtx {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error('useNowPlaying must be used inside NowPlayingProvider');
   return ctx;
+}
+
+const noopPing = () => {};
+
+/** Safe anywhere (no-ops outside the provider) — lets shared hooks report
+ * playback-control touches to the drive check. */
+export function useActivityPing(): () => void {
+  return useContext(Ctx)?.activityPing ?? noopPing;
 }

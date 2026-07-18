@@ -250,34 +250,52 @@ export async function startPlayback(contextUri?: string): Promise<StartResult> {
   const token = await getAccessToken();
   if (!token) return 'error';
 
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type':  'application/json',
+  };
   const body = contextUri ? JSON.stringify({ context_uri: contextUri }) : undefined;
   const attempt = (query = '') =>
-    fetch(`https://api.spotify.com/v1/me/player/play${query}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type':  'application/json',
-      },
-      body,
-    });
+    fetch(`https://api.spotify.com/v1/me/player/play${query}`, { method: 'PUT', headers, body });
 
   // Fast path: when a device is already active (the usual case mid-drive),
   // one round trip starts the music — no device lookup first.
   let res = await attempt();
   if (res.ok || res.status === 204) return 'playing';
   if (res.status === 403) return 'premium-required';
+  if (res.status !== 404) return 'error';
 
-  // Nothing active — hunt for a sleeping device and wake it by id.
-  if (res.status === 404) {
-    const devices = await getDevices();
-    if (devices.length === 0) return 'no-device';
-    const target = devices.find((d) => d.is_active) ?? devices[0];
-    res = await attempt(`?device_id=${encodeURIComponent(target.id)}`);
-    if (res.ok || res.status === 204) return 'playing';
-    if (res.status === 403) return 'premium-required';
-    if (res.status === 404) return 'no-device';
+  // No active session — the phone's Spotify has dozed off (Android does
+  // this within seconds of pausing). Find it and wake it by id.
+  const devices = await getDevices();
+  if (devices.length === 0) return 'no-device';
+  const target =
+    devices.find((d) => d.is_active) ??
+    devices.find((d) => d.type === 'Smartphone') ??
+    devices[0];
+
+  res = await attempt(`?device_id=${encodeURIComponent(target.id)}`);
+  if (res.ok || res.status === 204) return 'playing';
+  if (res.status === 403) return 'premium-required';
+
+  // Deep asleep — transfer playback onto the device with play=true, which
+  // resumes where it left off and is the most reliable wake-up Spotify has.
+  const transfer = await fetch('https://api.spotify.com/v1/me/player', {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ device_ids: [target.id], play: true }),
+  });
+  if (!(transfer.ok || transfer.status === 204)) {
+    return transfer.status === 404 ? 'no-device' : 'error';
   }
-  return 'error';
+  if (contextUri) {
+    // Transfer resumed the old queue — nudge it onto the requested playlist
+    // once the device has had a moment to come alive. Best-effort: the music
+    // is already playing either way.
+    await new Promise((r) => setTimeout(r, 700));
+    await attempt(`?device_id=${encodeURIComponent(target.id)}`);
+  }
+  return 'playing';
 }
 
 export async function pause() {

@@ -33,5 +33,5 @@ The owner does not code — describe changes in plain English, Claude implements
 - Spotify playback API needs the user's Spotify app active on some device, and Premium.
 
 ## Current state / next steps
-- DONE: all visuals unified, Spotify OAuth working on Android build, playback wired into all 4 modes (untested on device yet)
+- DONE: all visuals unified, Spotify OAuth working on Android build, playback CONFIRMED WORKING on device (2026-07-18: playlists load, music plays, controls obey; play uses active-device fast path, failures surface via PlaybackNotice card)
 - NEXT: test playback on Android build → new EAS build (picks up react-native-purchases; batch Sentry into it — owner has an account, DSN not yet provided) → owner creates "premium" entitlement in RevenueCat dashboard → Google Play Console account + £2.99 product → swap test_ key for goog_ key

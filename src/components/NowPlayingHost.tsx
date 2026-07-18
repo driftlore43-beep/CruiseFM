@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlossSheen } from '@/components/GlossSheen';
@@ -144,6 +144,69 @@ function PreviewGate() {
   );
 }
 
+/**
+ * "Why is my drive silent?" — when a start attempt fails, Spotify's verdict
+ * surfaces here in plain words instead of dying in a log. Its own Modal so it
+ * stacks above whichever mode is presenting; a tap anywhere dismisses it, and
+ * it bows out on its own after a few seconds.
+ */
+function PlaybackNotice() {
+  const np = useNowPlaying();
+  const notice = np.playbackNotice;
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(np.clearPlaybackNotice, 8000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  if (!notice) return null;
+
+  return (
+    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={np.clearPlaybackNotice}>
+      <Pressable style={pn.scrim} onPress={np.clearPlaybackNotice}>
+        <View style={pn.card}>
+          <View style={pn.iconRing}>
+            <MaterialCommunityIcons name="spotify" size={22} color="#1DB954" />
+          </View>
+          <Text style={pn.text}>{notice}</Text>
+          <Text style={pn.hint}>Tap anywhere to dismiss</Text>
+        </View>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const pn = StyleSheet.create({
+  scrim: {
+    flex: 1,
+    backgroundColor: 'rgba(2,2,10,0.45)',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    padding: 24,
+    paddingBottom: 120,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 20,
+    alignItems: 'center',
+    paddingHorizontal: 22,
+    paddingVertical: 20,
+    gap: 8,
+    backgroundColor: 'rgba(10,14,10,0.96)',
+    borderWidth: 1,
+    borderColor: 'rgba(29,185,84,0.4)',
+  },
+  iconRing: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(29,185,84,0.14)',
+  },
+  text: { color: 'rgba(255,255,255,0.92)', fontSize: 14.5, lineHeight: 21, textAlign: 'center', fontWeight: '600' },
+  hint: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '600' },
+});
+
 const pg = StyleSheet.create({
   scrim: {
     flex: 1,
@@ -205,6 +268,7 @@ export function NowPlayingHost() {
       <MiniPlayer />
       <PreviewGate />
       <DriveCheckCard />
+      <PlaybackNotice />
     </>
   );
 }

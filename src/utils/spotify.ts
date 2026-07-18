@@ -237,13 +237,14 @@ export async function getDevices(): Promise<Device[]> {
   return data?.devices ?? [];
 }
 
-export type StartResult = 'playing' | 'no-device' | 'error';
+export type StartResult = 'playing' | 'no-device' | 'premium-required' | 'error';
 
 /**
  * Best-effort "just start playing": finds an available Spotify device (the
  * user's phone app counts once it's been opened at least once), wakes it, and
  * resumes playback. Returns 'no-device' if Spotify isn't running anywhere —
- * the caller should then open the Spotify app so it becomes a device.
+ * the caller should then open the Spotify app so it becomes a device — and
+ * 'premium-required' when Spotify refuses remote control (free accounts).
  */
 export async function startPlayback(contextUri?: string): Promise<StartResult> {
   const token = await getAccessToken();
@@ -264,7 +265,10 @@ export async function startPlayback(contextUri?: string): Promise<StartResult> {
       body: contextUri ? JSON.stringify({ context_uri: contextUri }) : undefined,
     },
   );
-  return res.ok || res.status === 204 ? 'playing' : 'error';
+  if (res.ok || res.status === 204) return 'playing';
+  if (res.status === 403) return 'premium-required';
+  if (res.status === 404) return 'no-device';
+  return 'error';
 }
 
 export async function pause() {

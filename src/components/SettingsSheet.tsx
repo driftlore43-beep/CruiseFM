@@ -7,8 +7,10 @@ import { Image, Modal, Platform, Pressable, Share, StyleSheet, Switch, Text, Tex
 
 import { SettingsInfoRow, SettingsPageShell, SettingsSection } from '@/components/SettingsPageShell';
 import { GlossSheen } from '@/components/GlossSheen';
+import { OWNER_MODE } from '@/constants/config';
 import { Cruise } from '@/constants/theme';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE, type LegalDoc } from '@/constants/legal';
+import { sendTestCrash } from '@/utils/crashReports';
 import { DEFAULT_DRIVER_NAME, getDriverName, setDriverName } from '@/utils/driverName';
 
 export type SettingsPage =
@@ -227,7 +229,36 @@ function AboutBody() {
           </Text>
         </View>
       </SettingsSection>
+      {OWNER_MODE && <DiagnosticsSection />}
     </>
+  );
+}
+
+// Owner-only: prove the Sentry pipeline end to end. Never shown to real users.
+function DiagnosticsSection() {
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+
+  const handleTestCrash = async () => {
+    if (status === 'sending') return;
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setStatus('sending');
+    const ok = await sendTestCrash();
+    setStatus(ok ? 'sent' : 'failed');
+  };
+
+  const value = {
+    idle:    'Tap to send',
+    sending: 'Sending…',
+    sent:    'Sent ✓ — check sentry.io',
+    failed:  'Not available in this build',
+  }[status];
+
+  return (
+    <SettingsSection label="DIAGNOSTICS (OWNER ONLY)">
+      <Pressable onPress={handleTestCrash} style={({ pressed }) => pressed && { opacity: 0.7 }}>
+        <SettingsInfoRow label="Test Crash Report" value={value} last />
+      </Pressable>
+    </SettingsSection>
   );
 }
 

@@ -1,12 +1,15 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { PaywallShowcase } from '@/components/PaywallShowcase';
 import { Cruise } from '@/constants/theme';
+import { useEntitlements } from '@/context/EntitlementsContext';
+import { purchasePremium, restorePremium } from '@/utils/purchases';
 
 const AMBER      = '#F59E0B';
 const AMBER_SOFT = 'rgba(245,158,11,0.14)';
@@ -45,6 +48,17 @@ const COMPARISON: { label: string; free: boolean; premium: boolean }[] = [
   { label: 'Future premium modes',       free: false, premium: true },
 ];
 
+// Alert.alert is a no-op in the browser — fall back to the native web dialog
+// so the Safari-preview flow still talks back.
+function notify(title: string, message: string, onDone?: () => void) {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') window.alert(`${title}\n\n${message}`);
+    onDone?.();
+    return;
+  }
+  Alert.alert(title, message, [{ text: 'OK', onPress: onDone }]);
+}
+
 function TickCell({ on, amber }: { on: boolean; amber?: boolean }) {
   return (
     <View style={styles.compareIconCell}>
@@ -59,10 +73,38 @@ function TickCell({ on, amber }: { on: boolean; amber?: boolean }) {
 
 export default function PremiumScreen() {
   const insets = useSafeAreaInsets();
+  const { refreshSubscription } = useEntitlements();
+  const [busy, setBusy] = useState(false);
 
-  function handleUnlock() {
+  async function handleUnlock() {
+    if (busy) return;
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // TODO: wire to RevenueCat purchase flow (Week 4 — Paywall & Pro).
+    setBusy(true);
+    const outcome = await purchasePremium();
+    await refreshSubscription();
+    setBusy(false);
+    if (outcome === 'purchased') {
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notify('Welcome to Premium', 'Every mode, every mood — enjoy the drive.', () => router.back());
+    } else if (outcome === 'unavailable') {
+      notify('Not available yet', 'Purchases only work in the installed app, not this preview.');
+    } else if (outcome === 'error') {
+      notify('Something went wrong', 'No charge was made. Please try again in a moment.');
+    }
+    // 'cancelled' — the user changed their mind; no popup needed.
+  }
+
+  async function handleRestore() {
+    if (busy) return;
+    setBusy(true);
+    const restored = await restorePremium();
+    await refreshSubscription();
+    setBusy(false);
+    if (restored) {
+      notify('Premium restored', 'Welcome back — everything is unlocked again.', () => router.back());
+    } else {
+      notify('Nothing to restore', 'No previous Premium subscription was found for this account.');
+    }
   }
 
   return (
@@ -135,13 +177,20 @@ export default function PremiumScreen() {
           <Text style={styles.trialNote}>7-day free trial · cancel anytime</Text>
 
           {/* CTAs */}
-          <Pressable style={({ pressed }) => [styles.unlockBtn, pressed && { opacity: 0.9 }]} onPress={handleUnlock}>
+          <Pressable
+            style={({ pressed }) => [styles.unlockBtn, (pressed || busy) && { opacity: 0.9 }]}
+            onPress={handleUnlock}
+            disabled={busy}>
             <LinearGradient
               colors={['#F7B733', '#F59E0B']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.unlockGradient}>
-              <Text style={styles.unlockText}>Unlock Premium</Text>
+              <Text style={styles.unlockText}>{busy ? 'One moment…' : 'Unlock Premium'}</Text>
             </LinearGradient>
+          </Pressable>
+
+          <Pressable style={styles.laterBtn} onPress={handleRestore} hitSlop={8} disabled={busy}>
+            <Text style={styles.laterText}>Restore purchases</Text>
           </Pressable>
 
           <Pressable style={styles.laterBtn} onPress={() => router.back()} hitSlop={8}>

@@ -15,6 +15,9 @@ export type DriveStats = {
 
 // One drive runs at a time, so the open drive is simply the last logged event.
 let driveOpenedAt: number | null = null;
+// Set when the "Are you driving?" check went unanswered — the session is
+// still open but its minutes stopped counting until the user shows up.
+let driveSuspended = false;
 
 async function loadLog(): Promise<DriveEvent[]> {
   try {
@@ -38,13 +41,13 @@ export async function recordDriveStart(stationId: string): Promise<void> {
   const log = await loadLog();
   log.push({ ts: Date.now(), stationId });
   driveOpenedAt = Date.now();
+  driveSuspended = false;
   await saveLog(log);
 }
 
-/** Call when the visual mode closes — banks the drive's duration. */
-export async function recordDriveEnd(): Promise<void> {
+async function bankMinutes(upTo: number): Promise<void> {
   if (driveOpenedAt == null) return;
-  const minutes = Math.max(0, Math.round((Date.now() - driveOpenedAt) / 60000));
+  const minutes = Math.max(0, Math.round((upTo - driveOpenedAt) / 60000));
   driveOpenedAt = null;
   if (minutes === 0) return;
   const log = await loadLog();
@@ -53,6 +56,29 @@ export async function recordDriveEnd(): Promise<void> {
     last.minutes = (last.minutes ?? 0) + minutes;
     await saveLog(log);
   }
+}
+
+/**
+ * The "Are you driving?" check went unanswered — bank only the time up to
+ * when we asked, then stop the clock. The music and visuals keep going.
+ */
+export async function suspendDriveClock(askedAt: number): Promise<void> {
+  if (driveOpenedAt == null) return;
+  driveSuspended = true;
+  await bankMinutes(askedAt);
+}
+
+/** The user showed signs of life again — the drive counts from here on. */
+export function resumeDriveClock(): void {
+  if (!driveSuspended) return;
+  driveSuspended = false;
+  driveOpenedAt = Date.now();
+}
+
+/** Call when the visual mode closes — banks the drive's duration. */
+export async function recordDriveEnd(): Promise<void> {
+  driveSuspended = false;
+  await bankMinutes(Date.now());
 }
 
 function dayKey(d: Date): string {

@@ -2,6 +2,10 @@ import { DarkTheme, Slot, ThemeProvider } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Cruise } from '@/constants/theme';
+import { initCrashReports } from '@/utils/crashReports';
+
+// First thing on launch, so even startup crashes get reported.
+initCrashReports();
 import { ThemeProvider as CruiseThemeProvider, useTheme } from '@/context/ThemeContext';
 import { MotionProvider } from '@/context/MotionContext';
 import { NowPlayingProvider } from '@/context/NowPlayingContext';

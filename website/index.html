@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cruise FM — Music for the drive, not the playlist</title>
+<meta name="description" content="Spotify organises music by artist. Cruise FM organises it by how a drive feels. Mood stations, cinematic visual modes, one-tap Start Drive. Join the waitlist.">
+<meta property="og:title" content="Cruise FM — Music for the drive">
+<meta property="og:description" content="Your Spotify playlists, wrapped in a cinematic driving experience. Join the waitlist and claim your Founder badge.">
+<style>
+  :root{
+    --violet:#7B38E0; --violet-light:#9B5FFF; --violet-dim:#4A1F8A;
+    --charcoal:#1a1a2e; --midnight:#12122A; --deep:#0D0D20;
+    --surface:#20203A; --surface-hi:#2A2A48;
+    --text:#FFFFFF; --text-2:#9090B0; --text-3:#505068;
+    --amber:#F59E0B; --amber-soft:rgba(245,158,11,.35);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--deep); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6; overflow-x:hidden;
+  }
+  ::selection{background:var(--amber);color:var(--deep)}
+
+  .wrap{max-width:1060px;margin:0 auto;padding:0 24px}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    position:relative; min-height:100svh;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:80px 24px 64px;
+    background:
+      radial-gradient(ellipse 80% 55% at 50% -10%, rgba(123,56,224,.28), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 50% 110%, rgba(245,158,11,.14), transparent 60%),
+      linear-gradient(180deg, var(--deep) 0%, var(--charcoal) 100%);
+  }
+  .badge-pill{
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid var(--amber-soft); border-radius:999px;
+    padding:7px 16px; font-size:13px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--amber); background:rgba(245,158,11,.07); margin-bottom:28px;
+  }
+  .badge-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);
+    animation:pulse 2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.8)}}
+
+  .wordmark{
+    font-size:clamp(52px,9vw,96px); font-weight:800; letter-spacing:.06em; line-height:1.05;
+    background:linear-gradient(180deg,#fff 30%,#c9c9e8 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    text-shadow:0 0 80px rgba(123,56,224,.4);
+  }
+  .wordmark .fm{color:var(--amber);-webkit-text-fill-color:var(--amber)}
+  .pitch{
+    margin:26px auto 10px; max-width:640px;
+    font-size:clamp(19px,2.6vw,24px); color:var(--text-2); font-weight:400;
+  }
+  .pitch strong{color:var(--text);font-weight:600}
+
+  /* hero equalizer */
+  .eq{display:flex;align-items:flex-end;gap:6px;height:56px;margin:36px auto 8px}
+  .eq span{width:8px;border-radius:4px 4px 2px 2px;
+    background:linear-gradient(180deg,var(--violet-light),var(--violet));
+    animation:eqb 1.1s ease-in-out infinite alternate}
+  .eq span:nth-child(3n){background:linear-gradient(180deg,var(--amber),#d97706)}
+  .eq span:nth-child(1){height:30%;animation-delay:.05s}
+  .eq span:nth-child(2){height:70%;animation-delay:.25s}
+  .eq span:nth-child(3){height:45%;animation-delay:.45s}
+  .eq span:nth-child(4){height:90%;animation-delay:.1s}
+  .eq span:nth-child(5){height:60%;animation-delay:.6s}
+  .eq span:nth-child(6){height:100%;animation-delay:.3s}
+  .eq span:nth-child(7){height:55%;animation-delay:.5s}
+  .eq span:nth-child(8){height:80%;animation-delay:.15s}
+  .eq span:nth-child(9){height:40%;animation-delay:.4s}
+  .eq span:nth-child(10){height:65%;animation-delay:.2s}
+  @keyframes eqb{from{transform:scaleY(.35)}to{transform:scaleY(1)}}
+  .eq span{transform-origin:bottom}
+
+  /* ---------- SIGNUP FORM ---------- */
+  .signup{margin-top:34px;width:100%;max-width:520px}
+  .signup form{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .signup input[type=email]{
+    flex:1 1 260px; padding:16px 20px; font-size:16px; color:var(--text);
+    background:rgba(32,32,58,.85); border:1px solid var(--surface-hi); border-radius:14px;
+    outline:none; transition:border-color .2s, box-shadow .2s;
+  }
+  .signup input[type=email]::placeholder{color:var(--text-3)}
+  .signup input[type=email]:focus{border-color:var(--amber);box-shadow:0 0 0 3px rgba(245,158,11,.18)}
+  .btn{
+    padding:16px 30px; font-size:16px; font-weight:700; letter-spacing:.02em;
+    color:#1a1200; background:linear-gradient(180deg,#FFB733,var(--amber));
+    border:none; border-radius:14px; cursor:pointer;
+    box-shadow:0 6px 28px rgba(245,158,11,.35);
+    transition:transform .15s, box-shadow .2s;
+  }
+  .btn:hover{transform:translateY(-2px);box-shadow:0 10px 36px rgba(245,158,11,.5)}
+  .btn:active{transform:translateY(0)}
+  .signup .note{margin-top:14px;font-size:13.5px;color:var(--text-3)}
+  .signup .note b{color:var(--text-2);font-weight:600}
+
+  .scroll-hint{margin-top:56px;color:var(--text-3);font-size:13px;letter-spacing:.2em;text-transform:uppercase}
+  .scroll-hint::after{content:"";display:block;width:1px;height:38px;margin:12px auto 0;
+    background:linear-gradient(180deg,var(--text-3),transparent)}
+
+  /* ---------- SECTIONS ---------- */
+  section{padding:96px 0}
+  .kicker{color:var(--amber);font-size:13px;letter-spacing:.22em;text-transform:uppercase;
+    font-weight:700;text-align:center;margin-bottom:14px}
+  h2{font-size:clamp(28px,4.5vw,42px);font-weight:800;text-align:center;letter-spacing:.01em}
+  .sub{max-width:620px;margin:16px auto 0;text-align:center;color:var(--text-2);font-size:17px}
+
+  /* ---------- MODES GRID ---------- */
+  .modes{background:linear-gradient(180deg,var(--charcoal),var(--midnight))}
+  .mode-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:20px;margin-top:56px}
+  .mode-card{
+    position:relative; border-radius:22px; padding:30px 24px 26px;
+    background:linear-gradient(180deg,var(--surface),var(--midnight));
+    border:1px solid var(--surface-hi); overflow:hidden; text-align:center;
+    transition:transform .2s, border-color .2s;
+  }
+  .mode-card:hover{transform:translateY(-4px);border-color:var(--violet-dim)}
+  .mode-card .stage{height:130px;display:flex;align-items:center;justify-content:center;margin-bottom:22px}
+  .mode-card h3{font-size:19px;font-weight:700;letter-spacing:.03em}
+  .mode-card p{font-size:14px;color:var(--text-2);margin-top:6px}
+  .tag{
+    position:absolute;top:14px;right:14px;font-size:10.5px;font-weight:800;letter-spacing:.14em;
+    padding:5px 10px;border-radius:999px;text-transform:uppercase;
+  }
+  .tag.free{color:#7ef0c0;background:rgba(60,220,150,.12);border:1px solid rgba(60,220,150,.3)}
+  .tag.premium{color:var(--amber);background:rgba(245,158,11,.1);border:1px solid var(--amber-soft)}
+
+  /* equalizer mode mini */
+  .mini-eq{display:flex;align-items:flex-end;gap:5px;height:78px}
+  .mini-eq span{width:9px;border-radius:3px;transform-origin:bottom;animation:eqb 1s ease-in-out infinite alternate}
+  .mini-eq span:nth-child(1){height:45%;background:#5EE7FF;animation-delay:.1s}
+  .mini-eq span:nth-child(2){height:85%;background:#5B7BFF;animation-delay:.35s}
+  .mini-eq span:nth-child(3){height:60%;background:#C44CFF;animation-delay:.55s}
+  .mini-eq span:nth-child(4){height:100%;background:#5EE7FF;animation-delay:.2s}
+  .mini-eq span:nth-child(5){height:70%;background:#5B7BFF;animation-delay:.65s}
+  .mini-eq span:nth-child(6){height:88%;background:#C44CFF;animation-delay:.4s}
+  .mini-eq span:nth-child(7){height:52%;background:#5EE7FF;animation-delay:.05s}
+
+  /* cassette mini */
+  .cassette{width:170px;height:104px;border-radius:12px;position:relative;
+    background:linear-gradient(180deg,#2e2e50,#232340);border:1px solid #3a3a60;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+  .cassette .window{position:absolute;left:50%;top:26px;transform:translateX(-50%);
+    width:118px;height:44px;border-radius:8px;background:#15152c;border:1px solid #3a3a60;
+    display:flex;align-items:center;justify-content:space-between;padding:0 12px}
+  .reel{width:30px;height:30px;border-radius:50%;border:3px solid #6a6a92;position:relative;
+    animation:spin 3s linear infinite}
+  .reel::before,.reel::after{content:"";position:absolute;background:#6a6a92}
+  .reel::before{left:50%;top:2px;width:2.5px;height:20px;transform:translateX(-50%)}
+  .reel::after{top:50%;left:2px;height:2.5px;width:20px;transform:translateY(-50%)}
+  .cassette .label{position:absolute;top:7px;left:50%;transform:translateX(-50%);
+    font-size:8.5px;letter-spacing:.28em;color:var(--amber);text-transform:uppercase}
+  .cassette .tape{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+    width:80px;height:10px;border-radius:0 0 8px 8px;background:#15152c;border:1px solid #3a3a60;border-top:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* vinyl mini */
+  .vinyl{width:110px;height:110px;border-radius:50%;position:relative;animation:spin 4.5s linear infinite;
+    background:
+      radial-gradient(circle at 50% 50%, #17172e 0 14%, transparent 14%),
+      repeating-radial-gradient(circle at 50% 50%, #101024 0 3px, #1c1c36 3px 5px);
+    box-shadow:0 0 34px rgba(123,56,224,.35), inset 0 0 12px rgba(0,0,0,.7)}
+  .vinyl::before{content:"";position:absolute;inset:34%;border-radius:50%;
+    background:radial-gradient(circle,#FFB733,#c47a06);box-shadow:0 0 14px rgba(245,158,11,.5)}
+  .vinyl::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px;
+    border-radius:50%;background:var(--deep)}
+
+  /* retro radio mini */
+  .radio{width:170px;height:100px;border-radius:14px;position:relative;
+    background:linear-gradient(180deg,#33334f,#20203a);border:1px solid #3a3a60;padding:14px 16px 0}
+  .radio .dialband{height:30px;border-radius:6px;background:#15152c;border:1px solid #3a3a60;
+    position:relative;overflow:hidden}
+  .radio .dialband::before{content:"88   92   96   100   104   108";position:absolute;inset:0;
+    font-size:8px;letter-spacing:1px;color:#6a6a92;display:flex;align-items:center;justify-content:center}
+  .radio .needle{position:absolute;top:0;bottom:0;width:2px;background:var(--amber);
+    box-shadow:0 0 8px var(--amber);animation:tune 6s ease-in-out infinite}
+  @keyframes tune{0%,100%{left:22%}45%,55%{left:74%}}
+  .radio .knobs{display:flex;justify-content:space-between;padding:12px 8px 0}
+  .radio .knob{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#55557c,#2a2a48);
+    border:1px solid #3a3a60}
+  .radio .speaker{position:absolute;right:18px;bottom:12px;width:56px;height:22px;
+    background:repeating-linear-gradient(90deg,#15152c 0 3px,transparent 3px 6px);border-radius:3px}
+
+  /* ---------- STATIONS ---------- */
+  .stations-list{margin-top:52px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .station{
+    display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:16px;
+    background:rgba(32,32,58,.55);border:1px solid var(--surface-hi);
+    transition:border-color .2s, background .2s;
+  }
+  .station:hover{border-color:var(--violet-dim);background:rgba(42,42,72,.7)}
+  .station .dots{display:flex;gap:4px;flex-shrink:0}
+  .station .dots i{width:9px;height:9px;border-radius:50%;display:block}
+  .station b{font-size:15.5px;letter-spacing:.02em}
+  .station small{display:block;color:var(--text-2);font-size:13px;margin-top:1px}
+
+  /* ---------- FOUNDER ---------- */
+  .founder{background:
+      radial-gradient(ellipse 70% 60% at 50% 0%, rgba(245,158,11,.12), transparent 60%),
+      var(--midnight)}
+  .founder-card{
+    max-width:640px;margin:48px auto 0;text-align:center;padding:44px 34px;border-radius:26px;
+    background:linear-gradient(180deg,rgba(245,158,11,.09),rgba(32,32,58,.6));
+    border:1px solid var(--amber-soft);
+  }
+  .founder-medal{
+    width:88px;height:88px;margin:0 auto 22px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:38px;
+    background:radial-gradient(circle at 35% 30%,#FFC24C,#c47a06);
+    box-shadow:0 0 44px rgba(245,158,11,.45);
+  }
+  .founder-card h3{font-size:26px;font-weight:800}
+  .founder-card p{color:var(--text-2);margin-top:12px;font-size:16px}
+  .founder-card p b{color:var(--text)}
+
+  /* ---------- FOOTER ---------- */
+  footer{padding:56px 0 40px;background:var(--deep);border-top:1px solid var(--surface);text-align:center}
+  footer .fine{color:var(--text-3);font-size:13.5px;max-width:560px;margin:0 auto;line-height:1.7}
+  footer .fine b{color:var(--text-2)}
+  footer .mark{font-weight:800;letter-spacing:.08em;font-size:15px;margin-bottom:14px}
+  footer .mark span{color:var(--amber)}
+
+  @media (max-width:560px){
+    section{padding:72px 0}
+    .signup form{flex-direction:column}
+    .signup input[type=email]{flex:none;width:100%}
+    .btn{width:100%}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="badge-pill"><span class="dot"></span> Coming soon — iOS &amp; Android</div>
+  <h1 class="wordmark">CRUISE <span class="fm">FM</span></h1>
+  <p class="pitch"><strong>Spotify organises music by artist.</strong><br>Cruise FM organises it by how a drive feels.</p>
+
+  <div class="eq" aria-hidden="true">
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+
+  <div class="signup">
+    <!-- Replace YOUR_FORM_ID with your real Formspree form ID (free at formspree.io) -->
+    <form action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
+      <input type="email" name="email" required placeholder="you@email.com" autocomplete="email" aria-label="Email address">
+      <button class="btn" type="submit">Join the waitlist</button>
+    </form>
+    <p class="note">Be first in line at launch. <b>The first 500 get the Founder badge — forever.</b></p>
+  </div>
+
+  <div class="scroll-hint">The experience</div>
+</header>
+
+<section class="modes">
+  <div class="wrap">
+    <p class="kicker">Four ways to watch your music</p>
+    <h2>Full-screen modes, built for the dashboard</h2>
+    <p class="sub">Your playlist becomes the soundtrack. Cruise FM becomes the film. Every mode is a full-bleed, glowing companion for the road ahead.</p>
+
+    <div class="mode-grid">
+      <div class="mode-card">
+        <span class="tag free">Free</span>
+        <div class="stage">
+          <div class="mini-eq" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+        <h3>Equalizer</h3>
+        <p>A living spectrum, tinted to your station.</p>
+      </div>
+
+      <div class="mode-card">
+        <span class="tag free">Free</span>
+        <div class="stage">
+          <div class="cassette" aria-hidden="true">
+            <span class="label">Cruise FM</span>
+            <div class="window"><div class="reel"></div><div class="reel"></div></div>
+            <div class="tape"></div>
+          </div>
+        </div>
+        <h3>Cassette</h3>
+        <p>Reels turning. Nostalgia at 70 mph.</p>
+      </div>
+
+      <div class="mode-card">
+        <span class="tag premium">Premium</span>
+        <div class="stage"><div class="vinyl" aria-hidden="true"></div></div>
+        <h3>Vinyl</h3>
+        <p>Your track, spinning in amber and violet.</p>
+      </div>
+
+      <div class="mode-card">
+        <span class="tag premium">Premium</span>
+        <div class="stage">
+          <div class="radio" aria-hidden="true">
+            <div class="dialband"><div class="needle"></div></div>
+            <div class="knobs"><div class="knob"></div><div class="knob"></div></div>
+            <div class="speaker"></div>
+          </div>
+        </div>
+        <h3>Retro Radio</h3>
+        <p>A warm dial glow from another decade.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="kicker">Eight moods, one tap</p>
+    <h2>Stations tuned to the drive</h2>
+    <p class="sub">Link your own Spotify playlist to any station. Hit Start Drive. That's the whole idea.</p>
+
+    <div class="stations-list">
+      <div class="station"><span class="dots"><i style="background:#5EE7FF"></i><i style="background:#5B7BFF"></i><i style="background:#C44CFF"></i></span><span><b>Night Run FM</b><small>Empty expressways. Violet dashboards.</small></span></div>
+      <div class="station"><span class="dots"><i style="background:#FFF3B8"></i><i style="background:#FFE070"></i><i style="background:#F0C24C"></i></span><span><b>Rain Drive FM</b><small>Streetlights reflected in glass. Slow roads.</small></span></div>
+      <div class="station"><span class="dots"><i style="background:#4FE0C0"></i><i style="background:#F0B048"></i><i style="background:#FF7A3C"></i></span><span><b>Coastal FM</b><small>Ocean air. Open horizons. Golden hour.</small></span></div>
+      <div class="station"><span class="dots"><i style="background:#FFFFFF"></i><i style="background:#F2F6FF"></i><i style="background:#FFFFFF"></i></span><span><b>Mountain Pass FM</b><small>Cold air. Fog ahead. One more corner.</small></span></div>
+      <div class="station"><span class="dots"><i style="background:#FF4444"></i><i style="background:#FF1111"></i><i style="background:#FF0000"></i></span><span><b>After Hours FM</b><small>When the world is asleep. And the road belongs to you.</small></span></div>
+      <div class="station"><span class="dots"><i style="background:#FFC24C"></i><i style="background:#FF7A48"></i><i style="background:#D84C8A"></i></span><span><b>Sunset FM</b><small>Golden hour. Open roads.</small></span></div>
+      <div class="station"><span class="dots"><i style="background:#FFD9A0"></i><i style="background:#F0A050"></i><i style="background:#C06A28"></i></span><span><b>Cars &amp; Coffee FM</b><small>Cold mornings. Warm cups. Engines idling.</small></span></div>
+      <div class="station"><span class="dots"><i style="background:#FFD24C"></i><i style="background:#FF8A2A"></i><i style="background:#F03A2E"></i></span><span><b>Tunnel FM</b><small>Underground. Neon tubes. Bass reverberating.</small></span></div>
+    </div>
+  </div>
+</section>
+
+<section class="founder">
+  <div class="wrap">
+    <p class="kicker">Early birds</p>
+    <h2>Claim the Founder badge</h2>
+    <div class="founder-card">
+      <div class="founder-medal">🏁</div>
+      <h3>First 500 on the road</h3>
+      <p>The first <b>500 people</b> from this waitlist get the permanent <b>Founder badge</b> on their profile — a cosmetic that will <b>never</b> be sold, unlockable, or offered again. When it's gone, it's gone.</p>
+      <div class="signup" style="margin:30px auto 0">
+        <form action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
+          <input type="email" name="email" required placeholder="you@email.com" autocomplete="email" aria-label="Email address">
+          <button class="btn" type="submit">Reserve my badge</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="mark">CRUISE <span>FM</span></div>
+  <p class="fine">
+    Cruise FM plays music through your own Spotify account and requires <b>Spotify Premium</b>.
+    Free tier includes Cassette &amp; Equalizer modes. Premium unlocks everything for <b>£2.99/month</b>
+    after a <b>7-day free trial</b>. Offline listening and badges are free for everyone, always.
+    <br><br>Not affiliated with Spotify AB. Please don't watch the screen while driving — that's what passengers are for.
+  </p>
+</footer>
+
+</body>
+</html>

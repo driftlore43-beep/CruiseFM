@@ -88,6 +88,13 @@
 <!-- Reusable mark: disc + steering spokes + violet sound arcs -->
 <script>
 function markSVG(size){
+  // Sweeping sound-arc: from lower-left round to the top, like the reference.
+  const A = (r, a1, a2) => {
+    const d = x => x * Math.PI / 180;
+    const x1 = (r * Math.cos(d(a1))).toFixed(1), y1 = (r * Math.sin(d(a1))).toFixed(1);
+    const x2 = (r * Math.cos(d(a2))).toFixed(1), y2 = (r * Math.sin(d(a2))).toFixed(1);
+    return `M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`;
+  };
   return `
   <svg width="${size}" height="${size}" viewBox="-130 -130 260 260" xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -98,23 +105,23 @@ function markSVG(size){
         <stop offset="0" stop-color="#B78CFF"/><stop offset="1" stop-color="#7B38E0"/>
       </linearGradient>
       <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
-        <feGaussianBlur stdDeviation="7" result="b"/>
+        <feGaussianBlur stdDeviation="5" result="b"/>
         <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
-      <clipPath id="discClip"><circle r="104"/></clipPath>
     </defs>
     <circle r="104" fill="url(#disc)"/>
-    <g clip-path="url(#discClip)">
-      <rect x="-112" y="-14" width="80" height="28" rx="14" fill="#0a0a16"/>
-      <rect x="32"  y="-14" width="80" height="28" rx="14" fill="#0a0a16"/>
-      <rect x="-14" y="32"  width="28" height="80" rx="14" fill="#0a0a16"/>
-    </g>
-    <circle r="42" fill="#0a0a16"/>
-    <circle r="22" fill="url(#disc)"/>
-    <g filter="url(#glow)" stroke="url(#arc)" stroke-width="15" stroke-linecap="round" fill="none">
-      <path d="M -38.9 -21.2 A 44.3 44.3 0 0 1 -21.2 -38.9"/>
-      <path d="M -60.1 -32.7 A 68.4 68.4 0 0 1 -32.7 -60.1"/>
-      <path d="M -81.3 -44.3 A 92.5 92.5 0 0 1 -44.3 -81.3"/>
+    <!-- steering cutouts: left bar ends inside; right bar and bottom stem
+         break through the rim, exactly like the reference -->
+    <rect x="-82" y="-9" width="52" height="18" rx="9" fill="#0a0a16"/>
+    <rect x="30"  y="-9" width="86" height="18" rx="9" fill="#0a0a16"/>
+    <path d="M -9 30 L 9 30 L 13 116 L -13 116 Z" fill="#0a0a16"/>
+    <circle r="35" fill="#0a0a16"/>
+    <circle r="24" fill="url(#disc)"/>
+    <g filter="url(#glow)" stroke="url(#arc)" stroke-width="10" stroke-linecap="round" fill="none">
+      <path d="${A(48, 208, 246)}"/>
+      <path d="${A(63, 200, 254)}"/>
+      <path d="${A(78, 194, 260)}"/>
+      <path d="${A(93, 188, 265)}"/>
     </g>
   </svg>`;
 }
@@ -172,6 +179,12 @@ function markSVG(size){
   <div class="cap">Drag the dial.<br><span class="hl">Find the mood.</span></div>
   <div class="brandrow"><span class="mark" data-size="44"></span><span class="bw">Cruise<i>FM</i></span></div>
   <div class="phone"><img src="raw-tuner.png"></div>
+</div>
+
+<div class="canvas shot" id="shot-6-afterhours">
+  <div class="cap" style="font-size:66px">When the world sleeps,<br><span style="color:#FF5A5A">the road is yours.</span></div>
+  <div class="brandrow"><span class="mark" data-size="44"></span><span class="bw">Cruise<i>FM</i></span></div>
+  <div class="phone"><img src="raw-afterhours.png"></div>
 </div>
 
 <script>

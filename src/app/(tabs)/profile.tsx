@@ -16,9 +16,9 @@ import { PLATFORMS, PlatformId, getSavedPlatform } from '@/utils/musicPlatform';
 import { PlatformSelector } from '@/components/PlatformSelector';
 import { SpotifyConnectRow } from '@/components/SpotifyConnectRow';
 import { SettingsSheet, type SettingsPage } from '@/components/SettingsSheet';
+import { GlossSheen } from '@/components/GlossSheen';
 import { getDriveStats } from '@/utils/driveStats';
-
-const DRIVER_NAME = 'Night Driver';
+import { DEFAULT_DRIVER_NAME, getDriverName, initialsFor } from '@/utils/driverName';
 
 function stationName(id: string | null): string {
   return STATIONS.find((s) => s.id === id)?.name ?? '—';
@@ -109,12 +109,14 @@ export default function ProfileScreen() {
   const [themeGenVisible, setThemeGenVisible] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage | null>(null);
   const [stats, setStats] = useState<{ totalDrives: number; totalMinutes: number; favoriteStationId: string | null } | null>(null);
+  const [driverName, setDriverNameState] = useState(DEFAULT_DRIVER_NAME);
 
   // Real numbers from the drive log, refreshed each time the tab is focused.
   useFocusEffect(
     useCallback(() => {
       let active = true;
       getDriveStats().then((s) => { if (active) setStats(s); });
+      getDriverName().then((n) => { if (active) setDriverNameState(n); });
       return () => { active = false; };
     }, []),
   );
@@ -145,10 +147,10 @@ export default function ProfileScreen() {
               start={{ x: 0.2, y: 0 }} end={{ x: 0.85, y: 1 }}
               style={styles.avatar}>
               <View style={styles.avatarHighlight} pointerEvents="none" />
-              <Text style={styles.avatarInitials}>ND</Text>
+              <Text style={styles.avatarInitials}>{initialsFor(driverName)}</Text>
             </LinearGradient>
           </View>
-          <Text style={styles.name}>{DRIVER_NAME}</Text>
+          <Text style={styles.name}>{driverName}</Text>
           <View style={styles.planBadge}>
             <LinearGradient
               colors={[theme.accentColor + '2e', theme.accentColor + '0a']}
@@ -163,6 +165,7 @@ export default function ProfileScreen() {
         <View style={styles.statsCard}>
           <LinearGradient colors={STATS_GRADIENT} locations={GRADIENT_LOCATIONS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           <CardSheen />
+          <GlossSheen radius={20} />
           {STATS.map((stat, i) => (
             <View key={stat.label} style={[styles.statRow, i < STATS.length - 1 && styles.statBorder]}>
               <View style={styles.statRowLeft}>
@@ -178,6 +181,7 @@ export default function ProfileScreen() {
           <LinearGradient colors={UPGRADE_GRADIENT} locations={GRADIENT_LOCATIONS} start={{ x: 0, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} />
           <View style={styles.upgradeGlow} pointerEvents="none" />
           <CardSheen />
+          <GlossSheen radius={20} />
           <Text style={styles.upgradeEyebrow}>CRUISE FM PREMIUM</Text>
           <Text style={styles.upgradeTitle}>Unlock the full driving atmosphere.</Text>
           <Text style={styles.upgradeSub}>Premium modes, mood themes, and unlimited playlists.</Text>
@@ -207,6 +211,7 @@ export default function ProfileScreen() {
         <View style={styles.settingsCard}>
           <LinearGradient colors={SETTINGS_GRADIENT} locations={GRADIENT_LOCATIONS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           <CardSheen />
+          <GlossSheen radius={20} />
           {/* My Theme row */}
           <Pressable
             style={[styles.settingsRow, styles.settingsBorder]}
@@ -234,9 +239,10 @@ export default function ProfileScreen() {
             <Switch
               value={dataSaver}
               onValueChange={setDataSaver}
-              trackColor={{ false: 'rgba(255,255,255,0.18)', true: theme.accentColor }}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
               thumbColor="#fff"
               ios_backgroundColor="rgba(255,255,255,0.18)"
+              {...({ activeThumbColor: '#fff' } as object)}
             />
           </View>
 
@@ -280,9 +286,10 @@ export default function ProfileScreen() {
               <Switch
                 value={devFreePreview}
                 onValueChange={setDevFreePreview}
-                trackColor={{ false: 'rgba(255,255,255,0.18)', true: theme.accentColor }}
+                trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
                 thumbColor="#fff"
                 ios_backgroundColor="rgba(255,255,255,0.18)"
+                {...({ activeThumbColor: '#fff' } as object)}
               />
             </View>
           )}
@@ -313,7 +320,14 @@ export default function ProfileScreen() {
         onClose={() => setThemeGenVisible(false)}
       />
 
-      <SettingsSheet page={settingsPage} onClose={() => setSettingsPage(null)} />
+      <SettingsSheet
+        page={settingsPage}
+        onClose={() => {
+          setSettingsPage(null);
+          // The name may have been edited in Account Settings.
+          getDriverName().then(setDriverNameState);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -347,7 +361,7 @@ const styles = StyleSheet.create({
   },
   planText: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
   statsCard: {
-    borderRadius: 16, overflow: 'hidden',
+    borderRadius: 20, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(94,199,255,0.35)',
     shadowColor: '#5EC7FF', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
   },
@@ -365,7 +379,7 @@ const styles = StyleSheet.create({
   statLabel: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
   statValue: { color: Cruise.textPrimary, fontSize: 14, fontWeight: '600' },
   upgradeCard: {
-    borderRadius: 18, padding: 22, gap: 10, overflow: 'hidden',
+    borderRadius: 20, padding: 22, gap: 10, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(255,150,90,0.5)',
     shadowColor: '#FF8A3C', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4, shadowRadius: 22, elevation: 10,
@@ -389,7 +403,7 @@ const styles = StyleSheet.create({
   },
   upgradeBtnText: { color: '#2a1a00', fontSize: 15, fontWeight: '700' },
   settingsCard: {
-    borderRadius: 16, overflow: 'hidden',
+    borderRadius: 20, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(155,95,255,0.35)',
     shadowColor: Cruise.violet, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
   },

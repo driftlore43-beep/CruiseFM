@@ -84,7 +84,9 @@ export function useSpotifyPlayback(visible: boolean) {
   return {
     connected,
     track,
-    play: () => { ping(); startPlayback().then(report).catch(() => {}); after(); },
+    // Only surface Spotify's verdict for users who actually connected it —
+    // demo-mode listeners shouldn't be nagged about a service they never linked.
+    play: () => { ping(); startPlayback().then((r) => { if (connected) report(r); }).catch(() => {}); after(); },
     pause: () => { ping(); spotifyPause().catch(() => {}); after(); },
     next: () => { ping(); skipNext().catch(() => {}); after(); },
     prev: () => { ping(); skipPrev().catch(() => {}); after(); },

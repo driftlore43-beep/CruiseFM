@@ -75,12 +75,7 @@
   .logocard .tag b{color:var(--violet-light);font-weight:400}
 
   /* ── app icon 512 ── */
-  .appicon{
-    width:512px;height:512px;border-radius:110px;
-    background:linear-gradient(160deg,#1c1c34,#0D0D20);
-    display:flex;align-items:center;justify-content:center;
-    box-shadow:inset 0 0 0 6px rgba(155,95,255,.5), inset 0 0 90px rgba(123,56,224,.25);
-  }
+  .appicon{width:512px;height:512px}
 </style>
 </head>
 <body>
@@ -141,7 +136,7 @@ function markSVG(size){
 
 <!-- 2: app icon -->
 <div class="canvas appicon" id="app-icon-512">
-  <span class="mark" data-size="330"></span>
+  <img src="brand-icon.png" width="512" height="512" style="display:block">
 </div>
 
 <!-- 3: feature graphic -->
@@ -192,7 +187,8 @@ function markSVG(size){
 
 <script>
   document.querySelectorAll('.mark').forEach(el => {
-    el.innerHTML = markSVG(Number(el.dataset.size || 200));
+    const n = Number(el.dataset.size || 200);
+    el.innerHTML = `<img src="brand-mark.png" width="${n}" height="${n}" style="display:block">`;
   });
 </script>
 </body>

@@ -13,6 +13,6 @@ export const REVENUECAT_API_KEY = 'test_CcsXiJATGDBoQSYvQkxlayrjYct';
 export const PREMIUM_ENTITLEMENT = 'premium';
 
 // ── Sentry crash reports ──────────────────────────────────────────────────────
-// Paste the DSN from sentry.io (Project Settings → Client Keys). Empty string
-// = crash reporting stays off everywhere; a DSN is safe to ship in the app.
-export const SENTRY_DSN = '';
+// DSN from sentry.io (org cruise-fm, project react-native). Safe to ship in
+// the app. Set to '' to switch crash reporting off everywhere.
+export const SENTRY_DSN = 'https://c624e74abfd79764bba03001ea1513be@o4511754925047808.ingest.us.sentry.io/4511754937499648';

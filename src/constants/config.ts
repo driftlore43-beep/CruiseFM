@@ -11,3 +11,8 @@ export const OWNER_MODE = true;
 export const REVENUECAT_API_KEY = 'test_CcsXiJATGDBoQSYvQkxlayrjYct';
 // The entitlement that means "this user has Premium" (set up in the dashboard).
 export const PREMIUM_ENTITLEMENT = 'premium';
+
+// ── Sentry crash reports ──────────────────────────────────────────────────────
+// Paste the DSN from sentry.io (Project Settings → Client Keys). Empty string
+// = crash reporting stays off everywhere; a DSN is safe to ship in the app.
+export const SENTRY_DSN = '';

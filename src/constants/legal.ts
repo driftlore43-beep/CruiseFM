@@ -45,7 +45,7 @@ export const PRIVACY_POLICY: LegalDoc = {
     },
     {
       heading: 'Contact',
-      body: 'Questions about privacy: driftlore43@gmail.com.',
+      body: 'Questions about privacy: cruisefmservice@gmail.com.',
     },
   ],
 };
@@ -93,7 +93,7 @@ export const TERMS_OF_SERVICE: LegalDoc = {
     },
     {
       heading: 'Contact',
-      body: 'Questions about these terms: driftlore43@gmail.com.',
+      body: 'Questions about these terms: cruisefmservice@gmail.com.',
     },
   ],
 };

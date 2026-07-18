@@ -77,7 +77,7 @@ listing. Character limits noted per field.
 
 ## Contact details
 
-- Email: (the new Cruise FM Gmail once created)
+- Email: cruisefmservice@gmail.com
 - Website: (Netlify waitlist URL once live)
 - Privacy policy URL: (Netlify /privacy once live — REQUIRED before
   submitting the listing)

@@ -74,6 +74,7 @@ tier is purely cosmetic app features (visual modes and themes).
 - No data is sold or shared. Crash reporting (Sentry) contains technical
   crash context only.
 - Privacy policy: (public URL once hosted)
+- Contact: cruisefmservice@gmail.com
 
 ## Compliance notes (Developer Policy)
 

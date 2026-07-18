@@ -44,18 +44,23 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
   const slideAnim = useRef(new Animated.Value(80)).current;
   // Scale pop on appear
   const scaleAnim = useRef(new Animated.Value(0.96)).current;
+  // The wordmark reveals on its own beat, a breath after the sheet lands
+  const logoAnim  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
-          toValue: 1, duration: 280, useNativeDriver: true,
+          toValue: 1, duration: 400, useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
-          toValue: 0, tension: 68, friction: 11, useNativeDriver: true,
+          toValue: 0, tension: 52, friction: 12, useNativeDriver: true,
         }),
         Animated.spring(scaleAnim, {
-          toValue: 1, tension: 80, friction: 10, useNativeDriver: true,
+          toValue: 1, tension: 60, friction: 11, useNativeDriver: true,
+        }),
+        Animated.timing(logoAnim, {
+          toValue: 1, duration: 700, delay: 220, useNativeDriver: true,
         }),
       ]).start();
     } else {
@@ -63,6 +68,7 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
       slideAnim.setValue(80);
       scaleAnim.setValue(0.96);
       fadeAnim.setValue(0);
+      logoAnim.setValue(0);
     }
   }, [visible]);
 
@@ -119,9 +125,18 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
 
           {/* ── Header branding ─────────────────────────────────────────── */}
           <View style={styles.headerRow}>
-            <View style={styles.logoRow}>
+            <Animated.View
+              style={[
+                styles.logoRow,
+                {
+                  opacity: logoAnim,
+                  transform: [{
+                    translateY: logoAnim.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }),
+                  }],
+                },
+              ]}>
               <Text style={styles.logoText}>CRUISE FM</Text>
-            </View>
+            </Animated.View>
             <TouchableOpacity
               onPress={handleClose}
               style={styles.closeBtn}

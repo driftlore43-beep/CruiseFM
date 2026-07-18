@@ -34,4 +34,4 @@ The owner does not code — describe changes in plain English, Claude implements
 
 ## Current state / next steps
 - DONE: all visuals unified, Spotify OAuth working on Android build, playback CONFIRMED WORKING on device (2026-07-18: playlists load, music plays, controls obey; play uses active-device fast path, failures surface via PlaybackNotice card)
-- NEXT: test playback on Android build → new EAS build (picks up react-native-purchases; batch Sentry into it — owner has an account, DSN not yet provided) → owner creates "premium" entitlement in RevenueCat dashboard → Google Play Console account + £2.99 product → swap test_ key for goog_ key
+- NEXT: new EAS build (picks up react-native-purchases + Sentry — DSN live in config.ts, org cruise-fm/project react-native; reports only from non-OWNER_MODE devices) → sandbox-test a purchase unlocking premium → Google Play Console account + £2.99 product → swap test_ key for goog_ key

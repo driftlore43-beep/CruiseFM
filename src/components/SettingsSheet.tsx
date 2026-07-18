@@ -6,7 +6,9 @@ import { useEffect, useState } from 'react';
 import { Modal, Platform, Pressable, Share, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { SettingsInfoRow, SettingsPageShell, SettingsSection } from '@/components/SettingsPageShell';
+import { OWNER_MODE } from '@/constants/config';
 import { Cruise } from '@/constants/theme';
+import { sendTestCrash } from '@/utils/crashReports';
 
 export type SettingsPage = 'account' | 'notifications' | 'privacy' | 'about' | 'refer';
 
@@ -157,7 +159,36 @@ function AboutBody() {
           </Text>
         </View>
       </SettingsSection>
+      {OWNER_MODE && <DiagnosticsSection />}
     </>
+  );
+}
+
+// Owner-only: prove the Sentry pipeline end to end. Never shown to real users.
+function DiagnosticsSection() {
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+
+  const handleTestCrash = async () => {
+    if (status === 'sending') return;
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setStatus('sending');
+    const ok = await sendTestCrash();
+    setStatus(ok ? 'sent' : 'failed');
+  };
+
+  const value = {
+    idle:    'Tap to send',
+    sending: 'Sending…',
+    sent:    'Sent ✓ — check sentry.io',
+    failed:  'Not available in this build',
+  }[status];
+
+  return (
+    <SettingsSection label="DIAGNOSTICS (OWNER ONLY)">
+      <Pressable onPress={handleTestCrash} style={({ pressed }) => pressed && { opacity: 0.7 }}>
+        <SettingsInfoRow label="Test Crash Report" value={value} last />
+      </Pressable>
+    </SettingsSection>
   );
 }
 

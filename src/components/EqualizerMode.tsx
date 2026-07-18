@@ -30,6 +30,7 @@ import { MoodSheet } from '@/components/MoodSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -261,14 +262,10 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const [repeat,        setRepeat]        = useState(false);
   const [platform,      setPlatform]      = useState<{ id: PlatformId; name: string; color: string } | null>(null);
   const [dimmed,        setDimmed]        = useState(false);
-  const [currentTimeMs, setCurrentTimeMs] = useState(0);
   const [showMood,      setShowMood]      = useState(false);
   const [showPicker,    setShowPicker]    = useState(false);
   const [linked,        setLinked]        = useState<LinkedPlaylist | null>(null);
   const playBtnScale   = useRef(new Animated.Value(1)).current;
-  const progress       = useRef(new Animated.Value(0)).current;
-  const progressAnimRef = useRef<Animated.CompositeAnimation | null>(null);
-  const progressValue   = useRef(0);
 
   const slideY        = useRef(new Animated.Value(SCREEN_H)).current;
   const closePulse    = useRef(new Animated.Value(1)).current;
@@ -375,6 +372,12 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
   const spotify = useSpotifyPlayback(visible);
 
+  // Progress rides the shared track clock — real Spotify position when
+  // connected, the classic 4-minute demo loop otherwise.
+  const { progress, elapsedMs: currentTimeMs, durationMs } = useTrackClock({
+    visible, playing, track: spotify.track, demoDurationMs: 4 * 60 * 1000,
+  });
+
   const togglePlay = () => {
     if (playing) {
       stopBarAnims(fsValues, timers);
@@ -386,31 +389,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
       spotify.play();
     }
   };
-
-  // Progress listener — only commit state when the displayed second changes,
-  // otherwise we re-render (and repaint the blurred bg) on every frame.
-  useEffect(() => {
-    const id = progress.addListener(({ value }) => {
-      progressValue.current = value;
-      const ms = Math.round(value * 4 * 60 * 1000);
-      setCurrentTimeMs((prev) => (Math.floor(ms / 1000) === Math.floor(prev / 1000) ? prev : ms));
-    });
-    return () => progress.removeListener(id);
-  }, []);
-
-  // Advance progress while playing (4-minute loop)
-  useEffect(() => {
-    if (playing) {
-      const remaining = (1 - progressValue.current) * 4 * 60 * 1000;
-      progressAnimRef.current = Animated.timing(progress, { toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false });
-      progressAnimRef.current.start(({ finished }) => {
-        if (finished) { progress.setValue(0); progressValue.current = 0; }
-      });
-    } else {
-      progressAnimRef.current?.stop();
-    }
-    return () => progressAnimRef.current?.stop();
-  }, [playing]);
 
   const topPad    = Math.max(insets.top, 20);
   const bottomPad = Math.max(insets.bottom, 24) + 20;
@@ -641,7 +619,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             <View style={fs.progressRow}>
               <Text style={fs.timeText}>{formatMs(currentTimeMs)}</Text>
               <VioletProgressBar progress={progress} />
-              <Text style={[fs.timeText, { textAlign: 'right' }]}>4:00</Text>
+              <Text style={[fs.timeText, { textAlign: 'right' }]}>{formatMs(durationMs)}</Text>
             </View>
           </View>
 

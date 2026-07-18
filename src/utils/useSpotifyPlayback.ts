@@ -11,7 +11,17 @@ import {
   skipPrev,
 } from './spotify';
 
-export type NowPlaying = { title: string; artist: string };
+export type NowPlaying = {
+  title: string;
+  artist: string;
+  /** Real track length from Spotify, null when unknown. */
+  durationMs: number | null;
+  /** Where the song was (ms) when we last asked… */
+  progressMs: number | null;
+  /** …and when that was, so callers can extrapolate between polls. */
+  syncedAt: number;
+  isPlaying: boolean;
+};
 
 /**
  * Live Spotify playback bridge for the visual modes.
@@ -46,6 +56,10 @@ export function useSpotifyPlayback(visible: boolean) {
           setTrack({
             title: item.name,
             artist: item.artists?.map((a: any) => a.name).join(', ') ?? '',
+            durationMs: item.duration_ms ?? null,
+            progressMs: data.progress_ms ?? null,
+            syncedAt: Date.now(),
+            isPlaying: data.is_playing ?? true,
           });
         }
       };

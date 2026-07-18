@@ -16,6 +16,7 @@ import { FloatingNotes } from '@/components/FloatingNotes';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 
 const SCREEN_H = Dimensions.get('window').height;
@@ -175,7 +176,6 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
   const spotify = useSpotifyPlayback(visible);
   const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
-  const [elapsedMs, setElapsedMs] = useState(0);
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -185,15 +185,9 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   }, [visible, lockedStation.id]);
 
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
-  const progress = useRef(new Animated.Value(0)).current;
-  const progressAnim = useRef<Animated.CompositeAnimation | null>(null);
-  const playingRef = useRef(false);
-  useEffect(() => { playingRef.current = playing; }, [playing]);
-
-  useEffect(() => {
-    const id = progress.addListener(({ value }) => setElapsedMs(value * DEMO_DURATION_MS));
-    return () => progress.removeListener(id);
-  }, []);
+  const { progress, elapsedMs, durationMs } = useTrackClock({
+    visible, playing, track: spotify.track, demoDurationMs: DEMO_DURATION_MS,
+  });
 
   // Noise flicker clock (~30fps) — only really matters while off-station.
   useEffect(() => {
@@ -261,25 +255,8 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     })
   ).current;
 
-  // ── Demo progress (same as other modes) ──────────────────────────────────────
-  const startProgress = (fromMs: number) => {
-    const remaining = DEMO_DURATION_MS - fromMs;
-    if (remaining <= 0) return;
-    progressAnim.current = Animated.timing(progress, {
-      toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false,
-    });
-    progressAnim.current.start(({ finished }) => {
-      if (!finished) return;
-      progress.setValue(0);
-      if (playingRef.current) startProgress(0);
-    });
-  };
-
-  useEffect(() => {
-    if (playing) startProgress((progress as any)._value * DEMO_DURATION_MS);
-    else progressAnim.current?.stop();
-    return () => progressAnim.current?.stop();
-  }, [playing]);
+  // Progress is driven by useTrackClock — real Spotify position when
+  // connected, demo loop otherwise.
 
   useEffect(() => {
     if (!visible) return;
@@ -287,14 +264,11 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     setActiveId(id);
     setFreq(STATION_FREQS[id] ?? 92.1);
     slideY.setValue(SCREEN_H);
-    progress.setValue(0); setElapsedMs(0);
-    if (playingRef.current) startProgress(0);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
-    return () => { progressAnim.current?.stop(); cancelSnap(); };
+    return () => cancelSnap();
   }, [visible]);
 
   const handleClose = () => {
-    progressAnim.current?.stop();
     cancelSnap();
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
@@ -312,7 +286,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   })).current;
 
 
-  const resetTrack = () => { progress.setValue(0); setElapsedMs(0); };
+  const resetTrack = () => progress.setValue(0);
   const togglePlay = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
 
   const title = spotify.track?.title ?? 'Neon Autobahn';
@@ -411,7 +385,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 7 }}>
               <Text style={[fs.time, { fontFamily: Fonts.mono }]}>{formatMs(elapsedMs)}</Text>
-              <Text style={[fs.time, { fontFamily: Fonts.mono }]}>{formatMs(DEMO_DURATION_MS)}</Text>
+              <Text style={[fs.time, { fontFamily: Fonts.mono }]}>{formatMs(durationMs)}</Text>
             </View>
           </View>
 

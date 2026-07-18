@@ -1,0 +1,183 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --violet:#7B38E0; --violet-light:#9B5FFF; --violet-glow:rgba(123,56,224,.5);
+    --deep:#0D0D20; --charcoal:#1a1a2e; --amber:#F59E0B;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#333;font-family:'Liberation Sans','DejaVu Sans',Arial,sans-serif}
+  .canvas{position:relative;overflow:hidden;margin:20px}
+
+  /* ── the mark (steering-wheel vinyl + sound arcs) ── */
+  .mark svg{display:block}
+
+  /* ── screenshot canvases: 1080x1920 ── */
+  .shot{
+    width:1080px;height:1920px;
+    background:
+      radial-gradient(ellipse 90% 45% at 50% -8%, rgba(123,56,224,.38), transparent 62%),
+      radial-gradient(ellipse 70% 35% at 50% 108%, rgba(245,158,11,.16), transparent 60%),
+      linear-gradient(180deg,#12122A 0%, #0D0D20 100%);
+    display:flex;flex-direction:column;align-items:center;
+  }
+  .shot .cap{
+    margin-top:96px;text-align:center;padding:0 70px;
+    color:#fff;font-size:78px;font-weight:800;letter-spacing:-.5px;line-height:1.14;
+  }
+  .shot .cap .hl{color:var(--violet-light)}
+  .shot .cap .amber{color:var(--amber)}
+  .shot .brandrow{
+    display:flex;align-items:center;gap:18px;margin-top:26px;
+  }
+  .shot .brandrow .bw{color:rgba(255,255,255,.55);font-size:34px;font-weight:800;
+    font-style:italic;letter-spacing:.5px}
+  .shot .brandrow .bw i{color:var(--violet-light);font-style:italic}
+  .phone{
+    margin-top:64px;
+    width:726px;height:1572px;border-radius:74px;
+    background:#07070f;
+    padding:18px;
+    box-shadow:0 0 0 3px rgba(155,95,255,.35), 0 0 120px rgba(123,56,224,.45), 0 60px 120px rgba(0,0,0,.6);
+  }
+  .phone img{width:690px;height:1536px;border-radius:58px;object-fit:cover;display:block}
+
+  /* ── feature graphic 1024x500 ── */
+  .feature{
+    width:1024px;height:500px;
+    background:
+      radial-gradient(ellipse 60% 90% at 18% 50%, rgba(123,56,224,.4), transparent 65%),
+      radial-gradient(ellipse 50% 70% at 88% 85%, rgba(245,158,11,.14), transparent 60%),
+      linear-gradient(135deg,#14142c 0%, #0D0D20 100%);
+    display:flex;align-items:center;justify-content:center;gap:56px;
+  }
+  .feature .text .word{font-size:104px;font-weight:800;font-style:italic;letter-spacing:-1px;color:#fff}
+  .feature .text .word i{font-style:italic;
+    background:linear-gradient(180deg,#B78CFF,#7B38E0);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .feature .text .tag{margin-top:18px;font-size:24px;letter-spacing:3.5px;color:rgba(255,255,255,.65);text-transform:uppercase;white-space:nowrap}
+  .feature .text .tag b{color:var(--violet-light);font-weight:400}
+
+  /* ── logo card (1536x1024-ish presentation) ── */
+  .logocard{
+    width:1536px;height:1024px;
+    background:radial-gradient(ellipse 70% 70% at 50% 40%, #17172e, #0a0a16);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px;
+  }
+  .logocard .row{display:flex;align-items:center;gap:64px}
+  .logocard .word{font-size:170px;font-weight:800;font-style:italic;letter-spacing:-2px;color:#fff}
+  .logocard .word i{font-style:italic;
+    background:linear-gradient(180deg,#B78CFF,#7B38E0);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .logocard .tag{font-size:38px;letter-spacing:10px;color:rgba(255,255,255,.6);text-transform:uppercase}
+  .logocard .tag b{color:var(--violet-light);font-weight:400}
+
+  /* ── app icon 512 ── */
+  .appicon{
+    width:512px;height:512px;border-radius:110px;
+    background:linear-gradient(160deg,#1c1c34,#0D0D20);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:inset 0 0 0 6px rgba(155,95,255,.5), inset 0 0 90px rgba(123,56,224,.25);
+  }
+</style>
+</head>
+<body>
+
+<!-- Reusable mark: disc + steering spokes + violet sound arcs -->
+<script>
+function markSVG(size){
+  return `
+  <svg width="${size}" height="${size}" viewBox="-130 -130 260 260" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="disc" x1="0" y1="-1" x2="0" y2="1">
+        <stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#C9C9DB"/>
+      </linearGradient>
+      <linearGradient id="arc" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#B78CFF"/><stop offset="1" stop-color="#7B38E0"/>
+      </linearGradient>
+      <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="7" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <clipPath id="discClip"><circle r="104"/></clipPath>
+    </defs>
+    <circle r="104" fill="url(#disc)"/>
+    <g clip-path="url(#discClip)">
+      <rect x="-112" y="-14" width="80" height="28" rx="14" fill="#0a0a16"/>
+      <rect x="32"  y="-14" width="80" height="28" rx="14" fill="#0a0a16"/>
+      <rect x="-14" y="32"  width="28" height="80" rx="14" fill="#0a0a16"/>
+    </g>
+    <circle r="42" fill="#0a0a16"/>
+    <circle r="22" fill="url(#disc)"/>
+    <g filter="url(#glow)" stroke="url(#arc)" stroke-width="15" stroke-linecap="round" fill="none">
+      <path d="M -38.9 -21.2 A 44.3 44.3 0 0 1 -21.2 -38.9"/>
+      <path d="M -60.1 -32.7 A 68.4 68.4 0 0 1 -32.7 -60.1"/>
+      <path d="M -81.3 -44.3 A 92.5 92.5 0 0 1 -44.3 -81.3"/>
+    </g>
+  </svg>`;
+}
+</script>
+
+<!-- 1: logo presentation card -->
+<div class="canvas logocard" id="logo-full">
+  <div class="row">
+    <span class="mark" data-size="300"></span>
+    <div class="word">Cruise<i>FM</i></div>
+  </div>
+  <div class="tag">Feel the music. <b>Enjoy the ride.</b></div>
+</div>
+
+<!-- 2: app icon -->
+<div class="canvas appicon" id="app-icon-512">
+  <span class="mark" data-size="330"></span>
+</div>
+
+<!-- 3: feature graphic -->
+<div class="canvas feature" id="feature-graphic">
+  <span class="mark" data-size="270"></span>
+  <div class="text">
+    <div class="word">Cruise<i>FM</i></div>
+    <div class="tag">Feel the music. <b>Enjoy the ride.</b></div>
+  </div>
+</div>
+
+<!-- 4-8: store screenshots -->
+<div class="canvas shot" id="shot-1-start-drive">
+  <div class="cap">One tap.<br><span class="hl">Start Drive.</span></div>
+  <div class="brandrow"><span class="mark" data-size="44"></span><span class="bw">Cruise<i>FM</i></span></div>
+  <div class="phone"><img src="raw-home.png"></div>
+</div>
+
+<div class="canvas shot" id="shot-2-drive">
+  <div class="cap">Your music,<br><span class="hl">made cinematic.</span></div>
+  <div class="brandrow"><span class="mark" data-size="44"></span><span class="bw">Cruise<i>FM</i></span></div>
+  <div class="phone"><img src="raw-drive.png"></div>
+</div>
+
+<div class="canvas shot" id="shot-3-stations">
+  <div class="cap">Eight moods.<br><span class="hl">Your playlists.</span></div>
+  <div class="brandrow"><span class="mark" data-size="44"></span><span class="bw">Cruise<i>FM</i></span></div>
+  <div class="phone"><img src="raw-stations.png"></div>
+</div>
+
+<div class="canvas shot" id="shot-4-vinyl">
+  <div class="cap">Premium modes<br><span class="amber">set the vibe.</span></div>
+  <div class="brandrow"><span class="mark" data-size="44"></span><span class="bw">Cruise<i>FM</i></span></div>
+  <div class="phone"><img src="raw-vinyl.png"></div>
+</div>
+
+<div class="canvas shot" id="shot-5-tuner">
+  <div class="cap">Drag the dial.<br><span class="hl">Find the mood.</span></div>
+  <div class="brandrow"><span class="mark" data-size="44"></span><span class="bw">Cruise<i>FM</i></span></div>
+  <div class="phone"><img src="raw-tuner.png"></div>
+</div>
+
+<script>
+  document.querySelectorAll('.mark').forEach(el => {
+    el.innerHTML = markSVG(Number(el.dataset.size || 200));
+  });
+</script>
+</body>
+</html>

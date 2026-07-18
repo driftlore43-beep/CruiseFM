@@ -105,23 +105,26 @@ function markSVG(size){
         <stop offset="0" stop-color="#B78CFF"/><stop offset="1" stop-color="#7B38E0"/>
       </linearGradient>
       <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
-        <feGaussianBlur stdDeviation="5" result="b"/>
+        <feGaussianBlur stdDeviation="4" result="b"/>
         <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
+      <clipPath id="discClip"><circle r="104"/></clipPath>
     </defs>
     <circle r="104" fill="url(#disc)"/>
-    <!-- steering cutouts: left bar ends inside; right bar and bottom stem
-         break through the rim, exactly like the reference -->
-    <rect x="-82" y="-9" width="52" height="18" rx="9" fill="#0a0a16"/>
-    <rect x="30"  y="-9" width="86" height="18" rx="9" fill="#0a0a16"/>
-    <path d="M -9 30 L 9 30 L 13 116 L -13 116 Z" fill="#0a0a16"/>
-    <circle r="35" fill="#0a0a16"/>
-    <circle r="24" fill="url(#disc)"/>
-    <g filter="url(#glow)" stroke="url(#arc)" stroke-width="10" stroke-linecap="round" fill="none">
-      <path d="${A(48, 208, 246)}"/>
-      <path d="${A(63, 200, 254)}"/>
-      <path d="${A(78, 194, 260)}"/>
-      <path d="${A(93, 188, 265)}"/>
+    <!-- steering cutouts, per the concept: one slot straight across breaking
+         both rims, one slot from the hub through the bottom rim -->
+    <g clip-path="url(#discClip)">
+      <rect x="-110" y="-14" width="220" height="28" fill="#0a0a16"/>
+      <rect x="-14" y="0" width="28" height="112" fill="#0a0a16"/>
+    </g>
+    <circle r="44" fill="#0a0a16"/>
+    <circle r="26" fill="url(#disc)"/>
+    <!-- three bold sound arcs across the upper-left quadrant, clear of the
+         slot below them and the rim above -->
+    <g filter="url(#glow)" stroke="url(#arc)" stroke-width="15" stroke-linecap="round" fill="none">
+      <path d="${A(50, 210, 244)}"/>
+      <path d="${A(69, 204, 248)}"/>
+      <path d="${A(88, 199, 251)}"/>
     </g>
   </svg>`;
 }

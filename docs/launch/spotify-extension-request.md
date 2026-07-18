@@ -6,7 +6,7 @@ form). Field names vary slightly as Spotify updates the form; match by
 meaning.
 
 **Prerequisites before submitting**
-- Privacy policy at a public URL (Netlify) — required
+- Privacy policy: https://cruisefm.netlify.app/privacy/ — DONE
 - App must be functional for review (it is)
 - The dashboard app's name/description below should match
 
@@ -73,7 +73,7 @@ tier is purely cosmetic app features (visual modes and themes).
   between a station and a playlist ID chosen by the user.
 - No data is sold or shared. Crash reporting (Sentry) contains technical
   crash context only.
-- Privacy policy: (public URL once hosted)
+- Privacy policy: https://cruisefm.netlify.app/privacy/
 - Contact: cruisefmservice@gmail.com
 
 ## Compliance notes (Developer Policy)

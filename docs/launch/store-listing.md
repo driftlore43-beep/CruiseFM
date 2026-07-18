@@ -78,9 +78,8 @@ listing. Character limits noted per field.
 ## Contact details
 
 - Email: cruisefmservice@gmail.com
-- Website: (Netlify waitlist URL once live)
-- Privacy policy URL: (Netlify /privacy once live — REQUIRED before
-  submitting the listing)
+- Website: https://cruisefm.netlify.app
+- Privacy policy URL: https://cruisefm.netlify.app/privacy/
 
 ## Graphics checklist (all ready in /store-assets)
 

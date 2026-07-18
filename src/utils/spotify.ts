@@ -250,24 +250,33 @@ export async function startPlayback(contextUri?: string): Promise<StartResult> {
   const token = await getAccessToken();
   if (!token) return 'error';
 
-  const devices = await getDevices();
-  if (devices.length === 0) return 'no-device';
-
-  const target = devices.find((d) => d.is_active) ?? devices[0];
-  const res = await fetch(
-    `https://api.spotify.com/v1/me/player/play?device_id=${encodeURIComponent(target.id)}`,
-    {
+  const body = contextUri ? JSON.stringify({ context_uri: contextUri }) : undefined;
+  const attempt = (query = '') =>
+    fetch(`https://api.spotify.com/v1/me/player/play${query}`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type':  'application/json',
       },
-      body: contextUri ? JSON.stringify({ context_uri: contextUri }) : undefined,
-    },
-  );
+      body,
+    });
+
+  // Fast path: when a device is already active (the usual case mid-drive),
+  // one round trip starts the music — no device lookup first.
+  let res = await attempt();
   if (res.ok || res.status === 204) return 'playing';
   if (res.status === 403) return 'premium-required';
-  if (res.status === 404) return 'no-device';
+
+  // Nothing active — hunt for a sleeping device and wake it by id.
+  if (res.status === 404) {
+    const devices = await getDevices();
+    if (devices.length === 0) return 'no-device';
+    const target = devices.find((d) => d.is_active) ?? devices[0];
+    res = await attempt(`?device_id=${encodeURIComponent(target.id)}`);
+    if (res.ok || res.status === 204) return 'playing';
+    if (res.status === 403) return 'premium-required';
+    if (res.status === 404) return 'no-device';
+  }
   return 'error';
 }
 

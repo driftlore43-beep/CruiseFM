@@ -58,6 +58,13 @@ function TunerScene({ clock }: { clock: number }) {
   );
 }
 
+// Static star field for the Horizon sky (deterministic, no re-randomising).
+const HZ_STARS = Array.from({ length: 14 }, (_, i) => ({
+  left: ((i * 71) % 97) / 97,
+  top: ((i * 37) % 53) / 53,
+  size: 1 + (i % 3) * 0.5,
+}));
+
 function HorizonScene({ clock }: { clock: number }) {
   // Rows are 11px apart and the stack slides exactly one gap per cycle,
   // so the scroll toward the viewer loops seamlessly.
@@ -65,7 +72,29 @@ function HorizonScene({ clock }: { clock: number }) {
   const glow = wave(clock, 0.55, 1);
   return (
     <View style={sc.horizonWrap}>
-      <View style={[sc.horizonSun, { opacity: glow }]} />
+      {/* Stars in the sky, like the real mode */}
+      {HZ_STARS.map((s, i) => (
+        <View
+          key={i}
+          style={[
+            sc.horizonStar,
+            {
+              left: `${8 + s.left * 84}%`,
+              top: 4 + s.top * 52,
+              width: s.size, height: s.size, borderRadius: s.size,
+              opacity: 0.35 + 0.4 * ((i % 4) / 3),
+            },
+          ]}
+        />
+      ))}
+      {/* Slatted outrun sun rising out of the horizon — cuts clipped to the disc */}
+      <View style={[sc.horizonSunWrap, { opacity: glow }]}>
+        <View style={sc.horizonSunDisc}>
+          {[26, 34, 41, 47, 52].map((top, i) => (
+            <View key={top} style={[sc.horizonSunCut, { top, height: 2 + i * 0.6 }]} />
+          ))}
+        </View>
+      </View>
       <View style={sc.horizonGround}>
         {[-52, -32, -15, 0, 15, 32, 52].map((deg) => (
           <View key={deg} style={[sc.horizonRay, { transform: [{ rotate: `${deg}deg` }] }]} />
@@ -80,24 +109,39 @@ function HorizonScene({ clock }: { clock: number }) {
   );
 }
 
+// The real Circular EQ: a hollow ring of chunky bars with bursts sweeping
+// around it — miniaturised (24 bars vs the mode's 64).
+const ORB_BARS = 24;
+const ORB_BASE_R = 40;
+
 function OrbScene({ clock }: { clock: number }) {
-  // Two rings breathing out of phase around a pulsing core.
+  const sweep = clock * Math.PI * 2;
+  const size = 132;
   return (
     <View style={sc.center}>
-      <View
-        style={[
-          sc.orbRing,
-          sc.orbRingOuter,
-          { opacity: wave(clock, 0.55, 0.12), transform: [{ scale: wave(clock, 1.04, 0.92) }] },
-        ]}
-      />
-      <View
-        style={[
-          sc.orbRing,
-          { opacity: wave(clock, 0.2, 0.75), transform: [{ scale: wave(clock, 0.88, 1.04) }] },
-        ]}
-      />
-      <View style={[sc.orbCore, { transform: [{ scale: wave(clock, 0.85, 1.1) }] }]} />
+      <View style={{ width: size, height: size }}>
+        {Array.from({ length: ORB_BARS }).map((_, i) => {
+          const angle = (i / ORB_BARS) * Math.PI * 2;
+          // Two bursts chasing each other around the ring; everything else
+          // rests as chunky dots — same read as the real mode.
+          const burst =
+            Math.pow(Math.max(0, Math.cos(angle - sweep)), 6) +
+            Math.pow(Math.max(0, Math.cos(angle - sweep + Math.PI)), 6) * 0.6;
+          const len = 4 + 18 * burst;
+          return (
+            <View
+              key={i}
+              style={[sc.orbBarArm, { transform: [{ rotate: `${(i / ORB_BARS) * 360}deg` }] }]}>
+              <View
+                style={[
+                  sc.orbBar,
+                  { height: len, marginTop: size / 2 - ORB_BASE_R - len },
+                ]}
+              />
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -271,16 +315,30 @@ const sc = StyleSheet.create({
 
   // Horizon
   horizonWrap: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'flex-end' },
-  horizonSun: {
+  horizonStar: { position: 'absolute', backgroundColor: '#fff' },
+  horizonSunWrap: {
+    width: 64,
+    height: 64,
+    marginBottom: -30,
+  },
+  horizonSunDisc: {
     width: 64,
     height: 64,
     borderRadius: 32,
     backgroundColor: AMBER,
-    marginBottom: -30,
+    overflow: 'hidden',
+    // Glow lives on the circle itself — on a square wrapper the web
+    // renders a square halo.
     shadowColor: AMBER,
     shadowOpacity: 0.8,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 0 },
+  },
+  horizonSunCut: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: '#151009',
   },
   horizonGround: {
     alignSelf: 'stretch',
@@ -303,22 +361,15 @@ const sc = StyleSheet.create({
     backgroundColor: 'rgba(245,158,11,0.35)',
   },
 
-  // Orb
-  orbRing: {
+  // Orb (Circular EQ) — one absolutely-positioned arm per bar, rotated into place
+  orbBarArm: {
     position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 1.5,
-    borderColor: AMBER,
+    top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center',
   },
-  orbRingOuter: { width: 132, height: 132, borderRadius: 66 },
-  orbCore: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: 'rgba(245,158,11,0.25)',
-    borderWidth: 1.5,
-    borderColor: AMBER,
+  orbBar: {
+    width: 4.5,
+    borderRadius: 2.5,
+    backgroundColor: AMBER,
   },
 });

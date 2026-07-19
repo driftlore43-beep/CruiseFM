@@ -24,7 +24,7 @@ import { GlossSheen } from '@/components/GlossSheen';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { useTheme } from '@/context/ThemeContext';
 import { useMotion } from '@/context/MotionContext';
-import { isSpotifyConnected, getUserPlaylists } from '@/utils/spotify';
+import { PlaylistSheet } from '@/components/PlaylistSheet';
 import {
   getStationPlaylist,
   setStationPlaylist,
@@ -286,7 +286,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
         </ScrollView>
 
         {showPicker && (
-          <PlaylistPicker
+          <PlaylistSheet
             stationName={station.name}
             current={linked}
             onClose={() => setShowPicker(false)}
@@ -299,76 +299,6 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
         )}
       </Animated.View>
     </Modal>
-  );
-}
-
-// ── Playlist picker sheet ─────────────────────────────────────────────────────
-function PlaylistPicker({
-  stationName,
-  current,
-  onClose,
-  onPick,
-}: {
-  stationName: string;
-  current: LinkedPlaylist | null;
-  onClose: () => void;
-  onPick: (pl: LinkedPlaylist) => void;
-}) {
-  const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState(true);
-  const [connected, setConnected] = useState(false);
-  const [playlists, setPlaylists] = useState<LinkedPlaylist[]>([]);
-
-  useEffect(() => {
-    (async () => {
-      const isConn = await isSpotifyConnected();
-      setConnected(isConn);
-      if (isConn) {
-        const data = await getUserPlaylists();
-        const items: LinkedPlaylist[] =
-          data?.items?.map((p: any) => ({ uri: p.uri, name: p.name })) ?? [];
-        setPlaylists(items);
-      }
-      setLoading(false);
-    })();
-  }, []);
-
-  return (
-    <View style={styles.pickerBackdrop}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      <View style={[styles.pickerSheet, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={styles.pickerHandle} />
-        <Text style={styles.pickerTitle}>Add a playlist</Text>
-        <Text style={styles.pickerSub}>for {stationName}</Text>
-
-        {loading ? (
-          <ActivityIndicator color={SPOTIFY_GREEN} style={{ marginVertical: 32 }} />
-        ) : !connected ? (
-          <Text style={styles.pickerEmpty}>
-            Connect Spotify in Profile settings to add your own playlists.
-          </Text>
-        ) : playlists.length === 0 ? (
-          <Text style={styles.pickerEmpty}>No playlists found in your Spotify library.</Text>
-        ) : (
-          <ScrollView style={{ maxHeight: SCREEN_H * 0.5 }} showsVerticalScrollIndicator={false}>
-            {playlists.map((pl) => {
-              const active = current?.uri === pl.uri;
-              return (
-                <Pressable
-                  key={pl.uri}
-                  style={[styles.pickerRow, active && styles.pickerRowActive]}
-                  onPress={() => onPick(pl)}>
-                  <Text style={[styles.pickerRowText, active && { color: SPOTIFY_GREEN }]} numberOfLines={1}>
-                    {pl.name}
-                  </Text>
-                  {active && <MaterialCommunityIcons name="check" size={15} color={SPOTIFY_GREEN} style={styles.pickerCheck} />}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        )}
-      </View>
-    </View>
   );
 }
 
@@ -477,36 +407,4 @@ const styles = StyleSheet.create({
   startBtnArrow: { color: 'rgba(255,255,255,0.8)', fontSize: 18 },
 
   // Playlist picker
-  pickerBackdrop: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  pickerSheet: {
-    backgroundColor: Cruise.midnight,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingTop: 12,
-    borderWidth: 1, borderBottomWidth: 0, borderColor: 'rgba(255,255,255,0.08)',
-  },
-  pickerHandle: {
-    width: 36, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignSelf: 'center', marginBottom: 14,
-  },
-  pickerTitle: { color: '#fff', fontSize: 19, fontWeight: '700' },
-  pickerSub: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 2, marginBottom: 14 },
-  pickerEmpty: {
-    color: 'rgba(255,255,255,0.55)', fontSize: 14,
-    lineHeight: 20, textAlign: 'center', marginVertical: 28, paddingHorizontal: 16,
-  },
-  pickerRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 15, paddingHorizontal: 14,
-    borderRadius: 12, marginBottom: 6,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  pickerRowActive: { backgroundColor: 'rgba(29,185,84,0.12)', borderWidth: 1, borderColor: 'rgba(29,185,84,0.4)' },
-  pickerRowText: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '500', flex: 1 },
-  pickerCheck: { color: SPOTIFY_GREEN, fontSize: 15, fontWeight: '800', marginLeft: 8 },
 });

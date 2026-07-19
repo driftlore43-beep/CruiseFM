@@ -201,7 +201,46 @@ export async function isSpotifyConnected(): Promise<boolean> {
 }
 
 export async function disconnectSpotify(): Promise<void> {
-  await AsyncStorage.multiRemove([TOKEN_KEY, REFRESH_TOKEN_KEY, EXPIRY_KEY]);
+  await AsyncStorage.multiRemove([TOKEN_KEY, REFRESH_TOKEN_KEY, EXPIRY_KEY, RESTRICTED_KEY]);
+  restrictedCache = null;
+}
+
+// ── Dev-mode allowlist detection ─────────────────────────────────────────────
+// A connected account that isn't on the app's Spotify allowlist gets 403
+// "user not registered" on every API call. We remember that and the app
+// falls back to handing drives to the Spotify app directly.
+
+const RESTRICTED_KEY = 'spotify_restricted_account';
+let restrictedCache: boolean | null = null;
+
+export async function isRestrictedAccount(): Promise<boolean> {
+  if (restrictedCache != null) return restrictedCache;
+  try {
+    restrictedCache = (await AsyncStorage.getItem(RESTRICTED_KEY)) === 'true';
+  } catch {
+    restrictedCache = false;
+  }
+  return restrictedCache;
+}
+
+function setRestricted(on: boolean) {
+  if (restrictedCache === on) return;
+  restrictedCache = on;
+  AsyncStorage.setItem(RESTRICTED_KEY, on ? 'true' : 'false').catch(() => {});
+}
+
+/** 403 body sniff: allowlist rejection vs. premium-required. */
+async function classify403(res: Response): Promise<'restricted' | 'premium-required'> {
+  try {
+    const text = await res.text();
+    if (/not registered/i.test(text)) {
+      setRestricted(true);
+      return 'restricted';
+    }
+  } catch {
+    // fall through
+  }
+  return 'premium-required';
 }
 
 // ── Playback controls ────────────────────────────────────────────────────────
@@ -217,6 +256,8 @@ async function spotifyFetch(endpoint: string, method = 'GET', body?: object) {
     },
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (res.ok && restrictedCache) setRestricted(false); // e.g. after being allowlisted
+  if (res.status === 403) { classify403(res); return null; }
   if (res.status === 204 || res.status === 202) return null;
   if (!res.ok) return null;
   try { return await res.json(); } catch { return null; }
@@ -237,7 +278,13 @@ export async function getDevices(): Promise<Device[]> {
   return data?.devices ?? [];
 }
 
-export type StartResult = 'playing' | 'no-device' | 'premium-required' | 'error';
+export type StartResult =
+  | 'playing'
+  | 'no-device'
+  | 'premium-required'
+  | 'restricted'      // account not on the dev-mode allowlist
+  | 'handoff'         // playlist handed to the Spotify app (set by the caller)
+  | 'error';
 
 /**
  * Best-effort "just start playing": finds an available Spotify device (the
@@ -262,7 +309,7 @@ export async function startPlayback(contextUri?: string): Promise<StartResult> {
   // one round trip starts the music — no device lookup first.
   let res = await attempt();
   if (res.ok || res.status === 204) return 'playing';
-  if (res.status === 403) return 'premium-required';
+  if (res.status === 403) return classify403(res);
   if (res.status !== 404) return 'error';
 
   // No active session — the phone's Spotify has dozed off (Android does
@@ -276,7 +323,7 @@ export async function startPlayback(contextUri?: string): Promise<StartResult> {
 
   res = await attempt(`?device_id=${encodeURIComponent(target.id)}`);
   if (res.ok || res.status === 204) return 'playing';
-  if (res.status === 403) return 'premium-required';
+  if (res.status === 403) return classify403(res);
 
   // Deep asleep — transfer playback onto the device with play=true, which
   // resumes where it left off and is the most reliable wake-up Spotify has.

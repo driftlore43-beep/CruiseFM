@@ -1,18 +1,60 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getUserPlaylists, isSpotifyConnected } from '@/utils/spotify';
+import { parseSpotifyPlaylistLink } from '@/utils/spotifyHandoff';
 import { type LinkedPlaylist } from '@/utils/stationPlaylists';
 
 const SPOTIFY_GREEN = '#1DB954';
 
 /**
+ * Paste-a-link fallback: works for everyone, including accounts that can't
+ * browse their library through the API (not connected / not allowlisted).
+ * In Spotify: playlist → ⋯ → Share → Copy link.
+ */
+function PasteLinkRow({ onPick }: { onPick: (pl: LinkedPlaylist) => void }) {
+  const [text, setText] = useState('');
+  const [bad, setBad] = useState(false);
+
+  const link = () => {
+    const uri = parseSpotifyPlaylistLink(text);
+    if (!uri) { setBad(true); return; }
+    onPick({ uri, name: 'My Spotify playlist' });
+  };
+
+  return (
+    <View style={ps.pasteWrap}>
+      <View style={ps.pasteRow}>
+        <TextInput
+          value={text}
+          onChangeText={(t) => { setText(t); setBad(false); }}
+          placeholder="Paste a Spotify playlist link…"
+          placeholderTextColor="rgba(255,255,255,0.35)"
+          style={[ps.pasteInput, bad && ps.pasteInputBad]}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <Pressable style={ps.pasteBtn} onPress={link}>
+          <Text style={ps.pasteBtnText}>Link</Text>
+        </Pressable>
+      </View>
+      <Text style={ps.pasteHint}>
+        {bad
+          ? "That doesn't look like a playlist link — in Spotify: playlist → Share → Copy link."
+          : 'In Spotify: open a playlist → ⋯ → Share → Copy link, then paste it here.'}
+      </Text>
+    </View>
+  );
+}
+
+/**
  * Bottom-sheet playlist picker shared by every visual mode.
  *
- * Lists the user's Spotify playlists so they can link one to the station.
- * The parent owns persistence (setStationPlaylist) via `onPick`.
+ * Lists the user's Spotify playlists when the API allows; the paste-a-link
+ * row underneath works for everyone else. The parent owns persistence
+ * (setStationPlaylist) via `onPick`.
  */
 export function PlaylistSheet({
   stationName, current, onClose, onPick,
@@ -51,22 +93,33 @@ export function PlaylistSheet({
 
         {loading ? (
           <ActivityIndicator color={SPOTIFY_GREEN} style={{ marginVertical: 32 }} />
-        ) : !connected ? (
-          <Text style={ps.empty}>Connect Spotify in Profile settings to add your own playlists.</Text>
-        ) : playlists.length === 0 ? (
-          <Text style={ps.empty}>No playlists found in your Spotify library.</Text>
         ) : (
-          <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
-            {playlists.map((pl) => {
-              const active = current?.uri === pl.uri;
-              return (
-                <Pressable key={pl.uri} style={[ps.row, active && ps.rowActive]} onPress={() => onPick(pl)}>
-                  <Text style={[ps.rowText, active && { color: SPOTIFY_GREEN }]} numberOfLines={1}>{pl.name}</Text>
-                  {active && <MaterialCommunityIcons name="check" size={15} color={SPOTIFY_GREEN} style={ps.check} />}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <>
+            {connected && playlists.length > 0 && (
+              <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+                {playlists.map((pl) => {
+                  const active = current?.uri === pl.uri;
+                  return (
+                    <Pressable key={pl.uri} style={[ps.row, active && ps.rowActive]} onPress={() => onPick(pl)}>
+                      <Text style={[ps.rowText, active && { color: SPOTIFY_GREEN }]} numberOfLines={1}>{pl.name}</Text>
+                      {active && <MaterialCommunityIcons name="check" size={15} color={SPOTIFY_GREEN} style={ps.check} />}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+            {connected && playlists.length === 0 && (
+              <Text style={ps.empty}>
+                Your Spotify library isn't reachable from here — but any playlist can still be linked with its share link:
+              </Text>
+            )}
+            {!connected && (
+              <Text style={ps.empty}>
+                No Spotify login needed — link any playlist with its share link:
+              </Text>
+            )}
+            <PasteLinkRow onPick={onPick} />
+          </>
         )}
       </View>
     </View>
@@ -92,4 +145,20 @@ const ps = StyleSheet.create({
   rowActive: { backgroundColor: 'rgba(29,185,84,0.12)', borderWidth: 1, borderColor: 'rgba(29,185,84,0.4)' },
   rowText: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '500', flex: 1 },
   check: { color: SPOTIFY_GREEN, fontSize: 15, fontWeight: '800', marginLeft: 8 },
+
+  pasteWrap: { marginTop: 10 },
+  pasteRow: { flexDirection: 'row', gap: 8 },
+  pasteInput: {
+    flex: 1, color: '#fff', fontSize: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+  },
+  pasteInputBad: { borderColor: 'rgba(255,120,120,0.7)' },
+  pasteBtn: {
+    backgroundColor: SPOTIFY_GREEN, borderRadius: 12,
+    paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center',
+  },
+  pasteBtnText: { color: '#04220f', fontSize: 14.5, fontWeight: '800' },
+  pasteHint: { color: 'rgba(255,255,255,0.4)', fontSize: 11.5, lineHeight: 16, marginTop: 8, marginBottom: 2 },
 });

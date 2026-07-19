@@ -1,32 +1,50 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { recordDriveEnd } from '@/utils/driveStats';
-import { isSpotifyConnected, startPlayback, type StartResult } from '@/utils/spotify';
+import { isRestrictedAccount, isSpotifyConnected, startPlayback, type StartResult } from '@/utils/spotify';
+import { openInSpotify } from '@/utils/spotifyHandoff';
 import { getStationPlaylist } from '@/utils/stationPlaylists';
 
 /**
- * Kick Spotify toward this station's sound. If the user linked a playlist to
- * the station it starts playing; otherwise (unless onlyIfLinked) we just
- * resume whatever they had going. Returns Spotify's verdict so the UI can
- * explain a silent drive; null means "didn't even try" (not connected /
- * nothing linked) which needs no explaining.
+ * Get this station's music going, by whichever path this user has:
+ *
+ * - Allowlisted + connected → full Web API control (today's experience).
+ * - Not allowlisted (or not connected) but a playlist is linked → hand the
+ *   playlist to the Spotify app via deep link; Cruise FM stays the visuals.
+ * - Nothing linked and no API → demo mode, silently (nothing to explain).
+ *
+ * Returns the verdict so the UI can narrate; null means "didn't need to try".
  */
 async function playStationMusic(stationId: string, opts?: { onlyIfLinked?: boolean }): Promise<StartResult | null> {
   try {
-    if (!(await isSpotifyConnected())) return null;
     const linked = await getStationPlaylist(stationId);
     if (!linked && opts?.onlyIfLinked) return null;
-    return await startPlayback(linked?.uri);
+
+    const connected = await isSpotifyConnected();
+    const restricted = connected && (await isRestrictedAccount());
+
+    if (connected && !restricted) {
+      const r = await startPlayback(linked?.uri);
+      // Allowlist rejection discovered mid-drive: fall through to handoff.
+      if (r !== 'restricted') return r;
+    }
+
+    if (linked) return (await openInSpotify(linked.uri)) ? 'handoff' : 'error';
+    // Restricted with nothing linked: explain how to still get music.
+    if (connected) return 'restricted';
+    return null;
   } catch {
     return null; // never let a playback hiccup break the drive
   }
 }
 
-/** Plain-words translation of a failed start, shown over the player. */
+/** Plain-words translation of a start attempt, shown over the player. */
 const START_NOTICES: Record<StartResult, string | null> = {
   'playing': null,
   'no-device': "Spotify isn't awake. Open Spotify, play any song for a second, then come back and press play.",
   'premium-required': 'Spotify needs a Premium account to let Cruise FM control playback.',
+  'restricted': 'This Spotify account isn’t on the Cruise FM test list, so in-app control is off. Link a playlist to this station (paste a Spotify link) and drives will play through the Spotify app instead.',
+  'handoff': 'Playlist sent to Spotify — press play there, then come back. Your drive keeps rolling here.',
   'error': "Spotify didn't respond. Check the Spotify app is open and logged in, then press play to retry.",
 };
 

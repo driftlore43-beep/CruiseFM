@@ -289,7 +289,9 @@ function TurntableHero({
   const headH    = 24;
   const pivotX   = platSize * 0.935;
   const pivotY   = platSize * 0.048;
-  const armRot   = tonearmAnim.interpolate({ inputRange: [0, 1], outputRange: ['28deg', '-22deg'] });
+  // 0 = parked clear of the record (negative swings right, off the platter),
+  // 1 = stylus resting on the outer groove (small positive).
+  const armRot   = tonearmAnim.interpolate({ inputRange: [0, 1], outputRange: ['-16deg', '4deg'] });
   const platOff  = (platSize - recSize) / 2;
   const rayLen   = recSize / 2;
   const rayPivot = recSize / 2 - rayLen / 2;
@@ -1074,7 +1076,7 @@ export function VinylModePreview() {
   // keeping the entire record (grooves + label) spinning as one unit.
   const idleRotate   = idleSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const staticRotate = idleSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '0deg'] });
-  const armRot       = tonearmAngle.interpolate({ inputRange: [0, 1], outputRange: ['30deg', '-34deg'] });
+  const armRot       = tonearmAngle.interpolate({ inputRange: [0, 1], outputRange: ['-18deg', '4deg'] });
 
   const startIdleSpin = () => {
     idleRef.current = Animated.loop(

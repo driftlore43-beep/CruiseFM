@@ -35,4 +35,5 @@ The owner does not code — describe changes in plain English, Claude implements
 
 ## Current state / next steps
 - DONE: all visuals unified, Spotify OAuth working on Android build, playback CONFIRMED WORKING on device (2026-07-18: playlists load, music plays, controls obey; play uses active-device fast path, failures surface via PlaybackNotice card)
-- NEXT: new EAS build (picks up react-native-purchases + Sentry — DSN live in config.ts, org cruise-fm/project react-native; reports only from non-OWNER_MODE devices) → sandbox-test a purchase unlocking premium → Google Play Console account + £2.99 product → swap test_ key for goog_ key
+- DONE 2026-07-19: sandbox purchase CONFIRMED on device (free-user preview → locks appear → Unlock Premium → RevenueCat test purchase unlocks → Restore purchases works)
+- NEXT: build the open-in-Spotify fallback (task 2) → Google ID verification clears → upload build, £2.99 product in Play Console, swap test_ key for goog_ key → closed test (12 testers/14 days)

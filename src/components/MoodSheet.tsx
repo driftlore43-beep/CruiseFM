@@ -1,5 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import {
   Animated, Dimensions, Easing, ScrollView, StyleSheet, Text, TouchableOpacity, View,
@@ -8,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { STATIONS } from '@/constants/stations';
 import { Fonts } from '@/constants/theme';
+import { useEntitlements } from '@/context/EntitlementsContext';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -25,6 +27,7 @@ export function MoodSheet({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const { isPro } = useEntitlements();
   const y = useRef(new Animated.Value(SCREEN_H)).current;
   const fade = useRef(new Animated.Value(0)).current;
 
@@ -66,11 +69,17 @@ export function MoodSheet({
           contentContainerStyle={s.row}>
           {STATIONS.map((station) => {
             const active = station.id === activeId;
+            // Premium moods stay visible (they sell themselves) but tapping
+            // one without Premium goes to the paywall, not the station.
+            const locked = station.premium && !isPro;
             return (
               <TouchableOpacity
                 key={station.id}
                 activeOpacity={0.85}
-                onPress={() => onSelect(station.id)}
+                onPress={() => {
+                  if (locked) { onClose(); router.push('/premium'); return; }
+                  onSelect(station.id);
+                }}
                 style={[s.card, active && s.cardActive]}>
                 <LinearGradient
                   colors={station.cardGradient}
@@ -84,6 +93,11 @@ export function MoodSheet({
                 {active && (
                   <View style={s.activeTick}>
                     <Ionicons name="checkmark" size={12} color="#fff" />
+                  </View>
+                )}
+                {locked && !active && (
+                  <View style={s.lockChip}>
+                    <MaterialCommunityIcons name="lock" size={11} color="#2a1a00" />
                   </View>
                 )}
               </TouchableOpacity>
@@ -134,6 +148,12 @@ const s = StyleSheet.create({
     position: 'absolute', top: 8, right: 8,
     width: 20, height: 20, borderRadius: 10,
     backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  lockChip: {
+    position: 'absolute', top: 8, right: 8,
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: '#F5B014',
     alignItems: 'center', justifyContent: 'center',
   },
 });

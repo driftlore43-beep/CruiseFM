@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import Svg, { Circle, Line, Rect, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MoodSheet } from '@/components/MoodSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
@@ -179,6 +180,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [showMood, setShowMood] = useState(false);
 
   useEffect(() => {
     if (visible) getStationPlaylist(lockedStation.id).then(setLinked);
@@ -415,15 +417,32 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             </TouchableOpacity>
           </View>
 
-          {/* Playlist */}
-          <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.playlistBtn} activeOpacity={0.75}>
-            <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.6)" />
-            <Text style={[fs.playlistBtnText, { fontFamily: Fonts.mono }]} numberOfLines={1}>
-              {linked ? linked.name.toUpperCase() : 'ADD PLAYLIST'}
-            </Text>
-            <Ionicons name="chevron-up" size={14} color="rgba(255,255,255,0.6)" />
-          </TouchableOpacity>
+          {/* Left-aligned action pills — same row, same spot as every mode */}
+          <View style={fs.actionRow}>
+            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
+              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
+              <Text style={fs.actionPillBold}>Change Mood</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
+              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
+              <Text style={fs.actionPillText} numberOfLines={1}>
+                {linked ? linked.name : 'Add Playlist'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
+        <MoodSheet
+          visible={showMood}
+          activeId={activeId}
+          onSelect={(id) => {
+            setActiveId(id);
+            setFreq(STATION_FREQS[id] ?? 92.1);
+            npSetStation(id);
+            setShowMood(false);
+          }}
+          onClose={() => setShowMood(false)}
+        />
 
         {showPicker && (
           <PlaylistSheet
@@ -476,11 +495,14 @@ const fs = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 14,
   },
   pauseBar: { width: 8, height: 28, borderRadius: 2, backgroundColor: '#0a0a12' },
-  playlistBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9,
-    alignSelf: 'center', marginTop: 18, maxWidth: '80%',
-    paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22, alignSelf: 'stretch' },
+  actionPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    maxWidth: '58%',
   },
-  playlistBtnText: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
+  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
 });

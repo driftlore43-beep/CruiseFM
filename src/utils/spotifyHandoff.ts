@@ -32,13 +32,14 @@ function webUrlFor(uri: string): string | null {
  * Open the playlist in the Spotify app (falls back to the web player when
  * the app isn't installed). Resolves true if something opened.
  *
- * Native apps take the spotify: scheme directly; browsers (iOS Safari
- * especially) often swallow raw schemes, so the web build leads with the
- * https universal link — which opens the app when installed anyway.
+ * Native apps lead with the `:play` autoplay hint — many Spotify versions
+ * start playback on arrival with it, and the ones that don't just open the
+ * playlist (today's behaviour). Browsers (iOS Safari especially) swallow
+ * raw schemes, so the web build leads with the https universal link.
  */
 export async function openInSpotify(uri: string): Promise<boolean> {
   const web = webUrlFor(uri);
-  const order = Platform.OS === 'web' ? [web, uri] : [uri, web];
+  const order = Platform.OS === 'web' ? [web, uri] : [`${uri}:play`, uri, web];
   for (const url of order) {
     if (!url) continue;
     try {

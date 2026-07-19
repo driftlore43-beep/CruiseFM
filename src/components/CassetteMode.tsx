@@ -62,6 +62,11 @@ function parseTrackMs(duration: string): number {
   return (m * 60 + s) * 1000;
 }
 
+function fmtTapeMs(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
 // ── Grain overlay ─────────────────────────────────────────────────────────────
 // Simulated film grain: a grid of tiny dots at random-but-stable positions
 function GrainOverlay() {
@@ -434,6 +439,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const isLandscape = winW > winH;
 
   const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
+  const spotify = useSpotifyPlayback(visible);
   const [activeId,    setActiveId]    = useState(stationId ?? 'night-run');
   const [activeTrack, setActiveTrack] = useState(1);   // A2 default (index 1)
   const [platform,    setPlatform]    = useState<{ id: PlatformId; name: string; color: string } | null>(null);
@@ -494,6 +500,16 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const progressValue   = useRef(0);
   const activeTrackRef  = useRef(activeTrack);
 
+  // ── Real-track layer — same contract as VinylMode: true duration from
+  // Spotify when connected, position re-synced from every poll; the demo
+  // tape below runs unchanged otherwise. ─────────────────────────────────────
+  const realMs = spotify.track?.durationMs ?? null;
+  const trackMs = realMs ?? parseTrackMs(SIDE_A_TRACKS[activeTrack].duration);
+  const trackMsRef = useRef(trackMs);
+  trackMsRef.current = trackMs;
+  const realTrackRef = useRef(false);
+  realTrackRef.current = realMs != null;
+
   useEffect(() => {
     const id = progress.addListener(({ value }) => { progressValue.current = value; });
     return () => progress.removeListener(id);
@@ -503,8 +519,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const lastSecRef = useRef(-1);
   useEffect(() => {
     const id = progress.addListener(({ value }) => {
-      const totalMs = parseTrackMs(SIDE_A_TRACKS[activeTrackRef.current].duration);
-      const s = Math.floor((value * totalMs) / 1000);
+      const s = Math.floor((value * trackMsRef.current) / 1000);
       if (s !== lastSecRef.current) {
         lastSecRef.current = s;
         setElapsedTxt(`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`);
@@ -532,13 +547,14 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     ]));
     pulseLoop.current.start();
 
-    const trackMs   = parseTrackMs(SIDE_A_TRACKS[activeTrackRef.current].duration);
-    const remaining = (1 - progressValue.current) * trackMs;
+    const remaining = (1 - progressValue.current) * trackMsRef.current;
     progressAnimRef.current = Animated.timing(progress, {
       toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false,
     });
     progressAnimRef.current.start(({ finished }) => {
-      if (finished) {
+      // Demo tape advances itself; a real track ends on Spotify's side and
+      // the next poll re-syncs us onto whatever plays next.
+      if (finished && !realTrackRef.current) {
         setActiveTrack((t) => {
           const next = Math.min(SIDE_A_TRACKS.length - 1, t + 1);
           if (next === t) setPlaying(false);
@@ -565,18 +581,19 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     return () => stopReels();
   }, [playing]);
 
-  // ── Reset progress when track changes ──────────────────────────────────────
+  // ── Reset progress when track changes (demo tape only) ─────────────────────
   useEffect(() => {
+    if (realTrackRef.current) return;
     progressAnimRef.current?.stop();
     progress.setValue(0);
     progressValue.current = 0;
     if (playing) {
-      const trackMs = parseTrackMs(SIDE_A_TRACKS[activeTrack].duration);
+      const demoMs = parseTrackMs(SIDE_A_TRACKS[activeTrack].duration);
       progressAnimRef.current = Animated.timing(progress, {
-        toValue: 1, duration: trackMs, easing: Easing.linear, useNativeDriver: false,
+        toValue: 1, duration: demoMs, easing: Easing.linear, useNativeDriver: false,
       });
       progressAnimRef.current.start(({ finished }) => {
-        if (finished) {
+        if (finished && !realTrackRef.current) {
           setActiveTrack((t) => {
             const next = Math.min(SIDE_A_TRACKS.length - 1, t + 1);
             if (next === t) setPlaying(false);
@@ -586,6 +603,28 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
       });
     }
   }, [activeTrack]);
+
+  // Follow the real song: on every poll (and after skips) snap the tape to
+  // Spotify's reported position.
+  useEffect(() => {
+    const t = spotify.track;
+    if (!visible || !t || t.progressMs == null || t.durationMs == null || t.durationMs <= 0) return;
+    const base = Math.min(t.durationMs, t.progressMs + (playing ? Date.now() - t.syncedAt : 0));
+    progressAnimRef.current?.stop();
+    const pct = base / t.durationMs;
+    progress.setValue(pct);
+    progressValue.current = pct;
+    if (playing) {
+      const remaining = t.durationMs - base;
+      if (remaining > 0) {
+        progressAnimRef.current = Animated.timing(progress, {
+          toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false,
+        });
+        progressAnimRef.current.start();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, playing, spotify.track?.progressMs, spotify.track?.syncedAt, spotify.track?.title]);
 
   useEffect(() => {
     if (!visible) return;
@@ -625,7 +664,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     if (visible) getStationPlaylist(activeId).then(setLinked);
   }, [visible, activeId]);
 
-  const spotify = useSpotifyPlayback(visible);
 
   const togglePlay = () => {
     if (playing) spotify.pause(); else spotify.play();
@@ -814,12 +852,12 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track?.artist ?? currentTrack.artist}</Text>
           </View>
 
-          {/* Tape progress */}
+          {/* Tape progress — live counter left, true track length right */}
           <View style={fs.progressWrap}>
             <View style={fs.progressRow}>
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono }]}>00:00</Text>
+              <Text style={[fs.timeText, { fontFamily: Fonts.mono }]}>{elapsedTxt}</Text>
               <AmberProgressBar progress={progress} />
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono, textAlign: 'right' }]}>90:00</Text>
+              <Text style={[fs.timeText, { fontFamily: Fonts.mono, textAlign: 'right' }]}>{fmtTapeMs(trackMs)}</Text>
             </View>
           </View>
 

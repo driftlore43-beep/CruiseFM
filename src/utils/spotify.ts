@@ -349,6 +349,10 @@ export async function pause() {
   return spotifyFetch('/me/player/pause', 'PUT');
 }
 
+export async function seekTo(positionMs: number) {
+  return spotifyFetch(`/me/player/seek?position_ms=${Math.max(0, Math.round(positionMs))}`, 'PUT');
+}
+
 export async function skipNext() {
   return spotifyFetch('/me/player/next', 'POST');
 }

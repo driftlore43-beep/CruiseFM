@@ -16,6 +16,7 @@ import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
+import { seekTo } from '@/utils/spotify';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
@@ -456,6 +457,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const { width: winW, height: winH } = useWindowDimensions();
 
   const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
+  const spotify = useSpotifyPlayback(visible);
   const [activeId,      setActiveId]      = useState(stationId ?? 'night-run');
   const [activeTrack,   setActiveTrack]   = useState(0);
   const [platform,      setPlatform]      = useState<{ id: PlatformId; name: string; color: string } | null>(null);
@@ -472,6 +474,19 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   useEffect(() => {
     if (visible) getStationPlaylist(activeId).then(setLinked);
   }, [visible, activeId]);
+
+  // ── Real-track layer ────────────────────────────────────────────────────────
+  // With Spotify connected the deck runs on the REAL song: true duration,
+  // position re-synced from every poll, and scrubs seek the actual track.
+  // Without it, the demo deck below behaves exactly as before. Refs so the
+  // once-created pan handlers always see fresh values.
+  const realMs = spotify.track?.durationMs ?? null;
+  const trackMs = realMs ?? parseTrackMs(VINYL_TRACKS[activeTrack].duration);
+  const trackMsRef = useRef(trackMs);
+  trackMsRef.current = trackMs;
+  const realTrackRef = useRef(false);
+  realTrackRef.current = realMs != null;
+  const scrubbingRef = useRef(false);
 
   const spinValue      = useRef(new Animated.Value(0)).current;
   const labelSpin      = useRef(new Animated.Value(0)).current;
@@ -530,13 +545,13 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           recordCenterX.current = pX + w / 2;
           recordCenterY.current = pY + h / 2;
         });
-        const trackMs = parseTrackMs(VINYL_TRACKS[activeTrackRef.current].duration);
-        scrubStartPosRef.current = progressValue.current * trackMs;
+        scrubStartPosRef.current = progressValue.current * trackMsRef.current;
         progressAnimRef.current?.stop();
         stopSpin();
         accumulatedRotation.current = spinCurrentRef.current * 360;
         lastAngle.current = _getAngleFromCenter(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
         lastHapticAccumRef.current = 0;
+        scrubbingRef.current = true;
         setIsScrubbing(true);
         if (scrubFadeTimerRef.current) clearTimeout(scrubFadeTimerRef.current);
         scrubIndicatorAnim.setValue(1);
@@ -549,7 +564,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         accumulatedRotation.current += diff;
 
         // 360° = 5 seconds of track
-        const trackMs = parseTrackMs(VINYL_TRACKS[activeTrackRef.current].duration);
+        const trackMs = trackMsRef.current;
         const deltaMs = (diff / 360) * 5000;
         const newMs   = Math.max(0, Math.min(trackMs, progressValue.current * trackMs + deltaMs));
         progress.setValue(newMs / trackMs);
@@ -567,20 +582,23 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       },
       onPanResponderRelease: () => {
         lastAngle.current = null;
+        scrubbingRef.current = false;
         setIsScrubbing(false);
         setScrubDir(null);
         if (scrubFadeTimerRef.current) clearTimeout(scrubFadeTimerRef.current);
         scrubFadeTimerRef.current = setTimeout(() => {
           Animated.timing(scrubIndicatorAnim, { toValue: 0, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
         }, 1000);
+        // Real track: the spin you gave the record seeks the actual song.
+        if (realTrackRef.current) seekTo(progressValue.current * trackMsRef.current).catch(() => {});
         if (playingRef.current) {
           startSpin();
-          const trackMs = parseTrackMs(VINYL_TRACKS[activeTrackRef.current].duration);
-          _restartProgressFrom(progressValue.current * trackMs, trackMs);
+          _restartProgressFrom(progressValue.current * trackMsRef.current, trackMsRef.current);
         }
       },
       onPanResponderTerminate: () => {
         lastAngle.current = null;
+        scrubbingRef.current = false;
         setIsScrubbing(false);
         setScrubDir(null);
       },
@@ -625,8 +643,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   useEffect(() => {
     const id = progress.addListener(({ value }) => {
       progressValue.current = value;
-      const trackMs = parseTrackMs(VINYL_TRACKS[activeTrackRef.current].duration);
-      setCurrentTimeMs(Math.round(value * trackMs));
+      setCurrentTimeMs(Math.round(value * trackMsRef.current));
     });
     return () => progress.removeListener(id);
   }, []);
@@ -747,11 +764,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         Animated.timing(glowPulse, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
       ]));
       pulseLoopRef.current.start();
-      const remaining = (1 - progressValue.current) * parseTrackMs(VINYL_TRACKS[activeTrackRef.current].duration);
-      progressAnimRef.current = Animated.timing(progress, { toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false });
-      progressAnimRef.current.start(({ finished }) => {
-        if (finished) setActiveTrack((t) => { const n = Math.min(VINYL_TRACKS.length - 1, t + 1); if (n === t) setPlaying(false); return n; });
-      });
+      _restartProgressFrom(progressValue.current * trackMsRef.current, trackMsRef.current);
     } else {
       pulseLoopRef.current?.stop();
       progressAnimRef.current?.stop();
@@ -760,16 +773,12 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     return () => { pulseLoopRef.current?.stop(); progressAnimRef.current?.stop(); };
   }, [playing]);
 
-  // Track change
+  // Track change (demo deck only — real tracks change on Spotify's side)
   useEffect(() => {
+    if (realTrackRef.current) return;
     progressAnimRef.current?.stop();
     progress.setValue(0); progressValue.current = 0;
-    if (playing) {
-      progressAnimRef.current = Animated.timing(progress, { toValue: 1, duration: parseTrackMs(VINYL_TRACKS[activeTrack].duration), easing: Easing.linear, useNativeDriver: false });
-      progressAnimRef.current.start(({ finished }) => {
-        if (finished) setActiveTrack((t) => { const n = Math.min(VINYL_TRACKS.length - 1, t + 1); if (n === t) setPlaying(false); return n; });
-      });
-    }
+    if (playing) _restartProgressFrom(0, parseTrackMs(VINYL_TRACKS[activeTrack].duration));
   }, [activeTrack]);
 
   // Visibility
@@ -795,7 +804,6 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
   const station      = resolveAnyStation(activeId);
   const currentTrack = VINYL_TRACKS[activeTrack];
-  const spotify = useSpotifyPlayback(visible);
   const platSize     = Math.min(winW * 0.9, winH * 0.46);
 
   // Swipe-down to dismiss
@@ -816,31 +824,51 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     if (remaining <= 0) return;
     progressAnimRef.current = Animated.timing(progress, { toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false });
     progressAnimRef.current.start(({ finished }) => {
-      if (finished) setActiveTrack((t) => { const n = Math.min(VINYL_TRACKS.length - 1, t + 1); if (n === t) setPlaying(false); return n; });
+      // Demo deck advances itself; a real track ends on Spotify's side and
+      // the next poll re-syncs us onto whatever plays next.
+      if (finished && !realTrackRef.current) {
+        setActiveTrack((t) => { const n = Math.min(VINYL_TRACKS.length - 1, t + 1); if (n === t) setPlaying(false); return n; });
+      }
     });
   };
 
-  pbHandlerRef.current.onGrant = (x: number) => {
-    const trackMs = parseTrackMs(VINYL_TRACKS[activeTrackRef.current].duration);
+  // Follow the real song: on every poll (and after skips) snap the deck to
+  // Spotify's reported position — unless the user's hand is on the record.
+  useEffect(() => {
+    const t = spotify.track;
+    if (!visible || !t || t.progressMs == null || t.durationMs == null || t.durationMs <= 0) return;
+    if (scrubbingRef.current) return;
+    const base = Math.min(t.durationMs, t.progressMs + (playing ? Date.now() - t.syncedAt : 0));
     progressAnimRef.current?.stop();
+    const pct = base / t.durationMs;
+    progress.setValue(pct);
+    progressValue.current = pct;
+    setCurrentTimeMs(Math.round(base));
+    if (playing) _restartProgressFrom(base, t.durationMs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, playing, spotify.track?.progressMs, spotify.track?.syncedAt, spotify.track?.title]);
+
+  pbHandlerRef.current.onGrant = (x: number) => {
+    progressAnimRef.current?.stop();
+    scrubbingRef.current = true;
     setIsScrubbing(true);
     const pct = Math.max(0, Math.min(1, x / progressBarWidthRef.current));
     progress.setValue(pct);
     progressValue.current = pct;
-    setCurrentTimeMs(Math.round(pct * trackMs));
+    setCurrentTimeMs(Math.round(pct * trackMsRef.current));
   };
   pbHandlerRef.current.onMove = (x: number) => {
-    const trackMs = parseTrackMs(VINYL_TRACKS[activeTrackRef.current].duration);
-    const pct     = Math.max(0, Math.min(1, x / progressBarWidthRef.current));
+    const pct = Math.max(0, Math.min(1, x / progressBarWidthRef.current));
     progress.setValue(pct);
     progressValue.current = pct;
-    setCurrentTimeMs(Math.round(pct * trackMs));
+    setCurrentTimeMs(Math.round(pct * trackMsRef.current));
   };
   pbHandlerRef.current.onRelease = () => {
+    scrubbingRef.current = false;
     setIsScrubbing(false);
+    if (realTrackRef.current) seekTo(progressValue.current * trackMsRef.current).catch(() => {});
     if (playingRef.current) {
-      const trackMs = parseTrackMs(VINYL_TRACKS[activeTrackRef.current].duration);
-      _restartProgressFrom(progressValue.current * trackMs, trackMs);
+      _restartProgressFrom(progressValue.current * trackMsRef.current, trackMsRef.current);
     }
   };
 
@@ -924,7 +952,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
                 onLayout={(e) => { progressBarWidthRef.current = e.nativeEvent.layout.width; }}
                 panHandlers={progressPanRef.panHandlers}
               />
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono, textAlign: 'right' }]}>{currentTrack.duration}</Text>
+              <Text style={[fs.timeText, { fontFamily: Fonts.mono, textAlign: 'right' }]}>{formatMs(trackMs)}</Text>
             </View>
           </View>
 

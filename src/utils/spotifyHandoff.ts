@@ -1,4 +1,4 @@
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 /**
  * The no-API Spotify path. Two jobs:
@@ -31,19 +31,22 @@ function webUrlFor(uri: string): string | null {
 /**
  * Open the playlist in the Spotify app (falls back to the web player when
  * the app isn't installed). Resolves true if something opened.
+ *
+ * Native apps take the spotify: scheme directly; browsers (iOS Safari
+ * especially) often swallow raw schemes, so the web build leads with the
+ * https universal link — which opens the app when installed anyway.
  */
 export async function openInSpotify(uri: string): Promise<boolean> {
-  try {
-    await Linking.openURL(uri);
-    return true;
-  } catch {
-    const web = webUrlFor(uri);
-    if (!web) return false;
+  const web = webUrlFor(uri);
+  const order = Platform.OS === 'web' ? [web, uri] : [uri, web];
+  for (const url of order) {
+    if (!url) continue;
     try {
-      await Linking.openURL(web);
+      await Linking.openURL(url);
       return true;
     } catch {
-      return false;
+      // try the next flavour
     }
   }
+  return false;
 }

@@ -17,7 +17,8 @@ import { PlatformSelector } from '@/components/PlatformSelector';
 import { SpotifyConnectRow } from '@/components/SpotifyConnectRow';
 import { SettingsSheet, type SettingsPage } from '@/components/SettingsSheet';
 import { GlossSheen } from '@/components/GlossSheen';
-import { getDriveStats } from '@/utils/driveStats';
+import { getDriveLog, getDriveStats } from '@/utils/driveStats';
+import { judgeBadges, type JudgedBadge } from '@/constants/badges';
 import { DEFAULT_DRIVER_NAME, getDriverName, initialsFor } from '@/utils/driverName';
 
 function stationName(id: string | null): string {
@@ -49,6 +50,8 @@ const SETTINGS_ITEMS: { icon: keyof typeof MaterialCommunityIcons.glyphMap; labe
 // per-card hues (not a washed-out transparent tint) so each card reads as
 // its own mood, with "Cruise FM Premium" the one fixed-violet exception.
 const STATS_GRADIENT    = ['#1a4f74', '#123049', '#0a1a2a'] as const;
+// Badges live between the blue stats and the amber upgrade card — deep teal.
+const BADGES_GRADIENT   = ['#14554a', '#0d3a34', '#071d1c'] as const;
 // Premium card matches the amber /premium screen it links to; Settings gets the violet.
 const UPGRADE_GRADIENT  = ['#a84f1c', '#7a3712', '#3a1808'] as const;
 const SETTINGS_GRADIENT = ['#2c1848', '#1c1038', '#0d0718'] as const;
@@ -110,6 +113,7 @@ export default function ProfileScreen() {
   const [settingsPage, setSettingsPage] = useState<SettingsPage | null>(null);
   const [stats, setStats] = useState<{ totalDrives: number; totalMinutes: number; favoriteStationId: string | null } | null>(null);
   const [driverName, setDriverNameState] = useState(DEFAULT_DRIVER_NAME);
+  const [badges, setBadges] = useState<JudgedBadge[]>([]);
 
   // Real numbers from the drive log, refreshed each time the tab is focused.
   useFocusEffect(
@@ -117,9 +121,13 @@ export default function ProfileScreen() {
       let active = true;
       getDriveStats().then((s) => { if (active) setStats(s); });
       getDriverName().then((n) => { if (active) setDriverNameState(n); });
+      getDriveLog().then((log) => { if (active) setBadges(judgeBadges(log)); });
       return () => { active = false; };
     }, []),
   );
+
+  const earnedCount = badges.filter((b) => b.earned).length;
+  const judgeable = badges.filter((b) => !b.reserved).length;
 
   const STATS: { label: string; value: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
     { label: 'Total Drives',     value: String(stats?.totalDrives ?? 0),        icon: 'steering' },
@@ -175,6 +183,51 @@ export default function ProfileScreen() {
               <Text style={styles.statValue}>{stat.value}</Text>
             </View>
           ))}
+        </View>
+
+        <View style={styles.badgesCard}>
+          <LinearGradient colors={BADGES_GRADIENT} locations={GRADIENT_LOCATIONS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <CardSheen />
+          <GlossSheen radius={20} />
+          <View style={styles.badgesHeader}>
+            <Text style={styles.badgesEyebrow}>BADGES</Text>
+            <Text style={styles.badgesCount}>{earnedCount} of {judgeable} earned</Text>
+          </View>
+          <View style={styles.badgeGrid}>
+            {badges.map((b) => {
+              const founder = !!b.reserved;
+              return (
+                <View
+                  key={b.id}
+                  style={[
+                    styles.badgeCell,
+                    b.earned && styles.badgeCellEarned,
+                    founder && styles.badgeCellFounder,
+                  ]}>
+                  <View style={[
+                    styles.badgeIconRing,
+                    b.earned && styles.badgeIconRingEarned,
+                    founder && styles.badgeIconRingFounder,
+                  ]}>
+                    <MaterialCommunityIcons
+                      name={b.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                      size={22}
+                      color={founder ? '#F7B733' : b.earned ? '#fff' : 'rgba(255,255,255,0.30)'}
+                    />
+                  </View>
+                  <Text style={[styles.badgeName, (b.earned || founder) && styles.badgeNameLit]} numberOfLines={1}>
+                    {b.name}
+                  </Text>
+                  <Text style={styles.badgeDesc} numberOfLines={2}>{b.desc}</Text>
+                  {founder && (
+                    <View style={styles.founderTag}>
+                      <Text style={styles.founderTagText}>FIRST 500</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
         </View>
 
         <View style={styles.upgradeCard}>
@@ -378,6 +431,54 @@ const styles = StyleSheet.create({
   statBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.10)' },
   statLabel: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
   statValue: { color: Cruise.textPrimary, fontSize: 14, fontWeight: '600' },
+  badgesCard: {
+    borderRadius: 20, overflow: 'hidden', padding: 16, gap: 12,
+    borderWidth: 1, borderColor: 'rgba(75,220,190,0.35)',
+    shadowColor: '#4BDCBE', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
+  },
+  badgesHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  badgesEyebrow: { color: '#4BDCBE', fontSize: 10, fontWeight: '700', letterSpacing: 2.5 },
+  badgesCount: { color: Cruise.textSecondary, fontSize: 12, fontWeight: '600' },
+  badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  badgeCell: {
+    width: '31%', flexGrow: 1, borderRadius: 14,
+    paddingVertical: 12, paddingHorizontal: 8, gap: 5,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  badgeCellEarned: {
+    backgroundColor: 'rgba(155,95,255,0.16)',
+    borderColor: 'rgba(155,95,255,0.55)',
+    shadowColor: Cruise.violet, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 4,
+  },
+  badgeCellFounder: {
+    backgroundColor: 'rgba(247,183,51,0.08)',
+    borderColor: 'rgba(247,183,51,0.45)',
+  },
+  badgeIconRing: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  badgeIconRingEarned: {
+    backgroundColor: 'rgba(155,95,255,0.30)',
+    borderColor: 'rgba(200,160,255,0.7)',
+  },
+  badgeIconRingFounder: {
+    backgroundColor: 'rgba(247,183,51,0.12)',
+    borderColor: 'rgba(247,183,51,0.5)',
+  },
+  badgeName: { color: 'rgba(255,255,255,0.45)', fontSize: 11.5, fontWeight: '800', textAlign: 'center' },
+  badgeNameLit: { color: '#fff' },
+  badgeDesc: { color: 'rgba(255,255,255,0.35)', fontSize: 9.5, lineHeight: 12.5, textAlign: 'center' },
+  founderTag: {
+    borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1.5,
+    backgroundColor: 'rgba(247,183,51,0.14)',
+    borderWidth: 1, borderColor: 'rgba(247,183,51,0.4)',
+  },
+  founderTagText: { color: '#F7B733', fontSize: 7.5, fontWeight: '800', letterSpacing: 0.8 },
   upgradeCard: {
     borderRadius: 20, padding: 22, gap: 10, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(255,150,90,0.5)',

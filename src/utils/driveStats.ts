@@ -3,7 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const KEY = 'cruise_drive_log';
 const MAX_EVENTS = 400;
 
-type DriveEvent = { ts: number; stationId: string; minutes?: number };
+export type DriveEvent = { ts: number; stationId: string; minutes?: number };
+
+/** The raw drive history — badges are judged from this. */
+export async function getDriveLog(): Promise<DriveEvent[]> {
+  return loadLog();
+}
 
 export type DriveStats = {
   drivesThisWeek: number;

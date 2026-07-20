@@ -114,6 +114,11 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
 
   if (!station) return null;
 
+  // The sheet's accent follows the station's own mood (its mid EQ colour —
+  // the same hue the Tuner and cards use), not the app's fixed violet, so the
+  // Visual Mode chips and Start Drive button match the station you're opening.
+  const stationAccent = (station as Station).eqColors?.[1] ?? theme.accentColor;
+
   const topPad = insets.top + 12;
   const isCustom = !station.image;
   const custom = isCustom ? (station as CustomStation) : null;
@@ -244,7 +249,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
                   key={mode.id}
                   style={[
                     styles.modeBtn,
-                    active && { backgroundColor: theme.accentColor + '40', borderColor: theme.accentColor },
+                    active && { backgroundColor: stationAccent + '40', borderColor: stationAccent },
                     !unlocked && styles.modeBtnLocked,
                   ]}
                   onPress={() => setSelectedMode(mode.id)}>
@@ -263,7 +268,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
           <Pressable
             style={({ pressed }) => [
               styles.startBtn,
-              { shadowColor: needsPlaylist ? 'transparent' : theme.accentColor },
+              { shadowColor: needsPlaylist ? 'transparent' : stationAccent },
               needsPlaylist && styles.startBtnQuiet,
               pressed && { opacity: 0.9 },
             ]}
@@ -272,7 +277,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
               colors={
                 needsPlaylist
                   ? ['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.09)']
-                  : [theme.accentColor, darken(theme.accentColor, 0.35)]
+                  : [stationAccent, darken(stationAccent, 0.35)]
               }
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.startGradient}>

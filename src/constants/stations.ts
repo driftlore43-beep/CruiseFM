@@ -191,6 +191,26 @@ export const STATIONS: Station[] = [
     spotifyUrl: 'https://open.spotify.com/search/tunnel+drive+playlist',
     appleMusicUrl: 'https://music.apple.com/search?term=tunnel+drive',
   },
+  {
+    id: 'downtown',
+    name: 'Downtown FM',
+    tagline: 'Violet towers. Sleeping streets.',
+    tags: ['city lights', 'midnight'],
+    premium: true,
+    gradientColors: ['#0c1034', '#241a58', '#05030f'],
+    cardGradient: ['#2f3ec2', '#28248e', '#131350'],
+    iconName: 'city-variant',
+    eqColors: ['#6E8CFF', '#9B5CFF', '#E24CFF'],
+    glowColor: '#241a58',
+    image: require('../../assets/stations/downtown.jpg'),
+    icon: 'city-variant',
+    iconBg: '#1a1650',
+    bestTime: 'Midnight',
+    duration: '1 hr mix',
+    trackCount: 20,
+    spotifyUrl: 'https://open.spotify.com/search/downtown+night+drive+playlist',
+    appleMusicUrl: 'https://music.apple.com/search?term=downtown+night+drive',
+  },
 ];
 
 export const RECOMMENDED_IDS = ['night-run', 'after-midnight', 'sunset'];

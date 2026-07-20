@@ -103,7 +103,14 @@ Every built-in station background is now a licensed Unsplash or Pexels photo (fr
 No 🔴 high-risk / AI / Pinterest images remain. Keep this file updated if any art is swapped later.
 
 - Unsplash: rain-drive, after-midnight, cars-coffee, sunset
-- Pexels: mountain, coastal, tunnel, night-run
+- Pexels: mountain, coastal, tunnel, night-run, downtown
+
+### ✅ downtown.jpg — "Downtown FM"
+- In frame: deep blue-violet night street, parked cars, towers with a magenta crown. Two partially visible licence plates on the right-side cars were blur-patched before shipping.
+- Type: real photograph (owner-picked 2026-07-20 for the new ninth station).
+- Source: Pexels — pexels-reidimages-20131950 (photo 20131950 by Reid Images).
+- License: **Pexels License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; plates patched, no readable marks remain.
 
 ## Notes
 - Custom stations created by users bring their own art — out of scope here.

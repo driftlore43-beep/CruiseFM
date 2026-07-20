@@ -36,6 +36,7 @@ const STATION_FREQS: Record<string, number> = {
   'rain-drive':     98.9,
   'coastal':        101.3,
   'mountain-pass':  103.5,
+  'downtown':       100.1,
   'cars-coffee':    105.1,
   'tunnel':         107.5,
 };

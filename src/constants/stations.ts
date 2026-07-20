@@ -217,16 +217,16 @@ export const STATIONS: Station[] = [
     tagline: 'Top down. Open road.',
     tags: ['summer', 'sunny'],
     premium: false,
-    gradientColors: ['#0e3a44', '#1a6b6a', '#b8902e'],
-    cardGradient: ['#22C9A8', '#2AA5D8', '#F0C244'],
+    gradientColors: ['#3a2c08', '#7a5810', '#c9922a'],
+    cardGradient: ['#FFD645', '#F5A81E', '#E07B14'],
     iconName: 'white-balance-sunny',
-    // The one daytime station — a bright backdrop, so the visualiser needs a
-    // saturated teal to read against it (warm tones wash out on pale sky).
-    eqColors: ['#4DE8D2', '#17B8C0', '#0E86A8'],
-    glowColor: '#1a6b6a',
+    // The one daytime station — sun-drenched gold/amber. Deep amber base keeps
+    // the visualiser readable against the bright pale-sky backdrop.
+    eqColors: ['#FFD84A', '#FBA518', '#E8720E'],
+    glowColor: '#c9922a',
     image: require('../../assets/stations/daylight.jpg'),
     icon: 'white-balance-sunny',
-    iconBg: '#0e4a4a',
+    iconBg: '#5a3e0a',
     bestTime: 'Daytime',
     duration: '1 hr mix',
     trackCount: 20,

@@ -84,6 +84,7 @@ const SW_PALETTES: Record<string, [string, string, string]> = {
   'after-midnight': ['#FF3B3B', '#EE1111', '#C40000'],   // blood red, kept
   'sunset':         ['#FF5FB0', '#FF2E96', '#E0187E'],   // hot pink
   'tunnel':         ['#C9E7FF', '#A8D4FF', '#7FB4EE'],   // faint light blue
+  'daylight':       ['#FFDA45', '#FBA518', '#E8720E'],   // sun-drenched gold
 };
 
 // ── Fullscreen modal ────────────────────────────────────────────────────────────

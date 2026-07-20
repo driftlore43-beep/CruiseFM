@@ -52,11 +52,11 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 - Status: ✅ OK / cleared
 
 ### ✅ night-run.jpg — "Night Run FM"
-- In frame: night city skyline glowing against a dark sky, tree silhouettes below. No cars, people or brands. (Replaced the garage-coupe photo 2026-07-09 — the car cluttered the visualiser backdrops.)
+- In frame: soft-focus driver's view of a night expressway, tail lights ahead, distant downtown skyline. (Owner-picked 2026-07-20 — the dashcam view matches the "empty expressways" tagline; the huge dark sky suits the visualisers.)
 - Type: real photograph.
-- Source: Unsplash — photo-1667754248024-e1e03e60eb72 (2026-07-09).
-- License: **Unsplash License** (free commercial use, no attribution required).
-- Risk: **Low** — licensed source; nothing identifiable in frame.
+- Source: Pexels — pexels-thekameragrapher-15741271 (photo 15741271 by The Kameragrapher).
+- License: **Pexels License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; heavy motion blur leaves nothing legible in frame.
 - Status: ✅ OK / cleared
 
 ### ✅ sunset.jpg — "Sunset FM"
@@ -102,8 +102,8 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 Every built-in station background is now a licensed Unsplash or Pexels photo (free commercial use).
 No 🔴 high-risk / AI / Pinterest images remain. Keep this file updated if any art is swapped later.
 
-- Unsplash: rain-drive, after-midnight, cars-coffee, sunset, night-run
-- Pexels: mountain, coastal, tunnel
+- Unsplash: rain-drive, after-midnight, cars-coffee, sunset
+- Pexels: mountain, coastal, tunnel, night-run
 
 ## Notes
 - Custom stations created by users bring their own art — out of scope here.

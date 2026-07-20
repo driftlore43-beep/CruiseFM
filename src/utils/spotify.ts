@@ -243,19 +243,35 @@ async function classify403(res: Response): Promise<'restricted' | 'premium-requi
   return 'premium-required';
 }
 
+
+// ── Timed fetch — a drive must never stall on a sleepy network ───────────────
+// Spotify calls sit between "user pressed play" and music/handoff; an
+// unanswered request should give up fast so the fallback path can run.
+const FETCH_TIMEOUT_MS = 4000;
+function timedFetch(url: string, init?: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
+}
+
 // ── Playback controls ────────────────────────────────────────────────────────
 
 async function spotifyFetch(endpoint: string, method = 'GET', body?: object) {
   const token = await getAccessToken();
   if (!token) return null;
-  const res = await fetch(`https://api.spotify.com/v1${endpoint}`, {
-    method,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type':  'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await timedFetch(`https://api.spotify.com/v1${endpoint}`, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type':  'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    return null; // timed out / offline — callers treat null as "no data"
+  }
   if (res.ok && restrictedCache) setRestricted(false); // e.g. after being allowlisted
   if (res.status === 403) { classify403(res); return null; }
   if (res.status === 204 || res.status === 202) return null;
@@ -294,6 +310,16 @@ export type StartResult =
  * 'premium-required' when Spotify refuses remote control (free accounts).
  */
 export async function startPlayback(contextUri?: string): Promise<StartResult> {
+  try {
+    return await startPlaybackInner(contextUri);
+  } catch {
+    // Timed out / offline mid-sequence — report error so the caller can
+    // fall back (e.g. hand the playlist to the Spotify app) without waiting.
+    return 'error';
+  }
+}
+
+async function startPlaybackInner(contextUri?: string): Promise<StartResult> {
   const token = await getAccessToken();
   if (!token) return 'error';
 
@@ -303,7 +329,7 @@ export async function startPlayback(contextUri?: string): Promise<StartResult> {
   };
   const body = contextUri ? JSON.stringify({ context_uri: contextUri }) : undefined;
   const attempt = (query = '') =>
-    fetch(`https://api.spotify.com/v1/me/player/play${query}`, { method: 'PUT', headers, body });
+    timedFetch(`https://api.spotify.com/v1/me/player/play${query}`, { method: 'PUT', headers, body });
 
   // Fast path: when a device is already active (the usual case mid-drive),
   // one round trip starts the music — no device lookup first.
@@ -327,7 +353,7 @@ export async function startPlayback(contextUri?: string): Promise<StartResult> {
 
   // Deep asleep — transfer playback onto the device with play=true, which
   // resumes where it left off and is the most reliable wake-up Spotify has.
-  const transfer = await fetch('https://api.spotify.com/v1/me/player', {
+  const transfer = await timedFetch('https://api.spotify.com/v1/me/player', {
     method: 'PUT',
     headers,
     body: JSON.stringify({ device_ids: [target.id], play: true }),

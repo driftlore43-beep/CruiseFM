@@ -25,8 +25,10 @@ async function playStationMusic(stationId: string, opts?: { onlyIfLinked?: boole
 
     if (connected && !restricted) {
       const r = await startPlayback(linked?.uri);
-      // Allowlist rejection discovered mid-drive: fall through to handoff.
-      if (r !== 'restricted') return r;
+      // Allowlist rejection discovered mid-drive falls through to handoff —
+      // and so does a dead/slow network ('error'): opening the playlist in
+      // the Spotify app beats asking the user to retry.
+      if (r !== 'restricted' && !(r === 'error' && linked)) return r;
     }
 
     if (linked) return (await openInSpotify(linked.uri)) ? 'handoff' : 'error';

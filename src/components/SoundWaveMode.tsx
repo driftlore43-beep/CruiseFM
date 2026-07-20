@@ -45,6 +45,16 @@ function gauss(x: number, mu: number, sig: number): number {
   return Math.exp(-0.5 * d * d);
 }
 
+/** Blend a #rrggbb colour toward white by `amount` (0..1). */
+function lightenHex(hex: string, amount: number): string {
+  const m = hex.match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const ch = (v: number) => Math.round(v + (255 - v) * amount);
+  const r = ch((n >> 16) & 255), g = ch((n >> 8) & 255), b = ch(n & 255);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
+
 // Heights (0..~1.1) for every bar at this moment.
 function barHeights(phase: number, amp: number): number[] {
   const out: number[] = [];
@@ -75,6 +85,9 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
   const station = resolveAnyStation(activeId);
   const spotify = useSpotifyPlayback(visible);
   const eq = station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF'];
+  // Bar cap: a lightened tint of the mood's own top colour, not fixed white —
+  // white caps washed out cooler moods (Rain Drive) while suiting warm ones.
+  const capColor = lightenHex(eq[0], 0.45);
 
   const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
   const [phase, setPhase] = useState(0);
@@ -212,7 +225,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
               <Defs>
                 {/* Each bar takes the full gradient top→bottom (bright cap, mood base) */}
                 <SvgGradient id="swBar" x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0" stopColor="#EAF3FF" />
+                  <Stop offset="0" stopColor={capColor} />
                   <Stop offset="0.35" stopColor={eq[0]} />
                   <Stop offset="1" stopColor={eq[2]} />
                 </SvgGradient>

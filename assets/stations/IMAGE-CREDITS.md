@@ -85,11 +85,11 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 - Status: ✅ OK / cleared
 
 ### ✅ tunnel.jpg — "Tunnel FM"
-- In frame: motion-blur drive through a lit road tunnel, distant unidentifiable car.
+- In frame: long-exposure light trails of cars exiting a dark tunnel mouth at night.
 - Type: real photograph.
-- Source: Unsplash — photo-1766083639765-1c9462495e68 (2026-07-08).
-- License: **Unsplash License** (free commercial use, no attribution required).
-- Risk: **Low** — licensed source; nothing identifiable in frame.
+- Source: Pexels — https://www.pexels.com/photo/time-lapse-photo-of-tunnel-730134/ by Burak The Weekender (2026-07-20; owner-picked to replace the busy neon-tube shot that fought the Sound Waves bars).
+- License: **Pexels License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; no identifiable vehicles or marks.
 - Status: ✅ OK / cleared
 
 ### (disabled) sunset-motion.webp
@@ -102,8 +102,8 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 Every built-in station background is now a licensed Unsplash or Pexels photo (free commercial use).
 No 🔴 high-risk / AI / Pinterest images remain. Keep this file updated if any art is swapped later.
 
-- Unsplash: rain-drive, after-midnight, cars-coffee, sunset, night-run, tunnel
-- Pexels: mountain, coastal
+- Unsplash: rain-drive, after-midnight, cars-coffee, sunset, night-run
+- Pexels: mountain, coastal, tunnel
 
 ## Notes
 - Custom stations created by users bring their own art — out of scope here.

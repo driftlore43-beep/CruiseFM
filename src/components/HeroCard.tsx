@@ -24,10 +24,9 @@ type HeroCardProps = {
   station: Station;
   /** "Start Drive" fresh, "Continue Drive" when resuming. */
   buttonLabel?: string;
-  driverName?: string;
 };
 
-export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start Drive', driverName = 'Night Driver' }: HeroCardProps) {
+export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start Drive' }: HeroCardProps) {
   const { dataSaver } = useMotion();
   const handleStart = () => {
     triggerHaptic();
@@ -64,7 +63,6 @@ export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start
 
         {/* ── Main copy ── */}
         <View style={styles.copyBlock}>
-          <Text style={styles.greeting}>Welcome back, {driverName}</Text>
           <Text style={styles.title}>Let’s cruise.</Text>
           {/* Greeting fades in first, then cross-fades into the cue label */}
           <WelcomeCueLine cueLabel={cueLabel} />
@@ -119,14 +117,6 @@ const styles = StyleSheet.create({
     paddingTop: 28,
     paddingBottom: 10,
     gap: 8,
-  },
-  greeting: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowRadius: 8,
   },
   title: {
     color: '#fff',

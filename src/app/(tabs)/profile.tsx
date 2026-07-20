@@ -11,7 +11,6 @@ import { useTheme } from '@/context/ThemeContext';
 import { useMotion } from '@/context/MotionContext';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { OWNER_MODE } from '@/constants/config';
-import { ThemeGenerator } from '@/components/ThemeGenerator';
 import { PLATFORMS, PlatformId, getSavedPlatform } from '@/utils/musicPlatform';
 import { PlatformSelector } from '@/components/PlatformSelector';
 import { SpotifyConnectRow } from '@/components/SpotifyConnectRow';
@@ -109,7 +108,6 @@ export default function ProfileScreen() {
   const { devFreePreview, setDevFreePreview } = useEntitlements();
   const { name: platformName, color: platformColor, refresh: refreshPlatform } = useMusicPlatformInfo();
   const [selectorVisible, setSelectorVisible] = useState(false);
-  const [themeGenVisible, setThemeGenVisible] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage | null>(null);
   const [stats, setStats] = useState<{ totalDrives: number; totalMinutes: number; favoriteStationId: string | null } | null>(null);
   const [driverName, setDriverNameState] = useState(DEFAULT_DRIVER_NAME);
@@ -265,20 +263,8 @@ export default function ProfileScreen() {
           <LinearGradient colors={SETTINGS_GRADIENT} locations={GRADIENT_LOCATIONS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           <CardSheen />
           <GlossSheen radius={20} />
-          {/* My Theme row */}
-          <Pressable
-            style={[styles.settingsRow, styles.settingsBorder]}
-            onPress={() => setThemeGenVisible(true)}>
-            <View style={styles.themeRowLeft}>
-              <IconChip icon="palette" size={34} />
-              <Text style={styles.settingsLabel}>Custom Theme</Text>
-              <View style={[styles.proBadge, { backgroundColor: theme.accentColor + '22', borderColor: theme.accentColor + '55' }]}>
-                <Text style={[styles.proBadgeText, { color: theme.accentColor }]}>PREMIUM</Text>
-              </View>
-            </View>
-            <View style={[styles.themeColorDot, { backgroundColor: theme.accentColor, shadowColor: theme.accentColor }]} />
-            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
-          </Pressable>
+          {/* Custom Theme was removed until it applies app-wide (only accent +
+              glow worked). Station moods now colour the app automatically. */}
 
           {/* Data Saver toggle — forces still backgrounds for everyone */}
           <View style={[styles.settingsRow, styles.settingsBorder]}>
@@ -366,11 +352,6 @@ export default function ProfileScreen() {
       <PlatformSelector
         visible={selectorVisible}
         onDismiss={handlePlatformDismiss}
-      />
-
-      <ThemeGenerator
-        visible={themeGenVisible}
-        onClose={() => setThemeGenVisible(false)}
       />
 
       <SettingsSheet

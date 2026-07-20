@@ -138,7 +138,7 @@ export const STATIONS: Station[] = [
     gradientColors: ['#8a3a05', '#5a1a6a', '#000000'],
     cardGradient: ['#c4461d', '#733061', '#331f47'],
     iconName: 'weather-sunset',
-    eqColors: ['#FFC24C', '#FF7A48', '#D84C8A'],
+    eqColors: ['#FF5FB0', '#FF2E96', '#E0187E'],
     glowColor: '#8a3a05',
     image: require('../../assets/stations/sunset.jpg'),
     // motion: temporarily disabled — new still artwork used everywhere until a
@@ -178,7 +178,7 @@ export const STATIONS: Station[] = [
     tags: ['tunnel run', 'high energy'],
     premium: true,
     gradientColors: ['#2a0a5a', '#0a2a40', '#000000'],
-    cardGradient: ['#492eb3', '#243b80', '#1d1452'],
+    cardGradient: ['#3E66F2', '#232E82', '#C85A14'],
     iconName: 'flash',
     eqColors: ['#FFD24C', '#FF8A2A', '#F03A2E'],
     glowColor: '#2a0a5a',

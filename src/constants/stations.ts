@@ -198,7 +198,7 @@ export const STATIONS: Station[] = [
     tags: ['city lights', 'midnight'],
     premium: true,
     gradientColors: ['#0c1034', '#241a58', '#05030f'],
-    cardGradient: ['#2f3ec2', '#28248e', '#131350'],
+    cardGradient: ['#8A3FFF', '#4E52F5', '#2a2a9e'],
     iconName: 'city-variant',
     eqColors: ['#6E8CFF', '#9B5CFF', '#E24CFF'],
     glowColor: '#241a58',

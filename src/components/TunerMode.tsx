@@ -30,6 +30,7 @@ const LOCK_RANGE = 0.45;         // MHz within which a station "bleeds in"
 
 // Every station lives at a frequency on the dial.
 const STATION_FREQS: Record<string, number> = {
+  'daylight':       90.5,
   'night-run':      92.1,
   'after-midnight': 94.7,
   'sunset':         96.3,

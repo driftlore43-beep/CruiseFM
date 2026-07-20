@@ -114,7 +114,7 @@ export const STATIONS: Station[] = [
     name: 'After Hours FM',
     tagline: 'When the world is asleep. And the road belongs to you.',
     tags: ['late night', 'solitude'],
-    premium: false,
+    premium: true,
     gradientColors: ['#111118', '#0a0f2b', '#000000'],
     cardGradient: ['#3b34ac', '#283a7c', '#17174f'],
     iconName: 'star-four-points',
@@ -211,6 +211,28 @@ export const STATIONS: Station[] = [
     spotifyUrl: 'https://open.spotify.com/search/downtown+night+drive+playlist',
     appleMusicUrl: 'https://music.apple.com/search?term=downtown+night+drive',
   },
+  {
+    id: 'daylight',
+    name: 'Daylight FM',
+    tagline: 'Top down. Open road.',
+    tags: ['summer', 'sunny'],
+    premium: false,
+    gradientColors: ['#0e3a44', '#1a6b6a', '#b8902e'],
+    cardGradient: ['#22C9A8', '#2AA5D8', '#F0C244'],
+    iconName: 'white-balance-sunny',
+    // The one daytime station — a bright backdrop, so the visualiser needs a
+    // saturated teal to read against it (warm tones wash out on pale sky).
+    eqColors: ['#4DE8D2', '#17B8C0', '#0E86A8'],
+    glowColor: '#1a6b6a',
+    image: require('../../assets/stations/daylight.jpg'),
+    icon: 'white-balance-sunny',
+    iconBg: '#0e4a4a',
+    bestTime: 'Daytime',
+    duration: '1 hr mix',
+    trackCount: 20,
+    spotifyUrl: 'https://open.spotify.com/search/summer+daytime+drive+playlist',
+    appleMusicUrl: 'https://music.apple.com/search?term=summer+daytime+drive',
+  },
 ];
 
-export const RECOMMENDED_IDS = ['night-run', 'after-midnight', 'sunset'];
+export const RECOMMENDED_IDS = ['night-run', 'daylight', 'sunset'];

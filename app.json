@@ -7,6 +7,12 @@
     "icon": "./assets/images/icon.png",
     "scheme": "cruisefm",
     "userInterfaceStyle": "automatic",
+    "updates": {
+      "url": "https://u.expo.dev/95c6799b-4a44-45f4-89b2-81962388e88e"
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.driftlore.CruiseFM",

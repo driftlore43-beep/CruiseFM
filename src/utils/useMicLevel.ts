@@ -24,15 +24,19 @@ import {
  * reports `available: false` and the caller keeps its timed animation.
  */
 
-const POLL_MS = 90;
-// dBFS window we treat as silence → full. Cars are loud; -55..-8 reads well.
-const DB_FLOOR = -55;
-const DB_CEIL = -8;
+const POLL_MS = 70;
+// dBFS window we treat as silence → full. Tightened around where music
+// actually sits so the level swings hard between quiet and loud passages.
+const DB_FLOOR = -50;
+const DB_CEIL = -12;
 
 function normalize(db: number | undefined): number {
   if (db == null || !isFinite(db)) return 0;
   const t = (db - DB_FLOOR) / (DB_CEIL - DB_FLOOR);
-  return Math.max(0, Math.min(1, t));
+  const c = Math.max(0, Math.min(1, t));
+  // Smoothstep expands the contrast: quiet parts drop lower, loud beats
+  // punch higher, so the reaction is obvious rather than a gentle hum.
+  return c * c * (3 - 2 * c);
 }
 
 export function useMicLevel(active: boolean): { level: number; available: boolean } {
@@ -96,8 +100,8 @@ export function useMicLevel(active: boolean): { level: number; available: boolea
   useEffect(() => {
     if (!recording) return;
     const target = normalize(state.metering);
-    // Faster attack (rising) than release (falling) reads as musical.
-    const k = target > smoothed.current ? 0.6 : 0.22;
+    // Snappy attack so beats jump, slower release so bars fall between them.
+    const k = target > smoothed.current ? 0.8 : 0.3;
     smoothed.current = smoothed.current + (target - smoothed.current) * k;
     setLevel(smoothed.current);
   }, [state.metering, recording]);

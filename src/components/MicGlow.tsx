@@ -29,8 +29,8 @@ export function MicGlow({ active, color }: { active: boolean; color: string }) {
   useEffect(() => {
     if (!mic.available) return;
     Animated.timing(pulse, {
-      toValue: Math.min(1, 0.15 + mic.level * 1.5),
-      duration: 110,
+      toValue: Math.min(1, mic.level * 1.9),
+      duration: 90,
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
@@ -43,8 +43,8 @@ export function MicGlow({ active, color }: { active: boolean; color: string }) {
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.1, 0.5] }),
-            transform: [{ scaleY: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.35] }) }] },
+          { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.06, 0.72] }),
+            transform: [{ scaleY: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.45] }) }] },
         ]}>
         <LinearGradient
           colors={['transparent', color + '59', 'transparent']}
@@ -56,8 +56,8 @@ export function MicGlow({ active, color }: { active: boolean; color: string }) {
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          { opacity: pulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 0.34] }),
-            transform: [{ scaleY: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.25] }) }] },
+          { opacity: pulse.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, 0, 0.55] }),
+            transform: [{ scaleY: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.35] }) }] },
         ]}>
         <LinearGradient
           colors={['transparent', color + 'B3', 'transparent']}

@@ -352,15 +352,19 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     if (!micActive || !visible || !playing) return;
     const lvl = mic.level;
     const bell = isLandscape ? lsBellMaxH : fsBellMaxH;
+    // Snap fast when loud, settle slowly when quiet — reads like a real EQ.
+    const dur = 60 + (1 - lvl) * 150;
     fsValues.forEach((anim, i) => {
       const maxH = bell(i);
-      // Per-bar liveliness so a single loudness number still reads like an EQ.
-      const jitter = 0.55 + Math.random() * 0.75;
-      const target = FS_MIN_H + (maxH - FS_MIN_H) * Math.min(1, lvl * 1.8 * jitter);
-      Animated.timing(anim, { toValue: target, duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
+      // Per-bar spread grows with loudness: bars sit uniformly low in the quiet
+      // and jump tall & varied when the music kicks.
+      const variation = (Math.random() - 0.35) * lvl * 1.4;
+      const h = Math.max(0.03, Math.min(1, lvl * 1.5 + variation));
+      const target = FS_MIN_H + (maxH - FS_MIN_H) * h;
+      Animated.timing(anim, { toValue: target, duration: dur, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
     });
     // The big, unmissable one — the whole ambient glow breathes with the music.
-    Animated.timing(glowPulse, { toValue: Math.min(1, 0.2 + lvl * 1.4), duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    Animated.timing(glowPulse, { toValue: Math.min(1, lvl * 1.7), duration: 90, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
   }, [mic.level, micActive, visible, playing, isLandscape]);
 
   // ── Keep screen awake in landscape ───────────────────────────────────────

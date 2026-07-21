@@ -9,6 +9,8 @@ import {
   RecordingPresets,
 } from 'expo-audio';
 
+import { useMicQuietSignal } from '@/context/NowPlayingContext';
+
 /**
  * Live loudness of the sound around the phone, as a smoothed 0..1 value —
  * the engine behind music-reactive visuals.
@@ -25,6 +27,10 @@ import {
  */
 
 const POLL_MS = 70;
+// How long to step aside when Spotify (re)starts audio. Long enough for iOS to
+// hand Spotify the session and for the track to settle; short enough that the
+// visuals barely blink before the mic is back.
+const QUIET_MS = 1800;
 // dBFS window we treat as silence → full. Tightened around where music
 // actually sits so the level swings hard between quiet and loud passages.
 const DB_FLOOR = -50;
@@ -51,7 +57,18 @@ export function useMicLevel(active: boolean): { level: number; available: boolea
   const smoothed = useRef(0);
   const [level, setLevel] = useState(0);
 
-  const wantOn = active && Platform.OS !== 'web';
+  // Smart auto-pause: when Spotify is about to (re)start audio, drop the mic for
+  // a beat so iOS can hand it the session cleanly, then bring it back.
+  const quietTick = useMicQuietSignal();
+  const [hushed, setHushed] = useState(false);
+  useEffect(() => {
+    if (quietTick === 0) return; // ignore the initial value
+    setHushed(true);
+    const t = setTimeout(() => setHushed(false), QUIET_MS);
+    return () => clearTimeout(t);
+  }, [quietTick]);
+
+  const wantOn = active && Platform.OS !== 'web' && !hushed;
 
   // Resolve permission once we actually want the mic on (lazy — no prompt on
   // launch, only when a reactive visual first needs it).
@@ -82,6 +99,10 @@ export function useMicLevel(active: boolean): { level: number; available: boolea
           if (alive) setRecording(true);
         } else if ((!wantOn || !granted) && recording) {
           try { await recorder.stop(); } catch {}
+          // Fully release the session so Spotify reclaims the audio cleanly —
+          // just stopping the recorder can leave iOS in a recording-capable
+          // config that keeps fighting playback.
+          try { await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }); } catch {}
           if (alive) { setRecording(false); smoothed.current = 0; setLevel(0); }
         }
       } catch {

@@ -88,6 +88,12 @@ type NowPlayingCtx = {
   /** Re-open the current station's playlist in Spotify (the honest panel's
    * "Open Spotify" action). */
   returnToSpotify: () => void;
+  /** Bumps each time Spotify is about to (re)start audio (drive start, play,
+   * skip, track change). The mic-reactive hook briefly stops listening around
+   * these moments so iOS hands the audio session to Spotify cleanly — the
+   * "smart auto-pause" that keeps playback crisp without killing the visuals. */
+  micQuietTick: number;
+  requestMicQuiet: () => void;
 };
 
 const Ctx = createContext<NowPlayingCtx | null>(null);
@@ -98,6 +104,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const [playing, setPlayingRaw] = useState(false);
   const [activityTick, setActivityTick] = useState(0);
   const activityPing = useCallback(() => setActivityTick((t) => t + 1), []);
+  const [micQuietTick, setMicQuietTick] = useState(0);
+  const requestMicQuiet = useCallback(() => setMicQuietTick((t) => t + 1), []);
   const [playbackNotice, setPlaybackNotice] = useState<string | null>(null);
   const [handoff, setHandoff] = useState(false);
   const clearPlaybackNotice = useCallback(() => setPlaybackNotice(null), []);
@@ -125,9 +133,10 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     // if it has one, otherwise resume whatever was playing. A paused open
     // leaves Spotify alone until the user presses play.
     if (!opts?.paused) {
+      requestMicQuiet(); // let Spotify grab the audio session cleanly on start
       playStationMusic(stationId).then((r) => { if (r) reportStartResult(r); });
     }
-  }, [reportStartResult]);
+  }, [reportStartResult, requestMicQuiet]);
 
   const minimize = useCallback(() => setExpanded(false), []);
   const expand = useCallback(() => setExpanded(true), []);
@@ -138,8 +147,9 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     setSession({ ...current, stationId });
     // Retuning mid-drive (Tuner lock-on, Change Mood) switches the music
     // too — but only when the new station actually has a linked playlist.
+    requestMicQuiet();
     playStationMusic(stationId, { onlyIfLinked: true }).then((r) => { if (r) reportStartResult(r); });
-  }, [reportStartResult]);
+  }, [reportStartResult, requestMicQuiet]);
 
   const stop = useCallback(() => {
     setSession(null);
@@ -158,8 +168,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify }),
-    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify],
+    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, micQuietTick, requestMicQuiet }),
+    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, micQuietTick, requestMicQuiet],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -182,4 +192,15 @@ export function useActivityPing(): () => void {
 /** Safe anywhere — lets the playback hook feed start outcomes to the notice. */
 export function useStartResultReporter(): (result: StartResult) => void {
   return useContext(Ctx)?.reportStartResult ?? noopPing;
+}
+
+/** Safe anywhere — lets playback controls ask the mic to briefly step aside so
+ * Spotify can (re)start audio cleanly (the "smart auto-pause"). */
+export function useMicQuietRequester(): () => void {
+  return useContext(Ctx)?.requestMicQuiet ?? noopPing;
+}
+
+/** Safe anywhere — the counter the mic hook watches to know when to hush. */
+export function useMicQuietSignal(): number {
+  return useContext(Ctx)?.micQuietTick ?? 0;
 }

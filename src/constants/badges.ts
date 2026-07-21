@@ -29,7 +29,7 @@ export const BADGES: Badge[] = [
   { id: 'regular',      name: 'Regular',       desc: 'Ten drives with Cruise FM.',                icon: 'car' },
   { id: 'veteran',      name: 'Veteran',       desc: 'Fifty drives with Cruise FM.',              icon: 'medal-outline' },
   { id: 'local-legend', name: 'Local Legend',  desc: 'Ten drives on a single station.',           icon: 'star-circle-outline' },
-  { id: 'dial-surfer',  name: 'Dial Surfer',   desc: 'Drive all eight moods.',                    icon: 'radio' },
+  { id: 'dial-surfer',  name: 'Dial Surfer',   desc: 'Drive with every mood.',                    icon: 'radio' },
   { id: 'founder',      name: 'Founder',       desc: 'Reserved for the first 500.',               icon: 'flag-checkered', reserved: true },
 ];
 

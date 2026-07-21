@@ -18,6 +18,7 @@ import { SettingsSheet, type SettingsPage } from '@/components/SettingsSheet';
 import { GlossSheen } from '@/components/GlossSheen';
 import { getDriveLog, getDriveStats } from '@/utils/driveStats';
 import { judgeBadges, type JudgedBadge } from '@/constants/badges';
+import { appVersionLabel } from '@/utils/appVersion';
 import { DEFAULT_DRIVER_NAME, getDriverName, initialsFor } from '@/utils/driverName';
 
 function stationName(id: string | null): string {
@@ -347,6 +348,8 @@ export default function ProfileScreen() {
           ))}
         </View>
 
+        <Text style={styles.versionText}>{appVersionLabel()}</Text>
+
       </ScrollView>
 
       <PlatformSelector
@@ -511,4 +514,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   proBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  versionText: {
+    color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '600',
+    textAlign: 'center', letterSpacing: 0.3, marginTop: 4,
+  },
 });

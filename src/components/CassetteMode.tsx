@@ -21,6 +21,7 @@ import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/u
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MicGlow } from '@/components/MicGlow';
 import { MarqueeText } from '@/components/MarqueeText';
 
@@ -937,6 +938,8 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
         </View>
 
         <MicGlow active={visible && playing} color={station.eqColors?.[1] ?? station.glowColor} />
+
+        <ModeCloseButton onPress={handleClose} />
 
         {handoff && !spotify.track && <HandoffOverlay />}
 

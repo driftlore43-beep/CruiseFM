@@ -19,6 +19,7 @@ import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MicGlow } from '@/components/MicGlow';
 import { MarqueeText } from '@/components/MarqueeText';
 
@@ -338,6 +339,8 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
         </View>
 
         <MicGlow active={visible && playing} color={eq[1]} />
+
+        <ModeCloseButton onPress={handleClose} />
 
         {handoff && !spotify.track && <HandoffOverlay />}
 

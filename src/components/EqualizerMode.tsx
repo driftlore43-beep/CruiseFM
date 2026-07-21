@@ -34,6 +34,7 @@ import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { MarqueeText } from '@/components/MarqueeText';
+import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { useMotion } from '@/context/MotionContext';
 import { useMicLevel } from '@/utils/useMicLevel';
 import { OWNER_MODE } from '@/constants/config';
@@ -769,6 +770,8 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           </View>
 
         </View>
+
+        <ModeCloseButton onPress={handleClose} />
 
         {handoff && !spotify.track && <HandoffOverlay />}
 

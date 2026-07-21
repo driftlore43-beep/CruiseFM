@@ -948,12 +948,13 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             />
           </View>
 
-          {/* Song title — bottom-left, Spotify style */}
+          {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
-            <Text style={fs.trackTitle} numberOfLines={1}>{spotify.track?.title ?? currentTrack.title}</Text>
-            <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track?.artist ?? currentTrack.artist}</Text>
+            <Text style={[fs.trackTitle, !spotify.track && { fontSize: 20 }]} numberOfLines={2}>{spotify.track?.title ?? station.tagline}</Text>
+            {spotify.track && <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track.artist}</Text>}
           </View>
 
+          {spotify.track && (
           <View style={fs.progressWrap}>
             <View style={fs.progressRow}>
               <Text style={[fs.timeText, { fontFamily: Fonts.mono }]}>{formatMs(currentTimeMs)}</Text>
@@ -965,6 +966,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
               <Text style={[fs.timeText, { fontFamily: Fonts.mono, textAlign: 'right' }]}>{formatMs(trackMs)}</Text>
             </View>
           </View>
+          )}
 
           {/* Controls */}
           <View style={fs.controls}>

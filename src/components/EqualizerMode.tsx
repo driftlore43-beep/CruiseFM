@@ -515,7 +515,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
                 <Text style={ls.lsStation} numberOfLines={1}>{currentStation.name}</Text>
               </View>
               <Text style={ls.lsTrack} numberOfLines={1}>
-                {spotify.track ? `${spotify.track.title} — ${spotify.track.artist}` : 'Carbon Wing — Midnight Pilot'}
+                {spotify.track ? `${spotify.track.title} — ${spotify.track.artist}` : currentStation.tagline}
               </Text>
 
               {/* Spacer */}
@@ -685,13 +685,14 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             <FloatingNotes playing={playing} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
           </View>
 
-          {/* Song title — bottom-left, Spotify style */}
+          {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
-            <Text style={fs.trackTitle} numberOfLines={1}>{spotify.track?.title ?? 'Carbon Wing'}</Text>
-            <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track?.artist ?? 'Midnight Pilot'}</Text>
+            <Text style={[fs.trackTitle, !spotify.track && { fontSize: 20 }]} numberOfLines={2}>{spotify.track?.title ?? currentStation.tagline}</Text>
+            {spotify.track && <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track.artist}</Text>}
           </View>
 
-          {/* Progress bar */}
+          {/* Progress bar — only when a real song is playing through */}
+          {spotify.track && (
           <View style={fs.progressWrap}>
             <View style={fs.progressRow}>
               <Text style={fs.timeText}>{formatMs(currentTimeMs)}</Text>
@@ -699,6 +700,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               <Text style={[fs.timeText, { textAlign: 'right' }]}>{formatMs(durationMs)}</Text>
             </View>
           </View>
+          )}
 
           <View style={fs.controls}>
             <TouchableOpacity

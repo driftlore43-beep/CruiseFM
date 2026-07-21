@@ -848,13 +848,14 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             <FloatingNotes playing={playing} color={neonColor} />
           </View>
 
-          {/* Song title — bottom-left, Spotify style */}
+          {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
-            <Text style={fs.trackTitle} numberOfLines={1}>{spotify.track?.title ?? currentTrack.title}</Text>
-            <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track?.artist ?? currentTrack.artist}</Text>
+            <Text style={[fs.trackTitle, !spotify.track && { fontSize: 20 }]} numberOfLines={2}>{spotify.track?.title ?? station.tagline}</Text>
+            {spotify.track && <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track.artist}</Text>}
           </View>
 
-          {/* Tape progress — live counter left, true track length right */}
+          {/* Tape progress — only when a real song is playing through */}
+          {spotify.track && (
           <View style={fs.progressWrap}>
             <View style={fs.progressRow}>
               <Text style={[fs.timeText, { fontFamily: Fonts.mono }]}>{elapsedTxt}</Text>
@@ -862,6 +863,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
               <Text style={[fs.timeText, { fontFamily: Fonts.mono, textAlign: 'right' }]}>{fmtTapeMs(trackMs)}</Text>
             </View>
           </View>
+          )}
 
           {/* Controls */}
           <View style={fs.controls}>

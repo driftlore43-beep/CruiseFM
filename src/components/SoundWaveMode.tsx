@@ -174,8 +174,11 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
   const resetTrack = () => progress.setValue(0);
   const togglePlay = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
 
-  const title = spotify.track?.title ?? 'Neon Autobahn';
-  const artist = spotify.track?.artist ?? 'Cruise FM';
+  // Real song info when we're actually connected to it; otherwise the mood's
+  // own line — never a fake track. No music data = atmosphere, not pretence.
+  const hasTrack = !!spotify.track;
+  const title = spotify.track?.title ?? station.tagline;
+  const artist = spotify.track?.artist ?? '';
   const fill = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
   const glowTint = eq[1] + '26';
   const amp = ampRef.current;
@@ -277,11 +280,12 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
 
           {/* Song title */}
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
-            <Text style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={1}>{title}</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 }} numberOfLines={1}>{artist}</Text>
+            <Text style={{ color: '#fff', fontSize: hasTrack ? 24 : 20, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={2}>{title}</Text>
+            {hasTrack && <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 }} numberOfLines={1}>{artist}</Text>}
           </View>
 
-          {/* Progress */}
+          {/* Progress — only when we're actually tracking a real song */}
+          {hasTrack && (
           <View style={{ width: '100%', paddingHorizontal: 28, marginTop: 18 }}>
             <View style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' }}>
               <Animated.View style={{ height: 6, borderRadius: 3, width: fill, backgroundColor: '#fff' }} />
@@ -291,6 +295,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
               <Text style={[fs.time, { fontFamily: Fonts.mono }]}>{formatMs(durationMs)}</Text>
             </View>
           </View>
+          )}
 
           {/* Controls */}
           <View style={fs.controls}>

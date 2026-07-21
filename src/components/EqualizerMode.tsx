@@ -35,6 +35,7 @@ import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { useMotion } from '@/context/MotionContext';
 import { useMicLevel } from '@/utils/useMicLevel';
+import { OWNER_MODE } from '@/constants/config';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -258,6 +259,9 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const isLandscape = winW > winH;
 
   const fsValues = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(FS_MIN_H))).current;
+  // Drives the ambient glow's brightness/breath — a big, cheap element that
+  // reads the mic even on slow phones where 30 tiny bars are hard to see.
+  const glowPulse = useRef(new Animated.Value(0.7)).current;
 
   const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
   const { micReactive } = useMotion();
@@ -338,6 +342,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     stopBarAnims(fsValues, timers);
     if (!micActive) {
       startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
+      glowPulse.setValue(0.7); // static ambient glow when the mic isn't driving
     }
   }, [micActive]);
 
@@ -352,6 +357,8 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
       const target = FS_MIN_H + (maxH - FS_MIN_H) * Math.min(1, lvl * 1.8 * jitter);
       Animated.timing(anim, { toValue: target, duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
     });
+    // The big, unmissable one — the whole ambient glow breathes with the music.
+    Animated.timing(glowPulse, { toValue: Math.min(1, 0.2 + lvl * 1.4), duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
   }, [mic.level, micActive, visible, playing, isLandscape]);
 
   // ── Keep screen awake in landscape ───────────────────────────────────────
@@ -594,17 +601,34 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             tint → transparent) so it has NO hard edge and the blurred image
             stays visible all the way to the bottom. Tinted with the bright
             mid bar colour so it reads as light, never a dark cut-off. */}
-        <LinearGradient
-          colors={[
-            'transparent',
-            (currentStation.eqColors?.[1] ?? currentStation.glowColor) + '26',
-            'transparent',
+        <Animated.View
+          style={[
+            fs.glowBand,
+            { opacity: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }),
+              transform: [{ scaleY: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.32] }) }] },
           ]}
-          locations={[0, 0.5, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={fs.glowBand}
-          pointerEvents="none"
-        />
+          pointerEvents="none">
+          <LinearGradient
+            colors={[
+              'transparent',
+              (currentStation.eqColors?.[1] ?? currentStation.glowColor) + '26',
+              'transparent',
+            ]}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+        </Animated.View>
+
+        {/* Owner-only: live mic level, so reactivity is verifiable on any device */}
+        {OWNER_MODE && micReactive && (
+          <View style={{ position: 'absolute', top: topPad + 4, left: 12, zIndex: 30 }} pointerEvents="none">
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '700' }}>
+              mic {micActive ? mic.level.toFixed(2) : 'off'}
+            </Text>
+          </View>
+        )}
 
         {/* Drag pill — swipe down hint */}
         <View style={{ position: 'absolute', top: topPad + 6, left: 0, right: 0, alignItems: 'center', zIndex: 25 }} pointerEvents="none">

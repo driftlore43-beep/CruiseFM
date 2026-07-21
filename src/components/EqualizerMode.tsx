@@ -32,6 +32,7 @@ import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/u
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { HandoffOverlay } from '@/components/HandoffOverlay';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -256,7 +257,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
   const fsValues = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(FS_MIN_H))).current;
 
-  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
   const [activeStation, setActiveStation] = useState(stationId ?? 'night-run');
   const [shuffle,       setShuffle]       = useState(false);
   const [repeat,        setRepeat]        = useState(false);
@@ -680,6 +681,8 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           </View>
 
         </View>
+
+        {handoff && <HandoffOverlay />}
 
         <MoodSheet
           visible={showMood}

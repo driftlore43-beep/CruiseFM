@@ -19,6 +19,7 @@ import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { seekTo } from '@/utils/spotify';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { MoodSheet } from '@/components/MoodSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
@@ -464,7 +465,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
 
-  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
   const spotify = useSpotifyPlayback(visible);
   const [activeId,      setActiveId]      = useState(stationId ?? 'night-run');
   const [activeTrack,   setActiveTrack]   = useState(0);
@@ -1011,6 +1012,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           </View>
 
         </View>
+
+        {handoff && <HandoffOverlay />}
 
         <MoodSheet
           visible={showMood}

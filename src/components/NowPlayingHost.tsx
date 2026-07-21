@@ -47,6 +47,8 @@ function MiniPlayer() {
     TAB_BAR_HEIGHT + 10;
 
   const togglePlay = () => {
+    // Handoff drives have no in-app control — send the user back to Spotify.
+    if (np.handoff) { np.returnToSpotify(); return; }
     if (np.playing) spotify.pause(); else spotify.play();
     np.setPlaying(!np.playing);
   };

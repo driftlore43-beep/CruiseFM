@@ -19,6 +19,7 @@ import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/u
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { HandoffOverlay } from '@/components/HandoffOverlay';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -178,7 +179,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const accent = eq[1];
 
   const spotify = useSpotifyPlayback(visible);
-  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -433,6 +434,8 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             </TouchableOpacity>
           </View>
         </View>
+
+        {handoff && <HandoffOverlay />}
 
         <MoodSheet
           visible={showMood}

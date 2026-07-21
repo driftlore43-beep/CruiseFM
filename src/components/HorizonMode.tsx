@@ -18,6 +18,7 @@ import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/u
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { HandoffOverlay } from '@/components/HandoffOverlay';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -149,7 +150,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const spotify = useSpotifyPlayback(visible);
   const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
 
-  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -319,6 +320,8 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             </TouchableOpacity>
           </View>
         </View>
+
+        {handoff && <HandoffOverlay />}
 
         <MoodSheet
           visible={showMood}

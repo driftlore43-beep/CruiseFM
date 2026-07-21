@@ -20,6 +20,7 @@ import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { HandoffOverlay } from '@/components/HandoffOverlay';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -438,7 +439,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const { width: winW, height: winH } = useWindowDimensions();
   const isLandscape = winW > winH;
 
-  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
   const spotify = useSpotifyPlayback(visible);
   const [activeId,    setActiveId]    = useState(stationId ?? 'night-run');
   const [activeTrack, setActiveTrack] = useState(1);   // A2 default (index 1)
@@ -922,6 +923,8 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
           </View>
 
         </View>
+
+        {handoff && <HandoffOverlay />}
 
         <MoodSheet
           visible={showMood}

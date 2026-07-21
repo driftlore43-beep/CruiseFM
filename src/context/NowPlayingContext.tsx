@@ -46,7 +46,8 @@ const START_NOTICES: Record<StartResult, string | null> = {
   'no-device': "Spotify isn't awake. Open Spotify, play any song for a second, then come back and press play.",
   'premium-required': 'Spotify needs a Premium account to let Cruise FM control playback.',
   'restricted': 'This Spotify account isn’t on the Cruise FM test list, so in-app control is off. Link a playlist to this station (paste a Spotify link) and drives will play through the Spotify app instead.',
-  'handoff': 'Playlist sent to Spotify — press play there, then come back. Your drive keeps rolling here.',
+  // Handoff is explained by the persistent in-mode panel, not a transient toast.
+  'handoff': null,
   'error': "Spotify didn't respond. Check the Spotify app is open and logged in, then press play to retry.",
 };
 
@@ -81,6 +82,12 @@ type NowPlayingCtx = {
   clearPlaybackNotice: () => void;
   /** Feed a fresh start attempt's outcome into the notice. */
   reportStartResult: (result: StartResult) => void;
+  /** True when this drive's music was handed to the Spotify app (no in-app
+   * control): the modes swap their dead transport for an honest panel. */
+  handoff: boolean;
+  /** Re-open the current station's playlist in Spotify (the honest panel's
+   * "Open Spotify" action). */
+  returnToSpotify: () => void;
 };
 
 const Ctx = createContext<NowPlayingCtx | null>(null);
@@ -92,9 +99,12 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const [activityTick, setActivityTick] = useState(0);
   const activityPing = useCallback(() => setActivityTick((t) => t + 1), []);
   const [playbackNotice, setPlaybackNotice] = useState<string | null>(null);
+  const [handoff, setHandoff] = useState(false);
   const clearPlaybackNotice = useCallback(() => setPlaybackNotice(null), []);
   const reportStartResult = useCallback((result: StartResult) => {
     setPlaybackNotice(START_NOTICES[result] ?? null);
+    // Handoff = the music is playing in the Spotify app, uncontrollable here.
+    setHandoff(result === 'handoff');
   }, []);
   // Every play/pause is also a sign of life for the drive check.
   const setPlaying = useCallback((p: boolean) => {
@@ -110,6 +120,7 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     setSession({ mode: m, stationId, preview: opts?.preview });
     setExpanded(true);
     setPlaying(!opts?.paused);
+    setHandoff(false); // fresh drive; playStationMusic re-flags it if handed off
     // Every drive tries to get music going — the station's linked playlist
     // if it has one, otherwise resume whatever was playing. A paused open
     // leaves Spotify alone until the user presses play.
@@ -134,12 +145,21 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setExpanded(false);
     setPlaying(false);
+    setHandoff(false);
     recordDriveEnd().catch(() => {});
   }, []);
 
+  const returnToSpotify = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current) return;
+    getStationPlaylist(current.stationId).then((linked) => {
+      if (linked) openInSpotify(linked.uri);
+    });
+  }, []);
+
   const value = useMemo(
-    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult }),
-    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult],
+    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify }),
+    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

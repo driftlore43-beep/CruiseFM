@@ -33,6 +33,7 @@ import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { MarqueeText } from '@/components/MarqueeText';
 import { useMotion } from '@/context/MotionContext';
 import { useMicLevel } from '@/utils/useMicLevel';
 import { OWNER_MODE } from '@/constants/config';
@@ -694,7 +695,9 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
           {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
-            <Text style={[fs.trackTitle, !spotify.track && { fontSize: 20 }]} numberOfLines={2}>{spotify.track?.title ?? currentStation.tagline}</Text>
+            {spotify.track
+              ? <MarqueeText text={spotify.track.title} style={fs.trackTitle} />
+              : <Text style={[fs.trackTitle, { fontSize: 20 }]} numberOfLines={2}>{currentStation.tagline}</Text>}
             {spotify.track && <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track.artist}</Text>}
           </View>
 

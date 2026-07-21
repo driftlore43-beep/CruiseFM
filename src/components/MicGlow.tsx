@@ -43,7 +43,7 @@ export function MicGlow({ active, color }: { active: boolean; color: string }) {
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.8] }),
+          { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.1, 0.5] }),
             transform: [{ scaleY: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.35] }) }] },
         ]}>
         <LinearGradient
@@ -56,7 +56,7 @@ export function MicGlow({ active, color }: { active: boolean; color: string }) {
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          { opacity: pulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 0.68] }),
+          { opacity: pulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 0.34] }),
             transform: [{ scaleY: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.25] }) }] },
         ]}>
         <LinearGradient
@@ -71,11 +71,13 @@ export function MicGlow({ active, color }: { active: boolean; color: string }) {
 }
 
 const st = StyleSheet.create({
+  // Low band, behind the song title — clear of the centre visual (the vinyl
+  // disc, the cassette, the dial) so it never washes or blurs it.
   wrap: {
     position: 'absolute',
     left: 0, right: 0,
-    top: SCREEN_H * 0.10,
-    height: SCREEN_H * 0.48,
-    zIndex: 4,
+    top: SCREEN_H * 0.55,
+    height: SCREEN_H * 0.38,
+    zIndex: 0,
   },
 });

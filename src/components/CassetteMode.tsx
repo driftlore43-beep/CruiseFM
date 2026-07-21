@@ -22,6 +22,7 @@ import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { MicGlow } from '@/components/MicGlow';
+import { MarqueeText } from '@/components/MarqueeText';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -857,7 +858,9 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
           {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
-            <Text style={[fs.trackTitle, !spotify.track && { fontSize: 20 }]} numberOfLines={2}>{spotify.track?.title ?? station.tagline}</Text>
+            {spotify.track
+              ? <MarqueeText text={spotify.track.title} style={fs.trackTitle} />
+              : <Text style={[fs.trackTitle, { fontSize: 20 }]} numberOfLines={2}>{station.tagline}</Text>}
             {spotify.track && <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track.artist}</Text>}
           </View>
 

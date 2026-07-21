@@ -21,6 +21,7 @@ import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { MicGlow } from '@/components/MicGlow';
+import { MarqueeText } from '@/components/MarqueeText';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -390,7 +391,9 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
           {/* Song title / mood line */}
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
-            <Text style={{ color: '#fff', fontSize: hasTrack ? 24 : 20, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={2}>{title}</Text>
+            {hasTrack
+              ? <MarqueeText text={title} style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }} />
+              : <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={2}>{title}</Text>}
             {hasTrack && <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 }} numberOfLines={1}>{artist}</Text>}
           </View>
 

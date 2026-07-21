@@ -21,6 +21,7 @@ import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { MicGlow } from '@/components/MicGlow';
+import { MarqueeText } from '@/components/MarqueeText';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { MoodSheet } from '@/components/MoodSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
@@ -957,7 +958,9 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
           {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
-            <Text style={[fs.trackTitle, !spotify.track && { fontSize: 20 }]} numberOfLines={2}>{spotify.track?.title ?? station.tagline}</Text>
+            {spotify.track
+              ? <MarqueeText text={spotify.track.title} style={fs.trackTitle} />
+              : <Text style={[fs.trackTitle, { fontSize: 20 }]} numberOfLines={2}>{station.tagline}</Text>}
             {spotify.track && <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track.artist}</Text>}
           </View>
 

@@ -348,7 +348,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
 
         <MicGlow active={visible && playing} color={eq[1]} />
 
-        {handoff && <HandoffOverlay />}
+        {handoff && !spotify.track && <HandoffOverlay />}
 
         <MoodSheet
           visible={showMood}

@@ -936,7 +936,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
         <MicGlow active={visible && playing} color={station.eqColors?.[1] ?? station.glowColor} />
 
-        {handoff && <HandoffOverlay />}
+        {handoff && !spotify.track && <HandoffOverlay />}
 
         <MoodSheet
           visible={showMood}

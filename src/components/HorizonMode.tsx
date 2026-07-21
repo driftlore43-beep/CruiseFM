@@ -336,7 +336,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
 
         <MicGlow active={visible && playing} color={eq[1]} />
 
-        {handoff && <HandoffOverlay />}
+        {handoff && !spotify.track && <HandoffOverlay />}
 
         <MoodSheet
           visible={showMood}

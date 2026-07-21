@@ -1025,7 +1025,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
         <MicGlow active={visible && playing} color={station.eqColors?.[1] ?? V.gold} />
 
-        {handoff && <HandoffOverlay />}
+        {handoff && !spotify.track && <HandoffOverlay />}
 
         <MoodSheet
           visible={showMood}

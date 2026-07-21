@@ -767,7 +767,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
         </View>
 
-        {handoff && <HandoffOverlay />}
+        {handoff && !spotify.track && <HandoffOverlay />}
 
         <MoodSheet
           visible={showMood}

@@ -261,7 +261,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const fsValues = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(FS_MIN_H))).current;
   // Drives the ambient glow's brightness/breath — a big, cheap element that
   // reads the mic even on slow phones where 30 tiny bars are hard to see.
-  const glowPulse = useRef(new Animated.Value(0.7)).current;
+  const glowPulse = useRef(new Animated.Value(0.3)).current;
 
   const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
   const { micReactive } = useMotion();
@@ -342,7 +342,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     stopBarAnims(fsValues, timers);
     if (!micActive) {
       startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
-      glowPulse.setValue(0.7); // static ambient glow when the mic isn't driving
+      glowPulse.setValue(0.3); // calm static glow when the mic isn't driving
     }
   }, [micActive]);
 
@@ -605,16 +605,39 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           style={[
             fs.glowBand,
             { opacity: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }),
-              transform: [{ scaleY: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.32] }) }] },
+              transform: [{ scaleY: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.4] }) }] },
           ]}
           pointerEvents="none">
           <LinearGradient
             colors={[
               'transparent',
-              (currentStation.eqColors?.[1] ?? currentStation.glowColor) + '26',
+              (currentStation.eqColors?.[1] ?? currentStation.glowColor) + '59',
               'transparent',
             ]}
             locations={[0, 0.5, 1]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+        </Animated.View>
+
+        {/* Loud-transient bloom — near-invisible when quiet, a bright wash of
+            the station colour on the peaks, so the beat visibly lights the
+            scene even where the bars can't animate smoothly. */}
+        <Animated.View
+          style={[
+            fs.glowBand,
+            { opacity: glowPulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 0.72] }),
+              transform: [{ scaleY: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.25] }) }] },
+          ]}
+          pointerEvents="none">
+          <LinearGradient
+            colors={[
+              'transparent',
+              (currentStation.eqColors?.[2] ?? currentStation.eqColors?.[1] ?? currentStation.glowColor) + 'B3',
+              'transparent',
+            ]}
+            locations={[0.2, 0.5, 0.8]}
             start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
             style={StyleSheet.absoluteFill}
             pointerEvents="none"

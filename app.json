@@ -54,6 +54,12 @@
           "organization": "cruise-fm",
           "project": "react-native"
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Cruise FM uses the microphone to make the visuals pulse with the music playing around you. Audio is never recorded, saved, or sent anywhere."
+        }
       ]
     ],
     "experiments": {

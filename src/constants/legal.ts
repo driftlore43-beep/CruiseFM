@@ -21,6 +21,11 @@ export const PRIVACY_POLICY: LegalDoc = {
         'If you connect Spotify, you sign in on Spotify’s own page — Cruise FM never sees your password. Spotify gives the app a token, stored only on your device, used to control playback and read your playlists so drives can play your music. You can disconnect at any time in Profile, and you can also revoke access at spotify.com under Apps. Your use of Spotify is governed by Spotify’s own terms and privacy policy.',
     },
     {
+      heading: 'Microphone',
+      body:
+        'If you leave “Music-reactive visuals” on, Cruise FM reads the loudness of the sound around your phone so the on-screen visuals can pulse with the music. This happens live, on your device only — no audio is ever recorded, saved, or sent anywhere, and nothing is transcribed or analysed beyond the volume level. You can turn it off any time in Profile, or deny the microphone permission, and the visuals fall back to their timed animation.',
+    },
+    {
       heading: 'Purchases',
       body:
         'Cruise FM Premium is billed through the Apple App Store or Google Play. Payment is handled entirely by them — Cruise FM never sees your card details. Subscription status may be processed by RevenueCat, our billing infrastructure provider, which receives only an anonymous purchase record (never your identity or payment details).',

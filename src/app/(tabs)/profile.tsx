@@ -105,7 +105,7 @@ function useMusicPlatformInfo() {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { dataSaver, setDataSaver } = useMotion();
+  const { dataSaver, setDataSaver, micReactive, setMicReactive } = useMotion();
   const { devFreePreview, setDevFreePreview } = useEntitlements();
   const { name: platformName, color: platformColor, refresh: refreshPlatform } = useMusicPlatformInfo();
   const [selectorVisible, setSelectorVisible] = useState(false);
@@ -279,6 +279,25 @@ export default function ProfileScreen() {
             <Switch
               value={dataSaver}
               onValueChange={setDataSaver}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              thumbColor="#fff"
+              ios_backgroundColor="rgba(255,255,255,0.18)"
+              {...({ activeThumbColor: '#fff' } as object)}
+            />
+          </View>
+
+          {/* Music-reactive visuals toggle — visualisers pulse to the room's sound */}
+          <View style={[styles.settingsRow, styles.settingsBorder]}>
+            <View style={styles.platformRowLeft}>
+              <IconChip icon="waveform" size={34} />
+              <View>
+                <Text style={styles.settingsLabel}>Music-reactive visuals</Text>
+                <Text style={styles.dataSaverSub}>Bars move to the sound around you · uses the mic, never records</Text>
+              </View>
+            </View>
+            <Switch
+              value={micReactive}
+              onValueChange={setMicReactive}
               trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
               thumbColor="#fff"
               ios_backgroundColor="rgba(255,255,255,0.18)"

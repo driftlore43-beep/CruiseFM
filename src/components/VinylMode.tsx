@@ -66,7 +66,7 @@ const VINYL_ACCENTS: Record<string, string> = {
   'mountain-pass':  '#FFFFFF', // crisp white
   'cars-coffee':    '#8B5A2B', // coffee brown
   'night-run':      '#2B4CFF', // deep blue
-  'coastal':        '#7CD4FF', // light sky blue
+  'coastal':        '#FF7A3C', // golden-hour orange (matches the warm moods)
 };
 
 /** '#RRGGBB' → 'rgba(r,g,b,a)' — for animated colour interpolation. */

@@ -261,8 +261,10 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
   const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 4,
+      // Only claim horizontal drags (tuning) — a downward swipe must fall
+      // through to the dismiss gesture so the player can be dragged away.
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > Math.abs(g.dy) && Math.abs(g.dx) > 4,
       onPanResponderGrant: () => { cancelSnap(); startFreqRef.current = freqRef.current; },
       onPanResponderMove: (_, g) => tuneTo(startFreqRef.current - g.dx / PX_PER_MHZ),
       onPanResponderRelease: () => snapToNearest(),
@@ -347,10 +349,8 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
         {/* Content */}
         <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>
-          <View style={{ alignItems: 'center', gap: 3, paddingHorizontal: 32, paddingBottom: 4 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 }}>PLAYING FROM</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>{lockedStation.name}</Text>
-          </View>
+          {/* No "Playing from" header here — the dial's big frequency + station
+              name already say which station is on air. */}
 
           {/* ── The dial — drag anywhere in this zone to tune ── */}
           <View style={{ flex: 1, justifyContent: 'center' }} {...pan.panHandlers}>
@@ -506,7 +506,7 @@ const fs = StyleSheet.create({
   freqBig: { fontSize: 76, fontWeight: '800', letterSpacing: -2, lineHeight: 82 },
   freqUnit: { color: 'rgba(255,255,255,0.45)', fontSize: 18, fontWeight: '800', letterSpacing: 2 },
   stationName: { fontSize: 17, fontWeight: '700', letterSpacing: 0.3, marginTop: 2 },
-  dragHint: { color: 'rgba(255,255,255,0.28)', fontSize: 9.5, fontWeight: '700', letterSpacing: 3, textAlign: 'center', marginTop: 8 },
+  dragHint: { color: 'rgba(255,255,255,0.18)', fontSize: 8, fontWeight: '600', letterSpacing: 2, textAlign: 'center', marginTop: 10 },
   time: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
   controls: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

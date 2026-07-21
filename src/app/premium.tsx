@@ -171,7 +171,7 @@ export default function PremiumScreen() {
 
           {/* Price */}
           <View style={styles.priceRow}>
-            <Text style={styles.price}>£2.99</Text>
+            <Text style={styles.price}>£1.99</Text>
             <Text style={styles.pricePer}>/ month</Text>
           </View>
           <Text style={styles.trialNote}>7-day free trial · cancel anytime</Text>

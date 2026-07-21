@@ -50,7 +50,7 @@ listing. Character limits noted per field.
 >
 > **FREE AND PREMIUM**
 > Cruise FM is free with the Cassette and Equalizer modes, basic playback,
-> and up to three custom stations. Premium (£2.99/month after a 7-day free
+> and up to three custom stations. Premium (£1.99/month after a 7-day free
 > trial, cancel anytime) unlocks every visual mode, every mood theme, and
 > unlimited custom stations. Badges and core features are never paywalled.
 >

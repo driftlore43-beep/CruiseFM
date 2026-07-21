@@ -58,7 +58,7 @@ communicates that Spotify Premium is required and links users to Spotify.
 
 ## Monetisation
 
-Cruise FM offers an optional in-app subscription (£2.99/month) that unlocks
+Cruise FM offers an optional in-app subscription (£1.99/month) that unlocks
 additional VISUAL themes and modes in the app itself. Access to Spotify
 content is never sold: playback requires the user's own Spotify Premium
 account, all Spotify functionality works identically for free and paying

@@ -9,7 +9,7 @@ A premium driving-companion app (React Native / Expo SDK 56, Expo Router). Users
 The owner does not code — describe changes in plain English, Claude implements everything. Keep explanations non-technical.
 
 ## Product decisions (fixed)
-- Monetisation: £2.99/mo subscription, 7-day free trial (RevenueCat SDK wired: sandbox test_ key in config.ts, entitlement "premium", safe no-op on web/old builds via src/utils/purchases.ts; real goog_ key + Play Console product still pending)
+- Monetisation: £1.99/mo subscription, 7-day free trial (RevenueCat SDK wired: sandbox test_ key in config.ts, entitlement "premium", safe no-op on web/old builds via src/utils/purchases.ts; real goog_ key + Play Console product still pending)
 - FREE tier: Cassette + Equalizer modes, basic playback, limited custom stations (3), badges
 - PREMIUM: Vinyl + Retro Radio modes, all mood themes, unlimited playlists, future additions
 - Never premium: offline listening, badges, founder cosmetics, seasonal themes
@@ -37,4 +37,4 @@ The owner does not code — describe changes in plain English, Claude implements
 - DONE: all visuals unified, Spotify OAuth working on Android build, playback CONFIRMED WORKING on device (2026-07-18: playlists load, music plays, controls obey; play uses active-device fast path, failures surface via PlaybackNotice card)
 - DONE 2026-07-19: sandbox purchase CONFIRMED on device (free-user preview → locks appear → Unlock Premium → RevenueCat test purchase unlocks → Restore purchases works)
 - DONE 2026-07-20: EAS Update (OTA) wired — expo-updates ~56.0.22 installed; app.json updates.url = https://u.expo.dev/<projectId> + runtimeVersion policy "fingerprint"; eas.json preview/production build profiles carry channel "preview"/"production". Default release behaviour = check-on-launch, apply-on-next-launch (no runtime code added). REQUIRES ONE FRESH BUILD before OTA works — current installed builds lack the expo-updates native module and will NOT receive updates. Owner runs on their machine: (1) `eas build -p android --profile preview` once to bake in expo-updates; after that, JS/asset-only changes ship via `eas update --branch preview -m "<note>"` (minutes, no store, no reinstall). Fingerprint policy auto-blocks OTA when native deps change → that's the signal a new build is needed, not an update.
-- NEXT: build the open-in-Spotify fallback (task 2) → Google ID verification clears → upload build, £2.99 product in Play Console, swap test_ key for goog_ key → closed test (12 testers/14 days)
+- NEXT: build the open-in-Spotify fallback (task 2) → Google ID verification clears → upload build, £1.99 product in Play Console, swap test_ key for goog_ key → closed test (12 testers/14 days)

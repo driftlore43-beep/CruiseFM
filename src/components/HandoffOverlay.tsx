@@ -47,6 +47,7 @@ export function HandoffOverlay() {
           <MaterialCommunityIcons name="open-in-new" size={17} color="#04220f" />
           <Text style={st.btnText}>Open Spotify</Text>
         </Pressable>
+        <Text style={st.roadmap}>Full in-app controls are on the way.</Text>
       </View>
     </View>
   );
@@ -79,4 +80,5 @@ const st = StyleSheet.create({
     marginTop: 8,
   },
   btnText: { color: '#04220f', fontSize: 15, fontWeight: '800' },
+  roadmap: { color: 'rgba(255,255,255,0.4)', fontSize: 11.5, fontWeight: '600', marginTop: 10 },
 });

@@ -281,8 +281,10 @@ function CustomStationCard({ station, onPress }: { station: CustomStation; onPre
 
 const styles = StyleSheet.create({
   safe: {
+    // Transparent like every other tab, so the shared near-black root shows
+    // through — the opaque midnight fill read as an off purple-navy.
     flex: 1,
-    backgroundColor: Cruise.midnight,
+    backgroundColor: 'transparent',
   },
   headerBlock: {
     paddingTop: 20,

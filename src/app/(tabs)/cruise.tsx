@@ -22,6 +22,7 @@ import {
 } from '@/utils/lastCruise';
 import { recordDriveStart } from '@/utils/driveStats';
 import { loadCustomStations, resolveAnyStation } from '@/utils/customStations';
+import { DEFAULT_DRIVER_NAME, getDriverName } from '@/utils/driverName';
 
 const recommended = STATIONS.filter((s) => RECOMMENDED_IDS.includes(s.id));
 
@@ -64,17 +65,19 @@ export default function CruiseScreen() {
   const [tonightPick, setTonightPick] = useState<Station>(() => stationById(defaultStationForNow()));
   const [lastCruise, setLastCruise] = useState<LastCruise | null>(null);
   const [statsKey, setStatsKey] = useState(0);
+  const [driverName, setDriverName] = useState(DEFAULT_DRIVER_NAME);
 
   useEffect(() => {
     getPlatformSkipped().then((skipped) => { if (skipped) setShowBanner(true); });
   }, []);
 
-  // Refresh on every focus — the time of day, last cruise and stats move on.
+  // Refresh on every focus — the name, time of day, last cruise and stats move on.
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setTonightPick(stationById(defaultStationForNow()));
       setStatsKey((k) => k + 1);
+      getDriverName().then((n) => { if (active) setDriverName(n); });
       loadCustomStations().then(() => loadLastCruise()).then((last) => { if (active) setLastCruise(last); });
       return () => { active = false; };
     }, []),
@@ -96,14 +99,23 @@ export default function CruiseScreen() {
 
   const handleStartDrive = () => launchCruise(heroCruise);
 
+  // The "NOW PLAYING" header follows the live drive if there is one, otherwise
+  // it previews tonight's pick — never a stale hardcoded name.
+  const nowStation = np.session ? stationById(np.session.stationId) : heroStation;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: TAB_SAFE_INSET + insets.bottom }]}
         showsVerticalScrollIndicator={false}>
-        <EqualizerHeader />
+        <EqualizerHeader
+          stationName={nowStation.name}
+          live={!!np.session}
+          accent={nowStation.eqColors?.[1]}
+        />
         {showBanner && <SkipBanner onDismiss={() => setShowBanner(false)} />}
+        <Text style={styles.greeting}>Welcome back, {driverName}</Text>
         <HeroCard
           onStartDrive={handleStartDrive}
           cueLabel={heroCue}
@@ -155,6 +167,14 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
   content: { paddingTop: 4 },
+  greeting: {
+    color: Cruise.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    marginHorizontal: 22,
+    marginBottom: 10,
+  },
   section: { marginBottom: 30, gap: 14 },
   sectionLabel: {
     color: Cruise.textMuted,

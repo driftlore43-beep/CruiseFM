@@ -52,19 +52,19 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 - Status: ✅ OK / cleared
 
 ### ✅ night-run.jpg — "Night Run FM"
-- In frame: night city skyline glowing against a dark sky, tree silhouettes below. No cars, people or brands. (Replaced the garage-coupe photo 2026-07-09 — the car cluttered the visualiser backdrops.)
+- In frame: soft-focus driver's view of a night expressway, tail lights ahead, distant downtown skyline. (Owner-picked 2026-07-20 — the dashcam view matches the "empty expressways" tagline; the huge dark sky suits the visualisers.)
 - Type: real photograph.
-- Source: Unsplash — photo-1667754248024-e1e03e60eb72 (2026-07-09).
-- License: **Unsplash License** (free commercial use, no attribution required).
-- Risk: **Low** — licensed source; nothing identifiable in frame.
+- Source: Pexels — pexels-thekameragrapher-15741271 (photo 15741271 by The Kameragrapher).
+- License: **Pexels License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; heavy motion blur leaves nothing legible in frame.
 - Status: ✅ OK / cleared
 
 ### ✅ sunset.jpg — "Sunset FM"
-- In frame: a car silhouetted at a golden-hour overlook, city lights and mountains below. Car in shadow — no visible logo or plate.
+- In frame: pink-to-orange dusk over a city avenue, tail lights and street lamps receding to distant mountains. (Owner upgrade 2026-07-20 — replaced the overlook silhouette for a richer sky.) A small "StoneBridge" hotel billboard was blur-patched before shipping.
 - Type: real photograph.
-- Source: Unsplash — photo-1602719501161-e0b16098314d (2026-07-08).
-- License: **Unsplash License** (free commercial use, no attribution required).
-- Risk: **Low** — licensed source; car is a dark silhouette with no identifiable branding.
+- Source: Pexels — pexels-futuremartian-7730786 (photo 7730786 by Future Martian).
+- License: **Pexels License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; the one legible billboard was patched, remaining signage is tiny/illegible under render blur.
 - Status: ✅ OK / cleared
 
 ### ✅ mountain.jpg — "Mountain Pass FM"
@@ -85,11 +85,11 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 - Status: ✅ OK / cleared
 
 ### ✅ tunnel.jpg — "Tunnel FM"
-- In frame: motion-blur drive through a lit road tunnel, distant unidentifiable car.
+- In frame: long-exposure light trails of cars exiting a dark tunnel mouth at night.
 - Type: real photograph.
-- Source: Unsplash — photo-1766083639765-1c9462495e68 (2026-07-08).
-- License: **Unsplash License** (free commercial use, no attribution required).
-- Risk: **Low** — licensed source; nothing identifiable in frame.
+- Source: Pexels — https://www.pexels.com/photo/time-lapse-photo-of-tunnel-730134/ by Burak The Weekender (2026-07-20; owner-picked to replace the busy neon-tube shot that fought the Sound Waves bars).
+- License: **Pexels License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; no identifiable vehicles or marks.
 - Status: ✅ OK / cleared
 
 ### (disabled) sunset-motion.webp
@@ -102,8 +102,22 @@ Stock / Shutterstock (paid), or AI from a tool whose terms **grant commercial us
 Every built-in station background is now a licensed Unsplash or Pexels photo (free commercial use).
 No 🔴 high-risk / AI / Pinterest images remain. Keep this file updated if any art is swapped later.
 
-- Unsplash: rain-drive, after-midnight, cars-coffee, sunset, night-run, tunnel
-- Pexels: mountain, coastal
+- Unsplash: rain-drive, after-midnight, cars-coffee
+- Pexels: mountain, coastal, tunnel, night-run, downtown, sunset, daylight
+
+### ✅ downtown.jpg — "Downtown FM"
+- In frame: deep blue-violet night street, parked cars, towers with a magenta crown. Two partially visible licence plates on the right-side cars were blur-patched before shipping.
+- Type: real photograph (owner-picked 2026-07-20 for the new ninth station).
+- Source: Pexels — pexels-reidimages-20131950 (photo 20131950 by Reid Images).
+- License: **Pexels License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; plates patched, no readable marks remain.
+
+### ✅ daylight.jpg — "Daylight FM"
+- In frame: yellow classic convertible cruising a sunlit tree-lined road, distant hills, passengers waving (seen from behind, no identifiable faces). (New free daytime station, owner-picked 2026-07-20.) The rear licence plate ("34 DDG 128") was blur-patched before shipping.
+- Type: real photograph.
+- Source: Pexels — pexels-c-2150313853-31175534 (photo 31175534).
+- License: **Pexels License** (free commercial use, no attribution required).
+- Risk: **Low** — licensed source; plate patched. Note: a faint "Chevrolet" chrome badge on the car (the vehicle's own marque, standard in stock car photography) — no affiliation implied.
 
 ## Notes
 - Custom stations created by users bring their own art — out of scope here.

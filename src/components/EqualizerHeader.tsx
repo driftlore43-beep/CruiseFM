@@ -53,16 +53,27 @@ function EqBar({
   return <Animated.View style={[styles.bar, { backgroundColor: color }, style]} />;
 }
 
-export function EqualizerHeader() {
+export function EqualizerHeader({
+  stationName,
+  live = false,
+  accent,
+}: {
+  /** Station to show — the active drive's, or tonight's pick when idle. */
+  stationName: string;
+  /** True when a drive session is actually playing. */
+  live?: boolean;
+  /** Mood colour to tint the bars, so the header matches the station. */
+  accent?: string;
+}) {
   return (
     <View style={styles.container}>
       <View style={styles.labelGroup}>
-        <Text style={styles.label}>NOW PLAYING</Text>
-        <Text style={styles.sublabel}>Night Run FM</Text>
+        <Text style={styles.label}>{live ? 'NOW PLAYING' : "TONIGHT'S PICK"}</Text>
+        <Text style={styles.sublabel}>{stationName}</Text>
       </View>
       <View style={styles.equalizerRow}>
         {BAR_CONFIGS.map((cfg, i) => (
-          <EqBar key={i} {...cfg} />
+          <EqBar key={i} {...cfg} color={accent ?? cfg.color} />
         ))}
       </View>
     </View>

@@ -45,6 +45,16 @@ function gauss(x: number, mu: number, sig: number): number {
   return Math.exp(-0.5 * d * d);
 }
 
+/** Blend a #rrggbb colour toward white by `amount` (0..1). */
+function lightenHex(hex: string, amount: number): string {
+  const m = hex.match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const ch = (v: number) => Math.round(v + (255 - v) * amount);
+  const r = ch((n >> 16) & 255), g = ch((n >> 8) & 255), b = ch(n & 255);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
+
 // Heights (0..~1.1) for every bar at this moment.
 function barHeights(phase: number, amp: number): number[] {
   const out: number[] = [];
@@ -65,6 +75,18 @@ function barHeights(phase: number, amp: number): number[] {
   return out;
 }
 
+
+// Owner-tuned Sound Waves palettes (cap → mid → base). Stations not listed
+// derive their bars from their shared eqColors.
+const SW_PALETTES: Record<string, [string, string, string]> = {
+  'rain-drive':     ['#FFE070', '#FFD24A', '#E8AE2E'],   // rich gold, no white cap
+  'coastal':        ['#FF9A4A', '#FF7A2E', '#F25A14'],   // entirely sunset orange
+  'after-midnight': ['#FF3B3B', '#EE1111', '#C40000'],   // blood red, kept
+  'sunset':         ['#FF5FB0', '#FF2E96', '#E0187E'],   // hot pink
+  'tunnel':         ['#C9E7FF', '#A8D4FF', '#7FB4EE'],   // faint light blue
+  'daylight':       ['#FFDA45', '#FBA518', '#E8720E'],   // sun-drenched gold
+};
+
 // ── Fullscreen modal ────────────────────────────────────────────────────────────
 export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
@@ -75,6 +97,10 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
   const station = resolveAnyStation(activeId);
   const spotify = useSpotifyPlayback(visible);
   const eq = station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF'];
+  // Bar gradient [cap, mid, base]. Owner-tuned per mood — several stations
+  // read best as one strong colour family (After Hours' solid red was the
+  // reference); the rest get a lightened tint of their own top colour.
+  const swStops = SW_PALETTES[station.id] ?? [lightenHex(eq[0], 0.45), eq[0], eq[2]];
 
   const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
   const [phase, setPhase] = useState(0);
@@ -105,7 +131,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
       const now = Date.now();
       if (now - last >= 33) {
         last = now;
-        const target = playingRef.current ? 1 : 0.5;
+        const target = playingRef.current ? 1 : 0.25;
         ampRef.current += (target - ampRef.current) * 0.08;
         setPhase(((now - start) / 1000) * PHASE_SPEED);
       }
@@ -122,7 +148,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
     if (!visible) return;
     if (stationId) setActiveId(stationId);
     slideY.setValue(SCREEN_H);
-    ampRef.current = playingRef.current ? 1 : 0.5;
+    ampRef.current = playingRef.current ? 1 : 0.25;
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
   }, [visible]);
 
@@ -212,13 +238,13 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
               <Defs>
                 {/* Each bar takes the full gradient top→bottom (bright cap, mood base) */}
                 <SvgGradient id="swBar" x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0" stopColor="#EAF3FF" />
-                  <Stop offset="0.35" stopColor={eq[0]} />
-                  <Stop offset="1" stopColor={eq[2]} />
+                  <Stop offset="0" stopColor={swStops[0]} />
+                  <Stop offset="0.35" stopColor={swStops[1]} />
+                  <Stop offset="1" stopColor={swStops[2]} />
                 </SvgGradient>
                 <RadialGradient id="swGlow" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
-                  <Stop offset="0" stopColor={eq[0]} stopOpacity="0.28" />
-                  <Stop offset="1" stopColor={eq[0]} stopOpacity="0" />
+                  <Stop offset="0" stopColor={swStops[1]} stopOpacity="0.28" />
+                  <Stop offset="1" stopColor={swStops[1]} stopOpacity="0" />
                 </RadialGradient>
               </Defs>
 
@@ -238,13 +264,13 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
                   return (
                     <Fragment key={i}>
                       <Rect x={x} y={cy - 2 - up} width={barW} height={up} rx={rx} ry={rx} fill="url(#swBar)" opacity={0.95} />
-                      <Rect x={x} y={cy + 2} width={barW} height={down} rx={rx} ry={rx} fill="url(#swBar)" opacity={0.26} />
+                      <Rect x={x} y={cy + 2} width={barW} height={down} rx={rx} ry={rx} fill="url(#swBar)" opacity={0.45} />
                     </Fragment>
                   );
                 });
               })()}
             </Svg>
-            <FloatingNotes playing={playing} color={eq[0]} />
+            <FloatingNotes playing={playing} color={swStops[1]} />
           </View>
 
           {/* Song title */}

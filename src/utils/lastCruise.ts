@@ -28,7 +28,7 @@ export function defaultStationForNow(): string {
   let id: string;
   if (h >= 0 && h < 5) id = 'after-midnight';
   else if (h >= 5 && h < 11) id = 'mountain-pass';
-  else if (h >= 11 && h < 16) id = 'coastal';
+  else if (h >= 11 && h < 16) id = 'daylight';
   else if (h >= 16 && h < 20) id = 'sunset';
   else id = 'night-run';
   // Fall back to the first station if that id is somehow missing.

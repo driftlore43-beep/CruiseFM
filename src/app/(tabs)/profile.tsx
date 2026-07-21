@@ -292,7 +292,7 @@ export default function ProfileScreen() {
               <IconChip icon="waveform" size={34} />
               <View>
                 <Text style={styles.settingsLabel}>Music-reactive visuals</Text>
-                <Text style={styles.dataSaverSub}>Bars move to the sound around you · uses the mic, never records</Text>
+                <Text style={styles.dataSaverSub}>Visuals pulse to the sound around you · uses the mic, never records · may briefly affect Spotify on iPhone</Text>
               </View>
             </View>
             <Switch

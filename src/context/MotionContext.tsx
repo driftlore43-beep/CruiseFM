@@ -14,12 +14,12 @@ type MotionCtx = {
 
 const Ctx = createContext<MotionCtx>({
   dataSaver: false, setDataSaver: () => {},
-  micReactive: true, setMicReactive: () => {},
+  micReactive: false, setMicReactive: () => {},
 });
 
 export function MotionProvider({ children }: { children: ReactNode }) {
   const [dataSaver, setDS] = useState(false);
-  const [micReactive, setMic] = useState(true);
+  const [micReactive, setMic] = useState(false);
 
   useEffect(() => {
     getDataSaver().then(setDS);

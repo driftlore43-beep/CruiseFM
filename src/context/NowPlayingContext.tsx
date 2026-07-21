@@ -94,6 +94,10 @@ type NowPlayingCtx = {
    * "smart auto-pause" that keeps playback crisp without killing the visuals. */
   micQuietTick: number;
   requestMicQuiet: () => void;
+  /** The station's linked playlist just changed. If that station is the one
+   * currently driving, switch the music to the new playlist right away;
+   * otherwise it simply takes effect on the next Start Drive. */
+  relinkStationPlaylist: (stationId: string) => void;
 };
 
 const Ctx = createContext<NowPlayingCtx | null>(null);
@@ -159,6 +163,15 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     recordDriveEnd().catch(() => {});
   }, []);
 
+  const relinkStationPlaylist = useCallback((stationId: string) => {
+    const current = sessionRef.current;
+    // Only live-switch when this station is the active drive; otherwise the new
+    // playlist is already saved and the next Start Drive will use it.
+    if (!current || current.stationId !== stationId) return;
+    requestMicQuiet();
+    playStationMusic(stationId).then((r) => { if (r) reportStartResult(r); });
+  }, [reportStartResult, requestMicQuiet]);
+
   const returnToSpotify = useCallback(() => {
     const current = sessionRef.current;
     if (!current) return;
@@ -168,8 +181,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, micQuietTick, requestMicQuiet }),
-    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, micQuietTick, requestMicQuiet],
+    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, micQuietTick, requestMicQuiet, relinkStationPlaylist }),
+    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, micQuietTick, requestMicQuiet, relinkStationPlaylist],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

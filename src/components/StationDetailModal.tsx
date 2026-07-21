@@ -24,6 +24,7 @@ import { GlossSheen } from '@/components/GlossSheen';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { useTheme } from '@/context/ThemeContext';
 import { useMotion } from '@/context/MotionContext';
+import { useNowPlaying } from '@/context/NowPlayingContext';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import {
   getStationPlaylist,
@@ -71,9 +72,11 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { dataSaver } = useMotion();
+  const { relinkStationPlaylist } = useNowPlaying();
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
   const [selectedMode, setSelectedMode] = useState('cassette');
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
+  const [linkToast, setLinkToast] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -290,15 +293,31 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
 
         </ScrollView>
 
+        {linkToast && (
+          <View style={[styles.linkToast, { bottom: insets.bottom + 24 }]} pointerEvents="none">
+            <MaterialCommunityIcons name="check-circle" size={16} color={SPOTIFY_GREEN} />
+            <Text style={styles.linkToastText} numberOfLines={1}>{linkToast}</Text>
+          </View>
+        )}
+
         {showPicker && (
           <PlaylistSheet
             stationName={station.name}
             current={linked}
             onClose={() => setShowPicker(false)}
             onPick={async (pl) => {
+              const changed = linked?.uri !== pl.uri;
               await setStationPlaylist(station.id, pl);
               setLinked(pl);
               setShowPicker(false);
+              if (changed) {
+                if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                // If this station is the drive playing right now, switch to it
+                // live; otherwise it's queued for the next Start Drive.
+                relinkStationPlaylist(station.id);
+                setLinkToast(`Playlist set: ${pl.name}`);
+                setTimeout(() => setLinkToast(null), 2600);
+              }
             }}
           />
         )}
@@ -351,6 +370,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 16, elevation: 10,
   },
   startBtnQuiet: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' },
+  linkToast: {
+    position: 'absolute', alignSelf: 'center', zIndex: 30,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    maxWidth: '86%',
+    backgroundColor: 'rgba(16,16,26,0.96)',
+    borderRadius: 999, paddingVertical: 11, paddingHorizontal: 18,
+    borderWidth: 1, borderColor: 'rgba(29,185,84,0.5)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 12,
+  },
+  linkToastText: { color: '#fff', fontSize: 13.5, fontWeight: '600', flexShrink: 1 },
 
   stationName: {
     color: '#fff', fontSize: 40, fontWeight: '800',

@@ -837,6 +837,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   })).current;
 
   const topPad       = Math.max(insets.top, 20);
+  const bottomPad    = Math.max(insets.bottom, 24) + 24;
 
   const _restartProgressFrom = (posMs: number, trackMs: number) => {
     const remaining = trackMs - posMs;
@@ -939,7 +940,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           <View style={fs.dragPill} />
         </View>
 
-        <View style={{ flex: 1, paddingTop: topPad + 52, alignItems: 'center' }}>
+        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: bottomPad, alignItems: 'center' }}>
 
           {/* ── Header — small top-center, Spotify style ── */}
           <View style={fs.header}>
@@ -1070,7 +1071,7 @@ const fs = StyleSheet.create({
   trackBlock:  { alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 16, paddingBottom: 4, alignItems: 'flex-start' },
   trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
   trackArtist: { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 },
-  turntableWrap:{ alignItems: 'center', width: '100%' },
+  turntableWrap:{ flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%' },
   progressWrap: { width: '100%', paddingHorizontal: 28, marginTop: 22, marginBottom: 0 },
   progressRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
   timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2, width: 38 },

@@ -1073,7 +1073,7 @@ const fs = StyleSheet.create({
   trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
   trackArtist: { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 },
 
-  cassetteWrap: { alignItems: 'center', gap: 10 },
+  cassetteWrap: { alignItems: 'center', justifyContent: 'center', gap: 10 },
   glowOrb:     { position: 'absolute', alignSelf: 'center' },
 
   playlistBtn: {

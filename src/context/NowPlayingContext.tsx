@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Platform } from 'react-native';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
 import { recordDriveEnd } from '@/utils/driveStats';
 import { isRestrictedAccount, isSpotifyConnected, startPlayback, type StartResult } from '@/utils/spotify';
@@ -125,6 +127,18 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   }, []);
   const sessionRef = useRef<NowPlayingSession | null>(null);
   useEffect(() => { sessionRef.current = session; }, [session]);
+
+  // Keep the screen awake for the whole drive — a driving companion that dims
+  // and locks mid-cruise is useless. Tied to the session (any mode, portrait
+  // or landscape); released the moment the drive ends so the phone sleeps
+  // normally again. A distinct tag keeps this independent of any per-mode
+  // keep-awake so neither cancels the other.
+  const driveActive = session != null;
+  useEffect(() => {
+    if (Platform.OS === 'web' || !driveActive) return;
+    activateKeepAwakeAsync('cruise-drive').catch(() => {});
+    return () => { deactivateKeepAwake('cruise-drive').catch(() => {}); };
+  }, [driveActive]);
 
   const open = useCallback((mode: string, stationId: string = 'night-run', opts?: { preview?: boolean; paused?: boolean }) => {
     // iPod mode was retired — any old saved iPod cruise resumes in Equalizer.

@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 
+import { ConnectSpotifyCard } from '@/components/ConnectSpotifyCard';
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
 import { HeroCard } from '@/components/HeroCard';
@@ -13,7 +13,6 @@ import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
 import { RECOMMENDED_IDS, STATIONS, type Station } from '@/constants/stations';
-import { getPlatformSkipped } from '@/utils/musicPlatform';
 import {
   loadLastCruise,
   saveLastCruise,
@@ -41,24 +40,10 @@ function stationById(id: string): Station {
   return resolveAnyStation(id);
 }
 
-function SkipBanner({ onDismiss }: { onDismiss: () => void }) {
-  return (
-    <View style={styles.banner}>
-      <Ionicons name="musical-notes" size={16} color="rgba(255,255,255,0.75)" />
-      <Text style={styles.bannerText}>Connect your music platform in Profile settings</Text>
-      <Pressable onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Ionicons name="close" size={16} color="rgba(255,255,255,0.4)" />
-      </Pressable>
-    </View>
-  );
-}
-
-
 export default function CruiseScreen() {
   const insets = useSafeAreaInsets();
   const np = useNowPlaying();
   const { isPro } = useEntitlements();
-  const [showBanner, setShowBanner] = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   // One smart hero: it becomes your last cruise if you have one, otherwise
   // tonight's time-of-day pick. Scene, cue and button all track it.
@@ -66,10 +51,6 @@ export default function CruiseScreen() {
   const [lastCruise, setLastCruise] = useState<LastCruise | null>(null);
   const [statsKey, setStatsKey] = useState(0);
   const [driverName, setDriverName] = useState(DEFAULT_DRIVER_NAME);
-
-  useEffect(() => {
-    getPlatformSkipped().then((skipped) => { if (skipped) setShowBanner(true); });
-  }, []);
 
   // Refresh on every focus — the name, time of day, last cruise and stats move on.
   useFocusEffect(
@@ -114,7 +95,7 @@ export default function CruiseScreen() {
           live={!!np.session}
           accent={nowStation.eqColors?.[1]}
         />
-        {showBanner && <SkipBanner onDismiss={() => setShowBanner(false)} />}
+        <ConnectSpotifyCard />
         <Text style={styles.greeting}>Welcome back, {driverName}</Text>
         <HeroCard
           onStartDrive={handleStartDrive}

@@ -541,7 +541,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   useEffect(() => { activeTrackRef.current = activeTrack; }, [activeTrack]);
 
   const station      = resolveAnyStation(activeId);
-  const currentTrack = SIDE_A_TRACKS[activeTrack];
 
   // ── Start secondary animations (tape flow, glow, progress) ──────────────────
   const startReels = () => {
@@ -745,7 +744,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
               <Text style={[ls.nowPlaying, { fontFamily: Fonts.mono }]}>NOW PLAYING</Text>
               <Text style={ls.lsStation} numberOfLines={1}>{station.name}</Text>
               <Text style={ls.lsTrack} numberOfLines={1}>
-                {currentTrack.title} — {currentTrack.artist}
+                {spotify.track ? `${spotify.track.title} — ${spotify.track.artist}` : station.tagline}
               </Text>
 
               <View style={{ height: 14 }} />
@@ -806,7 +805,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
                 opacity: playing ? glowOpacity : 0.12,
                 transform: [{ scale: glowScale }],
               }]} />
-              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={currentTrack.title} artist={currentTrack.artist} timeText={elapsedTxt} />
+              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
             </View>
           </View>
         </View>
@@ -851,7 +850,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
               transform: [{ scale: glowScale }],
             }]} />
             <TouchableOpacity onPress={togglePlay} activeOpacity={0.92}>
-              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={currentTrack.title} artist={currentTrack.artist} timeText={elapsedTxt} />
+              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
             </TouchableOpacity>
             <FloatingNotes playing={playing} color={neonColor} />
           </View>

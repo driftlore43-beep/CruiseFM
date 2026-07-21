@@ -4,6 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from 'expo-router';
 
 import { ConnectSpotifyCard } from '@/components/ConnectSpotifyCard';
+import { SpotifyNudgeCard } from '@/components/SpotifyNudgeCard';
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
 import { HeroCard } from '@/components/HeroCard';
@@ -96,6 +97,7 @@ export default function CruiseScreen() {
           accent={nowStation.eqColors?.[1]}
         />
         <ConnectSpotifyCard />
+        <SpotifyNudgeCard />
         <Text style={styles.greeting}>Welcome back, {driverName}</Text>
         <HeroCard
           onStartDrive={handleStartDrive}

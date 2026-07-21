@@ -20,6 +20,7 @@ import { seekTo } from '@/utils/spotify';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { MicGlow } from '@/components/MicGlow';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { MoodSheet } from '@/components/MoodSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
@@ -1012,6 +1013,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           </View>
 
         </View>
+
+        <MicGlow active={visible && playing} color={station.eqColors?.[1] ?? V.gold} />
 
         {handoff && <HandoffOverlay />}
 

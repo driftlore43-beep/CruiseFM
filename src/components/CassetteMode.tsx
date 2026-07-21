@@ -21,6 +21,7 @@ import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/u
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { MicGlow } from '@/components/MicGlow';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -923,6 +924,8 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
           </View>
 
         </View>
+
+        <MicGlow active={visible && playing} color={station.eqColors?.[1] ?? station.glowColor} />
 
         {handoff && <HandoffOverlay />}
 

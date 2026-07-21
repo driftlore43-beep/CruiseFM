@@ -714,7 +714,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               style={fs.shuffleRepeatBtn}
               onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={26} color={shuffle ? '#7B38E0' : '#ffffff'} />
+              <Ionicons name="shuffle" size={26} color={shuffle ? (currentStation.eqColors?.[1] ?? '#7B38E0') : '#ffffff'} />
             </TouchableOpacity>
 
             <TouchableOpacity style={fs.skipBtn} activeOpacity={0.75} onPress={spotify.prev}>
@@ -745,9 +745,9 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
             <TouchableOpacity
               style={fs.shuffleRepeatBtn}
-              onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'context' : 'off'); }}
+              onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'track' : 'off'); }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="repeat" size={26} color={repeat ? '#7B38E0' : '#ffffff'} />
+              <MaterialCommunityIcons name={repeat ? 'repeat-once' : 'repeat'} size={26} color={repeat ? (currentStation.eqColors?.[1] ?? '#7B38E0') : '#ffffff'} />
             </TouchableOpacity>
           </View>
 

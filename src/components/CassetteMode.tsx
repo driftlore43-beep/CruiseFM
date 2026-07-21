@@ -878,7 +878,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
               onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }}
               style={fs.shuffleRepeatBtn}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={26} color={shuffle ? '#C8860A' : '#ffffff'} />
+              <Ionicons name="shuffle" size={26} color={shuffle ? (currentEq?.[1] ?? '#C8860A') : '#ffffff'} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -911,10 +911,10 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'context' : 'off'); }}
+              onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'track' : 'off'); }}
               style={fs.shuffleRepeatBtn}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="repeat" size={26} color={repeat ? '#C8860A' : '#ffffff'} />
+              <MaterialCommunityIcons name={repeat ? 'repeat-once' : 'repeat'} size={26} color={repeat ? (currentEq?.[1] ?? '#C8860A') : '#ffffff'} />
             </TouchableOpacity>
           </View>
 

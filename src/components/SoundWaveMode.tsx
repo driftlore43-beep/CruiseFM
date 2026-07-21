@@ -326,8 +326,8 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
             <TouchableOpacity onPress={() => { resetTrack(); spotify.next(); }} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-next" size={44} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'context' : 'off'); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="repeat" size={24} color={repeat ? eq[1] : 'rgba(255,255,255,0.85)'} />
+            <TouchableOpacity onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'track' : 'off'); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <MaterialCommunityIcons name={repeat ? 'repeat-once' : 'repeat'} size={24} color={repeat ? eq[1] : 'rgba(255,255,255,0.85)'} />
             </TouchableOpacity>
           </View>
 

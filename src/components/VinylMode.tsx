@@ -978,7 +978,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           {/* Controls */}
           <View style={fs.controls}>
             <TouchableOpacity onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={26} color={shuffle ? V.gold : '#ffffff'} />
+              <Ionicons name="shuffle" size={26} color={shuffle ? (station.eqColors?.[1] ?? V.gold) : '#ffffff'} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { setActiveTrack((t) => Math.max(0, t - 1)); spotify.prev(); }} style={fs.skipBtn} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-previous" size={48} color="#fff" />
@@ -1002,8 +1002,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             <TouchableOpacity onPress={() => { setActiveTrack((t) => Math.min(VINYL_TRACKS.length - 1, t + 1)); spotify.next(); }} style={fs.skipBtn} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-next" size={48} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'context' : 'off'); }} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="repeat" size={26} color={repeat ? V.gold : '#ffffff'} />
+            <TouchableOpacity onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'track' : 'off'); }} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <MaterialCommunityIcons name={repeat ? 'repeat-once' : 'repeat'} size={26} color={repeat ? (station.eqColors?.[1] ?? V.gold) : '#ffffff'} />
             </TouchableOpacity>
           </View>
 

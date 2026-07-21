@@ -17,6 +17,17 @@
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
+    "testflight": {
+      "autoIncrement": true,
+      "channel": "preview",
+      "environment": "preview",
+      "ios": {
+        "distribution": "store"
+      },
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "channel": "production",
@@ -24,6 +35,7 @@
     }
   },
   "submit": {
+    "testflight": {},
     "production": {}
   }
 }

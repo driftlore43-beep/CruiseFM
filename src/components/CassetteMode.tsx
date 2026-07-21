@@ -442,6 +442,13 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
   const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
   const spotify = useSpotifyPlayback(visible);
+
+  // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
+  useEffect(() => {
+    if (!spotify.connected) return;
+    setShuffle(spotify.shuffleOn);
+    setRepeat(spotify.repeatMode !== 'off');
+  }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
   const [activeId,    setActiveId]    = useState(stationId ?? 'night-run');
   const [activeTrack, setActiveTrack] = useState(1);   // A2 default (index 1)
   const [platform,    setPlatform]    = useState<{ id: PlatformId; name: string; color: string } | null>(null);
@@ -868,7 +875,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
           {/* Controls */}
           <View style={fs.controls}>
             <TouchableOpacity
-              onPress={() => setShuffle((s) => !s)}
+              onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }}
               style={fs.shuffleRepeatBtn}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Ionicons name="shuffle" size={26} color={shuffle ? '#C8860A' : '#ffffff'} />
@@ -904,7 +911,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => setRepeat((r) => !r)}
+              onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'context' : 'off'); }}
               style={fs.shuffleRepeatBtn}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Ionicons name="repeat" size={26} color={repeat ? '#C8860A' : '#ffffff'} />

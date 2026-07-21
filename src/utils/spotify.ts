@@ -379,6 +379,14 @@ export async function seekTo(positionMs: number) {
   return spotifyFetch(`/me/player/seek?position_ms=${Math.max(0, Math.round(positionMs))}`, 'PUT');
 }
 
+export async function setShuffle(state: boolean) {
+  return spotifyFetch(`/me/player/shuffle?state=${state ? 'true' : 'false'}`, 'PUT');
+}
+
+export async function setRepeat(state: 'off' | 'context' | 'track') {
+  return spotifyFetch(`/me/player/repeat?state=${state}`, 'PUT');
+}
+
 export async function skipNext() {
   return spotifyFetch('/me/player/next', 'POST');
 }

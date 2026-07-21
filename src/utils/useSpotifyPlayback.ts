@@ -4,12 +4,16 @@ import { useActivityPing, useStartResultReporter } from '@/context/NowPlayingCon
 
 import {
   isSpotifyConnected,
-  getCurrentTrack,
+  getPlaybackState,
   pause as spotifyPause,
   startPlayback,
   skipNext,
   skipPrev,
+  setShuffle as spotifySetShuffle,
+  setRepeat as spotifySetRepeat,
 } from './spotify';
+
+export type RepeatMode = 'off' | 'context' | 'track';
 
 export type NowPlaying = {
   title: string;
@@ -34,6 +38,8 @@ export type NowPlaying = {
 export function useSpotifyPlayback(visible: boolean) {
   const [connected, setConnected] = useState(false);
   const [track, setTrack] = useState<NowPlaying | null>(null);
+  const [shuffleOn, setShuffleOn] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
   const cancelledRef = useRef(false);
   const refreshRef = useRef<() => void>(() => {});
 
@@ -49,7 +55,7 @@ export function useSpotifyPlayback(visible: boolean) {
       if (!conn) return;
 
       const refresh = async () => {
-        const data = await getCurrentTrack();
+        const data = await getPlaybackState();
         if (cancelledRef.current) return;
         const item = data?.item;
         if (item?.name) {
@@ -61,6 +67,11 @@ export function useSpotifyPlayback(visible: boolean) {
             syncedAt: Date.now(),
             isPlaying: data.is_playing ?? true,
           });
+        }
+        // Keep the shuffle/repeat buttons honest with Spotify's real state.
+        if (data) {
+          setShuffleOn(!!data.shuffle_state);
+          if (data.repeat_state) setRepeatMode(data.repeat_state as RepeatMode);
         }
       };
       refreshRef.current = refresh;
@@ -84,11 +95,16 @@ export function useSpotifyPlayback(visible: boolean) {
   return {
     connected,
     track,
+    shuffleOn,
+    repeatMode,
     // Only surface Spotify's verdict for users who actually connected it —
     // demo-mode listeners shouldn't be nagged about a service they never linked.
     play: () => { ping(); startPlayback().then((r) => { if (connected) report(r); }).catch(() => {}); after(); },
     pause: () => { ping(); spotifyPause().catch(() => {}); after(); },
     next: () => { ping(); skipNext().catch(() => {}); after(); },
     prev: () => { ping(); skipPrev().catch(() => {}); after(); },
+    // Optimistic local flip; the API call + next poll settle the truth.
+    shuffle: (state: boolean) => { ping(); setShuffleOn(state); spotifySetShuffle(state).catch(() => {}); after(); },
+    repeat: (mode: RepeatMode) => { ping(); setRepeatMode(mode); spotifySetRepeat(mode).catch(() => {}); after(); },
   };
 }

@@ -149,6 +149,14 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
   const station = resolveAnyStation(activeId);
   const spotify = useSpotifyPlayback(visible);
+
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState(false);
+  useEffect(() => {
+    if (!spotify.connected) return;
+    setShuffle(spotify.shuffleOn);
+    setRepeat(spotify.repeatMode !== 'off');
+  }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
   const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
 
   const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
@@ -287,8 +295,8 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
 
           {/* Controls */}
           <View style={fs.controls}>
-            <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={24} color="rgba(255,255,255,0.85)" />
+            <TouchableOpacity onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Ionicons name="shuffle" size={24} color={shuffle ? eq[1] : 'rgba(255,255,255,0.85)'} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { resetTrack(); spotify.prev(); }} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-previous" size={44} color="#fff" />
@@ -306,8 +314,8 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             <TouchableOpacity onPress={() => { resetTrack(); spotify.next(); }} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-next" size={44} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="repeat" size={24} color="rgba(255,255,255,0.85)" />
+            <TouchableOpacity onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'context' : 'off'); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Ionicons name="repeat" size={24} color={repeat ? eq[1] : 'rgba(255,255,255,0.85)'} />
             </TouchableOpacity>
           </View>
 

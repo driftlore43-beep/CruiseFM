@@ -409,6 +409,13 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
   const spotify = useSpotifyPlayback(visible);
 
+  // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
+  useEffect(() => {
+    if (!spotify.connected) return;
+    setShuffle(spotify.shuffleOn);
+    setRepeat(spotify.repeatMode !== 'off');
+  }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
+
   // Progress rides the shared track clock — real Spotify position when
   // connected, the classic 4-minute demo loop otherwise.
   const { progress, elapsedMs: currentTimeMs, durationMs } = useTrackClock({
@@ -705,7 +712,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           <View style={fs.controls}>
             <TouchableOpacity
               style={fs.shuffleRepeatBtn}
-              onPress={() => setShuffle((s) => !s)}
+              onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Ionicons name="shuffle" size={26} color={shuffle ? '#7B38E0' : '#ffffff'} />
             </TouchableOpacity>
@@ -738,7 +745,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
             <TouchableOpacity
               style={fs.shuffleRepeatBtn}
-              onPress={() => setRepeat((r) => !r)}
+              onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'context' : 'off'); }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Ionicons name="repeat" size={26} color={repeat ? '#7B38E0' : '#ffffff'} />
             </TouchableOpacity>

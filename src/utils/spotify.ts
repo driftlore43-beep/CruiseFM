@@ -300,6 +300,7 @@ export type StartResult =
   | 'premium-required'
   | 'restricted'      // account not on the dev-mode allowlist
   | 'handoff'         // playlist handed to the Spotify app (set by the caller)
+  | 'no-playlist'     // station has no linked playlist — nothing to play (set by the caller)
   | 'error';
 
 /**

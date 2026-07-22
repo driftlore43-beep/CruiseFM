@@ -12,6 +12,7 @@ import { Cruise } from '@/constants/theme';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE, type LegalDoc } from '@/constants/legal';
 import { sendTestCrash } from '@/utils/crashReports';
 import { DEFAULT_DRIVER_NAME, getDriverName, setDriverName } from '@/utils/driverName';
+import { disconnectSpotify } from '@/utils/spotify';
 
 export type SettingsPage =
   | 'account' | 'notifications' | 'privacy' | 'about' | 'refer'
@@ -105,11 +106,49 @@ function AccountBody() {
         <SettingsInfoRow label="Email" value="Not connected" />
         <SettingsInfoRow label="Plan" value="Free" last />
       </SettingsSection>
-      <SettingsSection label="ACCOUNT">
-        <SettingsInfoRow label="Change Password" value="Coming soon" />
-        <SettingsInfoRow label="Delete Account" value="Coming soon" last />
+      <SettingsSection label="YOUR DATA">
+        <View style={[styles.para, styles.paraBorder]}>
+          <Text style={styles.paraText}>
+            Cruise FM has no account or password — everything lives on this phone. Deleting your
+            data disconnects Spotify and wipes your drive history, playlists, badges and settings
+            from this device.
+          </Text>
+        </View>
+        <DeleteDataRow />
       </SettingsSection>
     </>
+  );
+}
+
+// Two-tap delete: first tap arms it (and quietly disarms after a few seconds),
+// second tap actually wipes. No accounts exist, so "delete account" honestly
+// means: disconnect Spotify + erase every locally stored trace of you.
+function DeleteDataRow() {
+  const [state, setState] = useState<'idle' | 'confirm' | 'done'>('idle');
+
+  const handle = async () => {
+    if (state === 'done') return;
+    if (state === 'idle') {
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setState('confirm');
+      setTimeout(() => setState((s) => (s === 'confirm' ? 'idle' : s)), 4000);
+      return;
+    }
+    try { await disconnectSpotify(); } catch {}
+    try { await AsyncStorage.clear(); } catch {}
+    setState('done');
+  };
+
+  const label = { idle: 'Delete My Data', confirm: 'Tap again to confirm', done: 'Data deleted' }[state];
+  const value = { idle: undefined, confirm: 'This wipes everything', done: 'Restart the app ✓' }[state];
+
+  return (
+    <Pressable onPress={handle} style={({ pressed }) => pressed && state !== 'done' ? { opacity: 0.7 } : undefined}>
+      <View style={styles.dangerRow}>
+        <Text style={[styles.dangerLabel, state === 'done' && { color: 'rgba(255,255,255,0.5)' }]}>{label}</Text>
+        {value != null && <Text style={styles.dangerValue}>{value}</Text>}
+      </View>
+    </Pressable>
   );
 }
 
@@ -345,7 +384,14 @@ const styles = StyleSheet.create({
   toggleLabel: { color: '#fff', fontSize: 14.5, fontWeight: '600' },
   toggleSub: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 16 },
   para: { paddingHorizontal: 16, paddingVertical: 15 },
+  paraBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   paraText: { color: 'rgba(255,255,255,0.75)', fontSize: 13.5, lineHeight: 20 },
+  dangerRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 15,
+  },
+  dangerLabel: { color: '#FF5C5C', fontSize: 14.5, fontWeight: '700' },
+  dangerValue: { color: 'rgba(255,92,92,0.75)', fontSize: 12.5, fontWeight: '600' },
   aboutTagline: { color: 'rgba(255,255,255,0.55)', fontSize: 13.5, textAlign: 'center', lineHeight: 19, paddingHorizontal: 24 },
   referCard: {
     borderRadius: 20, padding: 26, gap: 12, overflow: 'hidden', alignItems: 'center',

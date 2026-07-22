@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
 import { recordDriveEnd } from '@/utils/driveStats';
-import { isRestrictedAccount, isSpotifyConnected, startPlayback, type StartResult } from '@/utils/spotify';
+import { isRestrictedAccount, isSpotifyConnected, pause as pauseSpotify, startPlayback, type StartResult } from '@/utils/spotify';
 import { openInSpotify } from '@/utils/spotifyHandoff';
 import { getStationPlaylist } from '@/utils/stationPlaylists';
 
@@ -17,26 +17,31 @@ import { getStationPlaylist } from '@/utils/stationPlaylists';
  *
  * Returns the verdict so the UI can narrate; null means "didn't need to try".
  */
-async function playStationMusic(stationId: string, opts?: { onlyIfLinked?: boolean }): Promise<StartResult | null> {
+async function playStationMusic(stationId: string): Promise<StartResult | null> {
   try {
     const linked = await getStationPlaylist(stationId);
-    if (!linked && opts?.onlyIfLinked) return null;
-
     const connected = await isSpotifyConnected();
+
+    // Each station owns its own sound. A station with no playlist never
+    // borrows whatever happens to be playing — that made stations feel
+    // interchangeable and confusing. Pause the stray music and ask for a
+    // playlist instead.
+    if (!linked) {
+      if (connected) pauseSpotify().catch(() => {});
+      return 'no-playlist';
+    }
+
     const restricted = connected && (await isRestrictedAccount());
 
     if (connected && !restricted) {
-      const r = await startPlayback(linked?.uri);
+      const r = await startPlayback(linked.uri);
       // Allowlist rejection discovered mid-drive falls through to handoff —
       // and so does a dead/slow network ('error'): opening the playlist in
       // the Spotify app beats asking the user to retry.
-      if (r !== 'restricted' && !(r === 'error' && linked)) return r;
+      if (r !== 'restricted' && r !== 'error') return r;
     }
 
-    if (linked) return (await openInSpotify(linked.uri)) ? 'handoff' : 'error';
-    // Restricted with nothing linked: explain how to still get music.
-    if (connected) return 'restricted';
-    return null;
+    return (await openInSpotify(linked.uri)) ? 'handoff' : 'error';
   } catch {
     return null; // never let a playback hiccup break the drive
   }
@@ -50,6 +55,7 @@ const START_NOTICES: Record<StartResult, string | null> = {
   'restricted': 'This Spotify account isn’t on the Cruise FM test list, so in-app control is off. Link a playlist to this station (paste a Spotify link) and drives will play through the Spotify app instead.',
   // Handoff is explained by the persistent in-mode panel, not a transient toast.
   'handoff': null,
+  'no-playlist': "This station doesn't have its own playlist yet. Tap Add Playlist to give it one — every drive here will play it.",
   'error': "Spotify didn't respond. Check the Spotify app is open and logged in, then press play to retry.",
 };
 
@@ -163,10 +169,11 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     const current = sessionRef.current;
     if (!current || current.stationId === stationId) return;
     setSession({ ...current, stationId });
-    // Retuning mid-drive (Tuner lock-on, Change Mood) switches the music
-    // too — but only when the new station actually has a linked playlist.
+    // Retuning mid-drive (Tuner lock-on, Change Mood) switches the music too.
+    // A station with no playlist pauses the old one and asks for its own —
+    // moods never bleed into each other.
     requestMicQuiet();
-    playStationMusic(stationId, { onlyIfLinked: true }).then((r) => { if (r) reportStartResult(r); });
+    playStationMusic(stationId).then((r) => { if (r) reportStartResult(r); });
   }, [reportStartResult, requestMicQuiet]);
 
   const stop = useCallback(() => {
@@ -174,6 +181,11 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     setExpanded(false);
     setPlaying(false);
     setHandoff(false);
+    // The ✕ ends the whole drive — music included. Leaving Spotify running
+    // after the player is gone made every next station start confusing.
+    isSpotifyConnected()
+      .then((c) => { if (c) pauseSpotify().catch(() => {}); })
+      .catch(() => {});
     recordDriveEnd().catch(() => {});
   }, []);
 

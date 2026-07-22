@@ -125,7 +125,10 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const topPad = insets.top + 12;
   const isCustom = !station.image;
   const custom = isCustom ? (station as CustomStation) : null;
-  const needsPlaylist = isCustom && !linked;
+  // Every station — built-in or custom — needs its own playlist before a
+  // drive makes sound. The glowing playlist button + quiet Start Drive make
+  // that the obvious first step.
+  const needsPlaylist = !linked;
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>

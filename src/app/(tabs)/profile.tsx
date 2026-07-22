@@ -105,7 +105,7 @@ function useMusicPlatformInfo() {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { dataSaver, setDataSaver } = useMotion();
+  const { dataSaver, setDataSaver, autoDim, setAutoDim } = useMotion();
   const { devFreePreview, setDevFreePreview } = useEntitlements();
   const { name: platformName, color: platformColor, refresh: refreshPlatform } = useMusicPlatformInfo();
   const [selectorVisible, setSelectorVisible] = useState(false);
@@ -279,6 +279,25 @@ export default function ProfileScreen() {
             <Switch
               value={dataSaver}
               onValueChange={setDataSaver}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              thumbColor="#fff"
+              ios_backgroundColor="rgba(255,255,255,0.18)"
+              {...({ activeThumbColor: '#fff' } as object)}
+            />
+          </View>
+
+          {/* Auto-dim toggle — head-unit style screen dimming mid-drive */}
+          <View style={[styles.settingsRow, styles.settingsBorder]}>
+            <View style={styles.platformRowLeft}>
+              <IconChip icon="brightness-6" size={34} />
+              <View>
+                <Text style={styles.settingsLabel}>Auto-dim while driving</Text>
+                <Text style={styles.dataSaverSub}>Screen eases down after 30s untouched · tap to wake · big battery saver</Text>
+              </View>
+            </View>
+            <Switch
+              value={autoDim}
+              onValueChange={setAutoDim}
               trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
               thumbColor="#fff"
               ios_backgroundColor="rgba(255,255,255,0.18)"

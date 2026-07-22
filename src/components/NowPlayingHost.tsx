@@ -1,9 +1,12 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Brightness from 'expo-brightness';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { useMotion } from '@/context/MotionContext';
 
 import { GlossSheen } from '@/components/GlossSheen';
 
@@ -148,6 +151,72 @@ function PreviewGate() {
   );
 }
 
+// How long without a touch before the screen eases down, and how low it goes.
+const DIM_AFTER_MS = 30000;
+const DIM_LEVEL = 0.22;
+
+/**
+ * Auto-dim — like a car head unit: mid-drive, after ~30s without a touch,
+ * the screen brightness eases down (the visuals keep glowing); the first tap
+ * anywhere wakes it back to full and nothing underneath gets pressed by
+ * accident. The screen is the biggest battery cost of a drive, so this is
+ * the single largest saver in the app. Profile toggle, default ON.
+ *
+ * Brightness is always restored — on touch, on pause, on minimize, when the
+ * app backgrounds, and on unmount — so the phone never gets stuck dim.
+ */
+function AutoDim() {
+  const np = useNowPlaying();
+  const { autoDim } = useMotion();
+  const [dimmed, setDimmed] = useState(false);
+  const origRef = useRef<number | null>(null);
+
+  const eligible = autoDim && !!np.session && np.expanded && np.playing && Platform.OS !== 'web';
+
+  const restore = useCallback(async () => {
+    setDimmed(false);
+    const orig = origRef.current;
+    origRef.current = null;
+    if (orig == null) return;
+    try {
+      if (Platform.OS === 'android') await Brightness.restoreSystemBrightnessAsync();
+      else await Brightness.setBrightnessAsync(orig);
+    } catch { /* never leave the user stuck — but nothing more we can do */ }
+  }, []);
+
+  // The countdown: any playback-control touch (activityTick) restarts it.
+  useEffect(() => {
+    if (!eligible || dimmed) return;
+    const t = setTimeout(async () => {
+      try {
+        origRef.current = await Brightness.getBrightnessAsync();
+        await Brightness.setBrightnessAsync(DIM_LEVEL);
+        setDimmed(true);
+      } catch { /* no brightness control — skip silently */ }
+    }, DIM_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [eligible, dimmed, np.activityTick]);
+
+  // Losing eligibility (pause, minimize, stop, toggle off) wakes the screen.
+  useEffect(() => {
+    if (!eligible && dimmed) restore();
+  }, [eligible, dimmed, restore]);
+
+  // Leaving the app must never leave the phone stuck dim.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => { if (s !== 'active') restore(); });
+    return () => { sub.remove(); restore(); };
+  }, [restore]);
+
+  if (!dimmed) return null;
+  // Invisible catch layer: the wake tap lands here, not on the controls.
+  return (
+    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={restore}>
+      <Pressable style={{ flex: 1 }} onPress={restore} />
+    </Modal>
+  );
+}
+
 /**
  * "Why is my drive silent?" — when a start attempt fails, Spotify's verdict
  * surfaces here in plain words instead of dying in a log. Its own Modal so it
@@ -273,6 +342,7 @@ export function NowPlayingHost() {
       <PreviewGate />
       <DriveCheckCard />
       <PlaybackNotice />
+      <AutoDim />
     </>
   );
 }

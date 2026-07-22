@@ -216,7 +216,7 @@ function VioletProgressBar({ progress }: { progress: Animated.Value }) {
   const DOT = 14;
   return (
     <View
-      style={{ flex: 1, height: 36, justifyContent: 'center' }}
+      style={{ width: '100%', height: 36, justifyContent: 'center' }}
       onLayout={(e) => setBarW(e.nativeEvent.layout.width)}
     >
       <View style={{ position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)' }} />
@@ -703,10 +703,10 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           {/* Progress bar — only when a real song is playing through */}
           {spotify.track && (
           <View style={fs.progressWrap}>
-            <View style={fs.progressRow}>
+            <VioletProgressBar progress={progress} />
+            <View style={fs.timesBelow}>
               <Text style={fs.timeText}>{formatMs(currentTimeMs)}</Text>
-              <VioletProgressBar progress={progress} />
-              <Text style={[fs.timeText, { textAlign: 'right' }]}>{formatMs(durationMs)}</Text>
+              <Text style={fs.timeText}>{formatMs(durationMs)}</Text>
             </View>
           </View>
           )}
@@ -993,17 +993,17 @@ const fs = StyleSheet.create({
     marginTop: 22,
     marginBottom: 0,
   },
-  progressRow: {
+  // Times sit underneath the bar — the shared layout across every mode.
+  timesBelow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginTop: -4,
   },
   timeText: {
     color: '#ffffff',
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.2,
-    width: 38,
   },
 
   // ── Controls ──────────────────────────────────────────────────────────────

@@ -196,6 +196,19 @@ export default function ModesScreen() {
           />
         </AnimatedCard>
 
+        <AnimatedCard scrollY={scrollY} onPress={() => open('waves', false)} style={{ marginBottom: 14 }}>
+          <CompactModeCard
+            title="Sound Waves Mode"
+            desc="A flowing, glowing waveform that ripples in your station's mood colours."
+            icon="waveform"
+            gradient={['#22b8e6', '#2f6ad0', '#1a2a70']}
+            locked={false}
+          />
+        </AnimatedCard>
+
+        {/* ── Premium modes stacked together at the bottom ── */}
+        <Text style={styles.sectionLabel}>PREMIUM</Text>
+
         <AnimatedCard scrollY={scrollY} onPress={() => open('vinyl', !isPro)} style={{ marginBottom: 14 }}>
           <CompactModeCard
             title="Vinyl Record Mode"
@@ -229,16 +242,6 @@ export default function ModesScreen() {
           />
         </AnimatedCard>
 
-        <AnimatedCard scrollY={scrollY} onPress={() => open('waves', false)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Sound Waves Mode"
-            desc="A flowing, glowing waveform that ripples in your station's mood colours."
-            icon="waveform"
-            gradient={['#22b8e6', '#2f6ad0', '#1a2a70']}
-            locked={false}
-          />
-        </AnimatedCard>
-
         <AnimatedCard scrollY={scrollY} onPress={() => open('orb', !isPro)} style={{ marginBottom: 14 }}>
           <CompactModeCard
             title="Circular Equaliser Mode"
@@ -266,6 +269,15 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginLeft: 4,
     marginBottom: 18,
+  },
+  sectionLabel: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2.5,
+    marginLeft: 4,
+    marginTop: 8,
+    marginBottom: 12,
   },
 
   // Featured card

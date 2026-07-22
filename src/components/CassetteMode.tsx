@@ -22,6 +22,7 @@ import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
+import { AmbientGlow } from '@/components/AmbientGlow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
 
@@ -394,7 +395,7 @@ function AmberProgressBar({ progress }: { progress: Animated.Value }) {
   const DOT = 14;
   return (
     <View
-      style={{ flex: 1, height: 36, justifyContent: 'center' }}
+      style={{ width: '100%', height: 36, justifyContent: 'center' }}
       onLayout={(e) => setBarW(e.nativeEvent.layout.width)}
     >
       <View style={{ position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)' }} />
@@ -867,10 +868,10 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
           {/* Tape progress — only when a real song is playing through */}
           {spotify.track && (
           <View style={fs.progressWrap}>
-            <View style={fs.progressRow}>
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono }]}>{elapsedTxt}</Text>
-              <AmberProgressBar progress={progress} />
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono, textAlign: 'right' }]}>{fmtTapeMs(trackMs)}</Text>
+            <AmberProgressBar progress={progress} />
+            <View style={fs.timesBelow}>
+              <Text style={fs.timeText}>{elapsedTxt}</Text>
+              <Text style={fs.timeText}>{fmtTapeMs(trackMs)}</Text>
             </View>
           </View>
           )}
@@ -939,6 +940,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
         <ModeCloseButton onPress={handleClose} />
 
+        <AmbientGlow active={visible && playing} color={station.eqColors?.[1] ?? station.glowColor} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 
@@ -1123,8 +1125,8 @@ const fs = StyleSheet.create({
   sheetPlatformText: { flex: 1, fontSize: 13, fontWeight: '600' },
 
   progressWrap: { width: '100%', paddingHorizontal: 28, marginTop: 22, marginBottom: 0 },
-  progressRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2, width: 38 },
+  timesBelow:   { flexDirection: 'row', justifyContent: 'space-between', marginTop: -4 },
+  timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2 },
 
   controls:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 28, marginTop: 10, marginBottom: 8, paddingVertical: 4 },
   shuffleRepeatBtn:{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },

@@ -20,6 +20,7 @@ import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
+import { AmbientGlow } from '@/components/AmbientGlow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
 
@@ -242,8 +243,8 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
               <Animated.View style={{ height: 6, borderRadius: 3, width: fill, backgroundColor: '#fff' }} />
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 7 }}>
-              <Text style={[fs.time, { fontFamily: Fonts.mono }]}>{formatMs(elapsedMs)}</Text>
-              <Text style={[fs.time, { fontFamily: Fonts.mono }]}>{formatMs(durationMs)}</Text>
+              <Text style={fs.time}>{formatMs(elapsedMs)}</Text>
+              <Text style={fs.time}>{formatMs(durationMs)}</Text>
             </View>
           </View>
           )}
@@ -291,6 +292,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
 
         <ModeCloseButton onPress={handleClose} />
 
+        <AmbientGlow active={visible && playing} color={eq[1]} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 

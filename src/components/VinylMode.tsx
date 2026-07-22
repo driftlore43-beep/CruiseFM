@@ -21,6 +21,7 @@ import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
+import { AmbientGlow } from '@/components/AmbientGlow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
@@ -398,7 +399,7 @@ function ScrubProgressBar({ progress, isScrubbing, onLayout, panHandlers }: {
 
   return (
     <View
-      style={{ flex: 1, height: 36, justifyContent: 'center' }}
+      style={{ width: '100%', height: 36, justifyContent: 'center' }}
       onLayout={(e) => { setBarWidth(e.nativeEvent.layout.width); onLayout(e); }}
       {...panHandlers}
     >
@@ -968,14 +969,14 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
           {spotify.track && (
           <View style={fs.progressWrap}>
-            <View style={fs.progressRow}>
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono }]}>{formatMs(currentTimeMs)}</Text>
-              <ScrubProgressBar
-                progress={progress} isScrubbing={isScrubbing}
-                onLayout={(e) => { progressBarWidthRef.current = e.nativeEvent.layout.width; }}
-                panHandlers={progressPanRef.panHandlers}
-              />
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono, textAlign: 'right' }]}>{formatMs(trackMs)}</Text>
+            <ScrubProgressBar
+              progress={progress} isScrubbing={isScrubbing}
+              onLayout={(e) => { progressBarWidthRef.current = e.nativeEvent.layout.width; }}
+              panHandlers={progressPanRef.panHandlers}
+            />
+            <View style={fs.timesBelow}>
+              <Text style={fs.timeText}>{formatMs(currentTimeMs)}</Text>
+              <Text style={fs.timeText}>{formatMs(trackMs)}</Text>
             </View>
           </View>
           )}
@@ -1030,6 +1031,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
         <ModeCloseButton onPress={handleClose} />
 
+        <AmbientGlow active={visible && playing} color={station.eqColors?.[1] ?? V.gold} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 
@@ -1073,8 +1075,8 @@ const fs = StyleSheet.create({
   trackArtist: { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 },
   turntableWrap:{ flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%' },
   progressWrap: { width: '100%', paddingHorizontal: 28, marginTop: 22, marginBottom: 0 },
-  progressRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2, width: 38 },
+  timesBelow:   { flexDirection: 'row', justifyContent: 'space-between', marginTop: -4 },
+  timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2 },
   controls:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 28, marginTop: 10, marginBottom: 8, paddingVertical: 4 },
   shuffleRepeatBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   skipBtn:      { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },

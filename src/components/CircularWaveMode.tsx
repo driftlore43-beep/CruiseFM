@@ -163,7 +163,17 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   const artist = spotify.track?.artist ?? '';
   const fill = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
   const glowTint = eq[1] + '26';
-  const amp = ampRef.current;
+  // Beat-synced feel: on top of the flowing sweep, the whole ring KICKS on a
+  // steady ~100 BPM pattern — sharp jump, quick decay, with the downbeat of
+  // every bar of four hitting hardest. Reads like the ring is dancing to the
+  // music instead of drifting. Only while music actually plays (the scene
+  // freezes when paused, so the kick dies with it).
+  const tSec = phase / 1.5;
+  const BEAT_S = 0.6;
+  const beatPos = (tSec % BEAT_S) / BEAT_S;
+  const accent = Math.floor(tSec / BEAT_S) % 4 === 0 ? 1 : 0.6;
+  const kick = playing ? Math.pow(1 - beatPos, 2.5) * accent : 0;
+  const amp = ampRef.current * (0.68 + 0.6 * kick);
   const orbSize = Math.min(winW * 1.02, winH * 0.54, 460);
 
   return (

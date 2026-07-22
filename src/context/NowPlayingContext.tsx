@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
 import { recordDriveEnd } from '@/utils/driveStats';
-import { isRestrictedAccount, isSpotifyConnected, pause as pauseSpotify, startPlayback, type StartResult } from '@/utils/spotify';
+import { getPlaybackState, isRestrictedAccount, isSpotifyConnected, pause as pauseSpotify, startPlayback, type StartResult } from '@/utils/spotify';
 import { openInSpotify } from '@/utils/spotifyHandoff';
 import { getStationPlaylist } from '@/utils/stationPlaylists';
 
@@ -153,6 +153,25 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     activateKeepAwakeAsync('cruise-drive').catch(() => {});
     return () => { deactivateKeepAwake('cruise-drive').catch(() => {}); };
   }, [driveActive]);
+
+  // Smooth re-entry: when the app comes back to the foreground mid-drive,
+  // adopt Spotify's real play state. If the user paused from the lock screen
+  // or Spotify itself while away, the drive shows paused instead of dancing
+  // to silence — and vice versa. Quietly reads state; never starts, stops,
+  // or nags.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !sessionRef.current) return;
+      (async () => {
+        try {
+          if (!(await isSpotifyConnected())) return;
+          const data = await getPlaybackState();
+          if (data && typeof data.is_playing === 'boolean') setPlayingRaw(data.is_playing);
+        } catch { /* re-sync is best-effort */ }
+      })();
+    });
+    return () => sub.remove();
+  }, []);
 
   // Kick the station's music and narrate the outcome. Connected drivers see
   // the wake-Spotify note IMMEDIATELY on every start attempt — new users

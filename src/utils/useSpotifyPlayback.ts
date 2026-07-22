@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { useActivityPing, useStartResultReporter, useWakeNudge } from '@/context/NowPlayingContext';
 
@@ -87,6 +88,19 @@ export function useSpotifyPlayback(visible: boolean) {
       cancelledRef.current = true;
       if (interval) clearInterval(interval);
     };
+  }, [visible]);
+
+  // Smooth re-entry: the moment the app comes back to the foreground, ask
+  // Spotify where things stand instead of waiting out the 5s poll — the
+  // title, progress and play state snap into step before the user notices.
+  // Never triggers a start attempt or the wake note; music already flowing
+  // is left completely alone.
+  useEffect(() => {
+    if (!visible) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshRef.current();
+    });
+    return () => sub.remove();
   }, [visible]);
 
   // Fire-and-forget controls; refresh shortly after so the title catches up.

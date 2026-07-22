@@ -27,11 +27,17 @@ export function SettingsPageShell({
   const slideX = useRef(new Animated.Value(0)).current;
   const onBackRef = useRef(onBack);
   onBackRef.current = onBack;
-  const EDGE = 36;
+  const EDGE = 44;
   const backPan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: (e) => e.nativeEvent.pageX < EDGE,
-      onStartShouldSetPanResponderCapture: (e) => e.nativeEvent.pageX < EDGE,
+      // Claim in the CAPTURE phase — but only once a rightward drag from the
+      // left edge is confirmed (g.x0 = where the touch started). Claiming on
+      // touch-start would also swallow TAPS at the edge and kill the back
+      // button; claiming on confirmed movement lets taps through while still
+      // beating the ScrollView to the gesture.
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: (_, g) =>
+        g.x0 < EDGE && g.dx > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
       onMoveShouldSetPanResponder: (_, g) => g.dx > 14 && Math.abs(g.dx) > Math.abs(g.dy) * 1.6,
       onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, g) => { if (g.dx > 0) slideX.setValue(g.dx); },

@@ -3,6 +3,7 @@ import { AppState, Platform } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
 import { recordDriveEnd } from '@/utils/driveStats';
+import { getSavedPlatform } from '@/utils/musicPlatform';
 import { getPlaybackState, isRestrictedAccount, isSpotifyConnected, pause as pauseSpotify, startPlayback, type StartResult } from '@/utils/spotify';
 import { openInSpotify } from '@/utils/spotifyHandoff';
 import { getStationPlaylist } from '@/utils/stationPlaylists';
@@ -33,8 +34,15 @@ async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean 
         if (!restrictedPrev) return await startPlayback();
         return 'restricted';
       }
-      if (connected) pauseSpotify().catch(() => {});
-      return 'no-playlist';
+      if (connected) {
+        pauseSpotify().catch(() => {});
+        return 'no-playlist';
+      }
+      // Not connected: only nudge Spotify-platform people toward linking a
+      // playlist. YouTube Music / Apple Music / other listeners run their
+      // music in their own app — Cruise FM is the visual companion, silently.
+      const platform = await getSavedPlatform();
+      return platform === 'spotify' ? 'no-playlist' : null;
     }
 
     const restricted = connected && (await isRestrictedAccount());

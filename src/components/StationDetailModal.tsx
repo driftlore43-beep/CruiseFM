@@ -26,6 +26,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useMotion } from '@/context/MotionContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
+import { getSavedPlatform } from '@/utils/musicPlatform';
 import {
   getStationPlaylist,
   setStationPlaylist,
@@ -77,6 +78,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const [selectedMode, setSelectedMode] = useState('cassette');
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [linkToast, setLinkToast] = useState<string | null>(null);
+  const [spotifyPlatform, setSpotifyPlatform] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -87,6 +89,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
       setShowMenu(false);
       setConfirmDelete(false);
       if (station) getStationPlaylist(station.id).then(setLinked);
+      getSavedPlatform().then((p) => setSpotifyPlatform(p === 'spotify' || p == null));
       Animated.spring(slideY, { toValue: 0, useNativeDriver: true, bounciness: 3 }).start();
     }
   }, [visible, station?.id]);
@@ -135,8 +138,10 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const custom = isCustom ? (station as CustomStation) : null;
   // Every station — built-in or custom — needs its own playlist before a
   // drive makes sound. The glowing playlist button + quiet Start Drive make
-  // that the obvious first step.
-  const needsPlaylist = !linked;
+  // that the obvious first step. Spotify people only: YouTube Music / Apple
+  // Music / other listeners run music in their own app, so Cruise FM is the
+  // visual companion and Start Drive always proceeds.
+  const needsPlaylist = !linked && spotifyPlatform;
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>

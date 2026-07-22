@@ -288,18 +288,44 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     snapRaf.current = requestAnimationFrame(step);
   };
 
+  // The dial zone owns its touches outright. The old move-based negotiation
+  // (claim only once the drag proves horizontal) kept losing on iOS — between
+  // Svg subviews and modal touch quirks the claim never landed, so tuning
+  // simply didn't respond. Claiming on touch-start always works; the first
+  // few pixels of movement then decide the gesture ourselves: sideways tunes,
+  // downward drags the player away — both, with no renegotiation to lose.
+  const gestureModeRef = useRef<'tune' | 'dismiss' | null>(null);
+  const closeRef = useRef<() => void>(() => {});
   const pan = useRef(
     PanResponder.create({
-      // Only claim horizontal drags (tuning) — a downward swipe must fall
-      // through to the dismiss gesture so the player can be dragged away.
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > Math.abs(g.dy) && Math.abs(g.dx) > 4,
-      // Once tuning, don't let any parent steal the gesture mid-drag.
+      onStartShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => { cancelSnap(); startFreqRef.current = freqRef.current; },
-      onPanResponderMove: (_, g) => tuneTo(startFreqRef.current - g.dx / PX_PER_MHZ),
-      onPanResponderRelease: () => snapToNearest(),
-      onPanResponderTerminate: () => snapToNearest(),
+      onPanResponderGrant: () => {
+        gestureModeRef.current = null;
+        cancelSnap();
+        startFreqRef.current = freqRef.current;
+      },
+      onPanResponderMove: (_, g) => {
+        if (!gestureModeRef.current && (Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6)) {
+          gestureModeRef.current = Math.abs(g.dx) >= Math.abs(g.dy) ? 'tune' : 'dismiss';
+        }
+        if (gestureModeRef.current === 'tune') {
+          tuneTo(startFreqRef.current - g.dx / PX_PER_MHZ);
+        } else if (gestureModeRef.current === 'dismiss' && g.dy > 0) {
+          slideY.setValue(g.dy);
+        }
+      },
+      onPanResponderRelease: (_, g) => {
+        const mode = gestureModeRef.current;
+        gestureModeRef.current = null;
+        if (mode === 'dismiss') {
+          if (g.dy > 120 || g.vy > 0.8) closeRef.current();
+          else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+          return;
+        }
+        snapToNearest();
+      },
+      onPanResponderTerminate: () => { gestureModeRef.current = null; snapToNearest(); },
     })
   ).current;
 
@@ -320,6 +346,8 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     cancelSnap();
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
+  // The dial pan was created before handleClose exists — it reaches it here.
+  closeRef.current = handleClose;
 
   // Swipe down anywhere to drop back to the mini-player — the one exit
   // gesture shared by every mode (the mini-player's X ends the music).

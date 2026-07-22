@@ -87,7 +87,7 @@ function MiniPlayer() {
 }
 
 // How long a free user gets to taste a locked mode before the gate drops.
-const PREVIEW_MS = 25000;
+const PREVIEW_MS = 30000;
 
 /**
  * Preview gate — after the taste, this slides over the still-moving visuals.
@@ -126,7 +126,7 @@ function PreviewGate() {
           />
           <GlossSheen radius={24} />
           <Text style={pg.crest}>✦</Text>
-          <Text style={pg.title}>Keep the vibe</Text>
+          <Text style={pg.title}>Like what you're seeing?</Text>
           <Text style={pg.sub}>
             {label} is a Premium mode. Try everything free for 7 days — cancel anytime.
           </Text>

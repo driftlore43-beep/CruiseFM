@@ -175,40 +175,6 @@ const Bars = React.memo(function Bars({ values, barW, maxH, gaps, bgColor, color
   (prev.colors?.join() ?? '') === (next.colors?.join() ?? ''),
 );
 
-function Marquee({ text, textStyle }: { text: string; textStyle?: object }) {
-  const tx   = useRef(new Animated.Value(0)).current;
-  const [textW, setTextW] = useState(0);
-  const [boxW,  setBoxW]  = useState(0);
-  const loop = useRef<Animated.CompositeAnimation | null>(null);
-
-  useEffect(() => {
-    loop.current?.stop();
-    tx.setValue(0);
-    if (textW > boxW && boxW > 0) {
-      const travel = textW + 32;
-      loop.current = Animated.loop(Animated.sequence([
-        Animated.delay(1800),
-        Animated.timing(tx, { toValue: -travel, duration: travel * 22, easing: Easing.linear, useNativeDriver: true }),
-        Animated.delay(500),
-        Animated.timing(tx, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ]));
-      loop.current.start();
-    }
-    return () => loop.current?.stop();
-  }, [textW, boxW]);
-
-  return (
-    <View style={{ overflow: 'hidden', width: '100%' }} onLayout={(e) => setBoxW(e.nativeEvent.layout.width)}>
-      <Animated.Text
-        style={[textStyle, { transform: [{ translateX: tx }] }]}
-        onLayout={(e) => setTextW(e.nativeEvent.layout.width)}
-        numberOfLines={1}>
-        {text}
-      </Animated.Text>
-    </View>
-  );
-}
-
 // Slim volume slider with fade-in-on-touch
 // ── Violet progress bar ───────────────────────────────────────────────────────
 function VioletProgressBar({ progress }: { progress: Animated.Value }) {

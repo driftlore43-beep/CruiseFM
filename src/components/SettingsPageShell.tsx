@@ -18,19 +18,25 @@ export function SettingsPageShell({
   const insets = useSafeAreaInsets();
 
   // Settings live in a modal, so the iOS edge-swipe-back doesn't exist here —
-  // recreate it: swipe right anywhere and the page slides away, then onBack.
+  // recreate it. Move-based claiming loses to the native ScrollView on iOS
+  // (the same lesson as the Tuner dial), so a swipe STARTING at the left edge
+  // is claimed outright in the capture phase — the ScrollView never sees it —
+  // while swipes elsewhere still get the move-based fallback when available.
   // onBack changes as sub-pages open, so the once-created responder reads it
   // through a ref.
   const slideX = useRef(new Animated.Value(0)).current;
   const onBackRef = useRef(onBack);
   onBackRef.current = onBack;
+  const EDGE = 36;
   const backPan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponder: (e) => e.nativeEvent.pageX < EDGE,
+      onStartShouldSetPanResponderCapture: (e) => e.nativeEvent.pageX < EDGE,
       onMoveShouldSetPanResponder: (_, g) => g.dx > 14 && Math.abs(g.dx) > Math.abs(g.dy) * 1.6,
+      onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, g) => { if (g.dx > 0) slideX.setValue(g.dx); },
       onPanResponderRelease: (_, g) => {
-        if (g.dx > 90 || g.vx > 0.6) {
+        if (g.dx > 70 || g.vx > 0.5) {
           Animated.timing(slideX, { toValue: SCREEN_W, duration: 180, useNativeDriver: true }).start(() => {
             slideX.setValue(0);
             onBackRef.current();

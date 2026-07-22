@@ -17,7 +17,7 @@ import { getStationPlaylist } from '@/utils/stationPlaylists';
  *
  * Returns the verdict so the UI can narrate; null means "didn't need to try".
  */
-async function playStationMusic(stationId: string): Promise<StartResult | null> {
+async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean }): Promise<StartResult | null> {
   try {
     const linked = await getStationPlaylist(stationId);
     const connected = await isSpotifyConnected();
@@ -25,8 +25,14 @@ async function playStationMusic(stationId: string): Promise<StartResult | null> 
     // Each station owns its own sound. A station with no playlist never
     // borrows whatever happens to be playing — that made stations feel
     // interchangeable and confusing. Pause the stray music and ask for a
-    // playlist instead.
+    // playlist instead. EXCEPT free-mode previews (`resumeAny`): a taste of
+    // a locked visual should work with whatever song the user has going.
     if (!linked) {
+      if (opts?.resumeAny && connected) {
+        const restrictedPrev = await isRestrictedAccount();
+        if (!restrictedPrev) return await startPlayback();
+        return 'restricted';
+      }
       if (connected) pauseSpotify().catch(() => {});
       return 'no-playlist';
     }
@@ -59,10 +65,11 @@ const START_NOTICES: Record<StartResult, string | null> = {
   'error': "Spotify didn't respond. Check the Spotify app is open and logged in, then press play to retry.",
 };
 
-/** Proactive tip when a start is taking suspiciously long — Spotify only
- * hands over control once its own app is awake. */
+/** The default companion note on every start attempt — Spotify only hands
+ * over control once its own app is awake, and new users need to know that
+ * up front, not after a timeout. A clean 'playing' verdict clears it. */
 const WAKE_SPOTIFY_NUDGE =
-  "Still waking Spotify… if nothing plays, open Spotify and play any song for a second, then come back and press play.";
+  "Waking Spotify… if nothing plays in a few seconds, open Spotify and play any song for a moment, then come back and press play.";
 
 export type NowPlayingSession = { mode: string; stationId: string; preview?: boolean };
 
@@ -147,27 +154,24 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     return () => { deactivateKeepAwake('cruise-drive').catch(() => {}); };
   }, [driveActive]);
 
-  // Kick the station's music and narrate the outcome. If Spotify hasn't
-  // confirmed anything after a couple of seconds, proactively surface the
-  // wake-Spotify tip — a slow start almost always means the Spotify app is
-  // asleep. A confirmed 'playing' clears it; a real verdict replaces it.
+  // Kick the station's music and narrate the outcome. Connected drivers see
+  // the wake-Spotify note IMMEDIATELY on every start attempt — new users
+  // shouldn't have to wait out a silent gap to learn why nothing plays. A
+  // clean 'playing' verdict clears it within a beat; any other verdict
+  // replaces it with its own message.
   //
   // `breath` (mood switches): rather than yanking the music straight from one
   // playlist to the next, pause first and hold a beat of silence — a station
   // change should feel like retuning a radio, not a hard cut.
-  const startStationMusic = useCallback((stationId: string, opts?: { breath?: boolean }) => {
+  // `resumeAny` (previews): no linked playlist just resumes the user's music.
+  const startStationMusic = useCallback((stationId: string, opts?: { breath?: boolean; resumeAny?: boolean }) => {
     let settled = false;
-    const delay = opts?.breath ? 900 : 0;
-    const slowTimer = setTimeout(async () => {
-      if (settled) return;
-      try {
-        if (await isSpotifyConnected()) setPlaybackNotice(WAKE_SPOTIFY_NUDGE);
-      } catch { /* nudge is best-effort */ }
-    }, 2500 + delay);
+    isSpotifyConnected()
+      .then((c) => { if (c && !settled) setPlaybackNotice(WAKE_SPOTIFY_NUDGE); })
+      .catch(() => {});
     const kick = () => {
-      playStationMusic(stationId).then((r) => {
+      playStationMusic(stationId, { resumeAny: opts?.resumeAny }).then((r) => {
         settled = true;
-        clearTimeout(slowTimer);
         if (r) reportStartResult(r);
       });
     };
@@ -175,7 +179,7 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
       isSpotifyConnected()
         .then((c) => { if (c) return pauseSpotify().catch(() => {}); })
         .catch(() => {});
-      setTimeout(kick, delay);
+      setTimeout(kick, 900);
     } else {
       kick();
     }
@@ -189,8 +193,9 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     setPlaying(!opts?.paused);
     setHandoff(false); // fresh drive; playStationMusic re-flags it if handed off
     // Every drive tries to get its station's own playlist going. A paused
-    // open leaves Spotify alone until the user presses play.
-    if (!opts?.paused) startStationMusic(stationId);
+    // open leaves Spotify alone until the user presses play. Previews may
+    // resume whatever the user was listening to — any song works for a taste.
+    if (!opts?.paused) startStationMusic(stationId, { resumeAny: !!opts?.preview });
   }, [startStationMusic]);
 
   const minimize = useCallback(() => setExpanded(false), []);

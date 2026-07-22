@@ -217,7 +217,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     let last = 0;
     const tick = () => {
       const now = Date.now();
-      if (now - last >= 33) { last = now; setPhase((now - start) / 1000); }
+      if (now - last >= 40) { last = now; setPhase((now - start) / 1000); }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

@@ -106,17 +106,16 @@ export function useSpotifyPlayback(visible: boolean) {
     // demo-mode listeners shouldn't be nagged about a service they never linked.
     play: () => {
       ping();
-      // If Spotify hasn't answered after a couple of seconds it's probably
-      // asleep — surface the wake tip proactively; the real verdict (or a
-      // clean 'playing') replaces it the moment one arrives.
-      let settled = false;
-      const slow = setTimeout(() => { if (!settled && connected) wakeNudge(); }, 2500);
+      // The wake note is the DEFAULT on every play — new users learn the
+      // Spotify dance up front instead of sitting in silence. A clean
+      // 'playing' verdict clears it within a beat.
+      if (connected) wakeNudge();
       startPlayback()
-        .then((r) => { settled = true; clearTimeout(slow); if (connected) report(r); })
-        .catch(() => { settled = true; clearTimeout(slow); });
+        .then((r) => { if (connected) report(r); })
+        .catch(() => {});
       // After a long pause Spotify's API often accepts the play while the
       // dozing device takes ages to actually make sound. Re-poll and, if
-      // nothing is truly playing a few seconds in, show the wake tip.
+      // nothing is truly playing a few seconds in, re-show the wake tip.
       if (connected) {
         setTimeout(() => refreshRef.current(), 3200);
         setTimeout(() => { if (isPlayingRef.current === false) wakeNudge(); }, 4200);

@@ -143,7 +143,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
     let last = 0;
     const tick = () => {
       const now = Date.now();
-      if (now - last >= 33) {
+      if (now - last >= 40) {
         last = now;
         const target = playingRef.current ? 1 : 0.25;
         ampRef.current += (target - ampRef.current) * 0.08;

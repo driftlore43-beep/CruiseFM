@@ -114,7 +114,11 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
         last = now;
         const target = playingRef.current ? 1 : 0.55;
         ampRef.current += (target - ampRef.current) * 0.08;
-        setPhase(((now - start) / 1000) * 1.5);
+        // Battery: once paused and fully wound down, freeze the scene —
+        // zero re-renders until play flips it live again.
+        if (playingRef.current || Math.abs(ampRef.current - target) > 0.01) {
+          setPhase(((now - start) / 1000) * 1.5);
+        }
       }
       raf = requestAnimationFrame(tick);
     };

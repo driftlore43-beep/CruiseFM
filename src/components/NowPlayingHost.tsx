@@ -36,7 +36,8 @@ function MiniPlayer() {
   const np = useNowPlaying();
   const insets = useSafeAreaInsets();
   const visible = !!np.session && !np.expanded;
-  const spotify = useSpotifyPlayback(visible);
+  // Minimized = less detail on screen → poll Spotify at a relaxed pace.
+  const spotify = useSpotifyPlayback(visible, { pollMs: 12000 });
 
   if (!visible || !np.session) return null;
 

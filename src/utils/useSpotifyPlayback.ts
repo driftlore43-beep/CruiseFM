@@ -36,7 +36,7 @@ export type NowPlaying = {
  * When Spotify isn't connected (e.g. web preview), everything no-ops and
  * `track` stays null so callers can fall back to their demo track names.
  */
-export function useSpotifyPlayback(visible: boolean) {
+export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number }) {
   const [connected, setConnected] = useState(false);
   const [track, setTrack] = useState<NowPlaying | null>(null);
   const [shuffleOn, setShuffleOn] = useState(false);
@@ -81,7 +81,9 @@ export function useSpotifyPlayback(visible: boolean) {
       };
       refreshRef.current = refresh;
       refresh();
-      interval = setInterval(refresh, 5000);
+      // Battery: callers showing less detail (the mini-player) poll slower —
+      // every network wake costs radio time.
+      interval = setInterval(refresh, opts?.pollMs ?? 5000);
     })();
 
     return () => {

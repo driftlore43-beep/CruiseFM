@@ -147,7 +147,11 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
         last = now;
         const target = playingRef.current ? 1 : 0.25;
         ampRef.current += (target - ampRef.current) * 0.08;
-        setPhase(((now - start) / 1000) * PHASE_SPEED);
+        // Battery: once paused and fully wound down, freeze the scene —
+        // zero re-renders until play flips it live again.
+        if (playingRef.current || Math.abs(ampRef.current - target) > 0.01) {
+          setPhase(((now - start) / 1000) * PHASE_SPEED);
+        }
       }
       raf = requestAnimationFrame(tick);
     };

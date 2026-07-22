@@ -101,7 +101,9 @@ function DialRuler({ freq, width, color, lock }: { freq: number; width: number; 
   }
 
   return (
-    <Svg width={width} height={H}>
+    // pointerEvents none is CRITICAL: on iOS the Svg otherwise swallows
+    // touches, so drags starting on the ruler never reach the tune gesture.
+    <Svg width={width} height={H} pointerEvents="none">
       {/* Baseline */}
       <Line x1={0} y1={baseY} x2={width} y2={baseY} stroke="rgba(255,255,255,0.18)" strokeWidth={1} />
 
@@ -292,6 +294,8 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
       // through to the dismiss gesture so the player can be dragged away.
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > Math.abs(g.dy) && Math.abs(g.dx) > 4,
+      // Once tuning, don't let any parent steal the gesture mid-drag.
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => { cancelSnap(); startFreqRef.current = freqRef.current; },
       onPanResponderMove: (_, g) => tuneTo(startFreqRef.current - g.dx / PX_PER_MHZ),
       onPanResponderRelease: () => snapToNearest(),

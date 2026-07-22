@@ -651,6 +651,13 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     progress.setValue(0);
     progressValue.current = 0;
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
+    // Re-opening from the mini-player: the reel loops die while the modal is
+    // hidden, and `playing` hasn't changed so the [playing] effects never
+    // rekick them — restart everything explicitly if music is going.
+    if (playing) {
+      stopRolling(); stopReels();
+      startRolling(); startReels();
+    }
     return () => { stopReels(); };
   }, [visible]);
 

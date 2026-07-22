@@ -4,57 +4,69 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
+// One beat ≈ 100 BPM: a quick swell and a longer relax — reads as a
+// heartbeat/kick pattern without needing to hear the actual song.
+const BEAT_ATTACK_MS = 150;
+const BEAT_RELEASE_MS = 450;
+
 /**
- * Shared atmosphere layer — a station-tinted band low on the screen that
- * breathes slowly while the music plays, like cabin lighting swelling with
- * the drive. Runs entirely on the native driver (opacity + scale transforms
- * on two static gradients), so it adds vibe without adding any frame cost.
+ * Shared atmosphere layer — a station-tinted glow across the lower half of
+ * the screen that pulses to a steady drive-beat while music plays, over a
+ * slower breathing wash. Runs entirely on the native driver (opacity + scale
+ * transforms on static gradients), so all the vibe costs zero frames.
  *
  * Sits under the title/controls (zIndex 0) and ignores touches; when the
  * drive is paused it settles to a faint steady glow instead of vanishing.
  */
 export function AmbientGlow({ active, color }: { active: boolean; color: string }) {
-  const pulse = useRef(new Animated.Value(0)).current;
+  const breath = useRef(new Animated.Value(0)).current;
+  const beat = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!active) {
-      Animated.timing(pulse, { toValue: 0.15, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+      Animated.timing(breath, { toValue: 0.18, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+      Animated.timing(beat, { toValue: 0, duration: 500, useNativeDriver: true }).start();
       return;
     }
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: 3600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0.2, duration: 3600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    const breathLoop = Animated.loop(Animated.sequence([
+      Animated.timing(breath, { toValue: 1, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(breath, { toValue: 0.25, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ]));
-    loop.start();
-    return () => loop.stop();
+    const beatLoop = Animated.loop(Animated.sequence([
+      Animated.timing(beat, { toValue: 1, duration: BEAT_ATTACK_MS, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(beat, { toValue: 0.12, duration: BEAT_RELEASE_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]));
+    breathLoop.start();
+    beatLoop.start();
+    return () => { breathLoop.stop(); beatLoop.stop(); };
   }, [active]);
 
   return (
     <View style={ag.wrap} pointerEvents="none">
-      {/* Broad wash — always faintly present, swells with the breath */}
+      {/* Broad wash — the room light, swelling slowly */}
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.42] }),
-            transform: [{ scaleY: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.18] }) }] },
+          { opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.65] }),
+            transform: [{ scaleY: breath.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.22] }) }] },
         ]}>
         <LinearGradient
-          colors={['transparent', color + '4D', 'transparent']}
+          colors={['transparent', color + '73', 'transparent']}
           locations={[0, 0.5, 1]}
           start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
       </Animated.View>
-      {/* Hot core — only blooms near the top of the breath */}
+      {/* Beat layer — snaps bright on every pulse, relaxes between */}
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          { opacity: pulse.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, 0, 0.26] }),
-            transform: [{ scaleY: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.75, 1.1] }) }] },
+          { opacity: beat.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] }),
+            transform: [{ scaleY: beat.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.12] }) }] },
         ]}>
         <LinearGradient
-          colors={['transparent', color + '99', 'transparent']}
-          locations={[0.25, 0.5, 0.75]}
+          colors={['transparent', color + 'A6', 'transparent']}
+          locations={[0.2, 0.5, 0.8]}
           start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
@@ -64,12 +76,12 @@ export function AmbientGlow({ active, color }: { active: boolean; color: string 
 }
 
 const ag = StyleSheet.create({
-  // Low band behind the song title, clear of the hero visual up top.
+  // Lower half of the screen, behind the song title and controls.
   wrap: {
     position: 'absolute',
     left: 0, right: 0,
-    top: SCREEN_H * 0.52,
-    height: SCREEN_H * 0.42,
+    top: SCREEN_H * 0.45,
+    height: SCREEN_H * 0.52,
     zIndex: 0,
   },
 });

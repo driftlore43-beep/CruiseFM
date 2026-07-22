@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Cruise } from '@/constants/theme';
+import { Cruise, Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
@@ -663,6 +663,11 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
         {/* Drag pill — swipe down hint */}
         <View style={{ position: 'absolute', top: topPad + 6, left: 0, right: 0, alignItems: 'center', zIndex: 25 }} pointerEvents="none">
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' }} />
+        </View>
+
+        {/* Mode name — top-left corner tag, same treatment as every other mode */}
+        <View style={{ position: 'absolute', top: topPad + 14, left: 20, zIndex: 10 }} pointerEvents="none">
+          <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', letterSpacing: 3, fontFamily: Fonts.mono }}>EQUALIZER</Text>
         </View>
 
         {/* Close button — fixed top right, always visible */}

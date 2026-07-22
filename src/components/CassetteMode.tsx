@@ -442,7 +442,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const { width: winW, height: winH } = useWindowDimensions();
   const isLandscape = winW > winH;
 
-  const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist } = useNowPlaying();
   const spotify = useSpotifyPlayback(visible);
 
   // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
@@ -958,6 +958,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
               await setStationPlaylist(activeId, pl);
               setLinked(pl);
               setShowPicker(false);
+              relinkStationPlaylist(activeId);
             }}
           />
         )}

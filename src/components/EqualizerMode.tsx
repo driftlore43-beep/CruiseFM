@@ -290,7 +290,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   // reads the mic even on slow phones where 30 tiny bars are hard to see.
   const glowPulse = useRef(new Animated.Value(0.3)).current;
 
-  const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist } = useNowPlaying();
   const [activeStation, setActiveStation] = useState(stationId ?? 'night-run');
   const [shuffle,       setShuffle]       = useState(false);
   const [repeat,        setRepeat]        = useState(false);
@@ -790,6 +790,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               await setStationPlaylist(activeStation, pl);
               setLinked(pl);
               setShowPicker(false);
+              relinkStationPlaylist(activeStation);
             }}
           />
         )}

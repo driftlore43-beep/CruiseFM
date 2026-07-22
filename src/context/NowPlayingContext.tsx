@@ -225,7 +225,9 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     // Only live-switch when this station is the active drive; otherwise the new
     // playlist is already saved and the next Start Drive will use it.
     if (!current || current.stationId !== stationId) return;
-    startStationMusic(stationId);
+    // Same breath as a mood switch: pause the old playlist, hold a beat,
+    // then bring in the new one — never a mid-note yank.
+    startStationMusic(stationId, { breath: true });
   }, [startStationMusic]);
 
   const returnToSpotify = useCallback(() => {

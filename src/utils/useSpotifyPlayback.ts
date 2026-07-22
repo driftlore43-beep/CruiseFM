@@ -42,6 +42,9 @@ export function useSpotifyPlayback(visible: boolean) {
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
   const cancelledRef = useRef(false);
   const refreshRef = useRef<() => void>(() => {});
+  // What Spotify last reported about actual playback — the play button's
+  // "did sound really start?" check reads this after a resume attempt.
+  const isPlayingRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -58,6 +61,7 @@ export function useSpotifyPlayback(visible: boolean) {
         const data = await getPlaybackState();
         if (cancelledRef.current) return;
         const item = data?.item;
+        if (data) isPlayingRef.current = data.is_playing ?? null;
         if (item?.name) {
           setTrack({
             title: item.name,
@@ -110,9 +114,16 @@ export function useSpotifyPlayback(visible: boolean) {
       startPlayback()
         .then((r) => { settled = true; clearTimeout(slow); if (connected) report(r); })
         .catch(() => { settled = true; clearTimeout(slow); });
+      // After a long pause Spotify's API often accepts the play while the
+      // dozing device takes ages to actually make sound. Re-poll and, if
+      // nothing is truly playing a few seconds in, show the wake tip.
+      if (connected) {
+        setTimeout(() => refreshRef.current(), 3200);
+        setTimeout(() => { if (isPlayingRef.current === false) wakeNudge(); }, 4200);
+      }
       after();
     },
-    pause: () => { ping(); spotifyPause().catch(() => {}); after(); },
+    pause: () => { ping(); isPlayingRef.current = false; spotifyPause().catch(() => {}); after(); },
     next: () => { ping(); skipNext().catch(() => {}); after(); },
     prev: () => { ping(); skipPrev().catch(() => {}); after(); },
     // Optimistic local flip; the API call + next poll settle the truth.

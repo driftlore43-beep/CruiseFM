@@ -114,7 +114,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
   // reference); the rest get a lightened tint of their own top colour.
   const swStops = SW_PALETTES[station.id] ?? [lightenHex(eq[0], 0.45), eq[0], eq[2]];
 
-  const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist } = useNowPlaying();
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -371,6 +371,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
               await setStationPlaylist(station.id, pl);
               setLinked(pl);
               setShowPicker(false);
+              relinkStationPlaylist(station.id);
             }}
           />
         )}

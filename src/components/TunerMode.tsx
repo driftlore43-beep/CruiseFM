@@ -190,7 +190,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     setShuffle(spotify.shuffleOn);
     setRepeat(spotify.repeatMode !== 'off');
   }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
-  const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist } = useNowPlaying();
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -501,6 +501,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
               await setStationPlaylist(lockedStation.id, pl);
               setLinked(pl);
               setShowPicker(false);
+              relinkStationPlaylist(lockedStation.id);
             }}
           />
         )}

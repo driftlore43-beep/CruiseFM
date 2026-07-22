@@ -84,7 +84,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
   const eq = station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF'];
 
-  const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist } = useNowPlaying();
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -310,6 +310,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
               await setStationPlaylist(station.id, pl);
               setLinked(pl);
               setShowPicker(false);
+              relinkStationPlaylist(station.id);
             }}
           />
         )}

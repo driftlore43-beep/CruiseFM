@@ -36,6 +36,7 @@ import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { MarqueeText } from '@/components/MarqueeText';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
+import { SeekBar } from '@/components/SeekBar';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -427,7 +428,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
   // Progress rides the shared track clock — real Spotify position when
   // connected, the classic 4-minute demo loop otherwise.
-  const { progress, elapsedMs: currentTimeMs, durationMs } = useTrackClock({
+  const { progress, elapsedMs: currentTimeMs, durationMs, scrub } = useTrackClock({
     visible, playing, track: spotify.track, demoDurationMs: 4 * 60 * 1000,
   });
 
@@ -708,7 +709,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           {/* Progress bar — only when a real song is playing through */}
           {spotify.track && (
           <View style={fs.progressWrap}>
-            <VioletProgressBar progress={progress} />
+            <SeekBar progress={progress} scrub={scrub} />
             <View style={fs.timesBelow}>
               <Text style={fs.timeText}>{formatMs(currentTimeMs)}</Text>
               <Text style={fs.timeText}>{formatMs(durationMs)}</Text>

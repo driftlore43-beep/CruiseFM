@@ -18,6 +18,7 @@ import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { MoodSheet } from '@/components/MoodSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
+import { seekTo } from '@/utils/spotify';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
@@ -25,6 +26,7 @@ import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
+import { SeekBar } from '@/components/SeekBar';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -688,6 +690,25 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     setPlaying(!playing);
   };
 
+  // Drag-to-seek adapter for the cassette's own progress animation — freeze
+  // the tape while scrubbing, seek the real song on release, then let the
+  // timing (and the next poll) carry on from there.
+  const cassetteScrub = {
+    begin: () => progressAnimRef.current?.stop(),
+    move: (pct: number) => { progress.setValue(pct); progressValue.current = pct; },
+    end: (pct: number) => {
+      progressValue.current = pct;
+      if (realTrackRef.current) seekTo(pct * trackMsRef.current).catch(() => {});
+      const remaining = (1 - pct) * trackMsRef.current;
+      if (playing && remaining > 0) {
+        progressAnimRef.current = Animated.timing(progress, {
+          toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false,
+        });
+        progressAnimRef.current.start();
+      }
+    },
+  };
+
   // Glow: 0.3 → 0.6 range, gentle amber pulse
   const glowOpacity = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.16, 0.34] });
   const glowScale   = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] });
@@ -875,7 +896,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
           {/* Tape progress — only when a real song is playing through */}
           {spotify.track && (
           <View style={fs.progressWrap}>
-            <AmberProgressBar progress={progress} />
+            <SeekBar progress={progress} scrub={cassetteScrub} />
             <View style={fs.timesBelow}>
               <Text style={fs.timeText}>{elapsedTxt}</Text>
               <Text style={fs.timeText}>{fmtTapeMs(trackMs)}</Text>
@@ -947,7 +968,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
         <ModeCloseButton onPress={handleClose} />
 
-        <AmbientGlow active={visible && playing} color={station.eqColors?.[1] ?? station.glowColor} />
+        <AmbientGlow active={visible && playing} beat={visible && playing && (spotify.track?.isPlaying ?? true)} color={station.eqColors?.[1] ?? station.glowColor} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 

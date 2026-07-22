@@ -23,6 +23,7 @@ import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
+import { SeekBar } from '@/components/SeekBar';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -126,7 +127,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
   }, [visible, station.id]);
 
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
-  const { progress, elapsedMs, durationMs } = useTrackClock({
+  const { progress, elapsedMs, durationMs, scrub } = useTrackClock({
     visible, playing, track: spotify.track, demoDurationMs: DEMO_DURATION_MS,
   });
   const playingRef = useRef(false);
@@ -300,9 +301,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
           {/* Progress — only when we're actually tracking a real song */}
           {hasTrack && (
           <View style={{ width: '100%', paddingHorizontal: 28, marginTop: 18 }}>
-            <View style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' }}>
-              <Animated.View style={{ height: 6, borderRadius: 3, width: fill, backgroundColor: '#fff' }} />
-            </View>
+            <SeekBar progress={progress} scrub={scrub} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 7 }}>
               <Text style={fs.time}>{formatMs(elapsedMs)}</Text>
               <Text style={fs.time}>{formatMs(durationMs)}</Text>
@@ -353,7 +352,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
 
         <ModeCloseButton onPress={handleClose} />
 
-        <AmbientGlow active={visible && playing} color={eq[1]} />
+        <AmbientGlow active={visible && playing} beat={visible && playing && (spotify.track?.isPlaying ?? true)} color={eq[1]} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 

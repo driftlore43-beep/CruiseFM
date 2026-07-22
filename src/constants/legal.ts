@@ -35,6 +35,10 @@ export const PRIVACY_POLICY: LegalDoc = {
       body: 'None. Cruise FM contains no analytics, no trackers and no advertising.',
     },
     {
+      heading: 'Crash reports',
+      body: 'If the app crashes, an anonymous technical report (device model, OS version, and what the code was doing at the time) is sent to Sentry, our crash-reporting provider, so the bug can be fixed. Crash reports contain no name, no account details, no music history and no location, and are never used for advertising or tracking.',
+    },
+    {
       heading: 'Children',
       body: 'Cruise FM is not directed at children under 13 and does not knowingly collect information from them (it collects no personal information from anyone).',
     },

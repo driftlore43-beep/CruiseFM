@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { useActivityPing, useMicQuietRequester, useStartResultReporter } from '@/context/NowPlayingContext';
+import { useActivityPing, useStartResultReporter, useWakeNudge } from '@/context/NowPlayingContext';
 
 import {
   isSpotifyConnected,
@@ -42,14 +42,6 @@ export function useSpotifyPlayback(visible: boolean) {
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
   const cancelledRef = useRef(false);
   const refreshRef = useRef<() => void>(() => {});
-  const lastTitleRef = useRef<string | null>(null);
-
-  // Ask the mic-reactive hook to step aside for a beat so Spotify can (re)start
-  // audio cleanly. Kept in a ref so the poll effect needn't depend on it.
-  const requestMicQuiet = useMicQuietRequester();
-  const hushMicRef = useRef(requestMicQuiet);
-  hushMicRef.current = requestMicQuiet;
-  const hushMic = () => hushMicRef.current();
 
   useEffect(() => {
     if (!visible) return;
@@ -67,10 +59,6 @@ export function useSpotifyPlayback(visible: boolean) {
         if (cancelledRef.current) return;
         const item = data?.item;
         if (item?.name) {
-          // A new song (auto-advance) is also a fresh audio start — hush the
-          // mic so Spotify's transition isn't fighting the recorder.
-          if (lastTitleRef.current && lastTitleRef.current !== item.name) hushMic();
-          lastTitleRef.current = item.name;
           setTrack({
             title: item.name,
             artist: item.artists?.map((a: any) => a.name).join(', ') ?? '',
@@ -102,6 +90,7 @@ export function useSpotifyPlayback(visible: boolean) {
   // play doubles as a retry that reports Spotify's verdict to the notice.
   const ping = useActivityPing();
   const report = useStartResultReporter();
+  const wakeNudge = useWakeNudge();
   const after = () => setTimeout(() => refreshRef.current(), 700);
 
   return {
@@ -111,10 +100,21 @@ export function useSpotifyPlayback(visible: boolean) {
     repeatMode,
     // Only surface Spotify's verdict for users who actually connected it —
     // demo-mode listeners shouldn't be nagged about a service they never linked.
-    play: () => { ping(); hushMic(); startPlayback().then((r) => { if (connected) report(r); }).catch(() => {}); after(); },
+    play: () => {
+      ping();
+      // If Spotify hasn't answered after a couple of seconds it's probably
+      // asleep — surface the wake tip proactively; the real verdict (or a
+      // clean 'playing') replaces it the moment one arrives.
+      let settled = false;
+      const slow = setTimeout(() => { if (!settled && connected) wakeNudge(); }, 2500);
+      startPlayback()
+        .then((r) => { settled = true; clearTimeout(slow); if (connected) report(r); })
+        .catch(() => { settled = true; clearTimeout(slow); });
+      after();
+    },
     pause: () => { ping(); spotifyPause().catch(() => {}); after(); },
-    next: () => { ping(); hushMic(); skipNext().catch(() => {}); after(); },
-    prev: () => { ping(); hushMic(); skipPrev().catch(() => {}); after(); },
+    next: () => { ping(); skipNext().catch(() => {}); after(); },
+    prev: () => { ping(); skipPrev().catch(() => {}); after(); },
     // Optimistic local flip; the API call + next poll settle the truth.
     shuffle: (state: boolean) => { ping(); setShuffleOn(state); spotifySetShuffle(state).catch(() => {}); after(); },
     repeat: (mode: RepeatMode) => { ping(); setRepeatMode(mode); spotifySetRepeat(mode).catch(() => {}); after(); },

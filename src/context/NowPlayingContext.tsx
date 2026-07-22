@@ -59,6 +59,11 @@ const START_NOTICES: Record<StartResult, string | null> = {
   'error': "Spotify didn't respond. Check the Spotify app is open and logged in, then press play to retry.",
 };
 
+/** Proactive tip when a start is taking suspiciously long — Spotify only
+ * hands over control once its own app is awake. */
+const WAKE_SPOTIFY_NUDGE =
+  "Still waking Spotify… if nothing plays, open Spotify and play any song for a second, then come back and press play.";
+
 export type NowPlayingSession = { mode: string; stationId: string; preview?: boolean };
 
 type NowPlayingCtx = {
@@ -96,16 +101,13 @@ type NowPlayingCtx = {
   /** Re-open the current station's playlist in Spotify (the honest panel's
    * "Open Spotify" action). */
   returnToSpotify: () => void;
-  /** Bumps each time Spotify is about to (re)start audio (drive start, play,
-   * skip, track change). The mic-reactive hook briefly stops listening around
-   * these moments so iOS hands the audio session to Spotify cleanly — the
-   * "smart auto-pause" that keeps playback crisp without killing the visuals. */
-  micQuietTick: number;
-  requestMicQuiet: () => void;
   /** The station's linked playlist just changed. If that station is the one
    * currently driving, switch the music to the new playlist right away;
    * otherwise it simply takes effect on the next Start Drive. */
   relinkStationPlaylist: (stationId: string) => void;
+  /** Show the wake-Spotify tip (playback controls call this when a start is
+   * dragging on with no verdict). */
+  showWakeNudge: () => void;
 };
 
 const Ctx = createContext<NowPlayingCtx | null>(null);
@@ -116,11 +118,10 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const [playing, setPlayingRaw] = useState(false);
   const [activityTick, setActivityTick] = useState(0);
   const activityPing = useCallback(() => setActivityTick((t) => t + 1), []);
-  const [micQuietTick, setMicQuietTick] = useState(0);
-  const requestMicQuiet = useCallback(() => setMicQuietTick((t) => t + 1), []);
   const [playbackNotice, setPlaybackNotice] = useState<string | null>(null);
   const [handoff, setHandoff] = useState(false);
   const clearPlaybackNotice = useCallback(() => setPlaybackNotice(null), []);
+  const showWakeNudge = useCallback(() => setPlaybackNotice(WAKE_SPOTIFY_NUDGE), []);
   const reportStartResult = useCallback((result: StartResult) => {
     setPlaybackNotice(START_NOTICES[result] ?? null);
     // Handoff = the music is playing in the Spotify app, uncontrollable here.
@@ -146,6 +147,25 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     return () => { deactivateKeepAwake('cruise-drive').catch(() => {}); };
   }, [driveActive]);
 
+  // Kick the station's music and narrate the outcome. If Spotify hasn't
+  // confirmed anything after a couple of seconds, proactively surface the
+  // wake-Spotify tip — a slow start almost always means the Spotify app is
+  // asleep. A confirmed 'playing' clears it; a real verdict replaces it.
+  const startStationMusic = useCallback((stationId: string) => {
+    let settled = false;
+    const slowTimer = setTimeout(async () => {
+      if (settled) return;
+      try {
+        if (await isSpotifyConnected()) setPlaybackNotice(WAKE_SPOTIFY_NUDGE);
+      } catch { /* nudge is best-effort */ }
+    }, 2500);
+    playStationMusic(stationId).then((r) => {
+      settled = true;
+      clearTimeout(slowTimer);
+      if (r) reportStartResult(r);
+    });
+  }, [reportStartResult]);
+
   const open = useCallback((mode: string, stationId: string = 'night-run', opts?: { preview?: boolean; paused?: boolean }) => {
     // iPod mode was retired — any old saved iPod cruise resumes in Equalizer.
     const m = mode === 'ipod' ? 'equalizer' : mode;
@@ -153,14 +173,10 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     setExpanded(true);
     setPlaying(!opts?.paused);
     setHandoff(false); // fresh drive; playStationMusic re-flags it if handed off
-    // Every drive tries to get music going — the station's linked playlist
-    // if it has one, otherwise resume whatever was playing. A paused open
-    // leaves Spotify alone until the user presses play.
-    if (!opts?.paused) {
-      requestMicQuiet(); // let Spotify grab the audio session cleanly on start
-      playStationMusic(stationId).then((r) => { if (r) reportStartResult(r); });
-    }
-  }, [reportStartResult, requestMicQuiet]);
+    // Every drive tries to get its station's own playlist going. A paused
+    // open leaves Spotify alone until the user presses play.
+    if (!opts?.paused) startStationMusic(stationId);
+  }, [startStationMusic]);
 
   const minimize = useCallback(() => setExpanded(false), []);
   const expand = useCallback(() => setExpanded(true), []);
@@ -172,9 +188,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     // Retuning mid-drive (Tuner lock-on, Change Mood) switches the music too.
     // A station with no playlist pauses the old one and asks for its own —
     // moods never bleed into each other.
-    requestMicQuiet();
-    playStationMusic(stationId).then((r) => { if (r) reportStartResult(r); });
-  }, [reportStartResult, requestMicQuiet]);
+    startStationMusic(stationId);
+  }, [startStationMusic]);
 
   const stop = useCallback(() => {
     setSession(null);
@@ -194,9 +209,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     // Only live-switch when this station is the active drive; otherwise the new
     // playlist is already saved and the next Start Drive will use it.
     if (!current || current.stationId !== stationId) return;
-    requestMicQuiet();
-    playStationMusic(stationId).then((r) => { if (r) reportStartResult(r); });
-  }, [reportStartResult, requestMicQuiet]);
+    startStationMusic(stationId);
+  }, [startStationMusic]);
 
   const returnToSpotify = useCallback(() => {
     const current = sessionRef.current;
@@ -207,8 +221,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, micQuietTick, requestMicQuiet, relinkStationPlaylist }),
-    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, micQuietTick, requestMicQuiet, relinkStationPlaylist],
+    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge }),
+    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -233,13 +247,8 @@ export function useStartResultReporter(): (result: StartResult) => void {
   return useContext(Ctx)?.reportStartResult ?? noopPing;
 }
 
-/** Safe anywhere — lets playback controls ask the mic to briefly step aside so
- * Spotify can (re)start audio cleanly (the "smart auto-pause"). */
-export function useMicQuietRequester(): () => void {
-  return useContext(Ctx)?.requestMicQuiet ?? noopPing;
-}
-
-/** Safe anywhere — the counter the mic hook watches to know when to hush. */
-export function useMicQuietSignal(): number {
-  return useContext(Ctx)?.micQuietTick ?? 0;
+/** Safe anywhere — lets playback controls surface the wake-Spotify tip when a
+ * start attempt drags on with no verdict. */
+export function useWakeNudge(): () => void {
+  return useContext(Ctx)?.showWakeNudge ?? noopPing;
 }

@@ -20,7 +20,6 @@ import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
-import { MicGlow } from '@/components/MicGlow';
 import { MarqueeText } from '@/components/MarqueeText';
 
 const SCREEN_H = Dimensions.get('window').height;
@@ -288,8 +287,6 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
             </TouchableOpacity>
           </View>
         </View>
-
-        <MicGlow active={visible && playing} color={eq[1]} />
 
         <ModeCloseButton onPress={handleClose} />
 

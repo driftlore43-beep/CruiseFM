@@ -35,9 +35,6 @@ import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { MarqueeText } from '@/components/MarqueeText';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
-import { useMotion } from '@/context/MotionContext';
-import { useMicLevel } from '@/utils/useMicLevel';
-import { OWNER_MODE } from '@/constants/config';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -266,10 +263,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const glowPulse = useRef(new Animated.Value(0.3)).current;
 
   const { playing, setPlaying, setStationId: npSetStation, handoff } = useNowPlaying();
-  const { micReactive } = useMotion();
-  // Live loudness of the surrounding music; drives the bars when available.
-  const mic = useMicLevel(visible && playing && micReactive);
-  const micActive = mic.available;
   const [activeStation, setActiveStation] = useState(stationId ?? 'night-run');
   const [shuffle,       setShuffle]       = useState(false);
   const [repeat,        setRepeat]        = useState(false);
@@ -312,7 +305,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     slideY.setValue(SCREEN_H);
     // Respect the session's play state — a browse from the Modes tab opens
     // paused, so the bars hold still until the user presses play.
-    if (playing && !micActive) startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
+    if (playing) startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
     // Pulse the close button once to draw attention
     closePulse.setValue(1);
@@ -332,40 +325,22 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   useEffect(() => {
     if (!visible) return;
     stopBarAnims(fsValues, timers);
-    if (playing && !micActive) {
+    if (playing) {
       startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
     }
   }, [isLandscape]);
 
-  // ── Mic-reactive mode: when live loudness is available, halt the timed loop
-  //    and let the metering drive the bars; restore the loop when it drops. ──
+  // ── Ambient glow breathes slowly while the music plays — steady and calm,
+  //    with no microphone involved. ──
   useEffect(() => {
-    if (!visible || !playing) return;
-    stopBarAnims(fsValues, timers);
-    if (!micActive) {
-      startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
-      glowPulse.setValue(0.3); // calm static glow when the mic isn't driving
-    }
-  }, [micActive]);
-
-  useEffect(() => {
-    if (!micActive || !visible || !playing) return;
-    const lvl = mic.level;
-    const bell = isLandscape ? lsBellMaxH : fsBellMaxH;
-    // Snap fast when loud, settle slowly when quiet — reads like a real EQ.
-    const dur = 60 + (1 - lvl) * 150;
-    fsValues.forEach((anim, i) => {
-      const maxH = bell(i);
-      // Per-bar spread grows with loudness: bars sit uniformly low in the quiet
-      // and jump tall & varied when the music kicks.
-      const variation = (Math.random() - 0.35) * lvl * 1.4;
-      const h = Math.max(0.03, Math.min(1, lvl * 1.5 + variation));
-      const target = FS_MIN_H + (maxH - FS_MIN_H) * h;
-      Animated.timing(anim, { toValue: target, duration: dur, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
-    });
-    // The big, unmissable one — the whole ambient glow breathes with the music.
-    Animated.timing(glowPulse, { toValue: Math.min(1, lvl * 1.7), duration: 90, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
-  }, [mic.level, micActive, visible, playing, isLandscape]);
+    if (!visible || !playing) { glowPulse.setValue(0.3); return; }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(glowPulse, { toValue: 0.55, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(glowPulse, { toValue: 0.20, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [visible, playing]);
 
   // ── Keep screen awake in landscape ───────────────────────────────────────
   useEffect(() => {
@@ -434,7 +409,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
       setPlaying(false);
       spotify.pause();
     } else {
-      if (!micActive) startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
+      startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
       setPlaying(true);
       spotify.play();
     }
@@ -656,15 +631,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             pointerEvents="none"
           />
         </Animated.View>
-
-        {/* Owner-only: live mic level, so reactivity is verifiable on any device */}
-        {OWNER_MODE && micReactive && (
-          <View style={{ position: 'absolute', top: topPad + 4, left: 12, zIndex: 30 }} pointerEvents="none">
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '700' }}>
-              mic {micActive ? mic.level.toFixed(2) : 'off'}
-            </Text>
-          </View>
-        )}
 
         {/* Drag pill — swipe down hint */}
         <View style={{ position: 'absolute', top: topPad + 6, left: 0, right: 0, alignItems: 'center', zIndex: 25 }} pointerEvents="none">

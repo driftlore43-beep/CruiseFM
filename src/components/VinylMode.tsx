@@ -21,7 +21,6 @@ import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
-import { MicGlow } from '@/components/MicGlow';
 import { MarqueeText } from '@/components/MarqueeText';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { MoodSheet } from '@/components/MoodSheet';
@@ -1027,8 +1026,6 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           </View>
 
         </View>
-
-        <MicGlow active={visible && playing} color={station.eqColors?.[1] ?? V.gold} />
 
         <ModeCloseButton onPress={handleClose} />
 

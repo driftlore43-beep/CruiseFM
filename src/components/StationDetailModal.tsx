@@ -110,6 +110,14 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const selectedIsLocked = !isPro && !!MODES.find((m) => m.id === selectedMode)?.pro;
 
   function handleStartDrive() {
+    // Strict rule: no playlist, no drive. Starting anyway used to inherit
+    // whatever Spotify was already playing, which made stations feel broken.
+    // Instead the button routes straight into the playlist picker.
+    if (needsPlaylist) {
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setShowPicker(true);
+      return;
+    }
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     // Locked mode selected? Launch it anyway as a free preview.
     onStartDrive(selectedMode, selectedIsLocked);
@@ -288,9 +296,13 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.startGradient}>
               <Text style={styles.startBtnText}>
-                {selectedIsLocked ? `Preview ${MODES.find((m) => m.id === selectedMode)?.label}` : 'Start Drive'}
+                {needsPlaylist
+                  ? 'Add a Playlist to Start'
+                  : selectedIsLocked
+                    ? `Preview ${MODES.find((m) => m.id === selectedMode)?.label}`
+                    : 'Start Drive'}
               </Text>
-              <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.9)" />
+              <Ionicons name={needsPlaylist ? 'musical-notes' : 'arrow-forward'} size={18} color="rgba(255,255,255,0.9)" />
             </LinearGradient>
           </Pressable>
 

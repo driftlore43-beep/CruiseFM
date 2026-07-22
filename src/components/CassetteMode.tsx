@@ -22,7 +22,6 @@ import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
-import { MicGlow } from '@/components/MicGlow';
 import { MarqueeText } from '@/components/MarqueeText';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -936,8 +935,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
           </View>
 
         </View>
-
-        <MicGlow active={visible && playing} color={station.eqColors?.[1] ?? station.glowColor} />
 
         <ModeCloseButton onPress={handleClose} />
 

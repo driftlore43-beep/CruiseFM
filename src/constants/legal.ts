@@ -23,7 +23,7 @@ export const PRIVACY_POLICY: LegalDoc = {
     {
       heading: 'Microphone',
       body:
-        'If you leave “Music-reactive visuals” on, Cruise FM reads the loudness of the sound around your phone so the on-screen visuals can pulse with the music. This happens live, on your device only — no audio is ever recorded, saved, or sent anywhere, and nothing is transcribed or analysed beyond the volume level. You can turn it off any time in Profile, or deny the microphone permission, and the visuals fall back to their timed animation.',
+        'Cruise FM does not use the microphone. Nothing is ever listened to, recorded, or analysed — the on-screen visuals run on their own animations.',
     },
     {
       heading: 'Purchases',

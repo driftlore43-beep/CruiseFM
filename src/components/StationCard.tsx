@@ -235,9 +235,6 @@ const styles = StyleSheet.create({
     fontSize: 15.5,
     fontWeight: '800',
     lineHeight: 20,
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowRadius: 6,
-    textShadowOffset: { width: 0, height: 1 },
   },
   iconCircleSmall: {
     position: 'absolute',

@@ -151,19 +151,34 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   // confirmed anything after a couple of seconds, proactively surface the
   // wake-Spotify tip — a slow start almost always means the Spotify app is
   // asleep. A confirmed 'playing' clears it; a real verdict replaces it.
-  const startStationMusic = useCallback((stationId: string) => {
+  //
+  // `breath` (mood switches): rather than yanking the music straight from one
+  // playlist to the next, pause first and hold a beat of silence — a station
+  // change should feel like retuning a radio, not a hard cut.
+  const startStationMusic = useCallback((stationId: string, opts?: { breath?: boolean }) => {
     let settled = false;
+    const delay = opts?.breath ? 900 : 0;
     const slowTimer = setTimeout(async () => {
       if (settled) return;
       try {
         if (await isSpotifyConnected()) setPlaybackNotice(WAKE_SPOTIFY_NUDGE);
       } catch { /* nudge is best-effort */ }
-    }, 2500);
-    playStationMusic(stationId).then((r) => {
-      settled = true;
-      clearTimeout(slowTimer);
-      if (r) reportStartResult(r);
-    });
+    }, 2500 + delay);
+    const kick = () => {
+      playStationMusic(stationId).then((r) => {
+        settled = true;
+        clearTimeout(slowTimer);
+        if (r) reportStartResult(r);
+      });
+    };
+    if (opts?.breath) {
+      isSpotifyConnected()
+        .then((c) => { if (c) return pauseSpotify().catch(() => {}); })
+        .catch(() => {});
+      setTimeout(kick, delay);
+    } else {
+      kick();
+    }
   }, [reportStartResult]);
 
   const open = useCallback((mode: string, stationId: string = 'night-run', opts?: { preview?: boolean; paused?: boolean }) => {
@@ -185,10 +200,11 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     const current = sessionRef.current;
     if (!current || current.stationId === stationId) return;
     setSession({ ...current, stationId });
-    // Retuning mid-drive (Tuner lock-on, Change Mood) switches the music too.
-    // A station with no playlist pauses the old one and asks for its own —
-    // moods never bleed into each other.
-    startStationMusic(stationId);
+    // Retuning mid-drive (Tuner lock-on, Change Mood) switches the music too —
+    // with a breath of silence between moods so it feels like retuning, not a
+    // hard cut. A station with no playlist pauses the old one and asks for
+    // its own — moods never bleed into each other.
+    startStationMusic(stationId, { breath: true });
   }, [startStationMusic]);
 
   const stop = useCallback(() => {

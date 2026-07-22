@@ -19,6 +19,7 @@ import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
 
@@ -290,6 +291,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
 
         <ModeCloseButton onPress={handleClose} />
 
+        <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 
         <MoodSheet

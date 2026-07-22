@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Brightness from 'expo-brightness';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -33,6 +33,7 @@ import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { MarqueeText } from '@/components/MarqueeText';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 
@@ -86,11 +87,13 @@ function startBarAnims(
     const maxH = bellFn(i);
     const dur  = barDur(i);
     const t = setTimeout(() => {
+      // Native driver: the values only feed transform interpolations in Bars,
+      // so the whole loop runs off the JS thread — no per-frame layout work.
       Animated.loop(Animated.sequence([
-        Animated.timing(anim, { toValue: maxH,                         duration: dur,        easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-        Animated.timing(anim, { toValue: minH + (maxH - minH) * 0.18, duration: dur * 0.65, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-        Animated.timing(anim, { toValue: maxH * 0.6,                   duration: dur * 0.5,  easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-        Animated.timing(anim, { toValue: minH,                         duration: dur * 0.75, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+        Animated.timing(anim, { toValue: maxH,                         duration: dur,        easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: minH + (maxH - minH) * 0.18, duration: dur * 0.65, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: maxH * 0.6,                   duration: dur * 0.5,  easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: minH,                         duration: dur * 0.75, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])).start();
     }, i * 14);
     timers.current.push(t);
@@ -118,7 +121,15 @@ function GapStrips({ gaps, bgColor }: { gaps: number[]; bgColor: string }) {
   );
 }
 
-function Bars({ values, barW, maxH, gaps, bgColor, colors }: {
+// Performance-critical: 30 of these animate continuously. The old version
+// animated `height` (JS-driven — a full native layout pass for every bar on
+// every frame, the source of visible lag). This version keeps every layout
+// static and animates only transforms on the native driver, so the whole
+// dance runs on the GPU: a clipping window slides up to reveal the bar while
+// an inner counter-slide keeps the gradient anchored to the bottom — same
+// look, no layout work. React.memo keeps the per-second clock re-renders of
+// the parent from rebuilding 30 gradient stacks.
+const Bars = React.memo(function Bars({ values, barW, maxH, gaps, bgColor, colors }: {
   values: Animated.Value[];
   barW: number;
   maxH: number;
@@ -129,22 +140,39 @@ function Bars({ values, barW, maxH, gaps, bgColor, colors }: {
   const barColors = colors ?? ['#00BFFF', '#8A2BE2', '#FF00AA'];
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: maxH }}>
-      {values.map((anim, i) => (
-        <Animated.View key={i} style={{ width: barW, height: anim, overflow: 'hidden' }}>
-          <View style={{ width: barW, height: maxH, position: 'absolute', bottom: 0 }}>
-            <LinearGradient
-              colors={barColors}
-              start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }}
-              style={[StyleSheet.absoluteFill, { borderRadius: 3 }]}
-            />
-            <GapStrips gaps={gaps} bgColor={bgColor} />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 3 }]} />
+      {values.map((anim, i) => {
+        const rise    = anim.interpolate({ inputRange: [0, maxH], outputRange: [maxH, 0] });
+        const counter = anim.interpolate({ inputRange: [0, maxH], outputRange: [-maxH, 0] });
+        return (
+          <View key={i} style={{ width: barW, height: maxH, overflow: 'hidden' }}>
+            {/* The window itself must clip — it slides down while the content
+                counter-slides up, so the gradient stays anchored and only the
+                bottom `h` pixels show. Without overflow here the two motions
+                cancel and the bar renders full-height. */}
+            <Animated.View style={{ width: barW, height: maxH, overflow: 'hidden', transform: [{ translateY: rise }] }}>
+              <Animated.View style={{ width: barW, height: maxH, transform: [{ translateY: counter }] }}>
+                <LinearGradient
+                  colors={barColors}
+                  start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }}
+                  style={[StyleSheet.absoluteFill, { borderRadius: 3 }]}
+                />
+                <GapStrips gaps={gaps} bgColor={bgColor} />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 3 }]} />
+              </Animated.View>
+            </Animated.View>
           </View>
-        </Animated.View>
-      ))}
+        );
+      })}
     </View>
   );
-}
+}, (prev, next) =>
+  prev.values === next.values &&
+  prev.barW === next.barW &&
+  prev.maxH === next.maxH &&
+  prev.bgColor === next.bgColor &&
+  prev.gaps.length === next.gaps.length &&
+  (prev.colors?.join() ?? '') === (next.colors?.join() ?? ''),
+);
 
 function Marquee({ text, textStyle }: { text: string; textStyle?: object }) {
   const tx   = useRef(new Animated.Value(0)).current;
@@ -743,6 +771,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
         <ModeCloseButton onPress={handleClose} />
 
+        <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 
         <MoodSheet

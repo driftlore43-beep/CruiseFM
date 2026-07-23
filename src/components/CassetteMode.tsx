@@ -829,7 +829,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             {/* Right column — cassette */}
             <View style={[ls.rightCol, { paddingRight: safeR }]}>
               <Animated.View style={[fs.glowOrb, {
-                backgroundColor: C.amber, // warm tape-deck glow — the cassette identity is orange, whatever the mood
+                backgroundColor: currentEq?.[1] ?? C.amber, // glow follows the station's mood (amber on Coastal, neon on Downtown…)
                 width: cassetteW * 0.9, height: cassetteH * 1.4,
                 borderRadius: cassetteW * 0.45,
                 opacity: playing ? glowOpacity : 0.12,
@@ -873,7 +873,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
           {/* Cassette hero — flex:1 so it grows to fill available space */}
           <View style={[fs.cassetteWrap, { flex: 1 }]}>
             <Animated.View style={[fs.glowOrb, {
-              backgroundColor: C.amber, // warm tape-deck glow — the cassette identity is orange, whatever the mood
+              backgroundColor: currentEq?.[1] ?? C.amber, // glow follows the station's mood (amber on Coastal, neon on Downtown…)
               width: cassetteW * 0.85, height: cassetteH * 1.3,
               borderRadius: cassetteW * 0.42,
               opacity: playing ? glowOpacity : 0.12,
@@ -968,7 +968,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
         <ModeCloseButton onPress={handleClose} />
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} hero={false} color={C.amber} />
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} hero={false} color={currentEq?.[1] ?? C.amber} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 

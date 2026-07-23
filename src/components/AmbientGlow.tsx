@@ -36,7 +36,7 @@ function Haze({ id, color }: { id: string; color: string }) {
  * All animation is opacity/scale transforms on the native driver — zero
  * frame cost.
  */
-export function AmbientGlow({ active, beat, color }: { active: boolean; beat?: boolean; color: string }) {
+export function AmbientGlow({ active, beat, color, hero = true }: { active: boolean; beat?: boolean; color: string; hero?: boolean }) {
   const breath = useRef(new Animated.Value(0)).current;
   const beatPulse = useRef(new Animated.Value(0)).current;
 
@@ -72,8 +72,25 @@ export function AmbientGlow({ active, beat, color }: { active: boolean; beat?: b
   const leftO  = breath.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0.2] });
   const rightO = breath.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.7] });
   const mainO  = breath.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.8] });
+  const heroO  = breath.interpolate({ inputRange: [0, 1], outputRange: [0.28, 0.62] });
 
   return (
+    <>
+    {/* Hero halo — the cassette-style orb behind the mode's centrepiece.
+        Turned off (hero={false}) in modes whose scene already owns that
+        space (Cassette's own orb, Horizon's sun). */}
+    {hero && (
+      <View style={ag.heroWrap} pointerEvents="none">
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { opacity: heroO,
+              transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.1] }) }] },
+          ]}>
+          <Haze id="agHero" color={color} />
+        </Animated.View>
+      </View>
+    )}
     <View style={ag.wrap} pointerEvents="none">
       {/* Wide base cloud */}
       <Animated.View
@@ -111,6 +128,7 @@ export function AmbientGlow({ active, beat, color }: { active: boolean; beat?: b
         <Haze id="agBeat" color={color} />
       </Animated.View>
     </View>
+    </>
   );
 }
 
@@ -124,6 +142,14 @@ const ag = StyleSheet.create({
     height: SCREEN_H * 0.62,
     zIndex: 0,
     overflow: 'hidden',
+  },
+  // Upper-middle halo zone, bleeding past the sides so it stays round.
+  heroWrap: {
+    position: 'absolute',
+    left: -SCREEN_W * 0.18, right: -SCREEN_W * 0.18,
+    top: SCREEN_H * 0.08,
+    height: SCREEN_H * 0.5,
+    zIndex: 0,
   },
   haze: { position: 'absolute' },
 });

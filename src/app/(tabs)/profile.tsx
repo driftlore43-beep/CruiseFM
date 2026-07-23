@@ -18,6 +18,7 @@ import { SettingsSheet, type SettingsPage } from '@/components/SettingsSheet';
 import { GlossSheen } from '@/components/GlossSheen';
 import { getDriveLog, getDriveStats } from '@/utils/driveStats';
 import { judgeBadges, type JudgedBadge } from '@/constants/badges';
+import { isFounder } from '@/utils/founder';
 import { appVersionLabel } from '@/utils/appVersion';
 import { DEFAULT_DRIVER_NAME, getDriverName, initialsFor } from '@/utils/driverName';
 
@@ -120,13 +121,17 @@ export default function ProfileScreen() {
       let active = true;
       getDriveStats().then((s) => { if (active) setStats(s); });
       getDriverName().then((n) => { if (active) setDriverNameState(n); });
-      getDriveLog().then((log) => { if (active) setBadges(judgeBadges(log)); });
+      Promise.all([getDriveLog(), isFounder()]).then(([log, founder]) => {
+        if (active) setBadges(judgeBadges(log, { founder }));
+      });
       return () => { active = false; };
     }, []),
   );
 
   const earnedCount = badges.filter((b) => b.earned).length;
-  const judgeable = badges.filter((b) => !b.reserved).length;
+  // Reserved badges only join the denominator once actually granted, so the
+  // count never reads "12 of 11".
+  const judgeable = badges.filter((b) => !b.reserved || b.earned).length;
 
   const STATS: { label: string; value: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
     { label: 'Total Drives',     value: String(stats?.totalDrives ?? 0),        icon: 'steering' },

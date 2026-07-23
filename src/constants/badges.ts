@@ -30,7 +30,7 @@ export const BADGES: Badge[] = [
   { id: 'veteran',      name: 'Veteran',       desc: 'Fifty drives with Cruise FM.',              icon: 'medal-outline' },
   { id: 'local-legend', name: 'Local Legend',  desc: 'Ten drives on a single station.',           icon: 'star-circle-outline' },
   { id: 'dial-surfer',  name: 'Dial Surfer',   desc: 'Drive with every mood.',                    icon: 'radio' },
-  { id: 'founder',      name: 'Founder',       desc: 'Reserved for the first 500.',               icon: 'flag-checkered', reserved: true },
+  { id: 'founder',      name: 'Founder',       desc: 'Here for launch week. Never offered again.', icon: 'flag-checkered', reserved: true },
 ];
 
 function streakDays(log: DriveEvent[]): number {
@@ -43,8 +43,8 @@ function streakDays(log: DriveEvent[]): number {
   return n;
 }
 
-/** Judge every badge against the drive log. */
-export function judgeBadges(log: DriveEvent[]): JudgedBadge[] {
+/** Judge every badge against the drive log (+ the device's Founder status). */
+export function judgeBadges(log: DriveEvent[], opts?: { founder?: boolean }): JudgedBadge[] {
   const totalDrives  = log.length;
   const totalMinutes = log.reduce((s, e) => s + (e.minutes ?? 0), 0);
   const nightDrives  = log.filter((e) => { const h = new Date(e.ts).getHours(); return h >= 22 || h < 5; }).length;
@@ -66,7 +66,7 @@ export function judgeBadges(log: DriveEvent[]): JudgedBadge[] {
     'veteran':      totalDrives >= 50,
     'local-legend': maxOnOne >= 10,
     'dial-surfer':  allEight,
-    'founder':      false, // granted at launch, never earned in-app
+    'founder':      !!opts?.founder, // granted to launch-week devices, never earned by driving
   };
 
   return BADGES.map((b) => ({ ...b, earned: earned[b.id] ?? false }));

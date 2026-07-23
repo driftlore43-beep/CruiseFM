@@ -13,6 +13,10 @@ import { EntitlementsProvider } from '@/context/EntitlementsContext';
 import { PlatformSelector, usePlatformSelector } from '@/components/PlatformSelector';
 import { BrandIntro } from '@/components/BrandIntro';
 import { setPlatformSkipped } from '@/utils/musicPlatform';
+import { claimFounderIfEligible } from '@/utils/founder';
+
+// Stamp launch-week devices as Founders (fire-and-forget, idempotent).
+claimFounderIfEligible();
 
 function AppShell() {
   const platformSelector = usePlatformSelector();

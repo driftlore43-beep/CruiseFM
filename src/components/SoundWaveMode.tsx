@@ -116,7 +116,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
   // reference); the rest get a lightened tint of their own top colour.
   const swStops = SW_PALETTES[station.id] ?? [lightenHex(eq[0], 0.45), eq[0], eq[2]];
 
-  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -356,7 +356,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
 
         <ModeCloseButton onPress={handleClose} />
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && (spotify.track?.isPlaying ?? true)} color={eq[1]} />
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} color={eq[1]} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 

@@ -445,7 +445,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const { width: winW, height: winH } = useWindowDimensions();
   const isLandscape = winW > winH;
 
-  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const spotify = useSpotifyPlayback(visible);
 
   // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
@@ -829,7 +829,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             {/* Right column — cassette */}
             <View style={[ls.rightCol, { paddingRight: safeR }]}>
               <Animated.View style={[fs.glowOrb, {
-                backgroundColor: neonColor,
+                backgroundColor: C.amber, // warm tape-deck glow — the cassette identity is orange, whatever the mood
                 width: cassetteW * 0.9, height: cassetteH * 1.4,
                 borderRadius: cassetteW * 0.45,
                 opacity: playing ? glowOpacity : 0.12,
@@ -873,7 +873,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
           {/* Cassette hero — flex:1 so it grows to fill available space */}
           <View style={[fs.cassetteWrap, { flex: 1 }]}>
             <Animated.View style={[fs.glowOrb, {
-              backgroundColor: neonColor,
+              backgroundColor: C.amber, // warm tape-deck glow — the cassette identity is orange, whatever the mood
               width: cassetteW * 0.85, height: cassetteH * 1.3,
               borderRadius: cassetteW * 0.42,
               opacity: playing ? glowOpacity : 0.12,
@@ -968,7 +968,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
         <ModeCloseButton onPress={handleClose} />
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && (spotify.track?.isPlaying ?? true)} hero={false} color={station.eqColors?.[1] ?? station.glowColor} />
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} hero={false} color={C.amber} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 

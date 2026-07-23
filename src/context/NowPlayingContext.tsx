@@ -123,6 +123,11 @@ type NowPlayingCtx = {
   /** Show the wake-Spotify tip (playback controls call this when a start is
    * dragging on with no verdict). */
   showWakeNudge: () => void;
+  /** True while a station's music is being (re)started — the silent gap of a
+   * mood switch or drive start. The atmosphere watches this to hold its beat
+   * until the music is actually flowing (the poll is too slow to catch the
+   * short gap on its own). */
+  musicSwitching: boolean;
   /** Adopt Spotify's real play state (poll-driven) — pauses the drive when
    * Spotify pauses on its own (car Bluetooth off, pause from another device)
    * and resumes it when music starts elsewhere. Unlike setPlaying this does
@@ -142,6 +147,7 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const [handoff, setHandoff] = useState(false);
   const clearPlaybackNotice = useCallback(() => setPlaybackNotice(null), []);
   const showWakeNudge = useCallback(() => setPlaybackNotice(WAKE_SPOTIFY_NUDGE), []);
+  const [musicSwitching, setMusicSwitching] = useState(false);
   const reportStartResult = useCallback((result: StartResult) => {
     setPlaybackNotice(START_NOTICES[result] ?? null);
     // Handoff = the music is playing in the Spotify app, uncontrollable here.
@@ -203,12 +209,18 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   // `resumeAny` (previews): no linked playlist just resumes the user's music.
   const startStationMusic = useCallback((stationId: string, opts?: { breath?: boolean; resumeAny?: boolean }) => {
     let settled = false;
+    // The atmosphere holds its beat through the silent gap; safety timer so a
+    // dead network can never leave it stuck holding.
+    setMusicSwitching(true);
+    const unstick = setTimeout(() => setMusicSwitching(false), 8000);
     isSpotifyConnected()
       .then((c) => { if (c && !settled) setPlaybackNotice(WAKE_SPOTIFY_NUDGE); })
       .catch(() => {});
     const kick = () => {
       playStationMusic(stationId, { resumeAny: opts?.resumeAny }).then((r) => {
         settled = true;
+        clearTimeout(unstick);
+        setMusicSwitching(false);
         if (r) reportStartResult(r);
       });
     };
@@ -281,8 +293,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState }),
-    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState],
+    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching }),
+    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

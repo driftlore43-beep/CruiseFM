@@ -469,7 +469,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
 
-  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const spotify = useSpotifyPlayback(visible);
 
   // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
@@ -542,6 +542,11 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const recordCenterY     = useRef(0);
   const lastAngle         = useRef<number | null>(null);
   const accumulatedRotation = useRef(0);
+  // Tap detection: a still, quick touch on the record toggles play/pause
+  // (like tapping the cassette body) instead of registering as a zero scrub.
+  const tapStartRef       = useRef(0);
+  const movedDegRef       = useRef(0);
+  const togglePlayRef     = useRef(() => {});
 
   const _getAngleFromCenter = (touchX: number, touchY: number) =>
     Math.atan2(touchY - recordCenterY.current, touchX - recordCenterX.current) * (180 / Math.PI);
@@ -565,6 +570,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           recordCenterX.current = pX + w / 2;
           recordCenterY.current = pY + h / 2;
         });
+        tapStartRef.current = Date.now();
+        movedDegRef.current = 0;
         scrubStartPosRef.current = progressValue.current * trackMsRef.current;
         progressAnimRef.current?.stop();
         stopSpin();
@@ -582,6 +589,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         const diff  = _angleDiff(angle, lastAngle.current);
         lastAngle.current = angle;
         accumulatedRotation.current += diff;
+        movedDegRef.current += Math.abs(diff);
 
         // 360° = 5 seconds of track
         const trackMs = trackMsRef.current;
@@ -606,6 +614,14 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         setIsScrubbing(false);
         setScrubDir(null);
         if (scrubFadeTimerRef.current) clearTimeout(scrubFadeTimerRef.current);
+        // A still, quick touch is a TAP: the record doubles as a play/pause
+        // button, matching the cassette body. No seek, no scrub indicator —
+        // the play-state effects handle spin-up / coast-down.
+        if (movedDegRef.current < 3 && Date.now() - tapStartRef.current < 350) {
+          scrubIndicatorAnim.setValue(0);
+          togglePlayRef.current();
+          return;
+        }
         scrubFadeTimerRef.current = setTimeout(() => {
           Animated.timing(scrubIndicatorAnim, { toValue: 0, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
         }, 1000);
@@ -624,6 +640,9 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       },
     })
   ).current;
+
+  // Re-bound every render so the tap always sees fresh play state.
+  togglePlayRef.current = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
 
   const progressPanRef = useRef(
     PanResponder.create({
@@ -1031,7 +1050,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
         <ModeCloseButton onPress={handleClose} />
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && (spotify.track?.isPlaying ?? true)} color={station.eqColors?.[1] ?? V.gold} />
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} color={station.eqColors?.[1] ?? V.gold} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 

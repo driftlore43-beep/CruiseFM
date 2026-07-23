@@ -194,7 +194,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     setShuffle(spotify.shuffleOn);
     setRepeat(spotify.repeatMode !== 'off');
   }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
-  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -511,7 +511,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
         <ModeCloseButton onPress={handleClose} />
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && (spotify.track?.isPlaying ?? true)} color={eq[1]} />
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} color={eq[1]} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 

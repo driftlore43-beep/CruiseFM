@@ -114,8 +114,8 @@ function SparkleField({ size }: { size: number }) {
 
 // ── Vinyl disc — clean bold design ───────────────────────────────────────────
 function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: number; spin: Animated.AnimatedInterpolation<string>; accent?: string; showLabel?: boolean }) {
-  // True-to-life proportions: a 100mm label on a 302mm pressing ≈ 33%.
-  const cSize = Math.min(110, size * 0.33);
+  // A touch over true-to-life (real label ≈ 33%) — matches the fullscreen deck.
+  const cSize = Math.min(120, size * 0.36);
   const cR    = cSize / 2;
 
   const cx = size / 2;
@@ -386,8 +386,9 @@ function TurntableHero({
       }} />
       {/* Center label — independent spin, sits above the record */}
       {(() => {
-        // True-to-life proportions: a 100mm label on a 302mm pressing ≈ 33%.
-        const cSize = Math.min(120, recSize * 0.33);
+        // A touch over true-to-life (real label ≈ 33%) — the album art deserves
+        // the extra breathing room (owner call, 23.07).
+        const cSize = Math.min(132, recSize * 0.36);
         const cR    = cSize / 2;
         return (
           <Animated.View pointerEvents="none" style={{

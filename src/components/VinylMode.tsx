@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Svg, { Circle as SvgCircle, G, Path, Rect as SvgRect } from 'react-native-svg';
 import {
-  Animated, Dimensions, Easing, Modal, PanResponder, ScrollView, StyleSheet,
+  Animated, Dimensions, Easing, Image, Modal, PanResponder, ScrollView, StyleSheet,
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -199,30 +199,30 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
 
 // ── Tonearm (shared between preview and fullscreen) ───────────────────────────
 function Tonearm({
-  armLen, armW, headW, headH, pivotX, pivotY, rotation, color = '#222222',
+  armLen, armW, headW, headH, pivotX, pivotY, rotation,
 }: {
   armLen: number; armW: number; headW: number; headH: number;
   pivotX: number; pivotY: number;
   rotation: Animated.AnimatedInterpolation<string>;
-  /** Solid mood colour for the arm + headshell. */
-  color?: string;
 }) {
-  const cwW = Math.max(16, armW * 2.2);
-  const cwH = Math.max(10, armW * 1.4);
-  // S-curve geometry (classic turntable arm): bows away from the record,
-  // then hooks back in so the angled headshell meets the groove.
-  const BEND  = Math.min(20, armLen * 0.085);
-  const svgW  = headW + BEND * 2 + 24;
+  // Hardware is silver/graphite regardless of mood — reads as real hi-fi kit.
+  const cwW = Math.max(16, armW * 2.6);
+  const cwH = Math.max(10, armW * 1.6);
+  // Faint-J geometry: straight shaft, one gentle hook in to the groove.
+  const BEND  = Math.min(17, armLen * 0.08);
+  const svgW  = headW + BEND * 2 + 28;
   const scx   = svgW / 2;
-  const ex    = scx - BEND * 0.55;
-  const ey    = armLen * 0.90;
-  const svgH  = armLen + headH + 14;
-  const armPath = `M ${scx} 6
-    C ${scx} ${armLen * 0.34}, ${scx + BEND} ${armLen * 0.46}, ${scx + BEND} ${armLen * 0.64}
-    C ${scx + BEND} ${armLen * 0.80}, ${ex} ${armLen * 0.74}, ${ex} ${ey}`;
+  const ex    = scx - BEND;
+  const TOP   = cwH + 8;               // headroom for the counterweight
+  const eyy   = TOP + armLen * 0.90;
+  const svgH  = TOP + armLen + headH + 16;
+  const armPath = `M ${scx} ${TOP + 8} L ${scx} ${TOP + armLen * 0.58} C ${scx} ${TOP + armLen * 0.76}, ${ex} ${TOP + armLen * 0.72}, ${ex} ${eyy}`;
+  const innerW  = Math.max(1, armW * 0.55);
+  const screwR  = Math.max(1, headW * 0.08);
+  const bandH   = Math.max(2.5, headH * 0.2);
   return (
     <View pointerEvents="none" style={{ position: 'absolute', top: pivotY, left: pivotX - armW / 2 }}>
-      {/* Whole arm (shadow + body + headshell) rotates about the pivot */}
+      {/* Whole arm (shadow + shaft + headshell + counterweight) rotates about the pivot */}
       <Animated.View style={{
         width: armW, height: armLen,
         transform: [
@@ -231,54 +231,75 @@ function Tonearm({
           { translateY: armLen / 2 },
         ],
       }}>
-        {/* Counterweight — behind the pivot, rides with the arm */}
-        <View style={{
-          position: 'absolute',
-          top: -cwH / 2 - 2,
-          left: -(cwW / 2 - armW / 2),
-          width: cwW, height: cwH,
-          backgroundColor: '#1e1e1e',
-          borderRadius: 4,
-          borderWidth: 1, borderColor: '#3a3a3a',
-        }} />
         <Svg
           width={svgW} height={svgH}
-          style={{ position: 'absolute', top: 0, left: armW / 2 - scx }}
+          style={{ position: 'absolute', top: -(TOP + 8), left: armW / 2 - scx }}
         >
-          {/* Drop shadow — offset dark clone of the curve and headshell */}
-          <G transform="translate(3,5)" opacity={0.45}>
+          {/* Drop shadow — offset dark clone of shaft and headshell */}
+          <G transform="translate(3,5)" opacity={0.4}>
             <Path d={armPath} stroke="#000" strokeWidth={armW} fill="none" strokeLinecap="round" />
-            <G transform={`rotate(-14 ${ex} ${ey})`}>
-              <SvgRect x={ex - headW / 2} y={ey - 2} width={headW} height={headH} rx={3} fill="#000" />
+            <G transform={`rotate(-18 ${ex} ${eyy})`}>
+              <SvgRect x={ex - headW / 2} y={eyy - 2} width={headW} height={headH} rx={3.5} fill="#000" />
             </G>
           </G>
-          {/* Arm body — solid mood colour, S-curved */}
-          <Path d={armPath} stroke={color} strokeWidth={armW} fill="none" strokeLinecap="round" />
-          {/* Highlight stripe following the curve */}
-          <Path d={armPath} stroke="rgba(255,255,255,0.30)" strokeWidth={1.8} fill="none" strokeLinecap="round" transform="translate(-2,0)" />
-          {/* Angled headshell with cartridge slot + stylus */}
-          <G transform={`rotate(-14 ${ex} ${ey})`}>
-            <SvgRect x={ex - headW / 2} y={ey - 2} width={headW} height={headH} rx={3} fill={color} stroke="rgba(0,0,0,0.35)" strokeWidth={1} />
-            <SvgRect x={ex - headW / 2 + 3} y={ey + 2} width={headW - 6} height={headH - 12} rx={2} fill="rgba(0,0,0,0.28)" />
-            <SvgRect x={ex - 2} y={ey + headH - 4} width={3.5} height={8} rx={1} fill="#CCC" />
-            <SvgRect x={ex - 1} y={ey + headH + 3} width={2} height={5} rx={1} fill="#FFF" />
+          {/* Counterweight — knurled cylinder behind the pivot */}
+          <SvgRect x={scx - cwW / 2} y={2} width={cwW} height={cwH} rx={cwH * 0.3} fill="#202024" stroke="#3a3a40" strokeWidth={1} />
+          <SvgRect x={scx - cwW / 2} y={2 + cwH * 0.42} width={cwW} height={cwH * 0.2} fill="#4a4a52" />
+          {[-0.32, -0.11, 0.11, 0.32].map((f, i) => (
+            <Path key={i} d={`M ${scx + cwW * f} 2 V ${2 + cwH}`} stroke="#333338" strokeWidth={1.3} />
+          ))}
+          {/* Shaft — brushed silver: dark edge, bright core, hot stripe */}
+          <Path d={armPath} stroke="#84848E" strokeWidth={armW} fill="none" strokeLinecap="round" />
+          <Path d={armPath} stroke="#E8E8EE" strokeWidth={innerW} fill="none" strokeLinecap="round" />
+          <Path d={armPath} stroke="rgba(255,255,255,0.85)" strokeWidth={Math.max(1, armW * 0.16)} fill="none" strokeLinecap="round" transform="translate(-1.5,0)" />
+          {/* Headshell — graphite cartridge: silver mount band, screws, vents, stylus */}
+          <G transform={`rotate(-18 ${ex} ${eyy})`}>
+            <SvgRect x={ex - headW / 2} y={eyy - 2} width={headW} height={headH} rx={3.5} fill="#26262c" stroke="#0e0e12" strokeWidth={1} />
+            <SvgRect x={ex - headW / 2} y={eyy - 2} width={headW} height={bandH * 1.4} rx={3} fill="#9C9CA6" />
+            <SvgCircle cx={ex - headW / 2 + headW * 0.24} cy={eyy + headH * 0.34} r={screwR} fill="#8A8A94" />
+            <SvgCircle cx={ex + headW / 2 - headW * 0.24} cy={eyy + headH * 0.34} r={screwR} fill="#8A8A94" />
+            <SvgRect x={ex - headW / 2 + headW * 0.18} y={eyy + headH * 0.48} width={headW * 0.64} height={bandH} rx={bandH / 2} fill="#111116" />
+            <SvgRect x={ex - headW / 2 + headW * 0.18} y={eyy + headH * 0.66} width={headW * 0.64} height={bandH} rx={bandH / 2} fill="#111116" />
+            <SvgRect x={ex - headW * 0.16} y={eyy + headH - 4} width={headW * 0.32} height={6} rx={1} fill="#B9B9C2" />
+            <Path d={`M ${ex} ${eyy + headH + 2} l ${headW * 0.11} ${headH * 0.2} l ${-headW * 0.22} 0 Z`} fill="#FFF" />
           </G>
         </Svg>
       </Animated.View>
 
-      {/* Pivot base — flat illustration style: grey circle with lighter center */}
-      <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: '#2a2a2a', borderWidth: 1, borderColor: '#444', top: -11, left: armW / 2 - 11, zIndex: 10,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.8, shadowRadius: 4, elevation: 6,
-      }} />
-      <View style={{ position: 'absolute', width: 12, height: 12, borderRadius: 6, backgroundColor: '#3e3e3e', top: -6, left: armW / 2 - 6, zIndex: 11 }} />
-      <View style={{ position: 'absolute', width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#585858', top: -2.5, left: armW / 2 - 2.5, zIndex: 12 }} />
+      {/* Pivot base — fixed round plate with screws, bearing and anti-skate
+          dial (does not swing with the arm) */}
+      {(() => {
+        const R = Math.max(11, armW * 1.7);
+        const dialR = Math.max(3.5, R * 0.32);
+        const bw = R * 2 + dialR * 2 + 8;
+        const bcx = R;
+        return (
+          <Svg
+            width={bw} height={R * 2 + 4}
+            style={{ position: 'absolute', top: -R, left: armW / 2 - R, zIndex: 10 }}
+            pointerEvents="none"
+          >
+            <SvgCircle cx={bcx} cy={R} r={R} fill="#232327" stroke="#3d3d44" strokeWidth={1.5} />
+            {[[-0.52, -0.42], [0.52, -0.42], [-0.52, 0.42], [0.52, 0.42]].map(([fx, fy], i) => (
+              <SvgCircle key={i} cx={bcx + R * fx} cy={R + R * fy} r={Math.max(1.2, R * 0.1)} fill="#6E6E78" />
+            ))}
+            {/* Anti-skate dial off the plate's shoulder */}
+            <SvgCircle cx={bcx + R + dialR + 2} cy={R + R * 0.24} r={dialR} fill="#33333a" stroke="#55555e" strokeWidth={1.2} />
+            <Path d={`M ${bcx + R + dialR + 2} ${R + R * 0.24 - dialR + 1.5} V ${R + R * 0.24}`} stroke="#9C9CA6" strokeWidth={1.3} />
+            {/* Bearing housing + spindle cap with a glint */}
+            <SvgCircle cx={bcx} cy={R} r={R * 0.5} fill="#2e2e34" stroke="#4a4a52" strokeWidth={1} />
+            <SvgCircle cx={bcx} cy={R} r={R * 0.24} fill="#55555e" />
+            <SvgCircle cx={bcx - R * 0.08} cy={R - R * 0.08} r={Math.max(1, R * 0.08)} fill="#8A8A94" />
+          </Svg>
+        );
+      })()}
     </View>
   );
 }
 
 // ── Fullscreen turntable hero ─────────────────────────────────────────────────
 function TurntableHero({
-  platSize, spin, tonearmAnim, glowOpacity, ringShimmer, raysSpin, labelRotate, playing, panHandlers, scrubbing, scrubDir, accent = V.gold, labelText = 'NIGHT RUN FM',
+  platSize, spin, tonearmAnim, glowOpacity, ringShimmer, raysSpin, labelRotate, playing, panHandlers, scrubbing, scrubDir, accent = V.gold, labelText = 'NIGHT RUN FM', albumArt = null,
 }: {
   platSize: number;
   spin: Animated.AnimatedInterpolation<string>;
@@ -291,16 +312,18 @@ function TurntableHero({
   panHandlers: any;
   scrubbing: boolean;
   scrubDir: 'fwd' | 'bwd' | null;
-  /** Station mood colour — rim, ring, rays, notes and tonearm all take it. */
+  /** Station mood colour — rim, ring, rays and notes all take it. */
   accent?: string;
+  /** Album cover URL — fills the centre label like a picture disc. */
+  albumArt?: string | null;
   /** Station name printed on the red centre label. */
   labelText?: string;
 }) {
   const recSize  = platSize * 0.865;
   const armLen   = platSize * 0.70;
-  const armW     = 9;
-  const headW    = 18;
-  const headH    = 24;
+  const armW     = 10;
+  const headW    = 20;
+  const headH    = 26;
   const pivotX   = platSize * 0.935;
   const pivotY   = platSize * 0.048;
   // 0 = parked clear of the record (negative swings right, off the platter),
@@ -358,22 +381,30 @@ function TurntableHero({
           <Animated.View pointerEvents="none" style={{
             position: 'absolute',
             width: cSize, height: cSize, borderRadius: cR,
-            backgroundColor: '#8B0000', borderWidth: 1, borderColor: '#6B0000',
+            backgroundColor: '#8B0000', borderWidth: 1, borderColor: albumArt ? 'rgba(0,0,0,0.55)' : '#6B0000',
             alignItems: 'center', justifyContent: 'center',
             top: platSize / 2 - cR, left: platSize / 2 - cR,
             transform: [{ rotate: labelRotate }],
             overflow: 'hidden',
           }}>
-            <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 1.2 }}>COLUMBIA</Text>
-            <Text style={{ position: 'absolute', top: cR * 0.50, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: Math.max(8, cSize * 0.145), fontWeight: '800', letterSpacing: 0.4 }}>CRUISE FM</Text>
-            <Text style={{ position: 'absolute', top: cR * 1.22, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: Math.max(4, cSize * 0.075), letterSpacing: 0.4 }} numberOfLines={1}>{labelText}</Text>
-            <View style={{ position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', top: cR - 3, left: cR - 3 }} />
+            {albumArt ? (
+              // Album cover fills the label — picture-disc style, MD-free.
+              <Image source={{ uri: albumArt }} style={{ position: 'absolute', width: cSize, height: cSize }} resizeMode="cover" />
+            ) : (
+              <>
+                <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 1.2 }}>COLUMBIA</Text>
+                <Text style={{ position: 'absolute', top: cR * 0.50, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: Math.max(8, cSize * 0.145), fontWeight: '800', letterSpacing: 0.4 }}>CRUISE FM</Text>
+                <Text style={{ position: 'absolute', top: cR * 1.22, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: Math.max(4, cSize * 0.075), letterSpacing: 0.4 }} numberOfLines={1}>{labelText}</Text>
+              </>
+            )}
+            {/* Spindle hole stays on top of art and label alike */}
+            <View style={{ position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', top: cR - 3, left: cR - 3, borderWidth: 1, borderColor: 'rgba(0,0,0,0.4)' }} />
           </Animated.View>
         );
       })()}
       {/* Floating music notes */}
       <FloatingNotes playing={playing} emitter="ring" ringRadius={recSize / 2} scrubbing={scrubbing} scrubDir={scrubDir} color={accent} />
-      <Tonearm armLen={armLen} armW={armW} headW={headW} headH={headH} pivotX={pivotX} pivotY={pivotY} rotation={armRot} color={accent} />
+      <Tonearm armLen={armLen} armW={armW} headW={headW} headH={headH} pivotX={pivotX} pivotY={pivotY} rotation={armRot} />
     </View>
   );
 }
@@ -976,6 +1007,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
               panHandlers={recordPanRef.panHandlers} scrubbing={isScrubbing} scrubDir={scrubDir}
               accent={VINYL_ACCENTS[station.id] ?? station.eqColors?.[1] ?? V.gold}
               labelText={station.name.toUpperCase()}
+              albumArt={spotify.track?.albumArt ?? null}
             />
           </View>
 
@@ -1198,7 +1230,7 @@ export function VinylModePreview() {
           <VinylDisc size={PV_RECORD} spin={staticRotate} showLabel />
         </Animated.View>
         {/* Tonearm — positioned in same container but outside spinning view */}
-        <Tonearm armLen={PV_ARM_LEN} armW={2} headW={9} headH={13} pivotX={PV_PIVOT_X} pivotY={PV_PIVOT_Y} rotation={armRot} />
+        <Tonearm armLen={PV_ARM_LEN} armW={2.5} headW={9} headH={13} pivotX={PV_PIVOT_X} pivotY={PV_PIVOT_Y} rotation={armRot} />
       </View>
 
       <VinylFullscreen visible={modalOpen} onClose={handleModalClose} />

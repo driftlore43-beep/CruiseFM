@@ -19,6 +19,8 @@ export type RepeatMode = 'off' | 'context' | 'track';
 export type NowPlaying = {
   title: string;
   artist: string;
+  /** Album cover URL (mid-size), null when Spotify doesn't provide one. */
+  albumArt: string | null;
   /** Real track length from Spotify, null when unknown. */
   durationMs: number | null;
   /** Where the song was (ms) when we last asked… */
@@ -79,6 +81,8 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
           setTrack({
             title: item.name,
             artist: item.artists?.map((a: any) => a.name).join(', ') ?? '',
+            // Spotify sorts images largest-first; [1] (~300px) suits the label.
+            albumArt: item.album?.images?.[1]?.url ?? item.album?.images?.[0]?.url ?? null,
             durationMs: item.duration_ms ?? null,
             progressMs: data.progress_ms ?? null,
             syncedAt: Date.now(),

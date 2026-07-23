@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { useActivityPing, useStartResultReporter, useWakeNudge } from '@/context/NowPlayingContext';
+import { useActivityPing, useAdoptPlayState, useStartResultReporter, useWakeNudge } from '@/context/NowPlayingContext';
 
 import {
   isSpotifyConnected,
@@ -46,6 +46,12 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
   // What Spotify last reported about actual playback — the play button's
   // "did sound really start?" check reads this after a resume attempt.
   const isPlayingRef = useRef<boolean | null>(null);
+  // When the user last pressed a control — recent presses win over the poll
+  // so an optimistic tap isn't fought by slightly-stale server state.
+  const lastControlRef = useRef(0);
+  const adoptPlay = useAdoptPlayState();
+  const adoptRef = useRef(adoptPlay);
+  adoptRef.current = adoptPlay;
 
   useEffect(() => {
     if (!visible) return;
@@ -63,6 +69,12 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
         if (cancelledRef.current) return;
         const item = data?.item;
         if (data) isPlayingRef.current = data.is_playing ?? null;
+        // Mirror reality: if Spotify pauses on its own (car Bluetooth off,
+        // pause from another device) the drive pauses too — and resumes when
+        // music starts again elsewhere. Recent user taps win for 8s.
+        if (typeof data?.is_playing === 'boolean' && Date.now() - lastControlRef.current > 8000) {
+          adoptRef.current(data.is_playing);
+        }
         if (item?.name) {
           setTrack({
             title: item.name,
@@ -122,6 +134,7 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
     // demo-mode listeners shouldn't be nagged about a service they never linked.
     play: () => {
       ping();
+      lastControlRef.current = Date.now();
       // The wake note is the DEFAULT on every play — new users learn the
       // Spotify dance up front instead of sitting in silence. A clean
       // 'playing' verdict clears it within a beat.
@@ -138,9 +151,9 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
       }
       after();
     },
-    pause: () => { ping(); isPlayingRef.current = false; spotifyPause().catch(() => {}); after(); },
-    next: () => { ping(); skipNext().catch(() => {}); after(); },
-    prev: () => { ping(); skipPrev().catch(() => {}); after(); },
+    pause: () => { ping(); lastControlRef.current = Date.now(); isPlayingRef.current = false; spotifyPause().catch(() => {}); after(); },
+    next: () => { ping(); lastControlRef.current = Date.now(); skipNext().catch(() => {}); after(); },
+    prev: () => { ping(); lastControlRef.current = Date.now(); skipPrev().catch(() => {}); after(); },
     // Optimistic local flip; the API call + next poll settle the truth.
     shuffle: (state: boolean) => { ping(); setShuffleOn(state); spotifySetShuffle(state).catch(() => {}); after(); },
     repeat: (mode: RepeatMode) => { ping(); setRepeatMode(mode); spotifySetRepeat(mode).catch(() => {}); after(); },

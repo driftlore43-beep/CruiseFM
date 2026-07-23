@@ -123,6 +123,11 @@ type NowPlayingCtx = {
   /** Show the wake-Spotify tip (playback controls call this when a start is
    * dragging on with no verdict). */
   showWakeNudge: () => void;
+  /** Adopt Spotify's real play state (poll-driven) — pauses the drive when
+   * Spotify pauses on its own (car Bluetooth off, pause from another device)
+   * and resumes it when music starts elsewhere. Unlike setPlaying this does
+   * NOT count as user activity. */
+  adoptPlayState: (p: boolean) => void;
 };
 
 const Ctx = createContext<NowPlayingCtx | null>(null);
@@ -149,6 +154,11 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   }, []);
   const sessionRef = useRef<NowPlayingSession | null>(null);
   useEffect(() => { sessionRef.current = session; }, [session]);
+
+  const adoptPlayState = useCallback((p: boolean) => {
+    if (!sessionRef.current) return;
+    setPlayingRaw(p);
+  }, []);
 
   // Keep the screen awake for the whole drive — a driving companion that dims
   // and locks mid-cruise is useless. Tied to the session (any mode, portrait
@@ -271,8 +281,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge }),
-    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge],
+    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState }),
+    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -301,4 +311,10 @@ export function useStartResultReporter(): (result: StartResult) => void {
  * start attempt drags on with no verdict. */
 export function useWakeNudge(): () => void {
   return useContext(Ctx)?.showWakeNudge ?? noopPing;
+}
+
+/** Safe anywhere — lets the playback poll mirror Spotify's real play state
+ * onto the drive (car Bluetooth off → Spotify pauses → drive pauses). */
+export function useAdoptPlayState(): (p: boolean) => void {
+  return useContext(Ctx)?.adoptPlayState ?? noopPing;
 }

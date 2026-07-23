@@ -13,6 +13,7 @@ The owner does not code — describe changes in plain English, Claude implements
 - FREE tier: Cassette + Equalizer modes, basic playback, limited custom stations (3), badges
 - PREMIUM: Vinyl + Retro Radio modes, all mood themes, unlimited playlists, future additions
 - Never premium: offline listening, badges, founder cosmetics, seasonal themes
+- Live song titles are Spotify-only (decided 2026-07-23): companion-mode listeners (YouTube Music etc.) see the station's mood tagline — Google exposes no now-playing API. Possible future: Android media-notification reader (native module, fresh build, Android-only); iOS has no equivalent.
 - `OWNER_MODE = true` in src/constants/config.ts bypasses all locks during development
 
 ## Architecture map

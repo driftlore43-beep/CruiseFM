@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cruise FM — Music for the drive, not the playlist</title>
-<meta name="description" content="Spotify organises music by artist. Cruise FM organises it by how a drive feels. Mood stations, cinematic visual modes, one-tap Start Drive. Join the waitlist.">
+<meta name="description" content="Spotify organises music by artist. Cruise FM organises it by how a drive feels. Mood stations, cinematic visual modes, one-tap Start Drive. Free on the App Store.">
 <meta property="og:title" content="Cruise FM — Music for the drive">
-<meta property="og:description" content="Your Spotify playlists, wrapped in a cinematic driving experience. Join the waitlist and claim your Founder badge.">
+<meta property="og:description" content="Your playlists, wrapped in a cinematic driving experience. Out now on the App Store — free during launch.">
 <style>
   :root{
     --violet:#7B38E0; --violet-light:#9B5FFF; --violet-dim:#4A1F8A;
@@ -99,6 +99,10 @@
   .btn:active{transform:translateY(0)}
   .signup .note{margin-top:14px;font-size:13.5px;color:var(--text-3)}
   .signup .note b{color:var(--text-2);font-weight:600}
+  .store-btn{display:inline-flex;align-items:center;gap:12px;text-decoration:none}
+  .store-btn .apple{flex-shrink:0}
+  .store-btn small{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;opacity:.75;text-align:left}
+  .store-btn span.big{display:block;font-size:17px;font-weight:800;letter-spacing:.02em;text-align:left}
 
   .scroll-hint{margin-top:56px;color:var(--text-3);font-size:13px;letter-spacing:.2em;text-transform:uppercase}
   .scroll-hint::after{content:"";display:block;width:1px;height:38px;margin:12px auto 0;
@@ -240,7 +244,7 @@
 <body>
 
 <header class="hero">
-  <div class="badge-pill"><span class="dot"></span> Coming soon — iOS &amp; Android</div>
+  <div class="badge-pill"><span class="dot"></span> Out now on iPhone — Android on the way</div>
   <h1 class="wordmark">CRUISE <span class="fm">FM</span></h1>
   <p class="pitch"><strong>Spotify organises music by artist.</strong><br>Cruise FM organises it by how a drive feels.</p>
 
@@ -250,12 +254,11 @@
   </div>
 
   <div class="signup">
-    <!-- Waitlist signups go to Formspree form mykrwzop (cruisefmservice@gmail.com) -->
-    <form action="https://formspree.io/f/mykrwzop" method="POST">
-      <input type="email" name="email" required placeholder="you@email.com" autocomplete="email" aria-label="Email address">
-      <button class="btn" type="submit">Join the waitlist</button>
-    </form>
-    <p class="note">Be first in line at launch. <b>The first 500 get the Founder badge — forever.</b></p>
+    <a class="btn store-btn" href="https://apps.apple.com/app/id6793233679">
+      <svg class="apple" width="22" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1a1200" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.031 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-.702"/></svg>
+      <span><small>Download on the</small><span class="big">App&nbsp;Store</span></span>
+    </a>
+    <p class="note">Free during launch — <b>every mode unlocked.</b> No account, no ads.</p>
   </div>
 
   <div class="scroll-hint">The experience</div>
@@ -263,9 +266,9 @@
 
 <section class="modes">
   <div class="wrap">
-    <p class="kicker">Four ways to watch your music</p>
+    <p class="kicker">Seven ways to watch your music</p>
     <h2>Full-screen modes, built for the dashboard</h2>
-    <p class="sub">Your playlist becomes the soundtrack. Cruise FM becomes the film. Every mode is a full-bleed, glowing companion for the road ahead.</p>
+    <p class="sub">Your playlist becomes the soundtrack. Cruise FM becomes the film. Seven full-bleed, glowing modes — here's a taste, all free while Cruise FM is in its launch period.</p>
 
     <div class="mode-grid">
       <div class="mode-card">
@@ -291,14 +294,14 @@
       </div>
 
       <div class="mode-card">
-        <span class="tag premium">Premium</span>
+        <span class="tag premium">Free at launch</span>
         <div class="stage"><div class="vinyl" aria-hidden="true"></div></div>
         <h3>Vinyl</h3>
         <p>Your track, spinning in amber and violet.</p>
       </div>
 
       <div class="mode-card">
-        <span class="tag premium">Premium</span>
+        <span class="tag premium">Free at launch</span>
         <div class="stage">
           <div class="radio" aria-hidden="true">
             <div class="dialband"><div class="needle"></div></div>
@@ -306,8 +309,8 @@
             <div class="speaker"></div>
           </div>
         </div>
-        <h3>Retro Radio</h3>
-        <p>A warm dial glow from another decade.</p>
+        <h3>Tuner</h3>
+        <p>Drag a real FM dial between moods.</p>
       </div>
     </div>
   </div>
@@ -339,12 +342,12 @@
     <div class="founder-card">
       <div class="founder-medal">🏁</div>
       <h3>First 500 on the road</h3>
-      <p>The first <b>500 people</b> from this waitlist get the permanent <b>Founder badge</b> on their profile — a cosmetic that will <b>never</b> be sold, unlockable, or offered again. When it's gone, it's gone.</p>
+      <p>The Founder badge is reserved for <b>launch-week drivers</b> — a permanent cosmetic on your profile that will <b>never</b> be sold, unlockable, or offered again. When it's gone, it's gone.</p>
       <div class="signup" style="margin:30px auto 0">
-        <form action="https://formspree.io/f/mykrwzop" method="POST">
-          <input type="email" name="email" required placeholder="you@email.com" autocomplete="email" aria-label="Email address">
-          <button class="btn" type="submit">Reserve my badge</button>
-        </form>
+        <a class="btn store-btn" href="https://apps.apple.com/app/id6793233679">
+          <svg class="apple" width="22" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1a1200" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.031 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-.702"/></svg>
+          <span><small>Download on the</small><span class="big">App&nbsp;Store</span></span>
+        </a>
       </div>
     </div>
   </div>
@@ -353,14 +356,17 @@
 <footer>
   <div class="mark">CRUISE <span>FM</span></div>
   <p class="fine">
-    Cruise FM plays music through your own Spotify account and requires <b>Spotify Premium</b>.
-    Free tier includes Cassette &amp; Equalizer modes. Premium unlocks everything for <b>£1.99/month</b>
-    after a <b>7-day free trial</b>. Offline listening and badges are free for everyone, always.
+    Cruise FM is <b>free during its launch period</b> — all seven modes unlocked, no account, no ads.
+    Full in-app playback control works with your own <b>Spotify Premium</b> account; on any other music
+    service, play music in your own app while Cruise FM runs the visuals alongside. A small subscription
+    for the premium modes arrives after launch — badges and seasonal themes stay free forever.
     <br><br>Not affiliated with Spotify AB. Please don't watch the screen while driving — that's what passengers are for.
     <br><br>
     <a href="/privacy/" style="color:var(--violet-light);text-decoration:none">Privacy Policy</a>
     &nbsp;·&nbsp;
     <a href="/terms/" style="color:var(--violet-light);text-decoration:none">Terms of Service</a>
+    &nbsp;·&nbsp;
+    <a href="/support/" style="color:var(--violet-light);text-decoration:none">Support</a>
     &nbsp;·&nbsp;
     <a href="mailto:cruisefmservice@gmail.com" style="color:var(--violet-light);text-decoration:none">cruisefmservice@gmail.com</a>
   </p>

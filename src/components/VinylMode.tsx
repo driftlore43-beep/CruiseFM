@@ -299,7 +299,7 @@ function Tonearm({
 
 // ── Fullscreen turntable hero ─────────────────────────────────────────────────
 function TurntableHero({
-  platSize, spin, tonearmAnim, glowOpacity, ringShimmer, raysSpin, labelRotate, playing, panHandlers, scrubbing, scrubDir, accent = V.gold, labelText = 'NIGHT RUN FM', albumArt = null,
+  platSize, spin, tonearmAnim, glowOpacity, ringShimmer, raysSpin, labelRotate, playing, panHandlers, scrubbing, scrubDir, accent = V.gold, labelText = 'NIGHT RUN FM', albumArt = null, progressAnim,
 }: {
   platSize: number;
   spin: Animated.AnimatedInterpolation<string>;
@@ -316,6 +316,8 @@ function TurntableHero({
   accent?: string;
   /** Album cover URL — fills the centre label like a picture disc. */
   albumArt?: string | null;
+  /** Track progress 0..1 — the arm creeps toward the label as the song plays. */
+  progressAnim?: Animated.Value;
   /** Station name printed on the red centre label. */
   labelText?: string;
 }) {
@@ -328,7 +330,17 @@ function TurntableHero({
   const pivotY   = platSize * 0.048;
   // 0 = parked clear of the record (negative swings right, off the platter),
   // 1 = stylus resting on the outer groove (small positive).
-  const armRot   = tonearmAnim.interpolate({ inputRange: [0, 1], outputRange: ['-16deg', '4deg'] });
+  // Parked at -16°; the stylus drops onto the outer grooves (6°, clearly
+  // inside the rim — needles never sit on the edge), then creeps toward the
+  // label as the song progresses, exactly like a real pressing. The creep is
+  // gated by tonearmAnim so a parked arm never wanders.
+  const armAngle = Animated.add(
+    tonearmAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 6] }),
+    progressAnim
+      ? Animated.multiply(tonearmAnim, Animated.multiply(progressAnim, 5))
+      : new Animated.Value(0),
+  );
+  const armRot = armAngle.interpolate({ inputRange: [-16, 11], outputRange: ['-16deg', '11deg'] });
   const platOff  = (platSize - recSize) / 2;
   const rayLen   = recSize / 2;
   const rayPivot = recSize / 2 - rayLen / 2;
@@ -823,7 +835,9 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       toValue: playing ? 1 : 0,
       duration: playing ? 1200 : 900,
       easing: playing ? Easing.out(Easing.cubic) : Easing.inOut(Easing.ease),
-      useNativeDriver: true,
+      // JS driver: the arm angle is combined with the (JS-driven) track
+      // progress for the inward creep — Animated can't mix drivers.
+      useNativeDriver: false,
     }).start();
   }, [playing]);
 
@@ -1008,6 +1022,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
               accent={VINYL_ACCENTS[station.id] ?? station.eqColors?.[1] ?? V.gold}
               labelText={station.name.toUpperCase()}
               albumArt={spotify.track?.albumArt ?? null}
+              progressAnim={progress}
             />
           </View>
 

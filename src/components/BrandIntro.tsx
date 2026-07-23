@@ -22,7 +22,7 @@ const ARCS = [
 
 // Snappy but fluid: launch already costs ~1.5s of real boot before we're
 // visible, so the theatre stays brief — one continuous swell, then the app.
-const END = 1.15; // seconds
+const END = 1.45; // seconds
 
 /** 0 before start, 1 after start+dur, eased in between. */
 function seg(t: number, start: number, dur: number) {
@@ -63,15 +63,15 @@ export function BrandIntro() {
   // One continuous gesture: the mark starts at the native splash's exact
   // size (no re-fade, no pop) and gently swells the whole way through; the
   // lift-away keeps the same zoom going as it fades, so nothing staggers.
-  const grow = seg(t, 0, 0.9);
-  const fadeOut = 1 - seg(t, 0.8, 0.35);
+  const grow = seg(t, 0, 1.15);
+  const fadeOut = 1 - seg(t, 1.05, 0.4);
   const zoom = 1 + 0.05 * grow + 0.07 * (1 - fadeOut);
   // Arcs bloom outward with heavy overlap — a swell, not a one-two-three.
-  const arcIn = [seg(t, 0.05, 0.4), seg(t, 0.18, 0.4), seg(t, 0.31, 0.4)];
-  const wordIn = seg(t, 0.3, 0.4);
+  const arcIn = [seg(t, 0.08, 0.5), seg(t, 0.24, 0.5), seg(t, 0.4, 0.5)];
+  const wordIn = seg(t, 0.4, 0.5);
 
   return (
-    <View style={[StyleSheet.absoluteFill, styles.root, { opacity: fadeOut }]} pointerEvents={t > 0.8 ? 'none' : 'auto'}>
+    <View style={[StyleSheet.absoluteFill, styles.root, { opacity: fadeOut }]} pointerEvents={t > 1.0 ? 'none' : 'auto'}>
       <View style={{ width: MARK, height: MARK, transform: [{ scale: zoom }] }}>
         <Image
           source={DISC}

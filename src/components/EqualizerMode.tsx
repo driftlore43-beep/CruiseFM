@@ -32,6 +32,7 @@ import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/u
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { AmbientGlow } from '@/components/AmbientGlow';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { MarqueeText } from '@/components/MarqueeText';
@@ -257,7 +258,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   // reads the mic even on slow phones where 30 tiny bars are hard to see.
   const glowPulse = useRef(new Animated.Value(0.3)).current;
 
-  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const [activeStation, setActiveStation] = useState(stationId ?? 'night-run');
   const [shuffle,       setShuffle]       = useState(false);
   const [repeat,        setRepeat]        = useState(false);
@@ -743,6 +744,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
         <ModeCloseButton onPress={handleClose} />
 
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 

@@ -14,7 +14,7 @@ The owner does not code — describe changes in plain English, Claude implements
 - PREMIUM: Vinyl + Retro Radio modes, all mood themes, unlimited playlists, future additions
 - Never premium: offline listening, badges, founder cosmetics, seasonal themes
 - Live song titles are Spotify-only (decided 2026-07-23): companion-mode listeners (YouTube Music etc.) see the station's mood tagline — Google exposes no now-playing API. Possible future: Android media-notification reader (native module, fresh build, Android-only); iOS has no equivalent.
-- `OWNER_MODE = true` in src/constants/config.ts bypasses all locks during development
+- `OWNER_MODE` in src/constants/config.ts bypasses all locks during development — set FALSE for launch (2026-07-23). `LAUNCH_FREE = true` (same file) is the public launch state: everyone premium, no locks/paywall, Sentry live; flip LAUNCH_FREE off only when real store products + platform RevenueCat keys ship (payments fast-follow)
 
 ## Architecture map
 - `src/app/(tabs)/` — cruise (home w/ one-tap Start Drive), stations, modes, profile

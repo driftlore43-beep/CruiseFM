@@ -29,6 +29,19 @@ const PLATFORM_ENTRIES = [
   NONE_ENTRY,
 ];
 
+// Honest tier line under each name. Spotify is the full ride; everything
+// else runs as the visual companion beside the user's own music app (which
+// genuinely works today — never call it "upcoming"), with Apple Music
+// flagged as the next full integration.
+const TIER_CAPTIONS: Record<string, string> = {
+  spotify:      'Full in-app control',
+  appleMusic:   'Visuals now · full control coming',
+  youtubeMusic: 'Visuals + your app',
+  amazonMusic:  'Visuals + your app',
+  tidal:        'Visuals + your app',
+  none:         'Just the visuals',
+};
+
 type Props = {
   visible: boolean;
   onDismiss: (skipped?: boolean) => void;
@@ -147,7 +160,7 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
 
           <Text style={styles.title}>Connect Your Music</Text>
           <Text style={styles.subtitle}>
-            Choose your favourite platform and we'll take you straight to the vibe.
+            Spotify unlocks full in-app control. On every other platform, Cruise FM runs the cinematic visuals alongside your own music app.
           </Text>
 
           {/* ── Platform grid ────────────────────────────────────────────── */}
@@ -186,16 +199,21 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
                     <PlatformIcon id={platform.id} />
                   </View>
 
-                  <Text
-                    style={[
-                      styles.platformName,
-                      isSelected
-                        ? { color: isNone ? '#aaa' : platform.color, fontWeight: '700' }
-                        : { color: Cruise.textPrimary },
-                    ]}
-                    numberOfLines={1}>
-                    {platform.name}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.platformName,
+                        isSelected
+                          ? { color: isNone ? '#aaa' : platform.color, fontWeight: '700' }
+                          : { color: Cruise.textPrimary },
+                      ]}
+                      numberOfLines={1}>
+                      {platform.name}
+                    </Text>
+                    <Text style={styles.platformTier} numberOfLines={1}>
+                      {TIER_CAPTIONS[platform.id] ?? ''}
+                    </Text>
+                  </View>
 
                   {/* Checkmark on selection */}
                   {isSelected && (
@@ -347,7 +365,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   platformName: {
-    flex: 1, fontSize: 13, fontWeight: '600',
+    fontSize: 13, fontWeight: '600',
+  },
+  platformTier: {
+    fontSize: 9.5, fontWeight: '600', color: 'rgba(255,255,255,0.42)', marginTop: 1,
   },
   checkCircle: {
     width: 19, height: 19, borderRadius: 10,

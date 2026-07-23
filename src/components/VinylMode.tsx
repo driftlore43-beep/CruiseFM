@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Svg, { Circle as SvgCircle, Path } from 'react-native-svg';
+import Svg, { Circle as SvgCircle, G, Path, Rect as SvgRect } from 'react-native-svg';
 import {
   Animated, Dimensions, Easing, Modal, PanResponder, ScrollView, StyleSheet,
   Text, TouchableOpacity, useWindowDimensions, View,
@@ -114,7 +114,8 @@ function SparkleField({ size }: { size: number }) {
 
 // ── Vinyl disc — clean bold design ───────────────────────────────────────────
 function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: number; spin: Animated.AnimatedInterpolation<string>; accent?: string; showLabel?: boolean }) {
-  const cSize = Math.min(80, size * 0.30);
+  // True-to-life proportions: a 100mm label on a 302mm pressing ≈ 33%.
+  const cSize = Math.min(110, size * 0.33);
   const cR    = cSize / 2;
 
   const cx = size / 2;
@@ -208,25 +209,20 @@ function Tonearm({
 }) {
   const cwW = Math.max(16, armW * 2.2);
   const cwH = Math.max(10, armW * 1.4);
+  // S-curve geometry (classic turntable arm): bows away from the record,
+  // then hooks back in so the angled headshell meets the groove.
+  const BEND  = Math.min(20, armLen * 0.085);
+  const svgW  = headW + BEND * 2 + 24;
+  const scx   = svgW / 2;
+  const ex    = scx - BEND * 0.55;
+  const ey    = armLen * 0.90;
+  const svgH  = armLen + headH + 14;
+  const armPath = `M ${scx} 6
+    C ${scx} ${armLen * 0.34}, ${scx + BEND} ${armLen * 0.46}, ${scx + BEND} ${armLen * 0.64}
+    C ${scx + BEND} ${armLen * 0.80}, ${ex} ${armLen * 0.74}, ${ex} ${ey}`;
   return (
     <View pointerEvents="none" style={{ position: 'absolute', top: pivotY, left: pivotX - armW / 2 }}>
-      {/* Drop shadow — slightly offset clone of arm behind the real arm */}
-      <Animated.View style={{
-        position: 'absolute',
-        width: armW, height: armLen,
-        top: 5, left: 3,
-        opacity: 0.45,
-        transform: [
-          { translateY: -(armLen / 2) },
-          { rotate: rotation },
-          { translateY: armLen / 2 },
-        ],
-      }}>
-        <View style={{ position: 'absolute', top: 0, left: 0, width: armW, height: armLen - headH + 4, backgroundColor: '#000', borderRadius: 3 }} />
-        <View style={{ position: 'absolute', bottom: -4, left: -(headW / 2 - armW / 2), width: headW + 2, height: headH + 2, backgroundColor: '#000', borderRadius: 3 }} />
-      </Animated.View>
-
-      {/* Main arm */}
+      {/* Whole arm (shadow + body + headshell) rotates about the pivot */}
       <Animated.View style={{
         width: armW, height: armLen,
         transform: [
@@ -235,7 +231,7 @@ function Tonearm({
           { translateY: armLen / 2 },
         ],
       }}>
-        {/* Counterweight — at back end of arm */}
+        {/* Counterweight — behind the pivot, rides with the arm */}
         <View style={{
           position: 'absolute',
           top: -cwH / 2 - 2,
@@ -245,25 +241,29 @@ function Tonearm({
           borderRadius: 4,
           borderWidth: 1, borderColor: '#3a3a3a',
         }} />
-        {/* Arm body — solid mood colour */}
-        <View style={{ position: 'absolute', top: 0, left: 0, width: armW, height: armLen - headH, backgroundColor: color, borderRadius: 3 }} />
-        {/* Highlight stripe */}
-        <View style={{ position: 'absolute', top: 8, left: 1.5, width: 1.5, height: armLen - headH - 16, backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 1 }} />
-        {/* Headshell — wide flat block, mood colour */}
-        <View style={{
-          position: 'absolute', bottom: 0,
-          left: -(headW / 2 - armW / 2),
-          width: headW, height: headH,
-          backgroundColor: color,
-          borderRadius: 3,
-          borderWidth: 1, borderColor: 'rgba(0,0,0,0.35)',
-        }}>
-          <View style={{ position: 'absolute', top: 3, left: 3, right: 3, height: headH - 10, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 2 }} />
-          {/* Stylus shank */}
-          <View style={{ position: 'absolute', bottom: -6, left: headW / 2 - 1.5, width: 3, height: 7, backgroundColor: '#CCC', borderRadius: 1 }} />
-          {/* Needle bright tip */}
-          <View style={{ position: 'absolute', bottom: -11, left: headW / 2 - 1, width: 2, height: 5, backgroundColor: '#FFF', borderRadius: 1 }} />
-        </View>
+        <Svg
+          width={svgW} height={svgH}
+          style={{ position: 'absolute', top: 0, left: armW / 2 - scx }}
+        >
+          {/* Drop shadow — offset dark clone of the curve and headshell */}
+          <G transform="translate(3,5)" opacity={0.45}>
+            <Path d={armPath} stroke="#000" strokeWidth={armW} fill="none" strokeLinecap="round" />
+            <G transform={`rotate(-14 ${ex} ${ey})`}>
+              <SvgRect x={ex - headW / 2} y={ey - 2} width={headW} height={headH} rx={3} fill="#000" />
+            </G>
+          </G>
+          {/* Arm body — solid mood colour, S-curved */}
+          <Path d={armPath} stroke={color} strokeWidth={armW} fill="none" strokeLinecap="round" />
+          {/* Highlight stripe following the curve */}
+          <Path d={armPath} stroke="rgba(255,255,255,0.30)" strokeWidth={1.8} fill="none" strokeLinecap="round" transform="translate(-2,0)" />
+          {/* Angled headshell with cartridge slot + stylus */}
+          <G transform={`rotate(-14 ${ex} ${ey})`}>
+            <SvgRect x={ex - headW / 2} y={ey - 2} width={headW} height={headH} rx={3} fill={color} stroke="rgba(0,0,0,0.35)" strokeWidth={1} />
+            <SvgRect x={ex - headW / 2 + 3} y={ey + 2} width={headW - 6} height={headH - 12} rx={2} fill="rgba(0,0,0,0.28)" />
+            <SvgRect x={ex - 2} y={ey + headH - 4} width={3.5} height={8} rx={1} fill="#CCC" />
+            <SvgRect x={ex - 1} y={ey + headH + 3} width={2} height={5} rx={1} fill="#FFF" />
+          </G>
+        </Svg>
       </Animated.View>
 
       {/* Pivot base — flat illustration style: grey circle with lighter center */}
@@ -351,7 +351,8 @@ function TurntableHero({
       }} />
       {/* Center label — independent spin, sits above the record */}
       {(() => {
-        const cSize = Math.min(80, recSize * 0.27);
+        // True-to-life proportions: a 100mm label on a 302mm pressing ≈ 33%.
+        const cSize = Math.min(120, recSize * 0.33);
         const cR    = cSize / 2;
         return (
           <Animated.View pointerEvents="none" style={{

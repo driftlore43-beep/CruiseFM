@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState, Platform } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
+import { isProMode } from '@/constants/modeCatalog';
+import { useEntitlements } from '@/context/EntitlementsContext';
 import { recordDriveEnd } from '@/utils/driveStats';
 import { getSavedPlatform } from '@/utils/musicPlatform';
 import { getPlaybackState, isRestrictedAccount, isSpotifyConnected, pause as pauseSpotify, startPlayback, type StartResult } from '@/utils/spotify';
@@ -138,6 +140,11 @@ type NowPlayingCtx = {
 const Ctx = createContext<NowPlayingCtx | null>(null);
 
 export function NowPlayingProvider({ children }: { children: ReactNode }) {
+  // Ref, not a dep: entitlements changing mustn't re-create open() and its
+  // ripple of effects; open() just reads the value at the moment of the tap.
+  const { isPro } = useEntitlements();
+  const isProRef = useRef(isPro);
+  useEffect(() => { isProRef.current = isPro; }, [isPro]);
   const [session, setSession] = useState<NowPlayingSession | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [playing, setPlayingRaw] = useState(false);
@@ -237,14 +244,18 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const open = useCallback((mode: string, stationId: string = 'night-run', opts?: { preview?: boolean; paused?: boolean }) => {
     // iPod mode was retired — any old saved iPod cruise resumes in Equalizer.
     const m = mode === 'ipod' ? 'equalizer' : mode;
-    setSession({ mode: m, stationId, preview: opts?.preview });
+    // The player itself is the lock: ANY doorway that opens a premium mode
+    // for a free user becomes a preview — Continue Drive included. Individual
+    // screens don't have to remember to check.
+    const preview = !!opts?.preview || (!isProRef.current && isProMode(m));
+    setSession({ mode: m, stationId, preview });
     setExpanded(true);
     setPlaying(!opts?.paused);
     setHandoff(false); // fresh drive; playStationMusic re-flags it if handed off
     // Every drive tries to get its station's own playlist going. A paused
     // open leaves Spotify alone until the user presses play. Previews may
     // resume whatever the user was listening to — any song works for a taste.
-    if (!opts?.paused) startStationMusic(stationId, { resumeAny: !!opts?.preview });
+    if (!opts?.paused) startStationMusic(stationId, { resumeAny: preview });
   }, [startStationMusic]);
 
   const minimize = useCallback(() => setExpanded(false), []);

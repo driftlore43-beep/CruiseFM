@@ -46,17 +46,7 @@ function darken(hex: string, amount: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
-type Mode = { id: string; label: string; pro: boolean };
-
-const MODES: Mode[] = [
-  { id: 'cassette',  label: 'Cassette',    pro: false },
-  { id: 'equalizer', label: 'Equalizer',   pro: false },
-  { id: 'vinyl',     label: 'Vinyl',       pro: true  },
-  { id: 'radio',     label: 'Tuner',       pro: true  },
-  { id: 'horizon',   label: 'Horizon',     pro: true  },
-  { id: 'waves',     label: 'Sound Waves', pro: false },
-  { id: 'orb',       label: 'Circular EQ', pro: true  },
-];
+import { MODE_CATALOG as MODES } from '@/constants/modeCatalog';
 
 type Props = {
   station: Station | CustomStation | null;

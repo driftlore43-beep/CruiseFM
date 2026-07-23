@@ -22,6 +22,7 @@ import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { isSpotifyConnected, pause as pauseSpotify } from '@/utils/spotify';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 
 const MODE_META: Record<string, { label: string; icon: string }> = {
@@ -108,6 +109,12 @@ function PreviewGate() {
     const t = setTimeout(() => {
       np.expand();          // bring the visuals back if they minimized
       setGateOpen(true);
+      // The taste is over: freeze the scene AND silence the music. A gate
+      // with the song still playing behind it isn't much of a gate.
+      np.setPlaying(false);
+      isSpotifyConnected()
+        .then((c) => { if (c) pauseSpotify().catch(() => {}); })
+        .catch(() => {});
     }, PREVIEW_MS);
     return () => clearTimeout(t);
     // Restart the clock whenever a new preview session begins.

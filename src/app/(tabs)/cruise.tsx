@@ -10,6 +10,7 @@ import { EqualizerHeader } from '@/components/EqualizerHeader';
 import { HeroCard } from '@/components/HeroCard';
 import { StationCard } from '@/components/StationCard';
 import { StationDetailModal } from '@/components/StationDetailModal';
+import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
@@ -66,11 +67,17 @@ export default function CruiseScreen() {
   );
 
   async function launchCruise(cruise: LastCruise) {
-    await saveLastCruise(cruise);
-    setLastCruise(cruise);
-    recordDriveStart(cruise.stationId);
+    // A free user resuming a saved premium-mode drive only gets a taste — it
+    // shouldn't count as a drive or re-save the cruise. (The player enforces
+    // the preview clock either way; this keeps the stats honest too.)
+    const preview = !isPro && isProMode(cruise.mode);
+    if (!preview) {
+      await saveLastCruise(cruise);
+      setLastCruise(cruise);
+      recordDriveStart(cruise.stationId);
+    }
     // np.open also kicks Spotify toward the station's linked playlist.
-    np.open(cruise.mode, cruise.stationId);
+    np.open(cruise.mode, cruise.stationId, { preview });
   }
 
   const heroCruise: LastCruise = lastCruise ?? { stationId: tonightPick.id, mode: 'equalizer' };

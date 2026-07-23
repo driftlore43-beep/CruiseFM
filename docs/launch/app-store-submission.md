@@ -75,10 +75,12 @@ usage data leaves the phone). The Spotify token stays on-device — that is not
 > • Cassette — spinning neon reels and tape-deck warmth
 > • Equalizer — LED bars pulsing in your station's colours
 > • Sound Waves — a flowing waveform that ripples with the mood
-> • Vinyl — a rotating record with a real tonearm (Premium)
-> • Tuner — drag a real FM dial between moods (Premium)
-> • Horizon — an endless synthwave grid rolling into the sun (Premium)
-> • Circular EQ — a ring of light that kicks to the beat (Premium)
+> • Vinyl — a rotating record with a real tonearm
+> • Tuner — drag a real FM dial between moods
+> • Horizon — an endless synthwave grid rolling into the sun
+> • Circular EQ — a ring of light that kicks to the beat
+>
+> All seven modes are free while Cruise FM is in its launch period.
 >
 > BUILT FOR THE DRIVE
 > • One-tap Start Drive from the home screen
@@ -108,7 +110,8 @@ drive (best set: Vinyl on Coastal, Tuner mid-drag, Equalizer on Night Run,
 Cassette on Daylight, the home screen, a station page). Send them to Claude
 to be resized/framed to Apple's required dimensions if the upload complains.
 
-**Build:** select build **1.0 (3)** (already processed via TestFlight).
+**Build:** select the **latest production build (7)** — the launch-free build
+uploaded 23 July. Do NOT pick build 3 (old TestFlight build with dev tools on).
 
 ## 5. App Review Information
 

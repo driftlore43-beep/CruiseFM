@@ -20,9 +20,9 @@ const ARCS = [
   require('../../assets/images/intro/logo-arc-3.png'),
 ];
 
-// Snappy: launch already costs ~1.5s of real boot before we're visible, so
-// the theatre must be brief. One second, then the app.
-const END = 1.0; // seconds
+// Snappy but fluid: launch already costs ~1.5s of real boot before we're
+// visible, so the theatre stays brief — one continuous swell, then the app.
+const END = 1.15; // seconds
 
 /** 0 before start, 1 after start+dur, eased in between. */
 function seg(t: number, start: number, dur: number) {
@@ -60,23 +60,22 @@ export function BrandIntro() {
 
   if (done) return null;
 
-  // The native splash already shows the solid mark — starting the disc at
-  // full opacity makes the hand-off invisible instead of a re-fade.
-  const discIn = 1;
-  // Broadcast pulse: inner arc first, outward — quick, like a power-on.
-  const arcIn = [seg(t, 0.0, 0.22), seg(t, 0.12, 0.22), seg(t, 0.24, 0.22)];
-  const wordIn = seg(t, 0.25, 0.3);
-  const fadeOut = 1 - seg(t, 0.72, 0.28);
+  // One continuous gesture: the mark starts at the native splash's exact
+  // size (no re-fade, no pop) and gently swells the whole way through; the
+  // lift-away keeps the same zoom going as it fades, so nothing staggers.
+  const grow = seg(t, 0, 0.9);
+  const fadeOut = 1 - seg(t, 0.8, 0.35);
+  const zoom = 1 + 0.05 * grow + 0.07 * (1 - fadeOut);
+  // Arcs bloom outward with heavy overlap — a swell, not a one-two-three.
+  const arcIn = [seg(t, 0.05, 0.4), seg(t, 0.18, 0.4), seg(t, 0.31, 0.4)];
+  const wordIn = seg(t, 0.3, 0.4);
 
   return (
-    <View style={[StyleSheet.absoluteFill, styles.root, { opacity: fadeOut }]} pointerEvents={t > 0.7 ? 'none' : 'auto'}>
-      <View style={{ width: MARK, height: MARK }}>
+    <View style={[StyleSheet.absoluteFill, styles.root, { opacity: fadeOut }]} pointerEvents={t > 0.8 ? 'none' : 'auto'}>
+      <View style={{ width: MARK, height: MARK, transform: [{ scale: zoom }] }}>
         <Image
           source={DISC}
-          style={[
-            StyleSheet.absoluteFill,
-            { width: MARK, height: MARK, opacity: discIn, transform: [{ scale: 0.9 + 0.1 * discIn }] },
-          ]}
+          style={[StyleSheet.absoluteFill, { width: MARK, height: MARK }]}
         />
         {ARCS.map((src, i) => (
           <Image
@@ -84,11 +83,7 @@ export function BrandIntro() {
             source={src}
             style={[
               StyleSheet.absoluteFill,
-              {
-                width: MARK, height: MARK,
-                opacity: arcIn[i],
-                transform: [{ scale: 0.94 + 0.06 * arcIn[i] }],
-              },
+              { width: MARK, height: MARK, opacity: arcIn[i] },
             ]}
           />
         ))}

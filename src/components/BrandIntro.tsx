@@ -20,7 +20,9 @@ const ARCS = [
   require('../../assets/images/intro/logo-arc-3.png'),
 ];
 
-const END = 2.05; // seconds
+// Snappy: launch already costs ~1.5s of real boot before we're visible, so
+// the theatre must be brief. One second, then the app.
+const END = 1.0; // seconds
 
 /** 0 before start, 1 after start+dur, eased in between. */
 function seg(t: number, start: number, dur: number) {
@@ -58,15 +60,16 @@ export function BrandIntro() {
 
   if (done) return null;
 
-  const discIn = seg(t, 0, 0.45);
-  // Broadcast pulse: inner arc first, outward, with a soft breathe after.
-  const arcIn = [seg(t, 0.5, 0.3), seg(t, 0.68, 0.3), seg(t, 0.86, 0.3)];
-  const breathe = t > 1.25 && t < 1.65 ? 1 - 0.3 * Math.sin(((t - 1.25) / 0.4) * Math.PI) : 1;
-  const wordIn = seg(t, 0.95, 0.4);
-  const fadeOut = 1 - seg(t, 1.75, 0.3);
+  // The native splash already shows the solid mark — starting the disc at
+  // full opacity makes the hand-off invisible instead of a re-fade.
+  const discIn = 1;
+  // Broadcast pulse: inner arc first, outward — quick, like a power-on.
+  const arcIn = [seg(t, 0.0, 0.22), seg(t, 0.12, 0.22), seg(t, 0.24, 0.22)];
+  const wordIn = seg(t, 0.25, 0.3);
+  const fadeOut = 1 - seg(t, 0.72, 0.28);
 
   return (
-    <View style={[StyleSheet.absoluteFill, styles.root, { opacity: fadeOut }]} pointerEvents={t > 1.7 ? 'none' : 'auto'}>
+    <View style={[StyleSheet.absoluteFill, styles.root, { opacity: fadeOut }]} pointerEvents={t > 0.7 ? 'none' : 'auto'}>
       <View style={{ width: MARK, height: MARK }}>
         <Image
           source={DISC}
@@ -83,7 +86,7 @@ export function BrandIntro() {
               StyleSheet.absoluteFill,
               {
                 width: MARK, height: MARK,
-                opacity: arcIn[i] * breathe,
+                opacity: arcIn[i],
                 transform: [{ scale: 0.94 + 0.06 * arcIn[i] }],
               },
             ]}

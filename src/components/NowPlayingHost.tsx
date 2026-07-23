@@ -152,8 +152,10 @@ function PreviewGate() {
 }
 
 // How long without a touch before the screen eases down, and how low it goes.
+// 0.35 keeps the visuals clearly readable in daylight while still saving
+// meaningful battery (0.22 proved too dark outside night drives).
 const DIM_AFTER_MS = 30000;
-const DIM_LEVEL = 0.22;
+const DIM_LEVEL = 0.35;
 
 /**
  * Auto-dim — like a car head unit: mid-drive, after ~30s without a touch,

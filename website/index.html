@@ -108,6 +108,19 @@
   .scroll-hint::after{content:"";display:block;width:1px;height:38px;margin:12px auto 0;
     background:linear-gradient(180deg,var(--text-3),transparent)}
 
+  /* ---------- REAL SCREENS SHOWCASE ---------- */
+  .shots{display:flex;gap:22px;overflow-x:auto;padding:56px 24px 26px;
+    scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;justify-content:flex-start}
+  .shots::-webkit-scrollbar{display:none}
+  .shot{flex:0 0 auto;scroll-snap-align:center;width:min(240px,62vw);border-radius:30px;
+    border:6px solid #08080f;outline:1px solid var(--surface-hi);overflow:hidden;
+    box-shadow:0 18px 48px rgba(0,0,0,.55), 0 0 44px rgba(123,56,224,.18);
+    transition:transform .25s}
+  .shot:hover{transform:translateY(-6px) scale(1.015)}
+  .shot img{display:block;width:100%;height:auto}
+  .shots-hint{text-align:center;color:var(--text-3);font-size:12.5px;letter-spacing:.16em;
+    text-transform:uppercase;margin-top:2px}
+
   /* ---------- SECTIONS ---------- */
   section{padding:96px 0}
   .kicker{color:var(--amber);font-size:13px;letter-spacing:.22em;text-transform:uppercase;
@@ -263,6 +276,23 @@
 
   <div class="scroll-hint">The experience</div>
 </header>
+
+<section class="modes">
+  <div class="wrap">
+    <p class="kicker">Straight from the app</p>
+    <h2>This is what a drive looks like</h2>
+    <p class="sub">Real screenshots, real songs, zero mock-ups. Swipe through.</p>
+  </div>
+  <div class="shots" aria-label="App screenshots">
+    <div class="shot"><img src="img/vinyl.jpg" alt="Vinyl mode on Sunset FM" loading="lazy"></div>
+    <div class="shot"><img src="img/horizon.jpg" alt="Horizon mode on After Hours FM" loading="lazy"></div>
+    <div class="shot"><img src="img/tuner.jpg" alt="Tuner mode on Mountain Pass FM" loading="lazy"></div>
+    <div class="shot"><img src="img/waves.jpg" alt="Sound Waves mode on Rain Drive FM" loading="lazy"></div>
+    <div class="shot"><img src="img/cassette.jpg" alt="Cassette mode on Daylight FM" loading="lazy"></div>
+    <div class="shot"><img src="img/equalizer.jpg" alt="Equalizer mode on Downtown FM" loading="lazy"></div>
+  </div>
+  <p class="shots-hint">← swipe →</p>
+</section>
 
 <section class="modes">
   <div class="wrap">

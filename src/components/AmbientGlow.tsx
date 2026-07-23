@@ -15,8 +15,8 @@ function Haze({ id, color }: { id: string; color: string }) {
     <Svg width="100%" height="100%" pointerEvents="none">
       <Defs>
         <RadialGradient id={id} cx="50%" cy="50%" rx="50%" ry="50%">
-          <Stop offset="0%" stopColor={color} stopOpacity="0.5" />
-          <Stop offset="55%" stopColor={color} stopOpacity="0.22" />
+          <Stop offset="0%" stopColor={color} stopOpacity="0.72" />
+          <Stop offset="55%" stopColor={color} stopOpacity="0.34" />
           <Stop offset="100%" stopColor={color} stopOpacity="0" />
         </RadialGradient>
       </Defs>
@@ -69,9 +69,9 @@ export function AmbientGlow({ active, beat, color }: { active: boolean; beat?: b
 
   // The two side hazes ride the same breath in opposite phase, so the smoke
   // leans left, then right — a drifting cloud, not a blinking band.
-  const leftO  = breath.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0.14] });
-  const rightO = breath.interpolate({ inputRange: [0, 1], outputRange: [0.14, 0.5] });
-  const mainO  = breath.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.55] });
+  const leftO  = breath.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0.2] });
+  const rightO = breath.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.7] });
+  const mainO  = breath.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.8] });
 
   return (
     <View style={ag.wrap} pointerEvents="none">
@@ -105,8 +105,8 @@ export function AmbientGlow({ active, beat, color }: { active: boolean; beat?: b
       <Animated.View
         style={[ag.haze, {
           left: -SCREEN_W * 0.15, right: -SCREEN_W * 0.15, top: '10%', height: '90%',
-          opacity: beatPulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] }),
-          transform: [{ scale: beatPulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.15] }) }],
+          opacity: beatPulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.7] }),
+          transform: [{ scale: beatPulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.18] }) }],
         }]}>
         <Haze id="agBeat" color={color} />
       </Animated.View>

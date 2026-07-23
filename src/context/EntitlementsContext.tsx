@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { OWNER_MODE } from '@/constants/config';
+import { LAUNCH_FREE, OWNER_MODE } from '@/constants/config';
 import { hasPremium, initPurchases, onPremiumChange } from '@/utils/purchases';
 
 const DEV_FREE_KEY = 'cruise_dev_free_preview';
@@ -44,7 +44,11 @@ export function EntitlementsProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(DEV_FREE_KEY, on ? 'true' : 'false').catch(() => {});
   };
 
-  const isPro = hasSubscription || (OWNER_MODE && !devFreePreview);
+  // Launch-free period: everyone is premium, unconditionally — a stale
+  // free-preview flag from an old dev session must never re-lock a device
+  // while the toggle itself is hidden. With OWNER_MODE on, the dev toggle
+  // still lets us preview the lock UI before the paid update.
+  const isPro = hasSubscription || (OWNER_MODE ? !devFreePreview : LAUNCH_FREE);
 
   const value = useMemo(
     () => ({ isPro, hasSubscription, refreshSubscription, devFreePreview, setDevFreePreview }),

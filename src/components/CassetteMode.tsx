@@ -306,12 +306,20 @@ function NeonReelHub({ size, color }: { size: number; color: string }) {
   );
 }
 
-// A small neon "×" screw mark.
-function Cross({ cx, cy, r = 2.8, color }: { cx: number; cy: number; r?: number; color: string }) {
+// A neon Phillips screw head — ringed circle with a cross, each one seated at
+// its own angle like a human actually drove it in.
+function Cross({ cx, cy, r = 3.4, color, angle = 0 }: { cx: number; cy: number; r?: number; color: string; angle?: number }) {
+  const s = r * 0.62;
+  const a = (angle * Math.PI) / 180;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  // Two slots of the cross, rotated by `angle`.
+  const p1 = { x1: cx - s * cos, y1: cy - s * sin, x2: cx + s * cos, y2: cy + s * sin };
+  const p2 = { x1: cx + s * sin, y1: cy - s * cos, x2: cx - s * sin, y2: cy + s * cos };
   return (
     <>
-      <SvgLine x1={cx - r} y1={cy - r} x2={cx + r} y2={cy + r} stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-      <SvgLine x1={cx - r} y1={cy + r} x2={cx + r} y2={cy - r} stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <SvgCircle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={1.2} strokeOpacity={0.9} />
+      <SvgLine {...p1} stroke={color} strokeWidth={1.4} strokeLinecap="round" />
+      <SvgLine {...p2} stroke={color} strokeWidth={1.4} strokeLinecap="round" />
     </>
   );
 }
@@ -321,7 +329,7 @@ const VB_W = 340;
 const VB_H = 210;
 
 function CassetteBody({
-  size, leftSpin, rightSpin,
+  size, leftSpin, rightSpin, progress,
   color = '#FF3DF0', accent = '#33E1FF',
   songName = 'YOUR SONG NAME', artist = 'CRUISE FM', timeText = '00:00',
 }: {
@@ -337,8 +345,31 @@ function CassetteBody({
   const scale = size / VB_W;
   const H = size * (VB_H / VB_W);
   const LX = 118, RX = 224, RY = 122;
-  const leftReelPx = 92 * scale;
-  const rightReelPx = 72 * scale;
+  // Both hubs are the same size — on a real cassette only the TAPE differs.
+  const hubPx = 64 * scale;
+
+  // Tape packs: the wound tape around each hub, driven by song progress like
+  // the vinyl needle. Supply (left) starts fat and empties; take-up (right)
+  // starts skinny and fills. A static mid-state when no progress is wired
+  // (the modes-tab preview card).
+  const fallbackProgress = useRef(new Animated.Value(0.4)).current;
+  const prog = progress ?? fallbackProgress;
+  const packBase = 96 * scale; // diameter at full wind
+  const leftPackScale  = prog.interpolate({ inputRange: [0, 1], outputRange: [1, 0.56] });
+  const rightPackScale = prog.interpolate({ inputRange: [0, 1], outputRange: [0.56, 0.94] });
+  const pack = (cx: number, packScale: Animated.AnimatedInterpolation<number>) => (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        width: packBase, height: packBase, borderRadius: packBase / 2,
+        left: cx * scale - packBase / 2, top: RY * scale - packBase / 2,
+        backgroundColor: color + '14',
+        borderWidth: 2, borderColor: color + 'A6',
+        transform: [{ scale: packScale }],
+      }}
+    />
+  );
 
   return (
     <View style={{ width: size, height: H, alignItems: 'center', justifyContent: 'center' }}>
@@ -347,44 +378,53 @@ function CassetteBody({
           {/* Body outline — crisp neon line */}
           <SvgRect x={8} y={8} width={324} height={194} rx={20} fill="none" stroke={color} strokeWidth={2.4} />
 
-          {/* Header label box (accent hue) */}
+          {/* Header label box (accent hue) — side letter, ruled line, stereo mark */}
           <SvgRect x={30} y={26} width={280} height={42} rx={11} fill="none" stroke={accent} strokeWidth={1.5} />
           <SvgRect x={42} y={37} width={18} height={18} rx={2} fill="none" stroke={color} strokeWidth={1.6} />
+          <SvgText x={51} y={50.5} fill={color} textAnchor="middle" fontSize={11} fontWeight="800" fontFamily={Fonts.mono}>A</SvgText>
           <SvgText x={188} y={45} fill={accent} textAnchor="middle" fontSize={11} fontWeight="700" fontFamily={Fonts.mono}>{songName}</SvgText>
-          <SvgText x={300} y={60} fill={accent} textAnchor="end" fontSize={8} fontWeight="700" fontFamily={Fonts.mono} opacity={0.85}>{artist}</SvgText>
+          <SvgLine x1={70} y1={51} x2={306} y2={51} stroke={accent} strokeWidth={0.8} strokeOpacity={0.35} />
+          <SvgText x={70} y={62} fill={accent} fontSize={6.5} fontWeight="700" fontFamily={Fonts.mono} opacity={0.55} letterSpacing={1}>STEREO · C90</SvgText>
+          <SvgText x={300} y={62} fill={accent} textAnchor="end" fontSize={8} fontWeight="700" fontFamily={Fonts.mono} opacity={0.85}>{artist}</SvgText>
 
           {/* Reel window */}
           <SvgRect x={66} y={86} width={208} height={72} rx={6} fill="none" stroke={color} strokeWidth={1.4} />
 
-          {/* Static reel outer rings */}
-          <SvgCircle cx={LX} cy={RY} r={46} fill="none" stroke={color} strokeOpacity={0.18} strokeWidth={7} />
-          <SvgCircle cx={LX} cy={RY} r={46} fill="none" stroke={color} strokeWidth={2} />
-          <SvgCircle cx={RX} cy={RY} r={36} fill="none" stroke={color} strokeOpacity={0.18} strokeWidth={7} />
-          <SvgCircle cx={RX} cy={RY} r={36} fill="none" stroke={color} strokeWidth={2} />
+          {/* Tape path: guide posts + the ribbon running along the head gap */}
+          <SvgCircle cx={80} cy={150} r={3} fill="none" stroke={color} strokeWidth={1.4} strokeOpacity={0.8} />
+          <SvgCircle cx={260} cy={150} r={3} fill="none" stroke={color} strokeWidth={1.4} strokeOpacity={0.8} />
+          <SvgLine x1={83} y1={152.5} x2={257} y2={152.5} stroke={color} strokeWidth={2} strokeOpacity={0.45} />
+          <SvgLine x1={83} y1={154.5} x2={257} y2={154.5} stroke={color} strokeWidth={0.8} strokeOpacity={0.25} />
 
           {/* Timer */}
           <SvgText x={170} y={178} fill={accent} textAnchor="middle" fontSize={13} fontWeight="700" fontFamily={Fonts.mono}>{timeText}</SvgText>
 
-          {/* Corner + edge screws */}
-          <Cross cx={26} cy={24} color={accent} />
-          <Cross cx={314} cy={24} color={accent} />
-          <Cross cx={26} cy={186} color={accent} />
-          <Cross cx={314} cy={186} color={accent} />
-          <Cross cx={170} cy={18} r={2.5} color={accent} />
+          {/* Corner + edge screws — Phillips heads, each seated at its own angle */}
+          <Cross cx={26} cy={24} color={accent} angle={12} />
+          <Cross cx={314} cy={24} color={accent} angle={-31} />
+          <Cross cx={26} cy={186} color={accent} angle={57} />
+          <Cross cx={314} cy={186} color={accent} angle={-8} />
+          <Cross cx={170} cy={18} r={2.6} color={accent} angle={40} />
 
-          {/* Bottom access door + buttons */}
+          {/* Bottom access door: capstan + pinch-roller holes flank the pads */}
           <SvgPath d="M112 184 L228 184 L216 200 L124 200 Z" fill="none" stroke={color} strokeWidth={1.5} />
+          <SvgCircle cx={136} cy={192} r={3.4} fill="none" stroke={color} strokeWidth={1.3} />
           <SvgRect x={150} y={188} width={16} height={9} rx={3} fill="none" stroke={color} strokeWidth={1.3} />
           <SvgRect x={174} y={188} width={16} height={9} rx={3} fill="none" stroke={color} strokeWidth={1.3} />
+          <SvgCircle cx={204} cy={192} r={3.4} fill="none" stroke={color} strokeWidth={1.3} />
         </Svg>
       </View>
 
-      {/* Spinning neon reels overlaid on the wells */}
-      <Animated.View style={{ position: 'absolute', width: leftReelPx, height: leftReelPx, left: LX * scale - leftReelPx / 2, top: RY * scale - leftReelPx / 2, transform: [{ rotate: leftSpin }] }}>
-        <NeonReelHub size={leftReelPx} color={color} />
+      {/* Wound tape packs — under the hubs, breathing with the song */}
+      {pack(LX, leftPackScale)}
+      {pack(RX, rightPackScale)}
+
+      {/* Spinning neon hubs overlaid on the wells */}
+      <Animated.View style={{ position: 'absolute', width: hubPx, height: hubPx, left: LX * scale - hubPx / 2, top: RY * scale - hubPx / 2, transform: [{ rotate: leftSpin }] }}>
+        <NeonReelHub size={hubPx} color={color} />
       </Animated.View>
-      <Animated.View style={{ position: 'absolute', width: rightReelPx, height: rightReelPx, left: RX * scale - rightReelPx / 2, top: RY * scale - rightReelPx / 2, transform: [{ rotate: rightSpin }] }}>
-        <NeonReelHub size={rightReelPx} color={color} />
+      <Animated.View style={{ position: 'absolute', width: hubPx, height: hubPx, left: RX * scale - hubPx / 2, top: RY * scale - hubPx / 2, transform: [{ rotate: rightSpin }] }}>
+        <NeonReelHub size={hubPx} color={color} />
       </Animated.View>
     </View>
   );
@@ -487,11 +527,13 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const startRolling = () => {
     leftReelAnim.setValue(0);
     rightReelAnim.setValue(0);
+    // Real transport physics: the take-up reel (right) starts near-empty, so
+    // it spins faster than the fat supply reel.
     leftLoopRef.current = Animated.loop(
-      Animated.timing(leftReelAnim, { toValue: 1, duration: 1600, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(leftReelAnim, { toValue: 1, duration: 2200, easing: Easing.linear, useNativeDriver: true })
     );
     rightLoopRef.current = Animated.loop(
-      Animated.timing(rightReelAnim, { toValue: 1, duration: 2200, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(rightReelAnim, { toValue: 1, duration: 1500, easing: Easing.linear, useNativeDriver: true })
     );
     leftLoopRef.current.start();
     rightLoopRef.current.start();
@@ -835,7 +877,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
                 opacity: playing ? glowOpacity : 0.12,
                 transform: [{ scale: glowScale }],
               }]} />
-              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
+              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
             </View>
           </View>
         </View>
@@ -880,7 +922,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
               transform: [{ scale: glowScale }],
             }]} />
             <TouchableOpacity onPress={togglePlay} activeOpacity={0.92}>
-              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
+              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
             </TouchableOpacity>
             <FloatingNotes playing={playing} color={neonColor} />
           </View>
@@ -1015,11 +1057,13 @@ export function CassettePreview() {
   const startRolling = () => {
     leftReelAnim.setValue(0);
     rightReelAnim.setValue(0);
+    // Real transport physics: the take-up reel (right) starts near-empty, so
+    // it spins faster than the fat supply reel.
     leftLoopRef.current = Animated.loop(
-      Animated.timing(leftReelAnim, { toValue: 1, duration: 1600, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(leftReelAnim, { toValue: 1, duration: 2200, easing: Easing.linear, useNativeDriver: true })
     );
     rightLoopRef.current = Animated.loop(
-      Animated.timing(rightReelAnim, { toValue: 1, duration: 2200, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(rightReelAnim, { toValue: 1, duration: 1500, easing: Easing.linear, useNativeDriver: true })
     );
     leftLoopRef.current.start();
     rightLoopRef.current.start();

@@ -116,7 +116,7 @@ function SparkleField({ size }: { size: number }) {
 // ── Vinyl disc — clean bold design ───────────────────────────────────────────
 function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: number; spin: Animated.AnimatedInterpolation<string>; accent?: string; showLabel?: boolean }) {
   // A touch over true-to-life (real label ≈ 33%) — matches the fullscreen deck.
-  const cSize = Math.min(120, size * 0.36);
+  const cSize = Math.min(135, size * 0.40);
   const cR    = cSize / 2;
 
   const cx = size / 2;
@@ -155,12 +155,19 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
           {[0.56, 0.62, 0.68, 0.73, 0.78, 0.86, 0.90].map((f, i) => (
             <SvgCircle key={i} cx={cx} cy={cx} r={r * f} fill="none" stroke={accent} strokeOpacity={i % 2 ? 0.24 : 0.14} strokeWidth={0.8} />
           ))}
-          {/* Faint pressing marks — the surface itself, so the spin still
-              reads as the disc turns beneath the stationary light */}
-          <Path d={`M ${pt(37, r * 0.55)} L ${pt(37, r * 0.94)}`} stroke="rgba(255,255,255,0.10)" strokeWidth={1} strokeLinecap="round" />
-          <Path d={`M ${pt(203, r * 0.60)} L ${pt(203, r * 0.88)}`} stroke="rgba(255,255,255,0.07)" strokeWidth={0.8} strokeLinecap="round" />
-          <SvgCircle cx={cx + r * 0.42} cy={cx - r * 0.31} r={1.4} fill="rgba(255,255,255,0.22)" />
-          <SvgCircle cx={cx - r * 0.58} cy={cx + r * 0.22} r={1.1} fill="rgba(255,255,255,0.16)" />
+          {/* Pressing marks — asymmetric surface texture, brighter than the
+              grooves, so the spin reads at a glance instead of only the
+              label appearing to turn */}
+          <Path d={`M ${pt(37, r * 0.50)} L ${pt(37, r * 0.95)}`} stroke="rgba(255,255,255,0.20)" strokeWidth={1.3} strokeLinecap="round" />
+          <Path d={`M ${pt(203, r * 0.58)} L ${pt(203, r * 0.90)}`} stroke="rgba(255,255,255,0.14)" strokeWidth={1} strokeLinecap="round" />
+          <Path d={`M ${pt(130, r * 0.44)} L ${pt(130, r * 0.70)}`} stroke="rgba(255,255,255,0.12)" strokeWidth={0.8} strokeLinecap="round" />
+          <Path d={`M ${pt(305, r * 0.62)} L ${pt(305, r * 0.85)}`} stroke="rgba(255,255,255,0.10)" strokeWidth={0.8} strokeLinecap="round" />
+          <SvgCircle cx={cx + r * 0.42} cy={cx - r * 0.31} r={1.6} fill="rgba(255,255,255,0.32)" />
+          <SvgCircle cx={cx - r * 0.58} cy={cx + r * 0.22} r={1.3} fill="rgba(255,255,255,0.24)" />
+          <SvgCircle cx={cx - r * 0.20} cy={cx - r * 0.66} r={1} fill="rgba(255,255,255,0.20)" />
+          <SvgCircle cx={cx + r * 0.66} cy={cx + r * 0.14} r={0.9} fill="rgba(255,255,255,0.18)" />
+          <SvgCircle cx={cx + r * 0.10} cy={cx + r * 0.72} r={1.1} fill="rgba(0,0,0,0.18)" />
+          <SvgCircle cx={cx - r * 0.48} cy={cx - r * 0.48} r={0.9} fill="rgba(0,0,0,0.14)" />
         </Svg>
         {/* Center label — rendered inside disc when showLabel=true (preview card) */}
         {showLabel && (
@@ -391,7 +398,7 @@ function TurntableHero({
       {(() => {
         // Well over true-to-life (real label ≈ 33%) — the album art is the
         // star, give it the room (owner calls, 23–24.07).
-        const cSize = Math.min(150, recSize * 0.40);
+        const cSize = Math.min(170, recSize * 0.45);
         const cR    = cSize / 2;
         return (
           <Animated.View pointerEvents="none" style={{

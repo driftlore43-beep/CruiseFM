@@ -161,6 +161,20 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   const hasTrack = !!spotify.track;
   const title = spotify.track?.title ?? station.tagline;
   const artist = spotify.track?.artist ?? '';
+
+  // Between songs the ring rests: a title change holds the kick ~2s, same
+  // manners as the atmosphere — the dance floor clears between tracks.
+  const [kickHold, setKickHold] = useState(false);
+  const prevTitleRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const now = spotify.track?.title ?? null;
+    const prev = prevTitleRef.current;
+    prevTitleRef.current = now;
+    if (prev === undefined || prev === now || !now) return;
+    setKickHold(true);
+    const t = setTimeout(() => setKickHold(false), 2200);
+    return () => clearTimeout(t);
+  }, [spotify.track?.title]);
   const fill = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
   const glowTint = eq[1] + '26';
   // Beat-synced feel: on top of the flowing sweep, the whole ring KICKS on a
@@ -172,7 +186,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   const BEAT_S = 0.6;
   const beatPos = (tSec % BEAT_S) / BEAT_S;
   const accent = Math.floor(tSec / BEAT_S) % 4 === 0 ? 1 : 0.6;
-  const kick = playing ? Math.pow(1 - beatPos, 2.5) * accent : 0;
+  const kick = playing && !musicSwitching && !kickHold ? Math.pow(1 - beatPos, 2.5) * accent : 0;
   const amp = ampRef.current * (0.68 + 0.6 * kick);
   const orbSize = Math.min(winW * 1.02, winH * 0.54, 460);
 
@@ -297,7 +311,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
             <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
               <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
               <Text style={fs.actionPillText} numberOfLines={1}>
-                {linked ? linked.name : 'Add Playlist'}
+                {spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
               </Text>
             </TouchableOpacity>
           </View>

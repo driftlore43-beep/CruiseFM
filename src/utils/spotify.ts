@@ -283,6 +283,17 @@ export async function getPlaybackState() {
   return spotifyFetch('/me/player');
 }
 
+// Playlist names by id — tiny session cache so the "playing from" pill can
+// name the playlist actually feeding the music without a fetch per poll.
+const playlistNameCache: Record<string, string> = {};
+export async function getPlaylistName(playlistId: string): Promise<string | null> {
+  if (playlistNameCache[playlistId]) return playlistNameCache[playlistId];
+  const data = await spotifyFetch(`/playlists/${playlistId}?fields=name`);
+  const name = data?.name ?? null;
+  if (name) playlistNameCache[playlistId] = name;
+  return name;
+}
+
 export async function play(contextUri?: string) {
   return spotifyFetch('/me/player/play', 'PUT', contextUri ? { context_uri: contextUri } : undefined);
 }

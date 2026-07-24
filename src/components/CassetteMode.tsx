@@ -599,12 +599,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     );
     tapeFlowLoop.current.start();
 
-    pulseLoop.current = Animated.loop(Animated.sequence([
-      Animated.timing(glowPulse, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-      Animated.timing(glowPulse, { toValue: 0, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-    ]));
-    pulseLoop.current.start();
-
     const remaining = (1 - progressValue.current) * trackMsRef.current;
     progressAnimRef.current = Animated.timing(progress, {
       toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false,
@@ -624,12 +618,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
   const stopReels = () => {
     tapeFlowLoop.current?.stop();
-    pulseLoop.current?.stop();
     progressAnimRef.current?.stop();
-
-    Animated.timing(glowPulse, {
-      toValue: 0, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: false,
-    }).start();
 
     tapeFlow.stopAnimation();
   };
@@ -755,8 +744,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   };
 
   // Glow: 0.3 → 0.6 range, gentle amber pulse
-  const glowOpacity = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.16, 0.34] });
-  const glowScale   = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] });
 
   const topPad    = Math.max(insets.top, 20);
   const bottomPad = Math.max(insets.bottom, 24) + 24;
@@ -873,13 +860,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
             {/* Right column — cassette */}
             <View style={[ls.rightCol, { paddingRight: safeR }]}>
-              <Animated.View style={[fs.glowOrb, {
-                backgroundColor: currentEq?.[1] ?? C.amber, // glow follows the station's mood (amber on Coastal, neon on Downtown…)
-                width: cassetteW * 0.9, height: cassetteH * 1.4,
-                borderRadius: cassetteW * 0.45,
-                opacity: playing ? glowOpacity : 0.12,
-                transform: [{ scale: glowScale }],
-              }]} />
               <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
             </View>
           </View>
@@ -917,13 +897,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
           {/* Cassette hero — flex:1 so it grows to fill available space */}
           <View style={[fs.cassetteWrap, { flex: 1 }]}>
-            <Animated.View style={[fs.glowOrb, {
-              backgroundColor: currentEq?.[1] ?? C.amber, // glow follows the station's mood (amber on Coastal, neon on Downtown…)
-              width: cassetteW * 0.85, height: cassetteH * 1.3,
-              borderRadius: cassetteW * 0.42,
-              opacity: playing ? glowOpacity : 0.12,
-              transform: [{ scale: glowScale }],
-            }]} />
             <TouchableOpacity onPress={togglePlay} activeOpacity={0.92}>
               <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
             </TouchableOpacity>
@@ -1004,7 +977,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
               <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
               <Text style={fs.actionPillText} numberOfLines={1}>
-                {linked ? linked.name : 'Add Playlist'}
+                {spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
               </Text>
             </TouchableOpacity>
           </View>

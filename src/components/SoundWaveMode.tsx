@@ -348,7 +348,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
             <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
               <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
               <Text style={fs.actionPillText} numberOfLines={1}>
-                {linked ? linked.name : 'Add Playlist'}
+                {spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
               </Text>
             </TouchableOpacity>
           </View>

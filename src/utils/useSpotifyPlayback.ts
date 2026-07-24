@@ -6,6 +6,7 @@ import { useActivityPing, useAdoptPlayState, useStartResultReporter, useWakeNudg
 import {
   isSpotifyConnected,
   getPlaybackState,
+  getPlaylistName,
   pause as spotifyPause,
   startPlayback,
   skipNext,
@@ -43,6 +44,11 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
   const [track, setTrack] = useState<NowPlaying | null>(null);
   const [shuffleOn, setShuffleOn] = useState(false);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
+  // Name of the playlist the music is ACTUALLY coming from right now (may
+  // differ from the station's linked playlist — e.g. user picked another
+  // one in Spotify). Null when unknown / not a playlist context.
+  const [contextName, setContextName] = useState<string | null>(null);
+  const lastCtxUriRef = useRef<string | null | undefined>(undefined);
   const cancelledRef = useRef(false);
   const refreshRef = useRef<() => void>(() => {});
   // What Spotify last reported about actual playback — the play button's
@@ -94,6 +100,18 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
           setShuffleOn(!!data.shuffle_state);
           if (data.repeat_state) setRepeatMode(data.repeat_state as RepeatMode);
         }
+        // Which playlist is really playing? Follow the player's context so
+        // the pill updates when the music source changes under us.
+        const ctxUri: string | null = data?.context?.uri ?? null;
+        if (ctxUri !== lastCtxUriRef.current) {
+          lastCtxUriRef.current = ctxUri;
+          const m = /^spotify:playlist:([A-Za-z0-9]+)$/.exec(ctxUri ?? '');
+          if (m) {
+            getPlaylistName(m[1]).then((n) => { if (!cancelledRef.current && n) setContextName(n); }).catch(() => {});
+          } else {
+            setContextName(null);
+          }
+        }
       };
       refreshRef.current = refresh;
       refresh();
@@ -132,6 +150,7 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
   return {
     connected,
     track,
+    contextName,
     shuffleOn,
     repeatMode,
     // Only surface Spotify's verdict for users who actually connected it —

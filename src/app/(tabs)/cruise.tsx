@@ -22,6 +22,7 @@ import {
   type LastCruise,
 } from '@/utils/lastCruise';
 import { recordDriveStart } from '@/utils/driveStats';
+import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { loadCustomStations, resolveAnyStation } from '@/utils/customStations';
 import { DEFAULT_DRIVER_NAME, getDriverName } from '@/utils/driverName';
 
@@ -55,16 +56,23 @@ export default function CruiseScreen() {
   const [driverName, setDriverName] = useState(DEFAULT_DRIVER_NAME);
 
   // Refresh on every focus — the name, time of day, last cruise and stats move on.
+  const [focused, setFocused] = useState(false);
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      setFocused(true);
       setTonightPick(stationById(defaultStationForNow()));
       setStatsKey((k) => k + 1);
       getDriverName().then((n) => { if (active) setDriverName(n); });
       loadCustomStations().then(() => loadLastCruise()).then((last) => { if (active) setLastCruise(last); });
-      return () => { active = false; };
+      return () => { active = false; setFocused(false); };
     }, []),
   );
+
+  // Light Spotify pulse-check (slow poll, only while this tab is focused) so
+  // the header equalizer wakes up when music is playing — even before any
+  // Cruise drive has started.
+  const spotify = useSpotifyPlayback(focused, { pollMs: 15000 });
 
   async function launchCruise(cruise: LastCruise) {
     // A free user resuming a saved premium-mode drive only gets a taste — it
@@ -100,7 +108,7 @@ export default function CruiseScreen() {
         showsVerticalScrollIndicator={false}>
         <EqualizerHeader
           stationName={nowStation.name}
-          live={!!np.session}
+          live={!!np.session || !!spotify.track?.isPlaying}
           accent={nowStation.eqColors?.[1]}
         />
         <ConnectSpotifyCard />

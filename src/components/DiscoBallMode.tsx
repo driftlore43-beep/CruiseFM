@@ -34,52 +34,136 @@ function formatMs(ms: number): string {
 }
 
 // ── The mirror ball ───────────────────────────────────────────────────────────
-// Facets drawn ONCE as static SVG; the whole ball rotates via a single
-// native-driver transform (GPU), never a per-frame redraw. Rows of tiles
-// shrink toward the poles so the sphere reads as round.
-function MirrorBall({ size, eq }: { size: number; eq: [string, string, string] }) {
+// A "spinning globe" trick, not an in-plane rotate: the facet texture is
+// built ONCE (useMemo) as a strip exactly one ball-width wide, rendered
+// TWICE side by side, and the pair slides via a single native-driver
+// translateX loop inside a circular clip. Because the two copies are
+// identical, the loop wraps with zero seam, and it reads as the sphere's
+// surface genuinely turning on a vertical axis — the old whole-circle
+// `rotate` looked like a flat coin spinning in the picture plane, which is
+// what prompted this rebuild. Everything suggesting light/depth (shading,
+// rim, highlight, sparkle) is a SEPARATE layer that never moves — real
+// light doesn't rotate with the ball, only the mirrors turning underneath it do.
+
+// Deterministic pseudo-random 0..1 from an integer seed (no Math.random —
+// the facet grid must render identically every time it's memoized).
+function hash01(n: number): number {
+  const x = Math.sin(n * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// Cheap two-stop hex mix, used to build the rainbow banding.
+function mixHex(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ar = (pa >> 16) & 255, ag = (pa >> 8) & 255, ab = pa & 255;
+  const br = (pb >> 16) & 255, bg = (pb >> 8) & 255, bb = pb & 255;
+  const r = Math.round(ar + (br - ar) * t), g = Math.round(ag + (bg - ag) * t), bl = Math.round(ab + (bb - ab) * t);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
+}
+
+// One period of the facet texture — drawn once, never touched again.
+function MirrorBallFace({ size, eq }: { size: number; eq: [string, string, string] }) {
+  const rows = 11, cols = 10;
   const facets = useMemo(() => {
-    const out: { cx: number; cy: number; w: number; h: number; tint: string; op: number }[] = [];
-    const R = 50;
-    const rows = 9;
-    for (let r = 0; r < rows; r++) {
-      const lat = (-1 + (2 * (r + 0.5)) / rows); // -1..1
-      const y = 50 + lat * R * 0.94;
-      const rowR = Math.sqrt(Math.max(0, 1 - lat * lat)) * R; // circle cross-section
-      const cols = Math.max(3, Math.round((rowR / R) * 12));
-      const tileW = (rowR * 2) / cols * 0.92;
-      const tileH = (R * 2 / rows) * 0.9;
-      for (let c = 0; c < cols; c++) {
-        const cx = 50 - rowR + tileW * 0.54 + (c * (rowR * 2)) / cols;
-        // A shimmer of tints across the tiles — mostly bright, some mood-tinted.
-        const pick = (r * 7 + c * 3) % 5;
-        const tint = pick === 0 ? eq[0] : pick === 1 ? eq[2] : '#EAF2FF';
-        const op = 0.35 + ((r * 5 + c * 2) % 6) * 0.11;
-        out.push({ cx, cy: y, w: tileW, h: tileH, tint, op });
+    const out: { x: number; y: number; r: number; fill: string; op: number }[] = [];
+    const cellW = size / cols, cellH = size / rows;
+    for (let row = 0; row < rows; row++) {
+      const t = row / (rows - 1);
+      // Rainbow ramp top→bottom (icy cyan → the station's own hues → warm
+      // gold) — reads as a classic disco ball while still carrying the mood.
+      const rowColor =
+        t < 0.28 ? mixHex('#EAF6FF', eq[0], t / 0.28) :
+        t < 0.62 ? mixHex(eq[0], mixHex(eq[1], '#D23AE0', 0.5), (t - 0.28) / 0.34) :
+        t < 0.85 ? mixHex(mixHex(eq[1], '#D23AE0', 0.5), '#FF8A3D', (t - 0.62) / 0.23) :
+        mixHex('#FF8A3D', '#FFC24C', (t - 0.85) / 0.15);
+      const stagger = row % 2 ? cellW / 2 : 0;
+      // One extra column on the left so an odd row's stagger tiles
+      // seamlessly into the copy beside it — see the loop below.
+      for (let col = -1; col < cols; col++) {
+        const x = col * cellW + cellW / 2 + stagger;
+        const y = row * cellH + cellH / 2;
+        const seed = row * 31 + col * 7;
+        const isGlint = hash01(seed) > 0.91;
+        out.push({
+          x, y, r: Math.min(cellW, cellH) * 0.42,
+          fill: isGlint ? '#FFFFFF' : rowColor,
+          op: isGlint ? 0.85 : 0.42 + hash01(seed + 1) * 0.34,
+        });
       }
     }
     return out;
-  }, [eq]);
+  }, [eq, size]);
 
   return (
-    <Svg width={size} height={size} viewBox="0 0 100 100">
-      <Defs>
-        <RadialGradient id="dbSphere" cx="0.4" cy="0.35" r="0.75">
-          <Stop offset="0" stopColor="#ffffff" stopOpacity="0.5" />
-          <Stop offset="0.5" stopColor={eq[1]} stopOpacity="0.28" />
-          <Stop offset="1" stopColor="#05040a" stopOpacity="0.85" />
-        </RadialGradient>
-      </Defs>
-      {/* Base sphere */}
-      <Circle cx={50} cy={50} r={50} fill="#0a0912" />
-      {/* Mirror tiles */}
-      {facets.map((f, i) => (
-        <Ellipse key={i} cx={f.cx} cy={f.cy} rx={f.w / 2} ry={f.h / 2} fill={f.tint} fillOpacity={f.op} />
-      ))}
-      {/* Spherical shade + top-left highlight, so it reads as a lit ball */}
-      <Circle cx={50} cy={50} r={50} fill="url(#dbSphere)" />
-      <Ellipse cx={36} cy={32} rx={13} ry={9} fill="#ffffff" fillOpacity={0.4} />
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      {facets.map((f, i) => <Circle key={i} cx={f.x} cy={f.y} r={f.r} fill={f.fill} fillOpacity={f.op} />)}
     </Svg>
+  );
+}
+
+function MirrorBall({ size, eq, spin }: { size: number; eq: [string, string, string]; spin: Animated.Value }) {
+  const scrollX = spin.interpolate({ inputRange: [0, 1], outputRange: [0, -size] });
+
+  // A handful of fixed glint points that twinkle independently of the
+  // scroll — the "hint of sparkle" ON the ball itself, not just the room.
+  const sparkles = useMemo(() => (
+    [{ x: 0.36, y: 0.3 }, { x: 0.58, y: 0.22 }, { x: 0.7, y: 0.46 }, { x: 0.3, y: 0.58 }]
+  ), []);
+  const twinkles = useRef(sparkles.map(() => new Animated.Value(0))).current;
+  useEffect(() => {
+    const loops = sparkles.map((_, i) => {
+      const loop = Animated.loop(Animated.sequence([
+        Animated.delay((i * 700) % 1600),
+        Animated.timing(twinkles[i], { toValue: 1, duration: 420, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(twinkles[i], { toValue: 0, duration: 900, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        Animated.delay(1200 + (i * 340) % 900),
+      ]));
+      loop.start();
+      return loop;
+    });
+    return () => loops.forEach((l) => l.stop());
+  }, []);
+
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#0a0912' }}>
+      {/* Scrolling surface — two identical copies, one continuous loop */}
+      <Animated.View style={{ flexDirection: 'row', width: size * 2, height: size, transform: [{ translateX: scrollX }] }}>
+        <MirrorBallFace size={size} eq={eq} />
+        <MirrorBallFace size={size} eq={eq} />
+      </Animated.View>
+
+      {/* Fixed lighting — never scrolls, so it reads as a real light source */}
+      <Svg width={size} height={size} viewBox="0 0 100 100" style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          <RadialGradient id="dbShade" cx="0.36" cy="0.3" r="0.9">
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.5" />
+            <Stop offset="0.4" stopColor={eq[1]} stopOpacity="0.1" />
+            <Stop offset="0.78" stopColor="#050208" stopOpacity="0.32" />
+            <Stop offset="1" stopColor="#020104" stopOpacity="0.75" />
+          </RadialGradient>
+          <RadialGradient id="dbWarm" cx="0.74" cy="0.8" r="0.55">
+            <Stop offset="0" stopColor="#FFA83C" stopOpacity="0.3" />
+            <Stop offset="1" stopColor="#FFA83C" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={50} cy={50} r={50} fill="url(#dbShade)" />
+        <Circle cx={50} cy={50} r={50} fill="url(#dbWarm)" />
+        <Ellipse cx={36} cy={30} rx={14} ry={9} fill="#ffffff" fillOpacity={0.42} />
+        <Circle cx={50} cy={50} r={49} fill="none" stroke="#ffffff" strokeOpacity={0.16} strokeWidth={1} />
+      </Svg>
+
+      {/* On-ball sparkle — small fixed glints that twinkle in place */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {sparkles.map((s, i) => (
+          <Animated.View key={i} style={{
+            position: 'absolute', left: s.x * size - 3, top: s.y * size - 3, width: 6, height: 6, borderRadius: 3,
+            backgroundColor: '#ffffff',
+            opacity: twinkles[i],
+            transform: [{ scale: twinkles[i].interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.3] }) }],
+          }} />
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -163,8 +247,9 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const [showMood, setShowMood] = useState(false);
 
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
-  const spin = useRef(new Animated.Value(0)).current;      // ball rotation
+  const spin = useRef(new Animated.Value(0)).current;       // ball surface scroll (axis spin)
   const fieldSpin = useRef(new Animated.Value(0)).current;  // dot-field orbit
+  const bob = useRef(new Animated.Value(0)).current;        // gentle hang/float
   const live = useRef(new Animated.Value(0)).current;       // 0 idle → 1 dancing
 
   const { progress, elapsedMs, durationMs, scrub } = useTrackClock({
@@ -178,9 +263,14 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
     if (!visible) return;
     const ballLoop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 9000, easing: Easing.linear, useNativeDriver: true }));
     const fieldLoop = Animated.loop(Animated.timing(fieldSpin, { toValue: 1, duration: 26000, easing: Easing.linear, useNativeDriver: true }));
+    const bobLoop = Animated.loop(Animated.sequence([
+      Animated.timing(bob, { toValue: 1, duration: 2100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(bob, { toValue: 0, duration: 2100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
     ballLoop.start();
     fieldLoop.start();
-    return () => { ballLoop.stop(); fieldLoop.stop(); };
+    bobLoop.start();
+    return () => { ballLoop.stop(); fieldLoop.stop(); bobLoop.stop(); };
   }, [visible]);
 
   // The room lights up while the music plays, dims between/at rest.
@@ -218,7 +308,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const artist = spotify.track?.artist ?? '';
 
   const ballSize = Math.min(winW * 0.62, winH * 0.34, 300);
-  const ballRotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const bobY = bob.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -6, 0] });
   const fieldRotate = fieldSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const glowTint = eq[1] + '26';
 
@@ -255,12 +345,12 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>{station.name}</Text>
           </View>
 
-          {/* The ball, hanging from a mount, slowly turning */}
+          {/* The ball, hanging from a mount, genuinely turning on its axis */}
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <View style={{ width: 2, height: ballSize * 0.22, backgroundColor: 'rgba(255,255,255,0.25)' }} />
-            <View style={{ width: 14, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: -3 }} />
-            <Animated.View style={{ width: ballSize, height: ballSize, transform: [{ rotate: ballRotate }] }}>
-              <MirrorBall size={ballSize} eq={eq} />
+            <Animated.View style={{ alignItems: 'center', transform: [{ translateY: bobY }] }}>
+              <View style={{ width: 2, height: ballSize * 0.22, backgroundColor: 'rgba(255,255,255,0.25)' }} />
+              <View style={{ width: 14, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: -3 }} />
+              <MirrorBall size={ballSize} eq={eq} spin={spin} />
             </Animated.View>
           </View>
 

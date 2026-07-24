@@ -34,6 +34,7 @@ import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { AmbientGlow } from '@/components/AmbientGlow';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { MarqueeText } from '@/components/MarqueeText';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
@@ -747,6 +748,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
         <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
+        <PreviewGate onSilence={spotify.pause} />
 
         <MoodSheet
           visible={showMood}

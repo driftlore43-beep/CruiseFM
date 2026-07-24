@@ -22,6 +22,7 @@ import { seekTo } from '@/utils/spotify';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
@@ -991,6 +992,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
         <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
+        <PreviewGate onSilence={spotify.pause} />
 
         <MoodSheet
           visible={showMood}

@@ -653,16 +653,17 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
       },
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (_evt, g) => {
         lastAngle.current = null;
         scrubbingRef.current = false;
         setIsScrubbing(false);
         setScrubDir(null);
         if (scrubFadeTimerRef.current) clearTimeout(scrubFadeTimerRef.current);
         // A still, quick touch is a TAP: the record doubles as a play/pause
-        // button, matching the cassette body. No seek, no scrub indicator —
-        // the play-state effects handle spin-up / coast-down.
-        if (movedDegRef.current < 3 && Date.now() - tapStartRef.current < 350) {
+        // button, matching the cassette body. Judged by FINGER TRAVEL in
+        // pixels (not rotation degrees — near the record's centre a tiny
+        // wobble reads as many degrees and taps kept registering as scrubs).
+        if (Math.hypot(g.dx, g.dy) < 12 && Date.now() - tapStartRef.current < 450) {
           scrubIndicatorAnim.setValue(0);
           togglePlayRef.current();
           return;
@@ -1099,7 +1100,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
         <ModeCloseButton onPress={handleClose} />
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} color={station.eqColors?.[1] ?? V.gold} />
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={station.eqColors?.[1] ?? V.gold} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 

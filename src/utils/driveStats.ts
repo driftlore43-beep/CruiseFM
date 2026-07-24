@@ -90,26 +90,36 @@ function dayKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
+// A drive only counts once it's real: at least this many banked minutes.
+// Twenty-second mode peeks and setting fiddles no longer inflate the stats.
+const QUALIFYING_MINUTES = 2;
+
 export async function getDriveStats(): Promise<DriveStats> {
   const log = await loadLog();
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-  const drivesThisWeek = log.filter((e) => e.ts >= weekAgo).length;
-  const totalMinutes = log.reduce((sum, e) => sum + (e.minutes ?? 0), 0);
-  const totalDrives = log.length;
+  // The drive happening right now hasn't banked minutes yet — count it.
+  const lastEvent = log[log.length - 1];
+  const real = log.filter((e) =>
+    (e.minutes ?? 0) >= QUALIFYING_MINUTES || (e === lastEvent && driveOpenedAt != null),
+  );
 
-  // Favourite = the most-driven station.
+  const drivesThisWeek = real.filter((e) => e.ts >= weekAgo).length;
+  const totalMinutes = log.reduce((sum, e) => sum + (e.minutes ?? 0), 0);
+  const totalDrives = real.length;
+
+  // Favourite = the most-driven station (real drives only).
   const counts: Record<string, number> = {};
-  for (const e of log) counts[e.stationId] = (counts[e.stationId] ?? 0) + 1;
+  for (const e of real) counts[e.stationId] = (counts[e.stationId] ?? 0) + 1;
   let favoriteStationId: string | null = null;
   let max = 0;
   for (const [id, c] of Object.entries(counts)) {
     if (c > max) { max = c; favoriteStationId = id; }
   }
 
-  // Streak: consecutive days with at least one drive. A quiet today doesn't
-  // break it yet — the chain only snaps once a full day is missed.
-  const days = new Set(log.map((e) => dayKey(new Date(e.ts))));
+  // Streak: consecutive days with at least one real drive. A quiet today
+  // doesn't break it yet — the chain only snaps once a full day is missed.
+  const days = new Set(real.map((e) => dayKey(new Date(e.ts))));
   const cursor = new Date();
   if (!days.has(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1);
   let streakDays = 0;

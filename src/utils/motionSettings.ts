@@ -39,3 +39,25 @@ export async function setAutoDimStored(value: boolean): Promise<void> {
     // ignore
   }
 }
+
+const ATMOSPHERE_KEY = 'cruise_atmosphere';
+
+/** Atmosphere = the smoke-machine haze breathing behind every mode.
+ * Default ON — it's part of the signature look; the toggle exists for
+ * drivers who want the scene clean. */
+export async function getAtmosphere(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(ATMOSPHERE_KEY);
+    return raw == null ? true : raw === 'true';
+  } catch {
+    return true;
+  }
+}
+
+export async function setAtmosphereStored(value: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(ATMOSPHERE_KEY, value ? 'true' : 'false');
+  } catch {
+    // ignore
+  }
+}

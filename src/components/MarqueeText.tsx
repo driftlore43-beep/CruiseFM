@@ -35,7 +35,10 @@ export function MarqueeText({ text, style }: { text: string; style?: StyleProp<T
       <Animated.Text
         numberOfLines={1}
         onLayout={(e) => setTextW(e.nativeEvent.layout.width)}
-        style={[style, { transform: [{ translateX: tx }] }]}>
+        // flexShrink: 0 is the load-bearing part — without it the row
+        // compresses the text to the box and ellipsizes it BEFORE we measure,
+        // so long titles read "…"-chopped and the pan never fires.
+        style={[style, { flexShrink: 0, transform: [{ translateX: tx }] }]}>
         {text}
       </Animated.Text>
     </View>

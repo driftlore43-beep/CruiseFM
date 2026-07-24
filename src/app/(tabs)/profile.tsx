@@ -106,7 +106,7 @@ function useMusicPlatformInfo() {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { dataSaver, setDataSaver, autoDim, setAutoDim } = useMotion();
+  const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere } = useMotion();
   const { devFreePreview, setDevFreePreview } = useEntitlements();
   const { name: platformName, color: platformColor, refresh: refreshPlatform } = useMusicPlatformInfo();
   const [selectorVisible, setSelectorVisible] = useState(false);
@@ -310,6 +310,24 @@ export default function ProfileScreen() {
             />
           </View>
 
+          {/* Atmosphere toggle — the smoke-machine haze in every mode */}
+          <View style={[styles.settingsRow, styles.settingsBorder]}>
+            <View style={styles.platformRowLeft}>
+              <IconChip icon="weather-fog" size={34} />
+              <View>
+                <Text style={styles.settingsLabel}>Atmosphere</Text>
+                <Text style={styles.dataSaverSub}>Smoke-machine haze pulsing with the music · off = clean scene</Text>
+              </View>
+            </View>
+            <Switch
+              value={atmosphere}
+              onValueChange={setAtmosphere}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              thumbColor="#fff"
+              ios_backgroundColor="rgba(255,255,255,0.18)"
+              {...({ activeThumbColor: '#fff' } as object)}
+            />
+          </View>
 
           {/* Music Platform row */}
           <Pressable

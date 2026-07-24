@@ -354,7 +354,7 @@ function CassetteBody({
   // (the modes-tab preview card).
   const fallbackProgress = useRef(new Animated.Value(0.4)).current;
   const prog = progress ?? fallbackProgress;
-  const packBase = 96 * scale; // diameter at full wind
+  const packBase = 108 * scale; // diameter at full wind — big, like a real C90
   const leftPackScale  = prog.interpolate({ inputRange: [0, 1], outputRange: [1, 0.56] });
   const rightPackScale = prog.interpolate({ inputRange: [0, 1], outputRange: [0.56, 0.94] });
   const pack = (cx: number, packScale: Animated.AnimatedInterpolation<number>) => (
@@ -375,11 +375,14 @@ function CassetteBody({
     <View style={{ width: size, height: H, alignItems: 'center', justifyContent: 'center' }}>
       <View>
         <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`}>
-          {/* Body outline — crisp neon line */}
-          <SvgRect x={8} y={8} width={324} height={194} rx={20} fill="none" stroke={color} strokeWidth={2.4} />
+          {/* Body — translucent tinted shell (like a clear-plastic cassette
+              held to the light), crisp neon edge, near-square corners */}
+          <SvgRect x={8} y={8} width={324} height={194} rx={9} fill={color} fillOpacity={0.10} stroke={color} strokeWidth={2.4} />
+          {/* Soft top sheen so the shell reads as plastic, not a flat wash */}
+          <SvgRect x={12} y={12} width={316} height={58} rx={7} fill="#FFFFFF" fillOpacity={0.05} />
 
           {/* Header label box (accent hue) — side letter, ruled line, stereo mark */}
-          <SvgRect x={30} y={26} width={280} height={42} rx={11} fill="none" stroke={accent} strokeWidth={1.5} />
+          <SvgRect x={30} y={26} width={280} height={42} rx={5} fill={accent} fillOpacity={0.08} stroke={accent} strokeWidth={1.5} />
           <SvgRect x={42} y={37} width={18} height={18} rx={2} fill="none" stroke={color} strokeWidth={1.6} />
           <SvgText x={51} y={50.5} fill={color} textAnchor="middle" fontSize={11} fontWeight="800" fontFamily={Fonts.mono}>A</SvgText>
           <SvgText x={188} y={45} fill={accent} textAnchor="middle" fontSize={11} fontWeight="700" fontFamily={Fonts.mono}>{songName}</SvgText>
@@ -387,8 +390,8 @@ function CassetteBody({
           <SvgText x={70} y={62} fill={accent} fontSize={6.5} fontWeight="700" fontFamily={Fonts.mono} opacity={0.55} letterSpacing={1}>STEREO · C90</SvgText>
           <SvgText x={300} y={62} fill={accent} textAnchor="end" fontSize={8} fontWeight="700" fontFamily={Fonts.mono} opacity={0.85}>{artist}</SvgText>
 
-          {/* Reel window */}
-          <SvgRect x={66} y={86} width={208} height={72} rx={6} fill="none" stroke={color} strokeWidth={1.4} />
+          {/* No inner window frame — the shell is transparent, so the tape
+              packs float full-size in the open body like the reference photo */}
 
           {/* Tape path: guide posts + the ribbon running along the head gap */}
           <SvgCircle cx={80} cy={150} r={3} fill="none" stroke={color} strokeWidth={1.4} strokeOpacity={0.8} />
@@ -1010,7 +1013,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
         <ModeCloseButton onPress={handleClose} />
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} hero={false} color={currentEq?.[1] ?? C.amber} />
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
         <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
         {handoff && !spotify.track && <HandoffOverlay />}
 

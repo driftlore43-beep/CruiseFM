@@ -1,6 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
+
+import { useMotion } from '@/context/MotionContext';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -36,9 +38,30 @@ function Haze({ id, color }: { id: string; color: string }) {
  * All animation is opacity/scale transforms on the native driver — zero
  * frame cost.
  */
-export function AmbientGlow({ active, beat, color, hero = true }: { active: boolean; beat?: boolean; color: string; hero?: boolean }) {
+export function AmbientGlow({ active, beat, color, hero = true, trackKey }: {
+  active: boolean; beat?: boolean; color: string; hero?: boolean;
+  /** Current song identity (title). When it changes, the beat holds its
+   *  breath for a couple of seconds — atmosphere pauses between songs. */
+  trackKey?: string | null;
+}) {
   const breath = useRef(new Animated.Value(0)).current;
   const beatPulse = useRef(new Animated.Value(0)).current;
+  const { atmosphere } = useMotion();
+
+  // Song-transition hold: a new title means the old song just ended — the
+  // 5s poll can't see the ~1s silent gap itself, so the moment the title
+  // flips we rest the beat briefly, like the room catching its breath.
+  const [transitionHold, setTransitionHold] = useState(false);
+  const prevKeyRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevKeyRef.current;
+    prevKeyRef.current = trackKey;
+    if (prev === undefined || prev === trackKey || !trackKey) return;
+    setTransitionHold(true);
+    const t = setTimeout(() => setTransitionHold(false), 2200);
+    return () => clearTimeout(t);
+  }, [trackKey]);
+  const beatActive = !!beat && !transitionHold;
 
   useEffect(() => {
     if (!active) {
@@ -54,8 +77,8 @@ export function AmbientGlow({ active, beat, color, hero = true }: { active: bool
   }, [active]);
 
   useEffect(() => {
-    if (!beat) {
-      // Music stopped / switching — let the pulse die out gently.
+    if (!beatActive) {
+      // Music stopped / switching / between songs — the pulse dies out gently.
       Animated.timing(beatPulse, { toValue: 0, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
       return;
     }
@@ -65,7 +88,7 @@ export function AmbientGlow({ active, beat, color, hero = true }: { active: bool
     ]));
     loop.start();
     return () => loop.stop();
-  }, [beat]);
+  }, [beatActive]);
 
   // The two side hazes ride the same breath in opposite phase, so the smoke
   // leans left, then right — a drifting cloud, not a blinking band.
@@ -73,6 +96,9 @@ export function AmbientGlow({ active, beat, color, hero = true }: { active: bool
   const rightO = breath.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.7] });
   const mainO  = breath.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.8] });
   const heroO  = breath.interpolate({ inputRange: [0, 1], outputRange: [0.28, 0.62] });
+
+  // Profile toggle: some drivers want the scene without the smoke.
+  if (!atmosphere) return null;
 
   return (
     <>

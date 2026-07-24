@@ -14,6 +14,7 @@ export const MODE_CATALOG: ModeInfo[] = [
   { id: 'horizon',   label: 'Horizon',     pro: true  },
   { id: 'waves',     label: 'Sound Waves', pro: false },
   { id: 'orb',       label: 'Circular EQ', pro: true  },
+  { id: 'disco',     label: 'Disco Ball',  pro: true  },
 ];
 
 export function isProMode(mode: string): boolean {

@@ -253,6 +253,17 @@ export default function ModesScreen() {
           />
         </AnimatedCard>
 
+        <AnimatedCard scrollY={scrollY} onPress={() => open('disco', !isPro)} style={{ marginBottom: 14 }}>
+          <CompactModeCard
+            title="Disco Ball Mode"
+            desc="A slow-turning mirror ball scattering light across your night drive."
+            icon="mirror-variant"
+            gradient={['#7a2ac0', '#c02a8a', '#2a1550']}
+            locked={!isPro}
+            premium
+          />
+        </AnimatedCard>
+
       </Animated.ScrollView>
 
     </View>

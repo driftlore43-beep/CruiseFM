@@ -135,7 +135,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
 
   useEffect(() => { playingRef.current = playing; }, [playing]);
 
-  // Waveform animation loop — throttled to ~30fps.
+  // Waveform animation loop — throttled to ~15fps — each tick re-renders the whole SVG scene on the CPU, and 25fps measured 53-59% sustained CPU (iOS resource reports, 24.07); 15fps looks identical for these slow drifts and halves the burn.
   useEffect(() => {
     if (!visible) return;
     let raf = 0;
@@ -143,7 +143,7 @@ export function SoundWaveFullscreen({ visible, onClose, stationId }: { visible: 
     let last = 0;
     const tick = () => {
       const now = Date.now();
-      if (now - last >= 40) {
+      if (now - last >= 66) {
         last = now;
         const target = playingRef.current ? 1 : 0.25;
         ampRef.current += (target - ampRef.current) * 0.08;

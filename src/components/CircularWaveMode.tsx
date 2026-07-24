@@ -102,7 +102,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   useEffect(() => { playingRef.current = playing; }, [playing]);
   useEffect(() => { if (visible) getStationPlaylist(station.id).then(setLinked); }, [visible, station.id]);
 
-  // Orb animation loop — throttled to ~30fps.
+  // Orb animation loop — throttled to ~15fps — each tick re-renders the whole SVG scene on the CPU, and 25fps measured 53-59% sustained CPU (iOS resource reports, 24.07); 15fps looks identical for these slow drifts and halves the burn.
   useEffect(() => {
     if (!visible) return;
     let raf = 0;
@@ -110,7 +110,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
     let last = 0;
     const tick = () => {
       const now = Date.now();
-      if (now - last >= 40) {
+      if (now - last >= 66) {
         last = now;
         const target = playingRef.current ? 1 : 0.55;
         ampRef.current += (target - ampRef.current) * 0.08;

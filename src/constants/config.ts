@@ -1,7 +1,10 @@
 // ── Dev / owner bypass ────────────────────────────────────────────────────────
 // Set to false before publishing to App Store.
 // When true: all premium locks are bypassed and a DEV badge appears on each card.
-export const OWNER_MODE = false;
+// TEMPORARILY TRUE (24.07, owner auditing the free tier via the Profile
+// "Free-user preview" toggle) — flip back to false when done, and NEVER
+// publish a production OTA while this is true.
+export const OWNER_MODE = true;
 
 // ── Launch-free switch ────────────────────────────────────────────────────────
 // While true, every user gets the full app: no locks, no paywall. This is the

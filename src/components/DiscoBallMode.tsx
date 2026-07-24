@@ -69,6 +69,14 @@ const ZONE_MID   = '#b7c1da';
 const ZONE_DARK  = '#7a83a2';
 const STROKE_COLOR = '#f6f8ff';
 
+// Fixed neon accent set for the moving reflections/bokeh — a deliberate
+// departure from the "always the station's own eqColors" rule elsewhere:
+// the brief calls for a specific club-neon identity (cyan/magenta/purple/
+// blue) for this one mode. Each is nudged ~18% toward the station's own
+// mid accent (eq[1]) wherever it's used, so it still feels station-tinted
+// rather than a totally unrelated palette bolted on.
+const NEON = { cyan: '#22E8FF', magenta: '#FF2FD1', purple: '#9B4DFF', blue: '#3D6BFF' } as const;
+
 type Tile = { d: string; fill: string };
 
 // Chunky geodesic tiles in curved latitude rows (soccer-ball taper — fewer,
@@ -141,15 +149,27 @@ function buildDiscoTiles(size: number): Tile[] {
   return tiles;
 }
 
-// One period of the facet texture — drawn once, never touched again.
+// One period of the facet texture — drawn once, never touched again. Three
+// static passes fake a rounded bevel per tile (a real per-edge bevel needs a
+// blur/shadow filter RN doesn't have): a soft dark offset copy reads as a
+// recessed seam, then the fill+outline, then a thin bright inner rim so each
+// facet catches the light like real beveled glass. All one-time SVG nodes —
+// zero per-frame cost, same CPU-safety rule as everywhere else in this app.
 function MirrorBallFace({ size }: { size: number }) {
   const tiles = useMemo(() => buildDiscoTiles(size), [size]);
   const strokeW = Math.max(1, size * 0.007);
+  const bevelOffset = `translate(${(size * 0.006).toFixed(2)} ${(size * 0.009).toFixed(2)})`;
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <Rect x={0} y={0} width={size} height={size} fill="#0a0912" />
       {tiles.map((t, i) => (
-        <Path key={i} d={t.d} fill={t.fill} stroke={STROKE_COLOR} strokeWidth={strokeW} strokeLinejoin="round" />
+        <Path key={`s${i}`} d={t.d} fill="#000000" fillOpacity={0.24} transform={bevelOffset} />
+      ))}
+      {tiles.map((t, i) => (
+        <Path key={i} d={t.d} fill={t.fill} stroke={STROKE_COLOR} strokeOpacity={0.85} strokeWidth={strokeW * 1.3} strokeLinejoin="round" />
+      ))}
+      {tiles.map((t, i) => (
+        <Path key={`h${i}`} d={t.d} fill="none" stroke="#ffffff" strokeOpacity={0.32} strokeWidth={strokeW * 0.5} strokeLinejoin="round" />
       ))}
     </Svg>
   );
@@ -240,7 +260,110 @@ function OnBallGlints({ size }: { size: number }) {
   );
 }
 
-function MirrorBall({ size, eq, spin }: { size: number; eq: [string, string, string]; spin: Animated.Value }) {
+// A single soft neon streak drifting down across the ball on its own slow
+// yo-yo loop (opacity + translateY only — native driver). Four of these,
+// one per NEON hue at staggered periods/phases, are what read as "coloured
+// reflections moving across the surface" rather than the ColorCycleWash's
+// uniform mood-colour crossfade underneath them.
+function NeonStreak({ size, color, angleDeg, widthPct, duration, delay, peak, pulse }: {
+  size: number; color: string; angleDeg: number; widthPct: number; duration: number; delay: number; peak: number;
+  pulse: Animated.Value;
+}) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.delay(delay),
+      Animated.timing(t, { toValue: 1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(t, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  const travel = size * 1.1;
+  const translateY = t.interpolate({ inputRange: [0, 1], outputRange: [-travel, travel] });
+  const baseOpacity = t.interpolate({ inputRange: [0, 0.15, 0.5, 0.85, 1], outputRange: [0, peak, peak * 0.45, peak, 0] });
+  const pulseNudge = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1.18] });
+  const streakW = size * widthPct;
+  return (
+    <Animated.View pointerEvents="none" style={{
+      position: 'absolute', left: size / 2 - streakW / 2, top: -size * 0.2, width: streakW, height: size * 1.4,
+      opacity: Animated.multiply(baseOpacity, pulseNudge),
+      transform: [{ rotate: `${angleDeg}deg` }, { translateY }],
+    }}>
+      <LinearGradient
+        colors={['transparent', color, 'transparent']}
+        locations={[0.2, 0.5, 0.8]}
+        style={{ flex: 1, borderRadius: streakW / 2 }}
+      />
+    </Animated.View>
+  );
+}
+
+// Four neon streaks (cyan/magenta/purple/blue), independent speeds and
+// phases so they cross each other rather than moving in lockstep — clipped
+// by the ball's own circular overflow:hidden, so they only ever show up
+// where the sphere is.
+function NeonSweep({ size, eq, pulse }: { size: number; eq: [string, string, string]; pulse: Animated.Value }) {
+  const tint = (hex: string) => mixHex(hex, eq[1], 0.18);
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <NeonStreak size={size} color={tint(NEON.cyan)}    angleDeg={18}  widthPct={0.30} duration={4200} delay={0}    peak={0.22} pulse={pulse} />
+      <NeonStreak size={size} color={tint(NEON.magenta)} angleDeg={-24} widthPct={0.24} duration={5100} delay={900}  peak={0.18} pulse={pulse} />
+      <NeonStreak size={size} color={tint(NEON.purple)}  angleDeg={10}  widthPct={0.20} duration={4700} delay={1700} peak={0.16} pulse={pulse} />
+      <NeonStreak size={size} color={tint(NEON.blue)}    angleDeg={-14} widthPct={0.26} duration={5600} delay={2500} peak={0.20} pulse={pulse} />
+    </View>
+  );
+}
+
+// A whisper-quiet lens flare along the highlight's light axis — a thin
+// streak plus a few shrinking ghost rings, the classic subtle "premium
+// camera" touch. Static geometry; only its overall opacity breathes with
+// the music pulse.
+function LensFlare({ size, pulse }: { size: number; pulse: Animated.Value }) {
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.85] });
+  const axis: [number, number][] = [[0.58, 0.5], [0.78, 0.72], [0.90, 0.86]];
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity }]}>
+      <Svg width={size} height={size} viewBox="0 0 100 100">
+        <Path d="M 26 24 L 46 24" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.9} strokeLinecap="round" />
+        {axis.map(([fx, fy], i) => (
+          <Circle key={i} cx={fx * 100} cy={fy * 100} r={2.4 - i * 0.5} fill="none" stroke="#ffffff" strokeOpacity={0.13 - i * 0.03} strokeWidth={0.6} />
+        ))}
+      </Svg>
+    </Animated.View>
+  );
+}
+
+// A soft radial halo bleeding OUTSIDE the ball's own circular clip — the
+// cheap, established way to fake bloom in this codebase (layered translucent
+// gradients, same trick as AmbientGlow's Haze) since RN has no blur filter.
+// Sized well past the ball so it reads as light spilling into the room, not
+// a rim on the sphere itself.
+function BallBloom({ size, color, pulse }: { size: number; color: string; pulse: Animated.Value }) {
+  const bloomSize = size * 2.3;
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.62] });
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1.05] });
+  return (
+    <Animated.View pointerEvents="none" style={{
+      position: 'absolute', width: bloomSize, height: bloomSize,
+      left: (size - bloomSize) / 2, top: (size - bloomSize) / 2,
+      opacity, transform: [{ scale }],
+    }}>
+      <Svg width={bloomSize} height={bloomSize}>
+        <Defs>
+          <RadialGradient id="dbBloom" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={color} stopOpacity="0.45" />
+            <Stop offset="45%" stopColor={color} stopOpacity="0.16" />
+            <Stop offset="100%" stopColor={color} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={bloomSize / 2} cy={bloomSize / 2} r={bloomSize / 2} fill="url(#dbBloom)" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, string, string]; spin: Animated.Value; pulse: Animated.Value }) {
   const scrollX = spin.interpolate({ inputRange: [0, 1], outputRange: [0, -size] });
 
   return (
@@ -254,6 +377,11 @@ function MirrorBall({ size, eq, spin }: { size: number; eq: [string, string, str
       {/* Colour cycle — the station's own mood colours washing through,
           above the tiles, below the fixed highlight so it stays clean */}
       <ColorCycleWash size={size} eq={eq} />
+
+      {/* Neon reflections — four independent streaks drifting across the
+          surface, above the mood wash so they read as light moving over
+          the facets rather than another flat tint */}
+      <NeonSweep size={size} eq={eq} pulse={pulse} />
 
       {/* Fixed lighting — never scrolls, so it reads as a real light source */}
       <Svg width={size} height={size} viewBox="0 0 100 100" style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -274,6 +402,9 @@ function MirrorBall({ size, eq, spin }: { size: number; eq: [string, string, str
         <Ellipse cx={36} cy={30} rx={14} ry={9} fill="#ffffff" fillOpacity={0.42} />
         <Circle cx={50} cy={50} r={49} fill="none" stroke="#ffffff" strokeOpacity={0.16} strokeWidth={1} />
       </Svg>
+
+      {/* Lens flare — subtle, along the same light axis as the highlight */}
+      <LensFlare size={size} pulse={pulse} />
 
       {/* On-ball sparkle — two prominent glints at the highlight's edge */}
       <OnBallGlints size={size} />
@@ -337,6 +468,104 @@ function LightField({ count, eq, live, winW, winH }: {
   );
 }
 
+// ── Floating bokeh — soft out-of-focus circles drifting in the room ─────────
+// Distinct from LightField's small hard twinkle dots: these are big, blurred
+// (a RadialGradient falloff, not a solid fill), and drift on a slow yo-yo
+// float rather than orbiting — read as an out-of-focus foreground/background
+// layer, the classic "premium visualizer" touch. One native-driver loop per
+// particle; nothing recomputed per frame.
+function BokehDot({ x, y, size, color, driftY, driftX, dur, delay }: {
+  x: number; y: number; size: number; color: string; driftY: number; driftX: number; dur: number; delay: number;
+}) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.delay(delay),
+      Animated.timing(t, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(t, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  const translateY = t.interpolate({ inputRange: [0, 1], outputRange: [0, -driftY] });
+  const translateX = t.interpolate({ inputRange: [0, 1], outputRange: [0, driftX] });
+  const opacity = t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.10, 0.30, 0.10] });
+  return (
+    <Animated.View pointerEvents="none" style={{
+      position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size,
+      opacity, transform: [{ translateX }, { translateY }],
+    }}>
+      <Svg width={size} height={size}>
+        <Defs>
+          <RadialGradient id="dbBokeh" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={color} stopOpacity="0.85" />
+            <Stop offset="55%" stopColor={color} stopOpacity="0.22" />
+            <Stop offset="100%" stopColor={color} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={size / 2} cy={size / 2} r={size / 2} fill="url(#dbBokeh)" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+function BokehField({ count, eq, live, winW, winH }: {
+  count: number; eq: [string, string, string]; live: Animated.Value; winW: number; winH: number;
+}) {
+  const dots = useMemo(() => Array.from({ length: count }, (_, i) => {
+    const x = hash01(i * 7.31 + 1.7) * winW;
+    const y = winH * 0.10 + hash01(i * 3.13 + 9.4) * winH * 0.72;
+    const size = 16 + hash01(i * 5.5 + 2.2) * 30;
+    const palette = [eq[0], eq[1], eq[2], NEON.cyan, NEON.magenta, NEON.purple, NEON.blue];
+    const color = palette[i % palette.length];
+    const driftY = 20 + hash01(i * 9.9) * 26;
+    const driftX = (hash01(i * 4.4) - 0.5) * 24;
+    const dur = 3600 + Math.floor(hash01(i * 2.1) * 2400);
+    const delay = Math.floor(hash01(i * 6.6) * 2000);
+    return { x, y, size, color, driftY, driftX, dur, delay };
+  }), [count, eq, winW, winH]);
+
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity: live }]} pointerEvents="none">
+      {dots.map((d, i) => <BokehDot key={i} {...d} />)}
+    </Animated.View>
+  );
+}
+
+// ── Volumetric light shafts — a couple of very faint cone gradients falling
+// from above the ball, slowly counter-rotating against the light field for
+// parallax. Pure static SVG under one native rotate loop — the "haze in a
+// beam of light" cue, kept deliberately subtle so it reads as atmosphere,
+// not a stage effect.
+function VolumetricRays({ size, color }: { size: number; color: string }) {
+  const rot = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(rot, { toValue: 1, duration: 46000, easing: Easing.linear, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  const rotate = rot.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] });
+  const raySize = size * 3.2;
+  return (
+    <Animated.View pointerEvents="none" style={{
+      position: 'absolute', width: raySize, height: raySize,
+      left: -(raySize - size) / 2, top: -(raySize - size) / 2 - size * 0.5,
+      opacity: 0.16, transform: [{ rotate }],
+    }}>
+      <Svg width={raySize} height={raySize} viewBox="0 0 100 100">
+        <Defs>
+          <RadialGradient id="dbRay" cx="50%" cy="18%" r="70%">
+            <Stop offset="0%" stopColor={color} stopOpacity="0.55" />
+            <Stop offset="100%" stopColor={color} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Path d="M50 4 L22 96 L78 96 Z" fill="url(#dbRay)" />
+        <Path d="M50 4 L38 96 L62 96 Z" fill="url(#dbRay)" opacity="0.65" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
 export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
@@ -365,6 +594,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const fieldSpin = useRef(new Animated.Value(0)).current;  // dot-field orbit
   const bob = useRef(new Animated.Value(0)).current;        // gentle hang/float
   const live = useRef(new Animated.Value(0)).current;       // 0 idle → 1 dancing
+  const pulse = useRef(new Animated.Value(0)).current;      // 0 rest → 1 on-beat (bloom/reflections)
 
   const { progress, elapsedMs, durationMs, scrub } = useTrackClock({
     visible, playing, track: spotify.track, demoDurationMs: DEMO_DURATION_MS,
@@ -372,10 +602,12 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
 
   useEffect(() => { if (visible) getStationPlaylist(station.id).then(setLinked); }, [visible, station.id]);
 
-  // Continuous native-driver rotations — GPU only, no CPU per frame.
+  // Continuous native-driver rotations — GPU only, no CPU per frame. The
+  // ball turns slowly and deliberately (14s/rev) — a fast spin read as a
+  // toy, this reads as a real hanging mirror ball.
   useEffect(() => {
     if (!visible) return;
-    const ballLoop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 9000, easing: Easing.linear, useNativeDriver: true }));
+    const ballLoop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 14000, easing: Easing.linear, useNativeDriver: true }));
     const fieldLoop = Animated.loop(Animated.timing(fieldSpin, { toValue: 1, duration: 26000, easing: Easing.linear, useNativeDriver: true }));
     const bobLoop = Animated.loop(Animated.sequence([
       Animated.timing(bob, { toValue: 1, duration: 2100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
@@ -392,6 +624,25 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   useEffect(() => {
     Animated.timing(live, { toValue: lightsOn ? 1 : 0.15, duration: lightsOn ? 900 : 700, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
   }, [lightsOn]);
+
+  // Glow intensity + reflections nudge gently on the beat — same simulated
+  // ~100BPM attack/release convention as AmbientGlow elsewhere in the app
+  // (no real audio analysis; gated on Spotify actually reporting playback so
+  // it never pulses over silence), kept subtle since this is a lighting
+  // accent, not the main show.
+  const beatActive = lightsOn && (spotify.track?.isPlaying ?? true);
+  useEffect(() => {
+    if (!beatActive) {
+      Animated.timing(pulse, { toValue: 0, duration: 700, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+      return;
+    }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 150, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0.1, duration: 450, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [beatActive]);
 
   useEffect(() => {
     if (!visible) return;
@@ -424,7 +675,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const ballSize = Math.min(winW * 0.62, winH * 0.34, 300);
   const bobY = bob.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -6, 0] });
   const fieldRotate = fieldSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const glowTint = eq[1] + '26';
+  const bloomColor = mixHex(eq[1], NEON.cyan, 0.3);
 
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
@@ -441,8 +692,11 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
 
         {/* Orbiting light field — behind the ball, over the whole room */}
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate: fieldRotate }] }]} pointerEvents="none">
-          <LightField count={26} eq={eq} live={live} winW={winW} winH={winH} />
+          <LightField count={22} eq={eq} live={live} winW={winW} winH={winH} />
         </Animated.View>
+
+        {/* Floating bokeh — soft out-of-focus particles drifting in the room */}
+        <BokehField count={12} eq={eq} live={live} winW={winW} winH={winH} />
 
         {/* Drag pill */}
         <View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
@@ -464,7 +718,13 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             <Animated.View style={{ alignItems: 'center', transform: [{ translateY: bobY }] }}>
               <View style={{ width: 2, height: ballSize * 0.22, backgroundColor: 'rgba(255,255,255,0.25)' }} />
               <View style={{ width: 14, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: -3 }} />
-              <MirrorBall size={ballSize} eq={eq} spin={spin} />
+              {/* A ball-sized anchor box — the bloom/ray layers below position
+                  themselves relative to it, not the taller pole+ball stack */}
+              <View style={{ width: ballSize, height: ballSize }}>
+                <VolumetricRays size={ballSize} color={bloomColor} />
+                <BallBloom size={ballSize} color={bloomColor} pulse={pulse} />
+                <MirrorBall size={ballSize} eq={eq} spin={spin} pulse={pulse} />
+              </View>
             </Animated.View>
           </View>
 

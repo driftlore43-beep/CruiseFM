@@ -5,7 +5,7 @@ import {
   Animated, Dimensions, Easing, Modal, PanResponder,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Ellipse, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaylistSheet } from '@/components/PlaylistSheet';
@@ -52,7 +52,7 @@ function hash01(n: number): number {
   return x - Math.floor(x);
 }
 
-// Cheap two-stop hex mix, used to build the rainbow banding.
+// Cheap two-stop hex mix, used by the colour wash.
 function mixHex(a: string, b: string, t: number): string {
   const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
   const ar = (pa >> 16) & 255, ag = (pa >> 8) & 255, ab = pa & 255;
@@ -61,76 +61,199 @@ function mixHex(a: string, b: string, t: number): string {
   return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
 }
 
-// One period of the facet texture — drawn once, never touched again.
-function MirrorBallFace({ size, eq }: { size: number; eq: [string, string, string] }) {
-  const rows = 11, cols = 10;
-  const facets = useMemo(() => {
-    const out: { x: number; y: number; r: number; fill: string; op: number }[] = [];
-    const cellW = size / cols, cellH = size / rows;
-    for (let row = 0; row < rows; row++) {
-      const t = row / (rows - 1);
-      // Rainbow ramp top→bottom (icy cyan → the station's own hues → warm
-      // gold) — reads as a classic disco ball while still carrying the mood.
-      const rowColor =
-        t < 0.28 ? mixHex('#EAF6FF', eq[0], t / 0.28) :
-        t < 0.62 ? mixHex(eq[0], mixHex(eq[1], '#D23AE0', 0.5), (t - 0.28) / 0.34) :
-        t < 0.85 ? mixHex(mixHex(eq[1], '#D23AE0', 0.5), '#FF8A3D', (t - 0.62) / 0.23) :
-        mixHex('#FF8A3D', '#FFC24C', (t - 0.85) / 0.15);
-      const stagger = row % 2 ? cellW / 2 : 0;
-      // One extra column on the left so an odd row's stagger tiles
-      // seamlessly into the copy beside it — see the loop below.
-      for (let col = -1; col < cols; col++) {
-        const x = col * cellW + cellW / 2 + stagger;
-        const y = row * cellH + cellH / 2;
-        const seed = row * 31 + col * 7;
-        const isGlint = hash01(seed) > 0.91;
-        out.push({
-          x, y, r: Math.min(cellW, cellH) * 0.42,
-          fill: isGlint ? '#FFFFFF' : rowColor,
-          op: isGlint ? 0.85 : 0.42 + hash01(seed + 1) * 0.34,
-        });
-      }
-    }
-    return out;
-  }, [eq, size]);
+// Neutral, pale cel-shading palette — no baked hue. The moving ColorCycleWash
+// (below) tints this at playback time, so the same tiles work for any station.
+const ZONE_WHITE = '#ffffff';
+const ZONE_LIGHT = '#e9eefa';
+const ZONE_MID   = '#b7c1da';
+const ZONE_DARK  = '#7a83a2';
+const STROKE_COLOR = '#f6f8ff';
 
+type Tile = { d: string; fill: string };
+
+// Chunky geodesic tiles in curved latitude rows (soccer-ball taper — fewer,
+// narrower tiles near the poles), each shaded into one of four HARD zones
+// (no gradients) so the roundness reads at a glance, like a cel-shaded
+// sticker rather than a photoreal mirror ball. One period, `size` wide —
+// the seam-tiling contract below is unchanged from the original dot grid.
+function buildDiscoTiles(size: number): Tile[] {
+  const rows = 9, maxCols = 10, minCols = 3;
+  const tiles: Tile[] = [];
+
+  // Latitude bands compress near the poles, open up through the equator.
+  const weights: number[] = [];
+  for (let r = 0; r < rows; r++) {
+    const v = (r + 0.5) / rows;
+    const phi = (v - 0.5) * Math.PI;
+    weights.push(Math.max(0.4, Math.cos(phi)));
+  }
+  const weightSum = weights.reduce((a, b) => a + b, 0);
+  const rowTops: number[] = [];
+  let cursor = 0;
+  for (let r = 0; r < rows; r++) { rowTops.push(cursor); cursor += (weights[r] / weightSum) * size; }
+  rowTops.push(size);
+
+  for (let r = 0; r < rows; r++) {
+    const yTop = rowTops[r], yBot = rowTops[r + 1], rowH = yBot - yTop;
+    const v = (r + 0.5) / rows;
+    const phi = (v - 0.5) * Math.PI;
+
+    // Fewer, narrower tiles near the poles — the soccer-ball UV taper.
+    const cols = Math.max(minCols, Math.round(maxCols * Math.cos(phi)));
+    const cellW = size / cols;
+    const stagger = r % 2 ? cellW / 2 : 0;
+
+    // One sine period per `size`, shared phase across rows, so the dome
+    // curvature lines up perfectly at the copy-to-copy seam.
+    const bowAmp = rowH * (0.06 + 0.10 * (1 - Math.cos(phi)));
+    const bow = (x: number) => bowAmp * Math.sin((2 * Math.PI * x) / size);
+
+    // col runs -1..cols-1: the col=-1 tile is the seam-tiling trick that
+    // made the original dot grid tile seamlessly, kept unchanged here.
+    for (let c = -1; c < cols; c++) {
+      const xLeft = c * cellW + stagger, xRight = xLeft + cellW, xMid = xLeft + cellW / 2;
+      const topL = yTop + bow(xLeft), topR = yTop + bow(xRight), topM = yTop + bow(xMid) - rowH * 0.035;
+      const botL = yBot + bow(xLeft), botR = yBot + bow(xRight), botM = yBot + bow(xMid) + rowH * 0.035;
+
+      const d = `M ${xLeft.toFixed(2)} ${topL.toFixed(2)} `
+              + `Q ${xMid.toFixed(2)} ${topM.toFixed(2)} ${xRight.toFixed(2)} ${topR.toFixed(2)} `
+              + `L ${xRight.toFixed(2)} ${botR.toFixed(2)} `
+              + `Q ${xMid.toFixed(2)} ${botM.toFixed(2)} ${xLeft.toFixed(2)} ${botL.toFixed(2)} Z`;
+
+      // Shading keyed on (row, cMod) only — cMod wraps col=-1 onto the same
+      // class as the true last column, so fill matches exactly at the seam.
+      const cMod = ((c % cols) + cols) % cols;
+      const frac = cols > 1 ? cMod / (cols - 1) : 0.5;
+
+      // Hard zones, not a gradient: a left-bright/right-dark 3/4 key-light
+      // tendency, a clumped hash so zones read as hand-placed blobs, and one
+      // hotspot cluster pushed to pure white for the specular patch.
+      let bias = 0.80 - frac * 0.95 + (0.5 - v) * 0.30;
+      const clump = hash01(r * 12.9 + Math.floor(cMod / 2) * 5.7 + Math.floor(v * 3) * 2.1);
+      bias += (clump - 0.5) * 0.6;
+      const hotspot = Math.exp(-(((frac - 0.36) ** 2) / 0.045 + ((v - 0.32) ** 2) / 0.05));
+      bias += hotspot * 0.95;
+
+      const fill = bias > 0.80 ? ZONE_WHITE : bias > 0.44 ? ZONE_LIGHT : bias > 0.14 ? ZONE_MID : ZONE_DARK;
+      tiles.push({ d, fill });
+    }
+  }
+  return tiles;
+}
+
+// One period of the facet texture — drawn once, never touched again.
+function MirrorBallFace({ size }: { size: number }) {
+  const tiles = useMemo(() => buildDiscoTiles(size), [size]);
+  const strokeW = Math.max(1, size * 0.007);
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {facets.map((f, i) => <Circle key={i} cx={f.x} cy={f.y} r={f.r} fill={f.fill} fillOpacity={f.op} />)}
+      <Rect x={0} y={0} width={size} height={size} fill="#0a0912" />
+      {tiles.map((t, i) => (
+        <Path key={i} d={t.d} fill={t.fill} stroke={STROKE_COLOR} strokeWidth={strokeW} strokeLinejoin="round" />
+      ))}
     </Svg>
+  );
+}
+
+const WASH_CYCLE_MS = 15000; // full first-hue -> second -> third -> first loop
+const WASH_PEAK_OPACITY = 0.6;
+
+// The station's own eqColors, cycled as three translucent washes over the
+// pale tiles — this is what reads as "the ball's colour shifting" in the
+// reference, without needing a CSS hue-rotate RN doesn't have. Sits ABOVE
+// the scrolling tiles but BELOW the fixed highlight, so the white specular
+// patch stays clean regardless of which hue is currently peaking.
+function ColorCycleWash({ size, eq }: { size: number; eq: [string, string, string] }) {
+  const cycle = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(cycle, { toValue: 1, duration: WASH_CYCLE_MS, easing: Easing.linear, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  const stops = [0, 1 / 3, 2 / 3, 1];
+  const hue1 = cycle.interpolate({ inputRange: stops, outputRange: [WASH_PEAK_OPACITY, 0, 0, WASH_PEAK_OPACITY] });
+  const hue2 = cycle.interpolate({ inputRange: stops, outputRange: [0, WASH_PEAK_OPACITY, 0, 0] });
+  const hue3 = cycle.interpolate({ inputRange: stops, outputRange: [0, 0, WASH_PEAK_OPACITY, 0] });
+
+  const layer = { position: 'absolute' as const, width: size, height: size, borderRadius: size / 2 };
+  return (
+    <View pointerEvents="none" style={{ width: size, height: size, position: 'absolute' }}>
+      <Animated.View style={[layer, { backgroundColor: eq[0], opacity: hue1 }]} />
+      <Animated.View style={[layer, { backgroundColor: mixHex(eq[1], '#D23AE0', 0.4), opacity: hue2 }]} />
+      <Animated.View style={[layer, { backgroundColor: eq[2], opacity: hue3 }]} />
+    </View>
+  );
+}
+
+// A static 4-point sparkle path + glow, drawn once — only opacity/scale animate.
+function SparklePath({ boxSize }: { boxSize: number }) {
+  return (
+    <Svg width={boxSize} height={boxSize} viewBox="0 0 100 100">
+      <Defs>
+        <RadialGradient id="dbGlow" cx="50%" cy="50%" r="50%">
+          <Stop offset="0%" stopColor="#ffffff" stopOpacity={0.55} />
+          <Stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Circle cx={50} cy={50} r={50} fill="url(#dbGlow)" />
+      <Path fill="#ffffff" d="M50 2 C55 33 67 45 98 50 C67 55 55 67 50 98 C45 67 33 55 2 50 C33 45 45 33 50 2 Z" />
+    </Svg>
+  );
+}
+
+function GlintStar({ size, leftPct, topPct, boxPct, period, phase = 0, minScale = 0.7, minOpacity = 0.35 }: {
+  size: number; leftPct: number; topPct: number; boxPct: number; period: number; phase?: number; minScale?: number; minOpacity?: number;
+}) {
+  const t = useRef(new Animated.Value(0)).current;
+  const boxSize = size * boxPct;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.delay(phase),
+      Animated.timing(t, { toValue: 1, duration: period / 2, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.timing(t, { toValue: 0, duration: period / 2, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  const opacity = t.interpolate({ inputRange: [0, 1], outputRange: [minOpacity, 1] });
+  const scale = t.interpolate({ inputRange: [0, 1], outputRange: [minScale, 1] });
+  return (
+    <Animated.View pointerEvents="none" style={{
+      position: 'absolute', left: size * leftPct - boxSize / 2, top: size * topPct - boxSize / 2,
+      width: boxSize, height: boxSize, opacity, transform: [{ scale }],
+    }}>
+      <SparklePath boxSize={boxSize} />
+    </Animated.View>
+  );
+}
+
+// Two prominent glints sitting right at the edge of the highlight patch —
+// positions/sizes measured off the reference (a big one + a smaller companion
+// just above-left), replacing the old four small twinkle dots.
+function OnBallGlints({ size }: { size: number }) {
+  return (
+    <>
+      <GlintStar size={size} leftPct={0.64} topPct={0.42} boxPct={0.19} period={3000} phase={0} minScale={0.7} minOpacity={0.35} />
+      <GlintStar size={size} leftPct={0.575} topPct={0.30} boxPct={0.10} period={3600} phase={700} minScale={0.6} minOpacity={0.25} />
+    </>
   );
 }
 
 function MirrorBall({ size, eq, spin }: { size: number; eq: [string, string, string]; spin: Animated.Value }) {
   const scrollX = spin.interpolate({ inputRange: [0, 1], outputRange: [0, -size] });
 
-  // A handful of fixed glint points that twinkle independently of the
-  // scroll — the "hint of sparkle" ON the ball itself, not just the room.
-  const sparkles = useMemo(() => (
-    [{ x: 0.36, y: 0.3 }, { x: 0.58, y: 0.22 }, { x: 0.7, y: 0.46 }, { x: 0.3, y: 0.58 }]
-  ), []);
-  const twinkles = useRef(sparkles.map(() => new Animated.Value(0))).current;
-  useEffect(() => {
-    const loops = sparkles.map((_, i) => {
-      const loop = Animated.loop(Animated.sequence([
-        Animated.delay((i * 700) % 1600),
-        Animated.timing(twinkles[i], { toValue: 1, duration: 420, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(twinkles[i], { toValue: 0, duration: 900, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-        Animated.delay(1200 + (i * 340) % 900),
-      ]));
-      loop.start();
-      return loop;
-    });
-    return () => loops.forEach((l) => l.stop());
-  }, []);
-
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#0a0912' }}>
       {/* Scrolling surface — two identical copies, one continuous loop */}
       <Animated.View style={{ flexDirection: 'row', width: size * 2, height: size, transform: [{ translateX: scrollX }] }}>
-        <MirrorBallFace size={size} eq={eq} />
-        <MirrorBallFace size={size} eq={eq} />
+        <MirrorBallFace size={size} />
+        <MirrorBallFace size={size} />
       </Animated.View>
+
+      {/* Colour cycle — the station's own mood colours washing through,
+          above the tiles, below the fixed highlight so it stays clean */}
+      <ColorCycleWash size={size} eq={eq} />
 
       {/* Fixed lighting — never scrolls, so it reads as a real light source */}
       <Svg width={size} height={size} viewBox="0 0 100 100" style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -152,17 +275,8 @@ function MirrorBall({ size, eq, spin }: { size: number; eq: [string, string, str
         <Circle cx={50} cy={50} r={49} fill="none" stroke="#ffffff" strokeOpacity={0.16} strokeWidth={1} />
       </Svg>
 
-      {/* On-ball sparkle — small fixed glints that twinkle in place */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {sparkles.map((s, i) => (
-          <Animated.View key={i} style={{
-            position: 'absolute', left: s.x * size - 3, top: s.y * size - 3, width: 6, height: 6, borderRadius: 3,
-            backgroundColor: '#ffffff',
-            opacity: twinkles[i],
-            transform: [{ scale: twinkles[i].interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.3] }) }],
-          }} />
-        ))}
-      </View>
+      {/* On-ball sparkle — two prominent glints at the highlight's edge */}
+      <OnBallGlints size={size} />
     </View>
   );
 }

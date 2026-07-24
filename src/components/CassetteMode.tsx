@@ -385,7 +385,9 @@ function CassetteBody({
           <SvgRect x={30} y={26} width={280} height={42} rx={5} fill={accent} fillOpacity={0.08} stroke={accent} strokeWidth={1.5} />
           <SvgRect x={42} y={37} width={18} height={18} rx={2} fill="none" stroke={color} strokeWidth={1.6} />
           <SvgText x={51} y={50.5} fill={color} textAnchor="middle" fontSize={11} fontWeight="800" fontFamily={Fonts.mono}>A</SvgText>
-          <SvgText x={188} y={45} fill={accent} textAnchor="middle" fontSize={11} fontWeight="700" fontFamily={Fonts.mono}>{songName}</SvgText>
+          {/* SVG text never clips — trim long titles so they can't spill past
+              the shell (the marquee title below the cassette shows the rest) */}
+          <SvgText x={188} y={45} fill={accent} textAnchor="middle" fontSize={11} fontWeight="700" fontFamily={Fonts.mono}>{songName.length > 26 ? songName.slice(0, 25) + '…' : songName}</SvgText>
           <SvgLine x1={70} y1={51} x2={306} y2={51} stroke={accent} strokeWidth={0.8} strokeOpacity={0.35} />
           <SvgText x={70} y={62} fill={accent} fontSize={6.5} fontWeight="700" fontFamily={Fonts.mono} opacity={0.55} letterSpacing={1}>STEREO · C90</SvgText>
           <SvgText x={300} y={62} fill={accent} textAnchor="end" fontSize={8} fontWeight="700" fontFamily={Fonts.mono} opacity={0.85}>{artist}</SvgText>

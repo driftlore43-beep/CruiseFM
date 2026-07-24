@@ -373,8 +373,10 @@ function TurntableHero({
           }} />
         ))}
       </Animated.View>
-      {/* Single thick pulsing mood ring — color interpolated, not opacity */}
-      <Animated.View style={{
+      {/* Single thick pulsing mood ring — color interpolated, not opacity.
+          pointerEvents none is LOAD-BEARING: this view covers the whole
+          record, and without it every tap/scrub on the vinyl died here. */}
+      <Animated.View pointerEvents="none" style={{
         position: 'absolute',
         width: recSize + 20, height: recSize + 20, borderRadius: (recSize + 20) / 2,
         borderWidth: 10,
@@ -386,9 +388,9 @@ function TurntableHero({
       }} />
       {/* Center label — independent spin, sits above the record */}
       {(() => {
-        // A touch over true-to-life (real label ≈ 33%) — the album art deserves
-        // the extra breathing room (owner call, 23.07).
-        const cSize = Math.min(132, recSize * 0.36);
+        // Well over true-to-life (real label ≈ 33%) — the album art is the
+        // star, give it the room (owner calls, 23–24.07).
+        const cSize = Math.min(150, recSize * 0.40);
         const cR    = cSize / 2;
         return (
           <Animated.View pointerEvents="none" style={{

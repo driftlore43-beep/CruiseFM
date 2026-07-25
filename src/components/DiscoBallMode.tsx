@@ -195,6 +195,8 @@ function SphereGrid({ size }: { size: number }) {
 // spots that read as individual mirrors catching the beam) scrolling behind
 // the static grid. Two identical copies, one native-driver translateX loop
 // — the seam-tiling contract from the original build, unchanged.
+type LightBlob = { x: number; y: number; r: number; g: string };
+
 function LightPatches({ size, spin, eq }: { size: number; spin: Animated.Value; eq: [string, string, string] }) {
   // spin 0..1 slides the strip left→right across one texture width. Rightward
   // is deliberate: a rightward drag scrubs forward, and the surface following
@@ -226,43 +228,61 @@ function LightPatches({ size, spin, eq }: { size: number; spin: Animated.Value; 
   }, [size]);
 
   return (
-    <Animated.View pointerEvents="none" style={{ position: 'absolute', width: size * 2, height: size, transform: [{ translateX: scrollX }] }}>
-      <Svg width={size * 2} height={size}>
-        <Defs>
-          {/* Hot and tight — these are what read as an individual mirror
-              catching the beam as it comes round. Contrast against the dark
-              base below is the whole effect; keep them near-white. */}
-          <RadialGradient id="lpHot" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
-            <Stop offset="55%" stopColor="#ffffff" stopOpacity="0.55" />
-            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-          </RadialGradient>
-          <RadialGradient id="lpSoft" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.62" />
-            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-          </RadialGradient>
-          <RadialGradient id="lpCool" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={eq[0]} stopOpacity="0.7" />
-            <Stop offset="100%" stopColor={eq[0]} stopOpacity="0" />
-          </RadialGradient>
-          <RadialGradient id="lpBig" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />
-            <Stop offset="60%" stopColor="#ffffff" stopOpacity="0.34" />
-            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-        <Rect x={0} y={0} width={size * 2} height={size} fill="#08070f" />
-        {/* Four copies, not two. The strip has to be exactly periodic over
-            `size` or the wrap shows as a flicker at the silhouette: a blob
-            sitting near either boundary needs its neighbour-period twin
-            drawn too, even though that twin falls outside the viewport. */}
-        {[-1, 0, 1, 2].map((k) =>
-          blobs.map((b, i) => (
-            <Circle key={`${k}_${i}`} cx={b.x + k * size} cy={b.y} r={b.r} fill={`url(#${b.g})`} />
-          )),
-        )}
-      </Svg>
+    // STRUCTURE IS LOAD-BEARING — do not "tidy" this into one wide absolutely
+    // positioned Svg. That rewrite (round 4) is exactly when the ball stopped
+    // appearing to turn: the value animated fine and a native transform on a
+    // plain View moved fine, but this layer never budged on device. A
+    // flexDirection row of two same-width faces, laid out in normal flow, is
+    // the arrangement that demonstrably moves.
+    <Animated.View
+      pointerEvents="none"
+      style={{ flexDirection: 'row', width: size * 2, height: size, transform: [{ translateX: scrollX }] }}
+    >
+      <LightFace size={size} eq={eq} blobs={blobs} sfx="a" />
+      <LightFace size={size} eq={eq} blobs={blobs} sfx="b" />
     </Animated.View>
+  );
+}
+
+// One period of the light texture, exactly `size` wide. Each blob is drawn at
+// its own position and one period either side, so the face is self-contained:
+// two of them side by side tile with no seam.
+function LightFace({ size, eq, blobs, sfx }: {
+  size: number; eq: [string, string, string]; blobs: LightBlob[]; sfx: string;
+}) {
+  const gid = (n: string) => `${n}${sfx}`;
+  return (
+    <Svg width={size} height={size}>
+      <Defs>
+        {/* Hot and tight — these are what read as an individual mirror
+            catching the beam as it comes round. Contrast against the dark
+            base below is the whole effect; keep them near-white. */}
+        <RadialGradient id={gid('lpHot')} cx="50%" cy="50%" r="50%">
+          <Stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
+          <Stop offset="55%" stopColor="#ffffff" stopOpacity="0.55" />
+          <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+        </RadialGradient>
+        <RadialGradient id={gid('lpSoft')} cx="50%" cy="50%" r="50%">
+          <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.62" />
+          <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+        </RadialGradient>
+        <RadialGradient id={gid('lpCool')} cx="50%" cy="50%" r="50%">
+          <Stop offset="0%" stopColor={eq[0]} stopOpacity="0.7" />
+          <Stop offset="100%" stopColor={eq[0]} stopOpacity="0" />
+        </RadialGradient>
+        <RadialGradient id={gid('lpBig')} cx="50%" cy="50%" r="50%">
+          <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />
+          <Stop offset="60%" stopColor="#ffffff" stopOpacity="0.34" />
+          <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+        </RadialGradient>
+      </Defs>
+      <Rect x={0} y={0} width={size} height={size} fill="#08070f" />
+      {[-1, 0, 1].map((k) =>
+        blobs.map((b, i) => (
+          <Circle key={`${k}_${i}`} cx={b.x + k * size} cy={b.y} r={b.r} fill={`url(#${gid(b.g)})`} />
+        )),
+      )}
+    </Svg>
   );
 }
 

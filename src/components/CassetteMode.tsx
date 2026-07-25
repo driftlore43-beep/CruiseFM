@@ -6,7 +6,10 @@ import {
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Rect as SvgRect, Circle as SvgCircle, Line as SvgLine, Path as SvgPath, Text as SvgText } from 'react-native-svg';
+import Svg, {
+  Rect as SvgRect, Circle as SvgCircle, Line as SvgLine, Path as SvgPath, Text as SvgText,
+  Defs, ClipPath, G, LinearGradient as SvgLinearGradient, Stop,
+} from 'react-native-svg';
 import { Fonts } from '@/constants/theme';
 import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
@@ -284,50 +287,77 @@ const pb = StyleSheet.create({
 
 // ── Reel component — static disc, rotation applied by parent wrapper ──────────
 // A spinning neon reel hub — cog spokes radiating from a glowing centre.
-function NeonReelHub({ size, color }: { size: number; color: string }) {
-  const c = 50;
+// Deterministic scatter for the shell's dust/wear (no Math.random — the
+// speckles must not crawl between renders).
+function ch01(n: number): number {
+  const x = Math.sin(n * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// ── Clear-shell cassette ─────────────────────────────────────────────────────
+// Same lesson as the CD: the shell is NEUTRAL clear polycarbonate and the only
+// colour is the hardware inside it. Everything used to be neon line-art in the
+// station hue, which read as a wireframe; now the station colour lives in the
+// reel hubs and the tape tint, and the shell is glass you can see the road
+// through. Thickness comes from PAIRED strokes — a lit outer edge, a dark line
+// just behind it, then a faint inner highlight.
+const VB_W = 340;
+const VB_H = 210;
+const LX = 118, RX = 224, RY = 118;
+const PACK_BASE = 104;
+
+// Reel hub: station-coloured flange, pale centre, dark drive teeth.
+function ReelHub({ size, color }: { size: number; color: string }) {
   const teeth = [0, 45, 90, 135, 180, 225, 270, 315];
   return (
-    <Svg width={size} height={size} viewBox="0 0 100 100">
-      <SvgCircle cx={c} cy={c} r={20} fill="none" stroke={color} strokeOpacity={0.3} strokeWidth={7} />
-      <SvgCircle cx={c} cy={c} r={20} fill="none" stroke={color} strokeWidth={2.4} />
-      {teeth.map((a) => {
-        const rad = (a * Math.PI) / 180;
+    <Svg width={size} height={size} viewBox="-24 -24 48 48">
+      <SvgCircle cx={0} cy={0} r={19} fill={color} />
+      <SvgCircle cx={0} cy={0} r={19} fill="none" stroke="#ffffff" strokeOpacity={0.40} strokeWidth={1} />
+      {/* one bright arc so the flange reads as moulded, not printed */}
+      <SvgPath d="M -13 -13 A 19 19 0 0 1 6 -18" fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={2} strokeLinecap="round" />
+      <SvgCircle cx={0} cy={0} r={10.5} fill="#f2f5ff" fillOpacity={0.92} />
+      {teeth.map((deg) => {
+        const a = (deg * Math.PI) / 180;
         return (
           <SvgLine
-            key={a}
-            x1={c + Math.cos(rad) * 20} y1={c + Math.sin(rad) * 20}
-            x2={c + Math.cos(rad) * 42} y2={c + Math.sin(rad) * 42}
-            stroke={color} strokeWidth={3} strokeLinecap="round"
+            key={deg}
+            x1={Math.cos(a) * 9} y1={Math.sin(a) * 9}
+            x2={Math.cos(a) * 15.5} y2={Math.sin(a) * 15.5}
+            stroke="#0a0c14" strokeOpacity={0.75} strokeWidth={4.4} strokeLinecap="round"
           />
         );
       })}
-      <SvgCircle cx={c} cy={c} r={6} fill={color} />
+      <SvgCircle cx={0} cy={0} r={6.4} fill="#05070e" />
     </Svg>
   );
 }
 
-// A neon Phillips screw head — ringed circle with a cross, each one seated at
-// its own angle like a human actually drove it in.
-function Cross({ cx, cy, r = 3.4, color, angle = 0 }: { cx: number; cy: number; r?: number; color: string; angle?: number }) {
-  const s = r * 0.62;
-  const a = (angle * Math.PI) / 180;
-  const cos = Math.cos(a), sin = Math.sin(a);
-  // Two slots of the cross, rotated by `angle`.
-  const p1 = { x1: cx - s * cos, y1: cy - s * sin, x2: cx + s * cos, y2: cy + s * sin };
-  const p2 = { x1: cx + s * sin, y1: cy - s * cos, x2: cx - s * sin, y2: cy + s * cos };
+// A recessed Phillips screw in neutral steel, each seated at its own angle.
+function Screw({ cx, cy, r = 4, angle = 0 }: { cx: number; cy: number; r?: number; angle?: number }) {
+  const s = r * 0.6;
+  const a = (angle * Math.PI) / 180, cos = Math.cos(a), sin = Math.sin(a);
   return (
     <>
-      <SvgCircle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={1.2} strokeOpacity={0.9} />
-      <SvgLine {...p1} stroke={color} strokeWidth={1.4} strokeLinecap="round" />
-      <SvgLine {...p2} stroke={color} strokeWidth={1.4} strokeLinecap="round" />
+      <SvgCircle cx={cx} cy={cy} r={r + 1.2} fill="#05070e" fillOpacity={0.40} />
+      <SvgCircle cx={cx} cy={cy} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={1.1} />
+      <SvgCircle cx={cx} cy={cy} r={r * 0.62} fill="#ffffff" fillOpacity={0.10} />
+      <SvgLine x1={cx - s * cos} y1={cy - s * sin} x2={cx + s * cos} y2={cy + s * sin} stroke="#ffffff" strokeOpacity={0.62} strokeWidth={1.2} strokeLinecap="round" />
+      <SvgLine x1={cx + s * sin} y1={cy - s * cos} x2={cx - s * sin} y2={cy + s * cos} stroke="#ffffff" strokeOpacity={0.62} strokeWidth={1.2} strokeLinecap="round" />
     </>
   );
 }
 
-// ── Neon cassette body — a transparent outline that glows to the mood colour ───
-const VB_W = 340;
-const VB_H = 210;
+function Sparkle({ cx, cy, s }: { cx: number; cy: number; s: number }) {
+  const k = s * 0.16;
+  return (
+    <SvgPath
+      d={`M ${cx} ${cy - s} Q ${cx + k} ${cy - k} ${cx + s} ${cy} Q ${cx + k} ${cy + k} ${cx} ${cy + s} Q ${cx - k} ${cy + k} ${cx - s} ${cy} Q ${cx - k} ${cy - k} ${cx} ${cy - s} Z`}
+      fill="#ffffff" fillOpacity={0.9}
+    />
+  );
+}
+
+const SHEEN = ['#7CF3D4', '#7FD0FF', '#B9A6FF', '#FF9AE0', '#FFC79C', '#FFF6AE'];
 
 function CassetteBody({
   size, leftSpin, rightSpin, progress,
@@ -345,93 +375,154 @@ function CassetteBody({
 }) {
   const scale = size / VB_W;
   const H = size * (VB_H / VB_W);
-  const LX = 118, RX = 224, RY = 122;
-  // Both hubs are the same size — on a real cassette only the TAPE differs.
-  const hubPx = 64 * scale;
+  const hubPx = 48 * scale;
 
-  // Tape packs: the wound tape around each hub, driven by song progress like
-  // the vinyl needle. Supply (left) starts fat and empties; take-up (right)
-  // starts skinny and fills. A static mid-state when no progress is wired
-  // (the modes-tab preview card).
   const fallbackProgress = useRef(new Animated.Value(0.4)).current;
   const prog = progress ?? fallbackProgress;
-  const packBase = 108 * scale; // diameter at full wind — big, like a real C90
-  const leftPackScale  = prog.interpolate({ inputRange: [0, 1], outputRange: [1, 0.56] });
+  const packBase = PACK_BASE * scale;
+  const leftPackScale = prog.interpolate({ inputRange: [0, 1], outputRange: [1, 0.56] });
   const rightPackScale = prog.interpolate({ inputRange: [0, 1], outputRange: [0.56, 0.94] });
+
+  const dust = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+    x: 14 + ch01(i * 2.7) * (VB_W - 28),
+    y: 14 + ch01(i * 5.9 + 3.1) * (VB_H - 28),
+    r: 0.3 + ch01(i * 8.2) * 0.7,
+    o: 0.06 + ch01(i * 4.4) * 0.14,
+  })), []);
+  const winds = useMemo(() => Array.from({ length: 9 }, (_, i) => (PACK_BASE / 2) * (0.42 + 0.065 * i)), []);
+
+  // The wound tape: dark, faintly station-tinted, with fine winding rings.
   const pack = (cx: number, packScale: Animated.AnimatedInterpolation<number>) => (
     <Animated.View
       pointerEvents="none"
       style={{
         position: 'absolute',
-        width: packBase, height: packBase, borderRadius: packBase / 2,
+        width: packBase, height: packBase,
         left: cx * scale - packBase / 2, top: RY * scale - packBase / 2,
-        backgroundColor: color + '14',
-        borderWidth: 2, borderColor: color + 'A6',
         transform: [{ scale: packScale }],
       }}
-    />
+    >
+      <Svg width={packBase} height={packBase} viewBox={`0 0 ${PACK_BASE} ${PACK_BASE}`}>
+        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill="#0a0c14" fillOpacity={0.80} />
+        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill={color} fillOpacity={0.13} />
+        {winds.map((r, i) => (
+          <SvgCircle key={i} cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.06} strokeWidth={0.7} />
+        ))}
+        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill="none" stroke={color} strokeOpacity={0.42} strokeWidth={1} />
+      </Svg>
+    </Animated.View>
   );
 
   return (
     <View style={{ width: size, height: H, alignItems: 'center', justifyContent: 'center' }}>
-      <View>
-        <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`}>
-          {/* Body — translucent tinted shell (like a clear-plastic cassette
-              held to the light), crisp neon edge, near-square corners */}
-          <SvgRect x={8} y={8} width={324} height={194} rx={9} fill={color} fillOpacity={0.10} stroke={color} strokeWidth={2.4} />
-          {/* Soft top sheen so the shell reads as plastic, not a flat wash */}
-          <SvgRect x={12} y={12} width={316} height={58} rx={7} fill="#FFFFFF" fillOpacity={0.05} />
+      {/* ── Behind the tape: shell body, internals, the tape path ── */}
+      <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`} style={StyleSheet.absoluteFill}>
+        <Defs>
+          <SvgLinearGradient id="csShell" x1="0" y1="0" x2="0.8" y2="1">
+            <Stop offset="0%" stopColor="#e8eeff" stopOpacity="0.20" />
+            <Stop offset="45%" stopColor="#9fb0d4" stopOpacity="0.10" />
+            <Stop offset="100%" stopColor="#dbe4ff" stopOpacity="0.17" />
+          </SvgLinearGradient>
+          <ClipPath id="csBody"><SvgRect x={8} y={8} width={324} height={194} rx={10} /></ClipPath>
+        </Defs>
+        <G clipPath="url(#csBody)">
+          <SvgRect x={8} y={8} width={324} height={194} fill="url(#csShell)" />
+          {/* internal chassis */}
+          <SvgRect x={60} y={30} width={220} height={150} rx={6} fill="none" stroke="#ffffff" strokeOpacity={0.13} strokeWidth={1} />
+          <SvgLine x1={171} y1={30} x2={171} y2={180} stroke="#ffffff" strokeOpacity={0.10} strokeWidth={1} />
+          {/* tape path — drawn BEFORE the packs so it emerges from under them
+              instead of crossing over the wound tape */}
+          <SvgPath d={`M ${LX} ${RY} L 74 168 L 268 168 L ${RX} ${RY}`} fill="none" stroke="#0a0c14" strokeOpacity={0.62} strokeWidth={3.4} />
+          <SvgLine x1={74} y1={168} x2={268} y2={168} stroke={color} strokeOpacity={0.34} strokeWidth={1} />
+        </G>
+      </Svg>
 
-          {/* Header label box (accent hue) — side letter, ruled line, stereo mark */}
-          <SvgRect x={30} y={26} width={280} height={42} rx={5} fill={accent} fillOpacity={0.08} stroke={accent} strokeWidth={1.5} />
-          <SvgRect x={42} y={37} width={18} height={18} rx={2} fill="none" stroke={color} strokeWidth={1.6} />
-          <SvgText x={51} y={50.5} fill={color} textAnchor="middle" fontSize={11} fontWeight="800" fontFamily={Fonts.mono}>A</SvgText>
-          {/* SVG text never clips — trim long titles so they can't spill past
-              the shell (the marquee title below the cassette shows the rest) */}
-          <SvgText x={188} y={45} fill={accent} textAnchor="middle" fontSize={11} fontWeight="700" fontFamily={Fonts.mono}>{songName.length > 26 ? songName.slice(0, 25) + '…' : songName}</SvgText>
-          <SvgLine x1={70} y1={51} x2={306} y2={51} stroke={accent} strokeWidth={0.8} strokeOpacity={0.35} />
-          <SvgText x={70} y={62} fill={accent} fontSize={6.5} fontWeight="700" fontFamily={Fonts.mono} opacity={0.55} letterSpacing={1}>STEREO · C90</SvgText>
-          <SvgText x={300} y={62} fill={accent} textAnchor="end" fontSize={8} fontWeight="700" fontFamily={Fonts.mono} opacity={0.85}>{artist}</SvgText>
-
-          {/* No inner window frame — the shell is transparent, so the tape
-              packs float full-size in the open body like the reference photo */}
-
-          {/* Tape path: guide posts + the ribbon running along the head gap */}
-          <SvgCircle cx={80} cy={150} r={3} fill="none" stroke={color} strokeWidth={1.4} strokeOpacity={0.8} />
-          <SvgCircle cx={260} cy={150} r={3} fill="none" stroke={color} strokeWidth={1.4} strokeOpacity={0.8} />
-          <SvgLine x1={83} y1={152.5} x2={257} y2={152.5} stroke={color} strokeWidth={2} strokeOpacity={0.45} />
-          <SvgLine x1={83} y1={154.5} x2={257} y2={154.5} stroke={color} strokeWidth={0.8} strokeOpacity={0.25} />
-
-          {/* Timer */}
-          <SvgText x={170} y={178} fill={accent} textAnchor="middle" fontSize={13} fontWeight="700" fontFamily={Fonts.mono}>{timeText}</SvgText>
-
-          {/* Corner + edge screws — Phillips heads, each seated at its own angle */}
-          <Cross cx={26} cy={24} color={accent} angle={12} />
-          <Cross cx={314} cy={24} color={accent} angle={-31} />
-          <Cross cx={26} cy={186} color={accent} angle={57} />
-          <Cross cx={314} cy={186} color={accent} angle={-8} />
-          <Cross cx={170} cy={18} r={2.6} color={accent} angle={40} />
-
-          {/* Bottom access door: capstan + pinch-roller holes flank the pads */}
-          <SvgPath d="M112 184 L228 184 L216 200 L124 200 Z" fill="none" stroke={color} strokeWidth={1.5} />
-          <SvgCircle cx={136} cy={192} r={3.4} fill="none" stroke={color} strokeWidth={1.3} />
-          <SvgRect x={150} y={188} width={16} height={9} rx={3} fill="none" stroke={color} strokeWidth={1.3} />
-          <SvgRect x={174} y={188} width={16} height={9} rx={3} fill="none" stroke={color} strokeWidth={1.3} />
-          <SvgCircle cx={204} cy={192} r={3.4} fill="none" stroke={color} strokeWidth={1.3} />
-        </Svg>
-      </View>
-
-      {/* Wound tape packs — under the hubs, breathing with the song */}
+      {/* ── The tape itself, breathing with the song ── */}
       {pack(LX, leftPackScale)}
       {pack(RX, rightPackScale)}
 
-      {/* Spinning neon hubs overlaid on the wells */}
-      <Animated.View style={{ position: 'absolute', width: hubPx, height: hubPx, left: LX * scale - hubPx / 2, top: RY * scale - hubPx / 2, transform: [{ rotate: leftSpin }] }}>
-        <NeonReelHub size={hubPx} color={color} />
+      {/* ── Reels ── */}
+      <Animated.View pointerEvents="none" style={{ position: 'absolute', width: hubPx, height: hubPx, left: LX * scale - hubPx / 2, top: RY * scale - hubPx / 2, transform: [{ rotate: leftSpin }] }}>
+        <ReelHub size={hubPx} color={color} />
       </Animated.View>
-      <Animated.View style={{ position: 'absolute', width: hubPx, height: hubPx, left: RX * scale - hubPx / 2, top: RY * scale - hubPx / 2, transform: [{ rotate: rightSpin }] }}>
-        <NeonReelHub size={hubPx} color={color} />
+      <Animated.View pointerEvents="none" style={{ position: 'absolute', width: hubPx, height: hubPx, left: RX * scale - hubPx / 2, top: RY * scale - hubPx / 2, transform: [{ rotate: rightSpin }] }}>
+        <ReelHub size={hubPx} color={color} />
       </Animated.View>
+
+      {/* ── In front of the tape: the shell's own glass. Reflections belong to
+             the surface nearest you, so they lie OVER the reels. ── */}
+      <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          {SHEEN.map((hue, i) => (
+            <SvgLinearGradient key={i} id={`csIr${i}`} x1="0" y1="0" x2="1" y2="0">
+              <Stop offset="0%" stopColor={hue} stopOpacity="0" />
+              <Stop offset="35%" stopColor={hue} stopOpacity="0.085" />
+              <Stop offset="65%" stopColor={SHEEN[(i + 3) % SHEEN.length]} stopOpacity="0.070" />
+              <Stop offset="100%" stopColor={SHEEN[(i + 1) % SHEEN.length]} stopOpacity="0" />
+            </SvgLinearGradient>
+          ))}
+          <SvgLinearGradient id="csEdge" x1="0" y1="0" x2="0.9" y2="1">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.92" />
+            <Stop offset="30%" stopColor="#ffffff" stopOpacity="0.24" />
+            <Stop offset="62%" stopColor="#ffffff" stopOpacity="0.62" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.22" />
+          </SvgLinearGradient>
+          <SvgLinearGradient id="csLabel" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.50" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.32" />
+          </SvgLinearGradient>
+          <ClipPath id="csBody2"><SvgRect x={8} y={8} width={324} height={194} rx={10} /></ClipPath>
+        </Defs>
+        <G clipPath="url(#csBody2)">
+          {/* iridescent sweeps — wide and heavily overlapped so they read as
+              light on plastic rather than stripes */}
+          {SHEEN.map((_, i) => (
+            <SvgRect key={i} x={-60} y={-90 + i * 44} width={460} height={120} fill={`url(#csIr${i})`} transform="rotate(-18 170 105)" />
+          ))}
+          {/* left tape-guide assembly */}
+          <SvgRect x={30} y={120} width={26} height={58} rx={4} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.26} strokeWidth={1} />
+          <SvgCircle cx={43} cy={134} r={4.4} fill="none" stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
+          <SvgCircle cx={43} cy={150} r={3} fill="none" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.9} />
+          <SvgRect x={37} y={160} width={12} height={12} rx={2} fill={color} fillOpacity={0.55} />
+          {/* guide rollers */}
+          <SvgCircle cx={74} cy={168} r={4.6} fill="none" stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.2} />
+          <SvgCircle cx={268} cy={168} r={4.6} fill="none" stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.2} />
+          {/* bottom access door */}
+          <SvgPath d="M112 182 L228 182 L218 200 L122 200 Z" fill="#ffffff" fillOpacity={0.04} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1.2} />
+          <SvgCircle cx={136} cy={190} r={3.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.34} strokeWidth={1} />
+          <SvgRect x={152} y={186} width={15} height={9} rx={3} fill="#05070e" fillOpacity={0.45} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
+          <SvgRect x={174} y={186} width={15} height={9} rx={3} fill="#05070e" fillOpacity={0.45} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
+          <SvgCircle cx={204} cy={190} r={3.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.34} strokeWidth={1} />
+          {/* label — frosted, with the station colour as its spine */}
+          <SvgRect x={30} y={24} width={280} height={40} rx={4} fill="url(#csLabel)" />
+          <SvgRect x={30} y={24} width={280} height={13} rx={4} fill={color} fillOpacity={0.60} />
+          <SvgRect x={30} y={24} width={280} height={40} rx={4} fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={1} />
+          <SvgText x={40} y={34} fill="#0d1020" fontSize={7} fontWeight="800" fontFamily={Fonts.mono} letterSpacing={1.6}>A · STEREO · C90</SvgText>
+          <SvgText x={40} y={52} fill="#0d1020" fontSize={11} fontWeight="800" fontFamily={Fonts.mono}>
+            {songName.length > 22 ? songName.slice(0, 21) + '…' : songName}
+          </SvgText>
+          <SvgText x={300} y={60} fill="#0d1020" fillOpacity={0.66} fontSize={7} fontWeight="700" fontFamily={Fonts.mono} textAnchor="end">{artist}</SvgText>
+          {/* embossed markings + running time */}
+          <SvgText x={300} y={176} fill="#ffffff" fillOpacity={0.20} fontSize={5} fontFamily={Fonts.mono} textAnchor="end">CR-02 · HIGH BIAS · MADE FOR THE ROAD</SvgText>
+          <SvgText x={170} y={178} fill="#ffffff" fillOpacity={0.72} textAnchor="middle" fontSize={12} fontWeight="700" fontFamily={Fonts.mono}>{timeText}</SvgText>
+          {/* broad glass reflections across the whole face */}
+          <SvgPath d="M 20 8 L 96 8 L 40 202 L 8 202 Z" fill="#ffffff" fillOpacity={0.045} />
+          <SvgPath d="M 250 8 L 282 8 L 214 202 L 190 202 Z" fill="#ffffff" fillOpacity={0.025} />
+          {dust.map((d, i) => <SvgCircle key={i} cx={d.x} cy={d.y} r={d.r} fill="#ffffff" fillOpacity={d.o} />)}
+        </G>
+        {/* moulded edge: lit outer, dark behind, faint inner */}
+        <SvgRect x={8} y={8} width={324} height={194} rx={10} fill="none" stroke="url(#csEdge)" strokeWidth={2.4} />
+        <SvgRect x={11} y={11} width={318} height={188} rx={8} fill="none" stroke="#05070e" strokeOpacity={0.45} strokeWidth={1.2} />
+        <SvgRect x={13.5} y={13.5} width={313} height={183} rx={7} fill="none" stroke="#ffffff" strokeOpacity={0.18} strokeWidth={0.9} />
+        <Screw cx={26} cy={24} angle={12} />
+        <Screw cx={314} cy={24} angle={-31} />
+        <Screw cx={26} cy={186} angle={57} />
+        <Screw cx={314} cy={186} angle={-8} />
+        <Screw cx={170} cy={16} r={2.8} angle={40} />
+        <Sparkle cx={330} cy={12} s={7} />
+        <Sparkle cx={12} cy={196} s={5} />
+        <Sparkle cx={322} cy={198} s={4} />
+      </Svg>
     </View>
   );
 }

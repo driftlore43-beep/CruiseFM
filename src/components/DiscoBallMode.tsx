@@ -31,13 +31,6 @@ const DEMO_DURATION_MS = 214000;
 // slow enough to still feel like a heavy hanging ball rather than a toy.
 const BALL_SPIN_MS = 7000;
 
-// TEMPORARY (25.07) — diagnostic strip under the ball. Three rounds of
-// "it still doesn't spin" with no way to tell whether the rotation value is
-// moving, whether it reaches a native transform, or whether the gate is
-// simply never opening. The green marker is driven by the SAME `spin` value
-// as the ball's surface, through the same kind of native transform. Delete
-// this const and the block that reads it once the cause is known.
-const SPIN_DEBUG = true;
 
 function formatMs(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -176,18 +169,122 @@ function buildSphereTiles(size: number): Tile[] {
   return tiles;
 }
 
-// The static mirror grid. Semi-transparent on purpose: the scrolling light
-// underneath shows through and gets carved into individual facets by these
-// tiles' dark seams — which is exactly how a real disco ball reads.
+// Latitude rings. These are STATIC and that is not a shortcut: a sphere
+// turning on its polar axis maps every latitude circle onto itself, so the
+// horizontal seams genuinely do not move. Only the meridians do.
+function buildLatitudeArcs(size: number): string[] {
+  const R = size / 2, cx = R, cy = R;
+  const st = Math.sin(TILT), ct = Math.cos(TILT);
+  const ROWS = 17;
+  const out: string[] = [];
+  for (let j = 1; j < ROWS; j++) {
+    const b = -Math.PI / 2 + (Math.PI * j) / ROWS;
+    let d = '', pen = false;
+    for (let i = 0; i <= 120; i++) {
+      const lam = -Math.PI / 2 + (Math.PI * i) / 120;
+      const cb = Math.cos(b);
+      const y1 = Math.sin(b) * ct - cb * Math.cos(lam) * st;
+      const z1 = Math.sin(b) * st + cb * Math.cos(lam) * ct;
+      if (z1 <= 0.02) { pen = false; continue; }
+      const x = cx + R * cb * Math.sin(lam), y = cy - R * y1;
+      d += (pen ? ' L ' : ' M ') + x.toFixed(2) + ' ' + y.toFixed(2);
+      pen = true;
+    }
+    if (d) out.push(d);
+  }
+  return out;
+}
+
+// The static part of the mirror grid: facet fills (the mirror colours) and
+// the latitude rings. Semi-transparent on purpose so the scrolling light
+// underneath shows through. The vertical seams are NOT here — they rotate,
+// see RotatingMeridians.
 function SphereGrid({ size }: { size: number }) {
   const tiles = useMemo(() => buildSphereTiles(size), [size]);
+  const arcs = useMemo(() => buildLatitudeArcs(size), [size]);
   const seam = Math.max(0.5, size * 0.0035);
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFill} pointerEvents="none">
       {tiles.map((t, i) => (
-        <Path key={i} d={t.d} fill={t.fill} fillOpacity={t.op} stroke="#07070f" strokeOpacity={0.5} strokeWidth={seam} strokeLinejoin="round" />
+        <Path key={i} d={t.d} fill={t.fill} fillOpacity={t.op} />
+      ))}
+      {arcs.map((d, i) => (
+        <Path key={`a${i}`} d={d} fill="none" stroke="#07070f" strokeOpacity={0.45} strokeWidth={seam} />
       ))}
     </Svg>
+  );
+}
+
+// ── The turning part of the grid ──────────────────────────────────────────
+// A meridian's projection is the ball's own profile curve scaled horizontally
+// by sin(longitude), plus a vertical shear proportional to that scaled x.
+// Both are plain transforms, so ONE fixed path per line can be driven round
+// the sphere by the native driver — 24 animated views for the whole rotating
+// grid, instead of animating hundreds of facets. Verified numerically against
+// the true projection: exact everywhere except within ~0.3° of dead centre,
+// where the meridian is a straight vertical line and the difference cannot be
+// drawn anyway.
+function buildMeridianBase(size: number): string {
+  const R = size / 2, cx = R, cy = R, ct = Math.cos(TILT);
+  let d = '';
+  for (let i = 0; i <= 48; i++) {
+    const b = -Math.PI / 2 + (Math.PI * i) / 48;
+    d += (i ? ' L ' : 'M ') + (cx + R * Math.cos(b)).toFixed(2) + ' ' + (cy - R * Math.sin(b) * ct).toFixed(2);
+  }
+  return d;
+}
+
+function Meridian({ size, path, lam0, spin, width }: {
+  size: number; path: string; lam0: number; spin: Animated.Value; width: number;
+}) {
+  const { inp, sx, sk, op } = useMemo(() => {
+    const st = Math.sin(TILT);
+    const N = 72;
+    const inp: number[] = [], sx: number[] = [], sk: string[] = [], op: number[] = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      inp.push(t);
+      const lam = lam0 + 2 * Math.PI * t;
+      const s = Math.sin(lam), c = Math.cos(lam);
+      // Never exactly zero: a zero scaleX is a degenerate matrix.
+      sx.push(Math.abs(s) < 0.002 ? (s < 0 ? -0.002 : 0.002) : s);
+      const tan = Math.abs(s) < 1e-6 ? (c >= 0 ? 1e9 : -1e9) : (st * c) / s;
+      const deg = Math.max(-89, Math.min(89, (Math.atan(tan) * 180) / Math.PI));
+      sk.push(`${deg.toFixed(3)}deg`);
+      // Full strength up to the silhouette, then gone as it passes behind.
+      op.push(c >= 0 ? 1 : Math.max(0, 1 + c / 0.15));
+    }
+    return { inp, sx, sk, op };
+  }, [lam0]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', left: 0, top: 0, width: size, height: size,
+        opacity: spin.interpolate({ inputRange: inp, outputRange: op }),
+        transform: [
+          { skewY: spin.interpolate({ inputRange: inp, outputRange: sk }) },
+          { scaleX: spin.interpolate({ inputRange: inp, outputRange: sx }) },
+        ],
+      }}
+    >
+      <Svg width={size} height={size}>
+        <Path d={path} fill="none" stroke="#07070f" strokeOpacity={0.5} strokeWidth={width} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+function RotatingMeridians({ size, spin, count = 24 }: { size: number; spin: Animated.Value; count?: number }) {
+  const path = useMemo(() => buildMeridianBase(size), [size]);
+  const width = Math.max(0.5, size * 0.0035);
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {Array.from({ length: count }, (_, m) => (
+        <Meridian key={m} size={size} path={path} lam0={(2 * Math.PI * m) / count} spin={spin} width={width} />
+      ))}
+    </View>
   );
 }
 
@@ -484,9 +581,14 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
       {/* The moving layer: light travelling across the surface as it turns */}
       <LightPatches size={size} spin={spin} eq={eq} />
 
-      {/* The sphere itself — a fixed, properly-projected mirror grid that
-          carves the light beneath it into individual facets */}
+      {/* The sphere itself — facet colours and latitude rings, which under an
+          axial turn genuinely don't move */}
       <SphereGrid size={size} />
+
+      {/* ...and the seams that DO move: the meridians sweep round with the
+          turn, so the grid itself is visibly rotating rather than only the
+          light travelling across it */}
+      <RotatingMeridians size={size} spin={spin} />
 
       {/* Colour cycle — the station's own mood colours washing through,
           above the tiles, below the fixed highlight so it stays clean */}
@@ -768,7 +870,6 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   // ball along feels like winding the track on. Only horizontal drags are
   // claimed; a downward swipe on the ball still dismisses the mode.
   const [scrubbing, setScrubbing] = useState(false);
-  const [dragCount, setDragCount] = useState(0);   // TEMPORARY, see SPIN_DEBUG
   const spinBaseRef = useRef(0);        // spin value when the finger landed
   const progressBaseRef = useRef(0);    // song position when the finger landed
   const scrubPctRef = useRef(0);        // latest scrubbed position
@@ -796,7 +897,6 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         scrubPctRef.current = progressBaseRef.current;
         scrub.begin();
         setScrubbing(true);
-        if (SPIN_DEBUG) setDragCount((n) => n + 1);
         // Where the turn currently sits, so the ball carries on from its
         // present angle instead of jumping. Synchronous — no native read.
         const at = readPhase();
@@ -1085,25 +1185,6 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
           </View>
         </View>
 
-        {/* TEMPORARY diagnostic — see SPIN_DEBUG at the top of this file. */}
-        {SPIN_DEBUG && (
-          <View
-            pointerEvents="none"
-            style={{ position: 'absolute', left: 18, right: 18, top: topPad + 44, zIndex: 60, alignItems: 'center' }}
-          >
-            <View style={{ width: 220, height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center' }}>
-              <Animated.View
-                style={{
-                  width: 16, height: 10, borderRadius: 5, backgroundColor: '#39FF88',
-                  transform: [{ translateX: spin.interpolate({ inputRange: [0, 1], outputRange: [0, 204] }) }],
-                }}
-              />
-            </View>
-            <Text style={{ color: '#39FF88', fontSize: 11, fontWeight: '700', marginTop: 4, fontFamily: Fonts.mono }}>
-              {`play${playing ? 1 : 0} sw${musicSwitching ? 1 : 0} isP${spotify.track?.isPlaying == null ? '-' : (spotify.track.isPlaying ? 1 : 0)} SPIN${spinning ? 1 : 0} drag${dragCount}`}
-            </Text>
-          </View>
-        )}
 
         <ModeCloseButton onPress={handleClose} />
 

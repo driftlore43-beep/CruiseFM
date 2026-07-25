@@ -5,7 +5,9 @@ import {
   Animated, Dimensions, Easing, Image, Modal, PanResponder,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
-import Svg, { Circle, ClipPath, Defs, G, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, {
+  Circle, ClipPath, Defs, G, LinearGradient as SvgLinearGradient, Path, RadialGradient, Rect, Stop,
+} from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaylistSheet } from '@/components/PlaylistSheet';
@@ -70,7 +72,7 @@ function buildFan(size: number): Wedge[] {
     const d = `M ${cx} ${cy} L ${pt(ang - WIDTH / 2, R)} A ${R} ${R} 0 0 1 ${pt(ang + WIDTH / 2, R)} Z`;
     out.push({
       d, id: `cdIr${i}`, hue: SPECTRUM[i % SPECTRUM.length],
-      a: 0.30 * strength, b: 0.22 * strength, c: 0,
+      a: 0.20 * strength, b: 0.13 * strength, c: 0,
     });
   }
   return out;
@@ -81,8 +83,8 @@ function buildFan(size: number): Wedge[] {
 function buildGrooves(size: number, inner: number): { r: number; op: number }[] {
   const R = size / 2;
   const out: { r: number; op: number }[] = [];
-  for (let i = 0; i < 34; i++) {
-    out.push({ r: inner + (R - inner) * (i / 34), op: i % 2 ? 0.030 : 0.016 });
+  for (let i = 0; i < 40; i++) {
+    out.push({ r: inner + (R - inner) * (i / 40), op: i % 2 ? 0.026 : 0.013 });
   }
   return out;
 }
@@ -116,39 +118,44 @@ function buildMarks(size: number, inner: number): Marks {
   return { arcs, scuffs, dust, text };
 }
 
-function CDDisc({ size, spin, albumArt, accent }: {
-  size: number; spin: Animated.Value; albumArt: string | null; accent: string;
+function CDDisc({ size, spin, albumArt }: {
+  size: number; spin: Animated.Value; albumArt: string | null;
 }) {
   const R = size / 2;
-  const HUB_CLEAR = R * 0.295, HUB_HOLE = R * 0.135, LABEL = R * 0.52;
+  // Hub proportions measured off the owner's reference: a small dark centre
+  // with four gripper holes, NOT the big printed label the first cut had.
+  const HUB_HOLE = R * 0.155, GRIP_R = R * 0.235, GRIP = R * 0.037;
+  const HUB_RING = R * 0.31, STACK = R * 0.62, ART = R * 0.88;
+
   const fan = useMemo(() => buildFan(size), [size]);
-  const grooves = useMemo(() => buildGrooves(size, HUB_CLEAR), [size, HUB_CLEAR]);
-  const marks = useMemo(() => buildMarks(size, HUB_CLEAR), [size, HUB_CLEAR]);
-  const rosette = useMemo(() => Array.from({ length: 6 }, (_, i) => {
-    const a = (i / 6) * Math.PI * 2 + 0.3, rt = HUB_HOLE * 1.62;
-    return { x: R + rt * Math.cos(a), y: R + rt * Math.sin(a) };
-  }), [R, HUB_HOLE]);
+  const grooves = useMemo(() => buildGrooves(size, HUB_RING), [size, HUB_RING]);
+  const marks = useMemo(() => buildMarks(size, HUB_RING), [size, HUB_RING]);
+  const grips = useMemo(() => Array.from({ length: 4 }, (_, i) => {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    return { x: R + GRIP_R * Math.cos(a), y: R + GRIP_R * Math.sin(a) };
+  }), [R, GRIP_R]);
 
   const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
     <View style={{ width: size, height: size }}>
-      {/* Static: the metal, the data rings, the diffraction, the sheen */}
+      {/* Static: the polycarbonate itself and the diffraction. The disc is
+          deliberately TRANSLUCENT — the drive behind it shows through, which
+          is what sells it as a real object rather than a printed sticker. */}
       <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
         <Defs>
-          <RadialGradient id="cdSilver" cx="42%" cy="34%" r="72%">
-            <Stop offset="0%" stopColor="#9aa6c2" />
-            <Stop offset="34%" stopColor="#6e7896" />
-            <Stop offset="66%" stopColor="#3f4761" />
-            <Stop offset="88%" stopColor="#5b6480" />
-            <Stop offset="100%" stopColor="#2b3145" />
+          <RadialGradient id="cdGlass" cx="40%" cy="32%" r="74%">
+            <Stop offset="0%" stopColor="#dfe8ff" stopOpacity="0.40" />
+            <Stop offset="40%" stopColor="#9fb0d4" stopOpacity="0.26" />
+            <Stop offset="74%" stopColor="#6d7c9e" stopOpacity="0.30" />
+            <Stop offset="100%" stopColor="#c9d6f2" stopOpacity="0.44" />
           </RadialGradient>
-          <RadialGradient id="cdSheen" cx="30%" cy="22%" r="86%">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.26" />
-            <Stop offset="38%" stopColor="#ffffff" stopOpacity="0.03" />
-            <Stop offset="70%" stopColor="#ffffff" stopOpacity="0.13" />
-            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-          </RadialGradient>
+          <SvgLinearGradient id="cdEdge" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />
+            <Stop offset="40%" stopColor="#ffffff" stopOpacity="0.18" />
+            <Stop offset="72%" stopColor="#ffffff" stopOpacity="0.40" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.10" />
+          </SvgLinearGradient>
           {fan.map((w) => (
             <RadialGradient key={w.id} id={w.id} cx="50%" cy="50%" r="50%">
               <Stop offset="18%" stopColor={w.hue} stopOpacity="0" />
@@ -160,76 +167,98 @@ function CDDisc({ size, spin, albumArt, accent }: {
           <ClipPath id="cdClip"><Circle cx={R} cy={R} r={R} /></ClipPath>
         </Defs>
         <G clipPath="url(#cdClip)">
-          <Circle cx={R} cy={R} r={R} fill="url(#cdSilver)" />
+          <Circle cx={R} cy={R} r={R} fill="url(#cdGlass)" />
           {grooves.map((g, i) => (
-            <Circle key={i} cx={R} cy={R} r={g.r} fill="none" stroke="#ffffff" strokeOpacity={g.op} strokeWidth={(R - HUB_CLEAR) / 34 * 0.9} />
+            <Circle key={i} cx={R} cy={R} r={g.r} fill="none" stroke="#ffffff" strokeOpacity={g.op} strokeWidth={(R - HUB_RING) / 40 * 0.9} />
           ))}
           {fan.map((w) => <Path key={w.id} d={w.d} fill={`url(#${w.id})`} />)}
-          <Circle cx={R} cy={R} r={R} fill="url(#cdSheen)" />
         </G>
       </Svg>
 
-      {/* Turning: the printed label, the wear, the hub. The label is ABOVE the
-          diffraction on purpose — a printed face doesn't catch a rainbow. */}
+      {/* Turning: the album ghosted onto the disc, the wear, the hub. The art
+          is faint and covers nearly the whole face rather than sitting in a
+          printed label — and because it turns, it's also what makes the spin
+          readable at a glance. */}
       <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate }] }]} pointerEvents="none">
-        <View style={{
-          position: 'absolute', left: R - LABEL, top: R - LABEL,
-          width: LABEL * 2, height: LABEL * 2, borderRadius: LABEL,
-          overflow: 'hidden', backgroundColor: '#161a29',
-        }}>
-          {albumArt
-            ? <Image source={{ uri: albumArt }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-            : <View style={{ flex: 1, backgroundColor: '#161a29' }} />}
-        </View>
+        {albumArt && (
+          <View style={{
+            position: 'absolute', left: R - ART, top: R - ART,
+            width: ART * 2, height: ART * 2, borderRadius: ART, overflow: 'hidden', opacity: 0.42,
+          }}>
+            <Image source={{ uri: albumArt }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            {/* pewter wash — pulls the art toward an etched-into-the-disc
+                look instead of a photo pasted on top */}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#9fb0d4', opacity: 0.28 }]} />
+          </View>
+        )}
         <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
           {marks.arcs.map((a, i) => <Path key={`a${i}`} d={a.d} fill="none" stroke="#ffffff" strokeOpacity={a.op} strokeWidth={a.w} />)}
-          {marks.scuffs.map((s, i) => <Path key={`s${i}`} d={s.d} stroke="#ffffff" strokeOpacity={s.op} strokeWidth={0.5} />)}
+          {marks.scuffs.map((sc, i) => <Path key={`s${i}`} d={sc.d} stroke="#ffffff" strokeOpacity={sc.op} strokeWidth={0.5} />)}
           {marks.dust.map((d, i) => <Circle key={`d${i}`} cx={d.x} cy={d.y} r={d.r} fill="#ffffff" fillOpacity={d.op} />)}
-          {marks.text.map((d, i) => <Path key={`t${i}`} d={d} stroke="#e6ecff" strokeOpacity={0.26} strokeWidth={1.5} />)}
-          {/* label rim: bright outer edge, dark inner shadow */}
-          <Circle cx={R} cy={R} r={LABEL} fill="none" stroke="#ffffff" strokeOpacity={0.28} strokeWidth={1} />
-          <Circle cx={R} cy={R} r={LABEL - 2} fill="none" stroke="#000000" strokeOpacity={0.30} strokeWidth={1.5} />
-          {/* clear hub + gripper teeth + centre hole */}
-          <Circle cx={R} cy={R} r={HUB_CLEAR} fill="#aab6d4" fillOpacity={0.16} />
-          <Circle cx={R} cy={R} r={HUB_CLEAR} fill="none" stroke="#ffffff" strokeOpacity={0.34} strokeWidth={1} />
-          <Circle cx={R} cy={R} r={HUB_CLEAR * 0.72} fill="none" stroke="#ffffff" strokeOpacity={0.16} strokeWidth={0.7} />
-          {rosette.map((p, i) => <Circle key={`r${i}`} cx={p.x} cy={p.y} r={HUB_HOLE * 0.19} fill="#04050a" fillOpacity={0.75} />)}
-          <Circle cx={R} cy={R} r={HUB_HOLE} fill="#04050a" />
-          <Circle cx={R} cy={R} r={HUB_HOLE} fill="none" stroke="#ffffff" strokeOpacity={0.40} strokeWidth={0.9} />
-          {/* polished outer edge */}
-          <Circle cx={R} cy={R} r={R - 0.6} fill="none" stroke="#ffffff" strokeOpacity={0.46} strokeWidth={1.1} />
-          <Circle cx={R} cy={R} r={R - 3} fill="none" stroke={accent} strokeOpacity={0.14} strokeWidth={1.6} />
+          {marks.text.map((d, i) => <Path key={`t${i}`} d={d} stroke="#e6ecff" strokeOpacity={0.30} strokeWidth={1.4} />)}
+          <Circle cx={R} cy={R} r={STACK} fill="none" stroke="#ffffff" strokeOpacity={0.13} strokeWidth={0.8} />
+          <Circle cx={R} cy={R} r={HUB_RING} fill="none" stroke="#ffffff" strokeOpacity={0.34} strokeWidth={1} />
+          {grips.map((g, i) => <Circle key={`g${i}`} cx={g.x} cy={g.y} r={GRIP} fill="#05060c" fillOpacity={0.82} />)}
+          <Circle cx={R} cy={R} r={HUB_HOLE} fill="#05060c" fillOpacity={0.88} />
+          <Circle cx={R} cy={R} r={HUB_HOLE} fill="none" stroke="#ffffff" strokeOpacity={0.42} strokeWidth={0.9} />
         </Svg>
       </Animated.View>
+
+      {/* Polished edge, above everything so the disc reads as one solid piece */}
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Circle cx={R} cy={R} r={R - 0.8} fill="none" stroke="url(#cdEdge)" strokeWidth={1.6} />
+        <Circle cx={R} cy={R} r={R - 4} fill="none" stroke="#ffffff" strokeOpacity={0.10} strokeWidth={2} />
+      </Svg>
     </View>
   );
 }
 
-/** The clear polycarbonate case the disc sits in — hinge spine, corner
- *  brackets, dust. Entirely static. */
+/** The clear case. Thickness is faked with paired strokes — a lit outer edge,
+ *  a dark inner line just behind it, then a faint inner highlight — which is
+ *  what reads as moulded plastic rather than a drawn rectangle. */
 function JewelCase({ size, children }: { size: number; children: React.ReactNode }) {
-  const dust = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+  const dust = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
     x: hash01(i * 2.7) * size, y: hash01(i * 5.9 + 3.1) * size,
-    r: 0.3 + hash01(i * 8.2) * 0.6, op: 0.06 + hash01(i * 4.4) * 0.12,
+    r: 0.3 + hash01(i * 8.2) * 0.6, op: 0.06 + hash01(i * 4.4) * 0.14,
   })), [size]);
-  const clip = [0.17, 0.5, 0.83];
+  const clips = [0.20, 0.5, 0.80];
+  const corners = [[20, 20, 1, 1], [size - 20, 20, -1, 1], [20, size - 20, 1, -1], [size - 20, size - 20, -1, -1]] as const;
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       {children}
       <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Rect x={5} y={5} width={size - 10} height={size - 10} rx={11} fill="none" stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1.3} />
-        <Rect x={9} y={9} width={size - 18} height={size - 18} rx={9} fill="none" stroke="#ffffff" strokeOpacity={0.11} strokeWidth={1} />
-        <Rect x={5} y={5} width={22} height={size - 10} fill="#ffffff" fillOpacity={0.045} />
-        <Rect x={27} y={5} width={1.3} height={size - 10} fill="#ffffff" fillOpacity={0.24} />
-        {clip.map((f, i) => (
-          <Rect key={i} x={8} y={size * f - 18} width={17} height={36} rx={3.5} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
+        <Defs>
+          <SvgLinearGradient id="cdCaseEdge" x1="0" y1="0" x2="0.9" y2="1">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.70" />
+            <Stop offset="28%" stopColor="#ffffff" stopOpacity="0.16" />
+            <Stop offset="60%" stopColor="#ffffff" stopOpacity="0.42" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.14" />
+          </SvgLinearGradient>
+          <SvgLinearGradient id="cdSpine" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.26" />
+            <Stop offset="45%" stopColor="#ffffff" stopOpacity="0.05" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.20" />
+          </SvgLinearGradient>
+        </Defs>
+        <Rect x={7} y={7} width={size - 14} height={size - 14} rx={14} fill="none" stroke="url(#cdCaseEdge)" strokeWidth={2.6} />
+        <Rect x={11.5} y={11.5} width={size - 23} height={size - 23} rx={11} fill="none" stroke="#000000" strokeOpacity={0.45} strokeWidth={1.4} />
+        <Rect x={14} y={14} width={size - 28} height={size - 28} rx={10} fill="none" stroke="#ffffff" strokeOpacity={0.20} strokeWidth={1} />
+        <Rect x={7} y={7} width={26} height={size - 14} rx={13} fill="url(#cdSpine)" />
+        <Rect x={33} y={9} width={1.6} height={size - 18} fill="#ffffff" fillOpacity={0.30} />
+        {clips.map((f, i) => (
+          <G key={`h${i}`}>
+            <Rect x={11} y={size * f - 21} width={18} height={42} rx={4} fill="#ffffff" fillOpacity={0.07} stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.1} />
+            <Rect x={14} y={size * f - 13} width={12} height={26} rx={3} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.20} strokeWidth={0.8} />
+          </G>
         ))}
-        {[0.17, 0.83].map((f, i) => (
-          <Rect key={`t${i}`} x={12} y={size * f - 9} width={9} height={18} rx={2} fill="#ffffff" fillOpacity={0.10} />
+        {corners.map(([x, y, sx, sy], i) => (
+          <G key={`c${i}`}>
+            <Path d={`M ${x} ${y + 30 * sy} L ${x} ${y} L ${x + 30 * sx} ${y}`} fill="none" stroke="#ffffff" strokeOpacity={0.40} strokeWidth={2} strokeLinecap="round" />
+            <Path d={`M ${x + 5 * sx} ${y + 30 * sy} L ${x + 5 * sx} ${y + 5 * sy} L ${x + 30 * sx} ${y + 5 * sy}`} fill="none" stroke="#ffffff" strokeOpacity={0.13} strokeWidth={1} strokeLinecap="round" />
+          </G>
         ))}
-        {([[15, 15, 1, 1], [size - 15, 15, -1, 1], [15, size - 15, 1, -1], [size - 15, size - 15, -1, -1]] as const).map(([x, y, sx, sy], i) => (
-          <Path key={`c${i}`} d={`M ${x} ${y + 24 * sy} L ${x} ${y} L ${x + 24 * sx} ${y}`} fill="none" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={1.5} strokeLinecap="round" />
-        ))}
+        {/* one broad diagonal reflection across the whole face */}
+        <Path d={`M ${size * 0.12} 8 L ${size * 0.52} 8 L ${size * 0.20} ${size - 8} L 8 ${size - 8} Z`} fill="#ffffff" fillOpacity={0.030} />
         {dust.map((d, i) => <Circle key={`d${i}`} cx={d.x} cy={d.y} r={d.r} fill="#ffffff" fillOpacity={d.op} />)}
       </Svg>
     </View>
@@ -434,7 +463,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <View style={fs.caseShadow} {...discPan.panHandlers}>
               <JewelCase size={caseSize}>
-                <CDDisc size={discSize} spin={spin} albumArt={spotify.track?.albumArt ?? null} accent={eq[1]} />
+                <CDDisc size={discSize} spin={spin} albumArt={spotify.track?.albumArt ?? null} />
               </JewelCase>
             </View>
           </View>

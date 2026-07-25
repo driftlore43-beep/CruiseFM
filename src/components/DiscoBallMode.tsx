@@ -31,6 +31,14 @@ const DEMO_DURATION_MS = 214000;
 // slow enough to still feel like a heavy hanging ball rather than a toy.
 const BALL_SPIN_MS = 7000;
 
+// TEMPORARY (25.07) — diagnostic strip under the ball. Three rounds of
+// "it still doesn't spin" with no way to tell whether the rotation value is
+// moving, whether it reaches a native transform, or whether the gate is
+// simply never opening. The green marker is driven by the SAME `spin` value
+// as the ball's surface, through the same kind of native transform. Delete
+// this const and the block that reads it once the cause is known.
+const SPIN_DEBUG = true;
+
 function formatMs(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -740,6 +748,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   // ball along feels like winding the track on. Only horizontal drags are
   // claimed; a downward swipe on the ball still dismisses the mode.
   const [scrubbing, setScrubbing] = useState(false);
+  const [dragCount, setDragCount] = useState(0);   // TEMPORARY, see SPIN_DEBUG
   const spinBaseRef = useRef(0);        // spin value when the finger landed
   const progressBaseRef = useRef(0);    // song position when the finger landed
   const scrubPctRef = useRef(0);        // latest scrubbed position
@@ -758,6 +767,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         scrubPctRef.current = progressBaseRef.current;
         scrub.begin();
         setScrubbing(true);
+        if (SPIN_DEBUG) setDragCount((n) => n + 1);
         // One-time read of where the turn currently sits, so the ball
         // carries on from its present angle instead of jumping.
         spin.stopAnimation((v) => { spinBaseRef.current = wrap01(v); });
@@ -1015,6 +1025,26 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* TEMPORARY diagnostic — see SPIN_DEBUG at the top of this file. */}
+        {SPIN_DEBUG && (
+          <View
+            pointerEvents="none"
+            style={{ position: 'absolute', left: 18, right: 18, top: topPad + 44, zIndex: 60, alignItems: 'center' }}
+          >
+            <View style={{ width: 220, height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.16)', justifyContent: 'center' }}>
+              <Animated.View
+                style={{
+                  width: 16, height: 10, borderRadius: 5, backgroundColor: '#39FF88',
+                  transform: [{ translateX: spin.interpolate({ inputRange: [0, 1], outputRange: [0, 204] }) }],
+                }}
+              />
+            </View>
+            <Text style={{ color: '#39FF88', fontSize: 11, fontWeight: '700', marginTop: 4, fontFamily: Fonts.mono }}>
+              {`play${playing ? 1 : 0} sw${musicSwitching ? 1 : 0} isP${spotify.track?.isPlaying == null ? '-' : (spotify.track.isPlaying ? 1 : 0)} SPIN${spinning ? 1 : 0} drag${dragCount}`}
+            </Text>
+          </View>
+        )}
 
         <ModeCloseButton onPress={handleClose} />
 

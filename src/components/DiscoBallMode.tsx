@@ -29,7 +29,7 @@ const SCREEN_H = Dimensions.get('window').height;
 const DEMO_DURATION_MS = 214000;
 // One full turn of the ball. Fast enough to read as driven by the music,
 // slow enough to still feel like a heavy hanging ball rather than a toy.
-const BALL_SPIN_MS = 9500;
+const BALL_SPIN_MS = 7000;
 
 function formatMs(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -66,7 +66,18 @@ function mixHex(a: string, b: string, t: number): string {
 
 // Neutral, pale shading ramp — no baked hue. The moving ColorCycleWash
 // (below) tints this at playback time, so the same tiles work for any station.
-const SHADE_RAMP = ['#39405c', '#5d6786', '#8b96b6', '#bcc6e2', '#e8eeff', '#ffffff'];
+const SHADE_ANCHORS = ['#39405c', '#5d6786', '#8b96b6', '#bcc6e2', '#e8eeff', '#ffffff'];
+// Facet brightness is quantised (cel-shaded, not smooth) but into FINER steps
+// than the anchor list — brightness falls off fastest across the middle of the
+// ball, so with coarse steps the band edge landed on one column and drew a
+// hard vertical line straight down the centre. More steps + per-tile jitter
+// dithers it away while keeping the stylised look.
+const SHADE_STEPS = 10;
+function shadeAt(t: number): string {
+  const x = Math.max(0, Math.min(1, t)) * (SHADE_ANCHORS.length - 1);
+  const i = Math.min(SHADE_ANCHORS.length - 2, Math.floor(x));
+  return mixHex(SHADE_ANCHORS[i], SHADE_ANCHORS[i + 1], x - i);
+}
 
 // Fixed neon accent set for the moving reflections/bokeh — a deliberate
 // departure from the "always the station's own eqColors" rule elsewhere:
@@ -135,21 +146,23 @@ function buildSphereTiles(size: number): Tile[] {
       // (real balls never have two neighbouring tiles the same brightness).
       const c = project((b0 + b1) / 2, (l0 + l1) / 2);
       const lambert = Math.max(0, c.nx * lx + c.ny * ly + c.nz * lz);
-      const jitter = (hash01(j * 31.7 + k * 7.31) - 0.5) * 1.3;
-      const level = Math.max(0, Math.min(SHADE_RAMP.length - 1,
-        Math.round(lambert * (SHADE_RAMP.length - 1) + jitter)));
+      const jitter = (hash01(j * 31.7 + k * 7.31) - 0.5) * 1.7;
+      const step = Math.max(0, Math.min(SHADE_STEPS - 1,
+        Math.round(lambert * (SHADE_STEPS - 1) + jitter)));
 
       // A minority of mirrors pick up a neon cast, like the reference's
       // pink/blue/lilac facets — the rest stay silver.
       const hueRoll = hash01(j * 5.13 + k * 11.27);
-      const base = SHADE_RAMP[level];
+      const base = shadeAt(step / (SHADE_STEPS - 1));
       const fill = hueRoll > 0.74
         ? mixHex(base, [NEON.magenta, NEON.cyan, NEON.purple, NEON.blue][k % 4], 0.28)
         : base;
 
       // Facets near the silhouette sit at a glancing angle — dimmer, so the
-      // sphere's edge falls away instead of ending in a hard ring.
-      tiles.push({ d, fill, op: 0.42 + Math.min(0.46, c.nz * 0.62) });
+      // sphere's edge falls away instead of ending in a hard ring. Kept well
+      // short of opaque: the travelling light below has to show through, or
+      // the ball stops looking like it's turning.
+      tiles.push({ d, fill, op: 0.28 + Math.min(0.38, c.nz * 0.52) });
     }
   }
   return tiles;
@@ -175,9 +188,12 @@ function SphereGrid({ size }: { size: number }) {
 // the static grid. Two identical copies, one native-driver translateX loop
 // — the seam-tiling contract from the original build, unchanged.
 function LightPatches({ size, spin, eq }: { size: number; spin: Animated.Value; eq: [string, string, string] }) {
-  const scrollX = spin.interpolate({ inputRange: [0, 1], outputRange: [0, -size] });
-  const blobs = useMemo(() => Array.from({ length: 11 }, (_, i) => {
-    const tight = hash01(i * 1.97 + 0.4) > 0.5;
+  // spin 0..1 slides the strip left→right across one texture width. Rightward
+  // is deliberate: a rightward drag scrubs forward, and the surface following
+  // the finger in that same direction is what makes the scrub feel physical.
+  const scrollX = spin.interpolate({ inputRange: [0, 1], outputRange: [-size, 0] });
+  const blobs = useMemo(() => Array.from({ length: 14 }, (_, i) => {
+    const tight = hash01(i * 1.97 + 0.4) > 0.44;
     return {
       x: hash01(i * 3.71 + 0.37) * size,
       y: hash01(i * 8.13 + 2.11) * size,
@@ -190,30 +206,42 @@ function LightPatches({ size, spin, eq }: { size: number; spin: Animated.Value; 
     <Animated.View pointerEvents="none" style={{ position: 'absolute', width: size * 2, height: size, transform: [{ translateX: scrollX }] }}>
       <Svg width={size * 2} height={size}>
         <Defs>
+          {/* Hot and tight — these are what read as an individual mirror
+              catching the beam as it comes round. Contrast against the dark
+              base below is the whole effect; keep them near-white. */}
           <RadialGradient id="lpHot" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
-            <Stop offset="40%" stopColor="#ffffff" stopOpacity="0.4" />
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
+            <Stop offset="55%" stopColor="#ffffff" stopOpacity="0.55" />
             <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
           </RadialGradient>
           <RadialGradient id="lpSoft" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.62" />
             <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
           </RadialGradient>
           <RadialGradient id="lpCool" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={eq[0]} stopOpacity="0.6" />
+            <Stop offset="0%" stopColor={eq[0]} stopOpacity="0.7" />
             <Stop offset="100%" stopColor={eq[0]} stopOpacity="0" />
           </RadialGradient>
         </Defs>
-        <Rect x={0} y={0} width={size * 2} height={size} fill="#0d0c1a" />
-        {blobs.map((b, i) => <Circle key={`a${i}`} cx={b.x} cy={b.y} r={b.r} fill={`url(#${b.g})`} />)}
-        {blobs.map((b, i) => <Circle key={`b${i}`} cx={b.x + size} cy={b.y} r={b.r} fill={`url(#${b.g})`} />)}
+        <Rect x={0} y={0} width={size * 2} height={size} fill="#08070f" />
+        {/* Four copies, not two. The strip has to be exactly periodic over
+            `size` or the wrap shows as a flicker at the silhouette: a blob
+            sitting near either boundary needs its neighbour-period twin
+            drawn too, even though that twin falls outside the viewport. */}
+        {[-1, 0, 1, 2].map((k) =>
+          blobs.map((b, i) => (
+            <Circle key={`${k}_${i}`} cx={b.x + k * size} cy={b.y} r={b.r} fill={`url(#${b.g})`} />
+          )),
+        )}
       </Svg>
     </Animated.View>
   );
 }
 
 const WASH_CYCLE_MS = 15000; // full first-hue -> second -> third -> first loop
-const WASH_PEAK_OPACITY = 0.6;
+// Held back on purpose — at higher values the mood tint flattens the facet
+// contrast and the ball stops reading as mirrors catching light.
+const WASH_PEAK_OPACITY = 0.44;
 
 // The station's own eqColors, cycled as three translucent washes over the
 // pale tiles — this is what reads as "the ball's colour shifting" in the
@@ -645,6 +673,11 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const topPad = Math.max(insets.top, 20);
 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
+  // Declared up here because the scrub gesture needs the ball's size, and
+  // the PanResponder is built before the render body reaches the ball.
+  const ballSize = Math.min(winW * 0.62, winH * 0.34, 300);
+  const ballSizeRef = useRef(ballSize);
+  ballSizeRef.current = ballSize;
   const station = resolveAnyStation(activeId);
   const spotify = useSpotifyPlayback(visible);
   const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
@@ -665,7 +698,6 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
   const spin = useRef(new Animated.Value(0)).current;       // ball surface scroll (axis spin)
   const fieldSpin = useRef(new Animated.Value(0)).current;  // dot-field orbit
-  const bob = useRef(new Animated.Value(0)).current;        // gentle hang/float
   const live = useRef(new Animated.Value(0)).current;       // 0 idle → 1 dancing
   const pulse = useRef(new Animated.Value(0)).current;      // 0 rest → 1 on-beat (bloom/reflections)
 
@@ -675,23 +707,72 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
 
   useEffect(() => { if (visible) getStationPlaylist(station.id).then(setLinked); }, [visible, station.id]);
 
+  // ── Swipe the ball to scrub ────────────────────────────────────────────
+  // Drag right and the surface follows your finger while the song moves
+  // forward — the same direction it turns during playback, so pushing the
+  // ball along feels like winding the track on. Only horizontal drags are
+  // claimed; a downward swipe on the ball still dismisses the mode.
+  const [scrubbing, setScrubbing] = useState(false);
+  const spinBaseRef = useRef(0);        // spin value when the finger landed
+  const progressBaseRef = useRef(0);    // song position when the finger landed
+  const scrubPctRef = useRef(0);        // latest scrubbed position
+
+  const wrap01 = (v: number) => ((v % 1) + 1) % 1;
+  const readAnim = (a: Animated.Value) => (a as unknown as { __getValue?: () => number }).__getValue?.() ?? 0;
+
+  const ballPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        progressBaseRef.current = readAnim(progress);
+        scrubPctRef.current = progressBaseRef.current;
+        scrub.begin();
+        setScrubbing(true);
+        // One-time read of where the turn currently sits, so the ball
+        // carries on from its present angle instead of jumping.
+        spin.stopAnimation((v) => { spinBaseRef.current = wrap01(v); });
+      },
+      onPanResponderMove: (_, g) => {
+        const size = ballSizeRef.current;
+        if (size <= 0) return;
+        // The surface tracks the finger 1:1 — drag a ball-width, turn a
+        // ball-width. Wrapped, because the scroll only has one texture
+        // width to play with.
+        spin.setValue(wrap01(spinBaseRef.current + g.dx / size));
+        // A ball-width of drag covers a fifth of the song: fast enough to
+        // cross a track in a few swipes, slow enough to land on a chorus.
+        const pct = Math.max(0, Math.min(1, progressBaseRef.current + g.dx / (size * 5)));
+        scrubPctRef.current = pct;
+        scrub.move(pct);
+      },
+      onPanResponderRelease: () => {
+        scrub.end(scrubPctRef.current);
+        setScrubbing(false);
+      },
+      onPanResponderTerminate: () => {
+        scrub.end(scrubPctRef.current);
+        setScrubbing(false);
+      },
+    }),
+  ).current;
+
   // The room lights up while the music plays, dims between/at rest.
   const lightsOn = playing && !musicSwitching;
   // The ball only turns while audio is genuinely playing — pause the music
   // and it coasts to a stop, exactly like the power being cut to the motor.
   const spinning = lightsOn && (spotify.track?.isPlaying ?? true);
 
-  // Ambient loops that run the whole time the mode is open.
+  // Ambient loop that runs the whole time the mode is open. The ball itself
+  // does NOT bob — it hangs dead still from its mount, like the real thing;
+  // all of its life comes from the turn and the light.
   useEffect(() => {
     if (!visible) return;
     const fieldLoop = Animated.loop(Animated.timing(fieldSpin, { toValue: 1, duration: 26000, easing: Easing.linear, useNativeDriver: true }));
-    const bobLoop = Animated.loop(Animated.sequence([
-      Animated.timing(bob, { toValue: 1, duration: 2100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(bob, { toValue: 0, duration: 2100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ]));
     fieldLoop.start();
-    bobLoop.start();
-    return () => { fieldLoop.stop(); bobLoop.stop(); };
+    return () => fieldLoop.stop();
   }, [visible]);
 
   // Ball rotation — starts and stops with the music, and picks up exactly
@@ -706,6 +787,10 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   // clamped for that reason.
   useEffect(() => {
     if (!visible) return;
+    // While a finger is on the ball the drag owns the rotation — don't fight
+    // it. Releasing re-runs this effect, which resumes from the angle the
+    // user left the ball at.
+    if (scrubbing) { spin.stopAnimation(); return; }
     let cancelled = false;
     let current: Animated.CompositeAnimation | null = null;
 
@@ -738,7 +823,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
     });
 
     return () => { cancelled = true; current?.stop(); };
-  }, [visible, spinning]);
+  }, [visible, spinning, scrubbing]);
 
   useEffect(() => {
     Animated.timing(live, { toValue: lightsOn ? 1 : 0.15, duration: lightsOn ? 900 : 700, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
@@ -790,8 +875,6 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const title = spotify.track?.title ?? station.tagline;
   const artist = spotify.track?.artist ?? '';
 
-  const ballSize = Math.min(winW * 0.62, winH * 0.34, 300);
-  const bobY = bob.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -6, 0] });
   const fieldRotate = fieldSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const bloomColor = mixHex(eq[1], NEON.cyan, 0.3);
 
@@ -836,17 +919,18 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
 
           {/* The ball, hanging from a mount, genuinely turning on its axis */}
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <Animated.View style={{ alignItems: 'center', transform: [{ translateY: bobY }] }}>
+            <View style={{ alignItems: 'center' }}>
               <View style={{ width: 2, height: ballSize * 0.22, backgroundColor: 'rgba(255,255,255,0.25)' }} />
               <View style={{ width: 14, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: -3 }} />
               {/* A ball-sized anchor box — the bloom/ray layers below position
-                  themselves relative to it, not the taller pole+ball stack */}
-              <View style={{ width: ballSize, height: ballSize }}>
+                  themselves relative to it, not the taller pole+ball stack.
+                  Also the scrub target: swipe left/right anywhere on the ball. */}
+              <View style={{ width: ballSize, height: ballSize }} {...ballPan.panHandlers}>
                 <VolumetricRays size={ballSize} color={bloomColor} />
                 <BallBloom size={ballSize} color={bloomColor} pulse={pulse} />
                 <MirrorBall size={ballSize} eq={eq} spin={spin} pulse={pulse} />
               </View>
-            </Animated.View>
+            </View>
           </View>
 
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>

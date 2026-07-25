@@ -161,13 +161,19 @@ export function AmbientGlow({ active, beat, color, hero = true, trackKey }: {
 const ag = StyleSheet.create({
   // Lower two-thirds of the screen; hazes bleed past the edges so nothing
   // reads as a straight line.
+  //
+  // NEVER put `overflow: 'hidden'` back on this. The hazes breathe up to
+  // scale 1.18, so a clip here slices the scaled-up smoke into a hard
+  // horizontal line — it used to land at exactly 0.96 × screen height and
+  // showed as a visible seam near the home indicator on every mode screen.
+  // Unclipped, the hazes simply fade out on their own gradient; the screen
+  // edge does the only clipping that's actually wanted.
   wrap: {
     position: 'absolute',
     left: 0, right: 0,
     top: SCREEN_H * 0.34,
-    height: SCREEN_H * 0.62,
+    bottom: 0,
     zIndex: 0,
-    overflow: 'hidden',
   },
   // Upper-middle halo zone, bleeding past the sides so it stays round.
   heroWrap: {

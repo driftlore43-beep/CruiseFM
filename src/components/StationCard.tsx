@@ -61,17 +61,23 @@ function CompactCard({ station, onPress }: { station: Station; onPress?: () => v
       {/* Clip everything to the rounded rect */}
       <View style={styles.compactCard}>
 
-        {/* The station's accent palette, full strength */}
+        {/* Smoked-glass base. The accent sits ON this rather than replacing
+            it, so the card reads as tinted glass over the dark app rather
+            than a solid slab of colour. */}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,17,29,0.55)' }]} />
+
+        {/* The station's accent palette, held well back — enough to tell the
+            stations apart at a glance, not enough to shout. */}
         <LinearGradient
           colors={accents}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, { opacity: 0.42 }]}
         />
 
         {/* Bottom scrim for the name */}
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.60)']}
+          colors={['transparent', 'rgba(0,0,0,0.55)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.compactOverlay}
@@ -200,9 +206,11 @@ const styles = StyleSheet.create({
   compactShadow: {
     marginRight: 14,
     borderRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 22,
+    // Softer, deeper lift than the old neon halo — the glow reads as the
+    // card floating, not as the card being lit from behind.
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.32,
+    shadowRadius: 26,
     elevation: 10,
   },
   compactCard: {
@@ -211,7 +219,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   compactImageStyle: {
     borderRadius: 20,

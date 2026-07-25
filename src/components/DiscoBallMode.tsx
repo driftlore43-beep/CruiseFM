@@ -90,6 +90,14 @@ const NEON = { cyan: '#22E8FF', magenta: '#FF2FD1', purple: '#9B4DFF', blue: '#3
 
 type Tile = { d: string; fill: string; op: number };
 
+// How far the bright inner face of a mirror is inset from the tile's own
+// outline, as a fraction of the tile. Deliberately ASYMMETRIC: the exposed
+// dark frame is thin along the top/left (a lit rim) and thick along the
+// bottom/right (the tile's own shadow), which is what a bevel actually looks
+// like under a key light from the upper left. Symmetric insets just read as
+// a grid of smaller squares.
+const BEVEL = { u0: 0.13, u1: 0.79, v0: 0.21, v1: 0.87 };
+
 // Viewing tilt — we look slightly DOWN on the ball. This matters: seen from
 // dead level, the latitude rings project to perfectly straight horizontal
 // lines and the ball reads as a flat brick wall (the old build's problem).
@@ -129,9 +137,14 @@ function buildSphereTiles(size: number): Tile[] {
   for (let j = 0; j < ROWS; j++) {
     const b0 = -Math.PI / 2 + (Math.PI * j) / ROWS;
     const b1 = -Math.PI / 2 + (Math.PI * (j + 1)) / ROWS;
+    // Brick bond — every other row is offset half a tile. Real mirror balls
+    // are built this way, and it also keeps the static tile edges from
+    // stacking into continuous vertical lines, which would compete with the
+    // rotating meridians for "the grid that turns".
+    const bond = (j % 2) * 0.5;
     for (let k = 0; k < COLS; k++) {
-      const l0 = (2 * Math.PI * k) / COLS;
-      const l1 = (2 * Math.PI * (k + 1)) / COLS;
+      const l0 = (2 * Math.PI * (k + bond)) / COLS;
+      const l1 = (2 * Math.PI * (k + bond + 1)) / COLS;
       const p00 = project(b0, l0), p01 = project(b0, l1);
       const p11 = project(b1, l1), p10 = project(b1, l0);
       // Back-face cull — anything past the horizon is on the far side.
@@ -147,23 +160,49 @@ function buildSphereTiles(size: number): Tile[] {
       // (real balls never have two neighbouring tiles the same brightness).
       const c = project((b0 + b1) / 2, (l0 + l1) / 2);
       const lambert = Math.max(0, c.nx * lx + c.ny * ly + c.nz * lz);
-      const jitter = (hash01(j * 31.7 + k * 7.31) - 0.5) * 1.7;
+      const jitter = (hash01(j * 31.7 + k * 7.31) - 0.5) * 2.1;
       const step = Math.max(0, Math.min(SHADE_STEPS - 1,
         Math.round(lambert * (SHADE_STEPS - 1) + jitter)));
 
       // A minority of mirrors pick up a neon cast, like the reference's
       // pink/blue/lilac facets — the rest stay silver.
       const hueRoll = hash01(j * 5.13 + k * 11.27);
-      const base = shadeAt(step / (SHADE_STEPS - 1));
-      const fill = hueRoll > 0.74
-        ? mixHex(base, [NEON.magenta, NEON.cyan, NEON.purple, NEON.blue][k % 4], 0.28)
-        : base;
+      const neon = [NEON.magenta, NEON.cyan, NEON.purple, NEON.blue][k % 4];
+      const tint = (s: number) => {
+        const base = shadeAt(Math.max(0, Math.min(1, s / (SHADE_STEPS - 1))));
+        return hueRoll > 0.74 ? mixHex(base, neon, 0.28) : base;
+      };
 
       // Facets near the silhouette sit at a glancing angle — dimmer, so the
       // sphere's edge falls away instead of ending in a hard ring. Kept well
       // short of opaque: the travelling light below has to show through, or
       // the ball stops looking like it's turning.
-      tiles.push({ d, fill, op: 0.18 + Math.min(0.26, c.nz * 0.36) });
+      const depth = Math.min(1, c.nz * 1.35);
+
+      // Each mirror is TWO quads, not one flat fill: a darker full-tile frame
+      // and a brighter inner face inset toward the light. That single extra
+      // path per tile is what stops the surface reading as a smooth painted
+      // sphere — you get a lit edge, a shaded edge and a face between them,
+      // i.e. an actual bevel, for no per-frame cost (the grid is static).
+      tiles.push({ d, fill: tint(step - 2.4), op: 0.13 + 0.17 * depth });
+
+      const P = (u: number, v: number) => {
+        const a = (1 - u) * (1 - v), b = u * (1 - v), cc = u * v, dd = (1 - u) * v;
+        return {
+          x: a * p00.x + b * p01.x + cc * p11.x + dd * p10.x,
+          y: a * p00.y + b * p01.y + cc * p11.y + dd * p10.y,
+        };
+      };
+      const f00 = P(BEVEL.u0, BEVEL.v0), f01 = P(BEVEL.u1, BEVEL.v0);
+      const f11 = P(BEVEL.u1, BEVEL.v1), f10 = P(BEVEL.u0, BEVEL.v1);
+      tiles.push({
+        d: `M ${f00.x.toFixed(2)} ${f00.y.toFixed(2)} `
+         + `L ${f01.x.toFixed(2)} ${f01.y.toFixed(2)} `
+         + `L ${f11.x.toFixed(2)} ${f11.y.toFixed(2)} `
+         + `L ${f10.x.toFixed(2)} ${f10.y.toFixed(2)} Z`,
+        fill: tint(step + 1.5),
+        op: 0.12 + 0.16 * depth,
+      });
     }
   }
   return tiles;
@@ -832,7 +871,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
   // Declared up here because the scrub gesture needs the ball's size, and
   // the PanResponder is built before the render body reaches the ball.
-  const ballSize = Math.min(winW * 0.62, winH * 0.34, 300);
+  const ballSize = Math.min(winW * 0.71, winH * 0.39, 340);
   const ballSizeRef = useRef(ballSize);
   ballSizeRef.current = ballSize;
   const station = resolveAnyStation(activeId);
@@ -1104,7 +1143,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         </View>
 
         <View style={[fs.topBar, { top: topPad + 14 }]}>
-          <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>DISCO BALL</Text>
+          <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>MIRROR BALL</Text>
         </View>
 
         <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>

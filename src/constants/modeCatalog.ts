@@ -13,7 +13,9 @@ export const MODE_CATALOG: ModeInfo[] = [
   { id: 'radio',     label: 'Tuner',       pro: true  },
   { id: 'horizon',   label: 'Horizon',     pro: true  },
   { id: 'orb',       label: 'Circular EQ', pro: false },
-  { id: 'disco',     label: 'Disco Ball',  pro: true  },
+  // Renamed from "Disco Ball" 2026-07-25 — the id stays `disco` on purpose:
+  // saved cruises and per-station mode picks store the bare string.
+  { id: 'disco',     label: 'Mirror Ball', pro: true  },
   { id: 'cd',        label: 'CD',          pro: true  },
 ];
 

@@ -17,6 +17,7 @@ import { DiscoBallFullscreen } from '@/components/DiscoBallMode';
 import { CDFullscreen } from '@/components/CDMode';
 import { EqualizerFullscreen } from '@/components/EqualizerMode';
 import { HorizonFullscreen } from '@/components/HorizonMode';
+import { MirrorBallGlyph } from '@/components/MirrorBallGlyph';
 import { TunerFullscreen } from '@/components/TunerMode';
 import { VinylFullscreen } from '@/components/VinylMode';
 import { STATIONS } from '@/constants/stations';
@@ -26,14 +27,16 @@ import { useNowPlaying } from '@/context/NowPlayingContext';
 import { isSpotifyConnected, pause as pauseSpotify } from '@/utils/spotify';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 
-const MODE_META: Record<string, { label: string; icon: string }> = {
+// `icon` is a MaterialCommunityIcons glyph; `glyph: true` means the mode has
+// a drawn icon instead (no icon font has a mirror ball).
+const MODE_META: Record<string, { label: string; icon: string; glyph?: boolean }> = {
   cassette:  { label: 'Cassette',    icon: 'cassette' },
   equalizer: { label: 'Equalizer',   icon: 'equalizer' },
   vinyl:     { label: 'Vinyl',       icon: 'album' },
   radio:     { label: 'Tuner',       icon: 'radio-tower' },
   horizon:   { label: 'Horizon',     icon: 'weather-sunset-up' },
   orb:       { label: 'Circular EQ', icon: 'chart-donut' },
-  disco:     { label: 'Disco Ball',  icon: 'mirror-variant' },
+  disco:     { label: 'Mirror Ball', icon: 'mirror-variant', glyph: true },
   cd:        { label: 'CD',          icon: 'disc' },
 };
 
@@ -70,7 +73,9 @@ function MiniPlayer() {
           style={StyleSheet.absoluteFill}
         />
         <View style={mp.iconChip}>
-          <MaterialCommunityIcons name={meta.icon as any} size={17} color="#fff" />
+          {meta.glyph
+            ? <MirrorBallGlyph size={19} />
+            : <MaterialCommunityIcons name={meta.icon as any} size={17} color="#fff" />}
         </View>
         <View style={{ flex: 1, gap: 1 }}>
           <Text style={mp.title} numberOfLines={1}>{spotify.track?.title ?? station.name}</Text>

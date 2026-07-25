@@ -123,7 +123,12 @@ const TILT = 0.30;                       // ~17°
 // per frame, and on a real mirror ball the grid barely appears to move
 // anyway; what you actually see travelling is the light across the facets
 // (that's the scrolling LightPatches layer underneath).
-function buildSphereTiles(size: number, eq: [string, string, string]): Tile[] {
+// How many phase buckets the flashing-mirror wave is quantised into, and how
+// wide the lit band is as a fraction of one turn.
+const FLASH_GROUPS = 26;
+const FLASH_WIDTH = 0.07;
+
+function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: Tile[]; flashes: Tile[][] } {
   const R = size / 2, cx = R, cy = R;
   const ROWS = 17, COLS = 32;   // ~240 visible facets after back-face culling
   const st = Math.sin(TILT), ct = Math.cos(TILT);
@@ -144,6 +149,7 @@ function buildSphereTiles(size: number, eq: [string, string, string]): Tile[] {
   };
 
   const tiles: Tile[] = [];
+  const flashes: Tile[][] = Array.from({ length: FLASH_GROUPS }, () => []);
   for (let j = 0; j < ROWS; j++) {
     const b0 = -Math.PI / 2 + (Math.PI * j) / ROWS;
     const b1 = -Math.PI / 2 + (Math.PI * (j + 1)) / ROWS;
@@ -222,9 +228,20 @@ function buildSphereTiles(size: number, eq: [string, string, string]): Tile[] {
 
       tiles.push({ d: `${d} ${face}`, fill: tint(frameStep, cast * 0.3), op: 0.24 + 0.30 * depth });
       tiles.push({ d: face, fill: tint(faceStep, cast), op: 0.16 + 0.22 * depth });
+
+      // ...and a BRIGHT copy of the same face, filed into a phase bucket by
+      // where it sits across the ball. MirrorFlash fades these in as a band
+      // sweeping left to right, so what travels is individual mirrors
+      // catching the light one after another. The soft light layer underneath
+      // already sweeps, but it is smooth — it slides over the mosaic instead
+      // of being carved up by it, which is why the mirrors themselves read as
+      // dead still. This is the layer that makes them read as turning.
+      const px = c.x / size + (hash01(j * 8.17 + k * 2.53) - 0.5) * 0.13;
+      const g = ((Math.floor(px * FLASH_GROUPS) % FLASH_GROUPS) + FLASH_GROUPS) % FLASH_GROUPS;
+      flashes[g].push({ d: face, fill: tint(faceStep + 4.5, cast * 0.35), op: 0.26 + 0.42 * depth });
     }
   }
-  return tiles;
+  return { tiles, flashes };
 }
 
 // Latitude rings. These are STATIC and that is not a shortcut: a sphere
@@ -257,24 +274,70 @@ function buildLatitudeArcs(size: number): string[] {
 // the latitude rings. Semi-transparent on purpose so the scrolling light
 // underneath shows through. The vertical seams are NOT here — they rotate,
 // see RotatingMeridians.
-function SphereGrid({ size, eq }: { size: number; eq: [string, string, string] }) {
-  const tiles = useMemo(() => buildSphereTiles(size, eq), [size, eq]);
+// The mirrors catching the light in turn. Each bucket is a static Svg of
+// bright faces whose whole layer just fades up and down — opacity only, native
+// driver, so 22 groups cost about what one animation costs. The bump is
+// computed on the CIRCULAR distance between the turn's phase and the bucket's,
+// which makes the sweep wrap seamlessly: as the band leaves the right limb the
+// left limb is already lighting up, exactly like the two-copy light strip
+// below it.
+function MirrorFlash({ size, groups, spin }: { size: number; groups: Tile[][]; spin: Animated.Value }) {
+  const curves = useMemo(() => groups.map((_, g) => {
+    const p = (g + 0.5) / groups.length;
+    const inp: number[] = [], out: number[] = [];
+    const N = 60;
+    for (let i = 0; i <= N; i++) {
+      const s = i / N;
+      const raw = ((s - p) % 1 + 1) % 1;
+      const dist = Math.min(raw, 1 - raw);
+      inp.push(s);
+      out.push(dist >= FLASH_WIDTH ? 0 : 0.5 * (1 + Math.cos((Math.PI * dist) / FLASH_WIDTH)));
+    }
+    return { inp, out };
+  }), [groups]);
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {groups.map((tiles, g) => (
+        <Animated.View
+          key={g}
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, {
+            opacity: spin.interpolate({ inputRange: curves[g].inp, outputRange: curves[g].out }),
+          }]}
+        >
+          <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            {tiles.map((t, i) => <Path key={i} d={t.d} fill={t.fill} fillOpacity={t.op} />)}
+          </Svg>
+        </Animated.View>
+      ))}
+    </View>
+  );
+}
+
+function SphereGrid({ size, eq, spin }: { size: number; eq: [string, string, string]; spin: Animated.Value }) {
+  const { tiles, flashes } = useMemo(() => buildSphereTiles(size, eq), [size, eq]);
   const arcs = useMemo(() => buildLatitudeArcs(size), [size]);
   const seam = Math.max(0.5, size * 0.0035);
   return (
-    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFill} pointerEvents="none">
-      {tiles.map((t, i) => (
-        // even-odd so the frame paths (outer tile + inner face in one `d`)
-        // punch their own hole and paint only the border
-        <Path key={i} d={t.d} fill={t.fill} fillOpacity={t.op} fillRule="evenodd" />
-      ))}
-      {arcs.map((d, i) => (
-        // Light on the lit side now comes from the tile frames themselves, so
-        // these only need to add a hairline of definition. At the old 0.45
-        // they cut straight through the bright grid.
-        <Path key={`a${i}`} d={d} fill="none" stroke="#07070f" strokeOpacity={0.26} strokeWidth={seam} />
-      ))}
-    </Svg>
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFill} pointerEvents="none">
+        {tiles.map((t, i) => (
+          // even-odd so the frame paths (outer tile + inner face in one `d`)
+          // punch their own hole and paint only the border
+          <Path key={i} d={t.d} fill={t.fill} fillOpacity={t.op} fillRule="evenodd" />
+        ))}
+        {arcs.map((d, i) => (
+          // Light on the lit side now comes from the tile frames themselves, so
+          // these only need to add a hairline of definition. At the old 0.45
+          // they cut straight through the bright grid.
+          <Path key={`a${i}`} d={d} fill="none" stroke="#07070f" strokeOpacity={0.26} strokeWidth={seam} />
+        ))}
+      </Svg>
+      {/* Above the mirrors, below the seams: the mirrors themselves lighting
+          up in sequence as the ball turns. */}
+      <MirrorFlash size={size} groups={flashes} spin={spin} />
+    </View>
   );
 }
 
@@ -658,7 +721,7 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
 
       {/* The sphere itself — facet colours and latitude rings, which under an
           axial turn genuinely don't move */}
-      <SphereGrid size={size} eq={eq} />
+      <SphereGrid size={size} eq={eq} spin={spin} />
 
       {/* ...and the seams that DO move: the meridians sweep round with the
           turn, so the grid itself is visibly rotating rather than only the
@@ -693,6 +756,11 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
           </RadialGradient>
           {/* Soft-edged, so the mirrors still read through the hotspot
               instead of it sitting on the ball like a painted blob */}
+          <RadialGradient id="dbRim" cx="50%" cy="50%" r="50%">
+            <Stop offset="0.80" stopColor={eq[2]} stopOpacity="0" />
+            <Stop offset="0.955" stopColor={eq[2]} stopOpacity="0.16" />
+            <Stop offset="1" stopColor="#ffffff" stopOpacity="0.10" />
+          </RadialGradient>
           <RadialGradient id="dbHot" cx="50%" cy="50%" r="50%">
             <Stop offset="0" stopColor="#ffffff" stopOpacity="0.26" />
             <Stop offset="0.45" stopColor="#ffffff" stopOpacity="0.11" />
@@ -702,12 +770,11 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
         <Circle cx={50} cy={50} r={50} fill="url(#dbShade)" />
         <Circle cx={50} cy={50} r={50} fill="url(#dbWarm)" />
         <Ellipse cx={36} cy={30} rx={19} ry={13} fill="url(#dbHot)" />
-        {/* Rim light in the station's own colour, then a white hairline on
-            top. Both references show the silhouette picking up a saturated
-            edge where the room light wraps round it — without it the ball
-            just ends, instead of turning away. */}
-        <Circle cx={50} cy={50} r={48.4} fill="none" stroke={eq[2]} strokeOpacity={0.34} strokeWidth={2.4} />
-        <Circle cx={50} cy={50} r={49} fill="none" stroke="#ffffff" strokeOpacity={0.18} strokeWidth={1} />
+        {/* Rim light — a GRADIENT that fades inward, not a stroke. A stroke of
+            any weight sits on the silhouette as a drawn outline (the ball
+            looked like a sticker); real rim light has no inner edge, it just
+            falls off. Nothing here may be a hard ring. */}
+        <Circle cx={50} cy={50} r={50} fill="url(#dbRim)" />
       </Svg>
 
       {/* Lens flare — subtle, along the same light axis as the highlight */}

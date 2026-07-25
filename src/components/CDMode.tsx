@@ -2,11 +2,12 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, Image, Modal, PanResponder,
+  Animated, Dimensions, Easing, Modal, PanResponder,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import Svg, {
-  Circle, ClipPath, Defs, G, LinearGradient as SvgLinearGradient, Path, RadialGradient, Rect, Stop,
+  Circle, ClipPath, Defs, G, Image as SvgImage, LinearGradient as SvgLinearGradient, Path,
+  RadialGradient, Rect, Stop,
 } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -125,7 +126,17 @@ function CDDisc({ size, spin, albumArt }: {
   // Hub proportions measured off the owner's reference: a small dark centre
   // with four gripper holes, NOT the big printed label the first cut had.
   const HUB_HOLE = R * 0.155, GRIP_R = R * 0.235, GRIP = R * 0.037;
-  const HUB_RING = R * 0.31, STACK = R * 0.62, ART = R * 0.88;
+  const HUB_RING = R * 0.31, STACK = R * 0.62;
+  // The album sits in the OUTER band, out where the silver and the rainbow
+  // are — not as a disc through the middle. Anything filled across the centre
+  // reads as a big dark circle against a dark scene, which is exactly what
+  // the printed-label version got wrong.
+  const ART_OUT = R * 0.95, ART_IN = R * 0.34;
+  // Inner circle is wound the OPPOSITE way (sweep flag 1 vs 0), so it punches
+  // a hole under the non-zero rule as well as even-odd — belt and braces,
+  // rather than depending on clipRule surviving the SVG bridge.
+  const ringPath = `M ${R - ART_OUT} ${R} a ${ART_OUT} ${ART_OUT} 0 1 0 ${ART_OUT * 2} 0 a ${ART_OUT} ${ART_OUT} 0 1 0 ${-ART_OUT * 2} 0 Z `
+                 + `M ${R - ART_IN} ${R} a ${ART_IN} ${ART_IN} 0 1 1 ${ART_IN * 2} 0 a ${ART_IN} ${ART_IN} 0 1 1 ${-ART_IN * 2} 0 Z`;
 
   const fan = useMemo(() => buildFan(size), [size]);
   const grooves = useMemo(() => buildGrooves(size, HUB_RING), [size, HUB_RING]);
@@ -180,18 +191,23 @@ function CDDisc({ size, spin, albumArt }: {
           printed label — and because it turns, it's also what makes the spin
           readable at a glance. */}
       <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate }] }]} pointerEvents="none">
-        {albumArt && (
-          <View style={{
-            position: 'absolute', left: R - ART, top: R - ART,
-            width: ART * 2, height: ART * 2, borderRadius: ART, overflow: 'hidden', opacity: 0.42,
-          }}>
-            <Image source={{ uri: albumArt }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-            {/* pewter wash — pulls the art toward an etched-into-the-disc
-                look instead of a photo pasted on top */}
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#9fb0d4', opacity: 0.28 }]} />
-          </View>
-        )}
         <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+          <Defs>
+            {/* one path, two circles, even-odd — a true ring, so the middle
+                of the disc stays clear glass instead of being filled in */}
+            <ClipPath id="cdArtRing"><Path d={ringPath} clipRule="evenodd" /></ClipPath>
+          </Defs>
+          {albumArt && (
+            <G clipPath="url(#cdArtRing)">
+              <SvgImage
+                href={{ uri: albumArt }}
+                x={R - ART_OUT} y={R - ART_OUT} width={ART_OUT * 2} height={ART_OUT * 2}
+                preserveAspectRatio="xMidYMid slice" opacity={0.44}
+              />
+              {/* pewter wash — etched into the disc rather than pasted on */}
+              <Circle cx={R} cy={R} r={ART_OUT} fill="#9fb0d4" fillOpacity={0.13} />
+            </G>
+          )}
           {marks.arcs.map((a, i) => <Path key={`a${i}`} d={a.d} fill="none" stroke="#ffffff" strokeOpacity={a.op} strokeWidth={a.w} />)}
           {marks.scuffs.map((sc, i) => <Path key={`s${i}`} d={sc.d} stroke="#ffffff" strokeOpacity={sc.op} strokeWidth={0.5} />)}
           {marks.dust.map((d, i) => <Circle key={`d${i}`} cx={d.x} cy={d.y} r={d.r} fill="#ffffff" fillOpacity={d.op} />)}
@@ -229,10 +245,10 @@ function JewelCase({ size, children }: { size: number; children: React.ReactNode
       <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
         <Defs>
           <SvgLinearGradient id="cdCaseEdge" x1="0" y1="0" x2="0.9" y2="1">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.70" />
-            <Stop offset="28%" stopColor="#ffffff" stopOpacity="0.16" />
-            <Stop offset="60%" stopColor="#ffffff" stopOpacity="0.42" />
-            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.14" />
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.88" />
+            <Stop offset="28%" stopColor="#ffffff" stopOpacity="0.24" />
+            <Stop offset="60%" stopColor="#ffffff" stopOpacity="0.58" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.20" />
           </SvgLinearGradient>
           <SvgLinearGradient id="cdSpine" x1="0" y1="0" x2="1" y2="0">
             <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.26" />
@@ -247,13 +263,13 @@ function JewelCase({ size, children }: { size: number; children: React.ReactNode
         <Rect x={33} y={9} width={1.6} height={size - 18} fill="#ffffff" fillOpacity={0.30} />
         {clips.map((f, i) => (
           <G key={`h${i}`}>
-            <Rect x={11} y={size * f - 21} width={18} height={42} rx={4} fill="#ffffff" fillOpacity={0.07} stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.1} />
+            <Rect x={11} y={size * f - 21} width={18} height={42} rx={4} fill="#ffffff" fillOpacity={0.07} stroke="#ffffff" strokeOpacity={0.52} strokeWidth={1.2} />
             <Rect x={14} y={size * f - 13} width={12} height={26} rx={3} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.20} strokeWidth={0.8} />
           </G>
         ))}
         {corners.map(([x, y, sx, sy], i) => (
           <G key={`c${i}`}>
-            <Path d={`M ${x} ${y + 30 * sy} L ${x} ${y} L ${x + 30 * sx} ${y}`} fill="none" stroke="#ffffff" strokeOpacity={0.40} strokeWidth={2} strokeLinecap="round" />
+            <Path d={`M ${x} ${y + 30 * sy} L ${x} ${y} L ${x + 30 * sx} ${y}`} fill="none" stroke="#ffffff" strokeOpacity={0.52} strokeWidth={2} strokeLinecap="round" />
             <Path d={`M ${x + 5 * sx} ${y + 30 * sy} L ${x + 5 * sx} ${y + 5 * sy} L ${x + 30 * sx} ${y + 5 * sy}`} fill="none" stroke="#ffffff" strokeOpacity={0.13} strokeWidth={1} strokeLinecap="round" />
           </G>
         ))}

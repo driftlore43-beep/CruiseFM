@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 /**
  * A tiny mirror ball, drawn rather than picked from an icon font.
@@ -59,18 +59,17 @@ function buildFacets(size: number, r: number, cx: number, cy: number): Facet[] {
       const pt = (p: { x: number; y: number }) =>
         `${(mx + (p.x - mx) * s).toFixed(2)} ${(my + (p.y - my) * s).toFixed(2)}`;
 
+      // Plain white, like every other icon in the app — the tiles differ only
+      // in how solid they are, never in hue. A silver/blue-tinted version read
+      // as a coloured illustration sitting among flat white glyphs.
       const c = project((b0 + b1) / 2, (l0 + l1) / 2);
       const lambert = Math.max(0, c.nx * lx + c.ny * ly + c.nz * lz);
       const jitter = (hash01(j * 13.7 + k * 4.3) - 0.5) * 0.3;
       const t = Math.max(0, Math.min(1, lambert * 0.9 + 0.12 + jitter));
-
-      // Pale silver ramp — cool shadow through to a near-white highlight.
-      const g = Math.round(120 + t * 135);
-      const b = Math.round(138 + t * 117);
       out.push({
         d: `M ${pt(p00)} L ${pt(p01)} L ${pt(p11)} L ${pt(p10)} Z`,
-        fill: `rgb(${Math.round(110 + t * 145)},${g},${b})`,
-        op: 0.45 + 0.55 * Math.min(1, c.nz * 1.5),
+        fill: '#ffffff',
+        op: (0.34 + 0.66 * t) * (0.5 + 0.5 * Math.min(1, c.nz * 1.5)),
       });
     }
   }
@@ -87,36 +86,23 @@ export function MirrorBallGlyph({ size = 22, hanger = true }: { size?: number; h
 
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <Defs>
-        <RadialGradient id="mbgBody" cx="34%" cy="30%" r="78%">
-          <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
-          <Stop offset="60%" stopColor="#7e8aa8" stopOpacity="0.35" />
-          <Stop offset="100%" stopColor="#0b0d18" stopOpacity="0.85" />
-        </RadialGradient>
-        <RadialGradient id="mbgHot" cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.75" />
-          <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-        </RadialGradient>
-      </Defs>
-
       {hanger && (
         <>
           <Path
             d={`M ${cx} ${cy - r} L ${cx} ${size * 0.09}`}
-            stroke="#ffffff" strokeOpacity={0.5} strokeWidth={Math.max(0.7, size * 0.045)}
+            stroke="#ffffff" strokeOpacity={0.55} strokeWidth={Math.max(0.7, size * 0.045)}
           />
-          <Circle cx={cx} cy={size * 0.075} r={Math.max(0.9, size * 0.055)} fill="#ffffff" fillOpacity={0.55} />
+          <Circle cx={cx} cy={size * 0.075} r={Math.max(0.9, size * 0.055)} fill="#ffffff" fillOpacity={0.6} />
         </>
       )}
 
-      <Circle cx={cx} cy={cy} r={r} fill="#3a4058" />
+      {/* No body gradient and no specular: the tiles alone carry the shape.
+          Anything darker underneath turned this into a picture of a ball
+          rather than an icon of one. */}
       {facets.map((f, i) => (
         <Path key={i} d={f.d} fill={f.fill} fillOpacity={f.op} />
       ))}
-      {/* Roundness + a single specular kiss, over the mosaic */}
-      <Circle cx={cx} cy={cy} r={r} fill="url(#mbgBody)" />
-      <Circle cx={cx - r * 0.34} cy={cy - r * 0.38} r={r * 0.34} fill="url(#mbgHot)" />
-      <Circle cx={cx} cy={cy} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.35} strokeWidth={Math.max(0.5, size * 0.035)} />
+      <Circle cx={cx} cy={cy} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.5} strokeWidth={Math.max(0.5, size * 0.035)} />
     </Svg>
   );
 }

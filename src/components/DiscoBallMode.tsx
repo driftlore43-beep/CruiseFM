@@ -86,13 +86,27 @@ function shadeAt(t: number): string {
   return mixHex(SHADE_ANCHORS[i], SHADE_ANCHORS[i + 1], x - i);
 }
 
-// Fixed neon accent set for the moving reflections/bokeh — a deliberate
-// departure from the "always the station's own eqColors" rule elsewhere:
-// the brief calls for a specific club-neon identity (cyan/magenta/purple/
-// blue) for this one mode. Each is nudged ~18% toward the station's own
-// mid accent (eq[1]) wherever it's used, so it still feels station-tinted
-// rather than a totally unrelated palette bolted on.
-const NEON = { cyan: '#22E8FF', magenta: '#FF2FD1', purple: '#9B4DFF', blue: '#3D6BFF' } as const;
+// NOTE (2026-07-26): this mode used to carry a fixed club-neon set
+// (cyan/magenta/purple/blue) blended alongside the station's own colours.
+// It was removed — it put pinks and teals on every ball regardless of mood,
+// which read as random rather than deliberate. Everything coloured here now
+// comes from stationPalette() below. Don't reintroduce a fixed palette.
+
+/**
+ * Everything coloured on this ball draws from here: the station's own three
+ * mood stops, plus a lighter and a deeper version of each. That gives the
+ * surface plenty of variety without ever introducing a hue the station
+ * doesn't own — the ball reads as this station's ball, on every station.
+ */
+function stationPalette(eq: [string, string, string]): string[] {
+  const out: string[] = [];
+  for (const c of eq) {
+    out.push(c);
+    out.push(mixHex(c, '#ffffff', 0.42));
+    out.push(mixHex(c, '#141726', 0.34));
+  }
+  return out;
+}
 
 type Tile = { d: string; fill: string; op: number };
 
@@ -209,7 +223,14 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
 
       // Colour lives on the mirrors, barely on the frame — and mostly it lives
       // on the FLASH, since an unlit mirror shows almost no colour of its own.
-      const palette = [eq[0], eq[1], eq[2], NEON.cyan, NEON.magenta, NEON.purple, NEON.blue];
+      //
+      // STATION COLOURS ONLY. This used to blend in a fixed club-neon set
+      // (cyan/magenta/purple/blue) alongside the station's own, which put
+      // pinks and teals on every ball no matter the mood — Mountain Pass is
+      // pure white and still came out speckled magenta. The variety now comes
+      // from light and dark versions of the station's own three stops, so a
+      // white station reads as silver and a golden one as gold.
+      const palette = stationPalette(eq);
       const hue = palette[Math.floor(hash01(j * 2.71 + k * 3.97) * palette.length) % palette.length];
       const cast = 0.10 + hash01(j * 5.13 + k * 11.27) * 0.34;
       const tint = (s: number, amount: number) => {
@@ -647,7 +668,7 @@ function BallGlitter({ size }: { size: number }) {
 
 // A single soft neon streak drifting down across the ball on its own slow
 // yo-yo loop (opacity + translateY only — native driver). Four of these,
-// one per NEON hue at staggered periods/phases, are what read as "coloured
+// one per station stop at staggered periods/phases, are what read as "coloured
 // reflections moving across the surface" rather than the ColorCycleWash's
 // uniform mood-colour crossfade underneath them.
 function NeonStreak({ size, color, angleDeg, widthPct, duration, delay, peak, pulse }: {
@@ -689,13 +710,15 @@ function NeonStreak({ size, color, angleDeg, widthPct, duration, delay, peak, pu
 // by the ball's own circular overflow:hidden, so they only ever show up
 // where the sphere is.
 function NeonSweep({ size, eq, pulse }: { size: number; eq: [string, string, string]; pulse: Animated.Value }) {
-  const tint = (hex: string) => mixHex(hex, eq[1], 0.18);
+  // Station stops only — a fixed neon set here was part of what put foreign
+  // hues on every ball.
+  const light = (hex: string) => mixHex(hex, '#ffffff', 0.30);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <NeonStreak size={size} color={tint(NEON.cyan)}    angleDeg={18}  widthPct={0.30} duration={4200} delay={0}    peak={0.22} pulse={pulse} />
-      <NeonStreak size={size} color={tint(NEON.magenta)} angleDeg={-24} widthPct={0.24} duration={5100} delay={900}  peak={0.18} pulse={pulse} />
-      <NeonStreak size={size} color={tint(NEON.purple)}  angleDeg={10}  widthPct={0.20} duration={4700} delay={1700} peak={0.16} pulse={pulse} />
-      <NeonStreak size={size} color={tint(NEON.blue)}    angleDeg={-14} widthPct={0.26} duration={5600} delay={2500} peak={0.20} pulse={pulse} />
+      <NeonStreak size={size} color={light(eq[0])} angleDeg={18}  widthPct={0.30} duration={4200} delay={0}    peak={0.22} pulse={pulse} />
+      <NeonStreak size={size} color={light(eq[2])} angleDeg={-24} widthPct={0.24} duration={5100} delay={900}  peak={0.18} pulse={pulse} />
+      <NeonStreak size={size} color={light(eq[1])} angleDeg={10}  widthPct={0.20} duration={4700} delay={1700} peak={0.16} pulse={pulse} />
+      <NeonStreak size={size} color={light(eq[2])} angleDeg={-14} widthPct={0.26} duration={5600} delay={2500} peak={0.20} pulse={pulse} />
     </View>
   );
 }
@@ -744,6 +767,49 @@ function BallBloom({ size, color, pulse }: { size: number; color: string; pulse:
         </Defs>
         <Circle cx={bloomSize / 2} cy={bloomSize / 2} r={bloomSize / 2} fill="url(#dbBloom)" />
       </Svg>
+    </Animated.View>
+  );
+}
+
+// A broad glossy shine sweeping across the ball — the highlight you get when
+// a light source tracks over a polished sphere. Deliberately a WIDE, soft
+// diagonal band rather than a small hotspot: a hotspot reads as a painted
+// blob (round 4 already learned that), whereas a band travelling over the
+// mirrors reads as light genuinely moving on the surface. Transform +
+// opacity only, native driver, clipped by the ball's own circle.
+function BallSheen({ size, pulse }: { size: number; pulse: Animated.Value }) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(t, { toValue: 1, duration: 5200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.delay(1400),
+      Animated.timing(t, { toValue: 0, duration: 5200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.delay(1000),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  const bandW = size * 0.52;
+  const travel = size * 0.95;
+  const translateX = t.interpolate({ inputRange: [0, 1], outputRange: [-travel, travel] });
+  const base = t.interpolate({ inputRange: [0, 0.2, 0.5, 0.8, 1], outputRange: [0, 0.85, 0.55, 0.85, 0] });
+  const beat = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.15] });
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', left: size / 2 - bandW / 2, top: -size * 0.3,
+        width: bandW, height: size * 1.6,
+        opacity: Animated.multiply(base, beat),
+        transform: [{ rotate: '22deg' }, { translateX }],
+      }}
+    >
+      <LinearGradient
+        colors={['transparent', 'rgba(255,255,255,0.10)', 'rgba(255,255,255,0.30)', 'rgba(255,255,255,0.10)', 'transparent']}
+        locations={[0, 0.3, 0.5, 0.7, 1]}
+        start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+        style={{ flex: 1 }}
+      />
     </Animated.View>
   );
 }
@@ -821,6 +887,9 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
           may sit on top of it. Depth falloff is baked into each flash's own
           opacity instead, so it still obeys the sphere's curvature. */}
       <MirrorFlash size={size} groups={flashes} spin={spin} />
+
+      {/* The glossy shine travelling over the mirrors */}
+      <BallSheen size={size} pulse={pulse} />
 
       {/* Lens flare — subtle, along the same light axis as the highlight */}
       <LensFlare size={size} pulse={pulse} />
@@ -935,7 +1004,7 @@ function BokehField({ count, eq, live, winW, winH }: {
     const x = hash01(i * 7.31 + 1.7) * winW;
     const y = winH * 0.10 + hash01(i * 3.13 + 9.4) * winH * 0.72;
     const size = 16 + hash01(i * 5.5 + 2.2) * 30;
-    const palette = [eq[0], eq[1], eq[2], NEON.cyan, NEON.magenta, NEON.purple, NEON.blue];
+    const palette = stationPalette(eq);
     const color = palette[i % palette.length];
     const driftY = 20 + hash01(i * 9.9) * 26;
     const driftX = (hash01(i * 4.4) - 0.5) * 24;
@@ -1000,7 +1069,7 @@ function VolumetricRays({ size, color }: { size: number; color: string }) {
     <Animated.View pointerEvents="none" style={{
       position: 'absolute', width: raySize, height: raySize,
       left: -(raySize - size) / 2, top: -(raySize - size) / 2 - size * 0.5,
-      opacity: 0.16, transform: [{ rotate }],
+      opacity: 0.26, transform: [{ rotate }],
     }}>
       <Svg width={raySize} height={raySize} viewBox="0 0 100 100">
         <Defs>
@@ -1264,7 +1333,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const artist = spotify.track?.artist ?? '';
 
   const fieldRotate = fieldSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const bloomColor = mixHex(eq[1], NEON.cyan, 0.3);
+  const bloomColor = mixHex(eq[1], eq[0], 0.35);
 
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
@@ -1306,7 +1375,9 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
           </View>
 
           {/* The ball, hanging from a mount, genuinely turning on its axis */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          {/* paddingBottom lifts the ball off the dead centre of its box —
+              it hangs from above, so sitting slightly high reads better. */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: ballSize * 0.30 }}>
             <View style={{ alignItems: 'center' }}>
               <View style={{ width: 2, height: ballSize * 0.22, backgroundColor: 'rgba(255,255,255,0.25)' }} />
               <View style={{ width: 14, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: -3 }} />

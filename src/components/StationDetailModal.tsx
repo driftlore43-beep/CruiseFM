@@ -121,7 +121,15 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   // The sheet's accent follows the station's own mood (its mid EQ colour —
   // the same hue the Tuner and cards use), not the app's fixed violet, so the
   // Visual Mode chips and Start Drive button match the station you're opening.
-  const stationAccent = (station as Station).eqColors?.[1] ?? theme.accentColor;
+  // A station the user made stores its chosen colour on `color` and reaches
+  // this sheet RAW — customToStation (which fills in eqColors) only runs when
+  // a mode resolves it. Without the `color` fallback every custom station's
+  // chips and Start Drive button came out the app's default violet instead of
+  // the colour the user picked.
+  const stationAccent =
+    (station as Station).eqColors?.[1]
+    ?? (station as CustomStation).color
+    ?? theme.accentColor;
 
   const topPad = insets.top + 12;
   const isCustom = !station.image;

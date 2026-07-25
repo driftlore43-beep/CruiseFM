@@ -47,13 +47,31 @@ export async function deleteCustomStation(id: string): Promise<void> {
   await persist(existing.filter((s) => s.id !== id));
 }
 
+/** Blend two hex colours — used to spread one chosen colour into a mood ramp. */
+function mixHex(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ar = (pa >> 16) & 255, ag = (pa >> 8) & 255, ab = pa & 255;
+  const br = (pb >> 16) & 255, bg = (pb >> 8) & 255, bb = pb & 255;
+  const r = Math.round(ar + (br - ar) * t), g = Math.round(ag + (bg - ag) * t), bl = Math.round(ab + (bb - ab) * t);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
+}
+
+/** A custom station's three mood stops, spread from its one chosen colour.
+ *  Three IDENTICAL stops (what this used to return) give the visualisers
+ *  nothing to work with — flat bars, a one-tone mirror ball — so the chosen
+ *  colour becomes the middle of a light → base → deep ramp. Derived rather
+ *  than stored, so stations saved before this get it too. */
+export function rampFromColor(color: string): [string, string, string] {
+  return [mixHex(color, '#ffffff', 0.45), color, mixHex(color, '#0c0f1a', 0.42)];
+}
+
 /** A custom station dressed as a full Station so modes can render it. */
 export function customToStation(c: CustomStation): Station {
   return {
     ...c,
     image: null as unknown as Station['image'],
     iconName: /^[a-z]/.test(c.icon) ? c.icon : 'star-four-points',
-    eqColors: c.eqColors ?? [c.color, c.color, c.color],
+    eqColors: c.eqColors ?? rampFromColor(c.color),
   } as Station;
 }
 

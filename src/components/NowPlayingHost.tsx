@@ -134,16 +134,27 @@ function AutoDim() {
   }, []);
 
   // The countdown: any playback-control touch (activityTick) restarts it.
+  //
+  // `cancelled` matters more than it looks. The timer fires and then AWAITS
+  // the brightness calls; if the user closes the mode during that gap,
+  // clearTimeout is far too late and the continuation still ran setDimmed(true)
+  // — mounting the invisible full-screen catch layer OVER the app the user had
+  // just returned to. It cleared itself a render later, but for that moment
+  // taps and swipes went nowhere.
   useEffect(() => {
     if (!eligible || dimmed) return;
+    let cancelled = false;
     const t = setTimeout(async () => {
       try {
-        origRef.current = await Brightness.getBrightnessAsync();
+        const orig = await Brightness.getBrightnessAsync();
+        if (cancelled) return;
         await Brightness.setBrightnessAsync(DIM_LEVEL);
+        if (cancelled) { Brightness.setBrightnessAsync(orig).catch(() => {}); return; }
+        origRef.current = orig;
         setDimmed(true);
       } catch { /* no brightness control — skip silently */ }
     }, DIM_AFTER_MS);
-    return () => clearTimeout(t);
+    return () => { cancelled = true; clearTimeout(t); };
   }, [eligible, dimmed, np.activityTick]);
 
   // Losing eligibility (pause, minimize, stop, toggle off) wakes the screen.

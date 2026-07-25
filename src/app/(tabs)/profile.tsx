@@ -106,7 +106,7 @@ function useMusicPlatformInfo() {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere } = useMotion();
+  const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere } = useMotion();
   const { devFreePreview, setDevFreePreview } = useEntitlements();
   const { name: platformName, color: platformColor, refresh: refreshPlatform } = useMusicPlatformInfo();
   const [selectorVisible, setSelectorVisible] = useState(false);
@@ -328,6 +328,28 @@ export default function ProfileScreen() {
               {...({ activeThumbColor: '#fff' } as object)}
             />
           </View>
+
+          {/* Softer Atmosphere — sits directly under the Atmosphere toggle it
+              modifies, and hides entirely when the haze is off. */}
+          {atmosphere && (
+          <View style={[styles.settingsRow, styles.settingsBorder]}>
+            <View style={styles.platformRowLeft}>
+              <IconChip icon="blur" size={34} />
+              <View style={styles.settingsTextBlock}>
+                <Text style={styles.settingsLabel}>Softer Atmosphere</Text>
+                <Text style={styles.dataSaverSub}>Half-strength haze · off = the full smoke machine</Text>
+              </View>
+            </View>
+            <Switch
+              value={softAtmosphere}
+              onValueChange={setSoftAtmosphere}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              thumbColor="#fff"
+              ios_backgroundColor="rgba(255,255,255,0.18)"
+              {...({ activeThumbColor: '#fff' } as object)}
+            />
+          </View>
+          )}
 
           {/* Music Platform row */}
           <Pressable

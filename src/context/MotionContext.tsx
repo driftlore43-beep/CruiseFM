@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-import { getAtmosphere, getAutoDim, getDataSaver, setAtmosphereStored, setAutoDimStored, setDataSaverStored } from '@/utils/motionSettings';
+import { getAtmosphere, getAutoDim, getDataSaver, getSoftAtmosphere, setAtmosphereStored, setAutoDimStored, setDataSaverStored, setSoftAtmosphereStored } from '@/utils/motionSettings';
 
 type MotionCtx = {
   /** When true, motion backgrounds are forced to stills everywhere. */
@@ -12,23 +12,29 @@ type MotionCtx = {
   /** The smoke-machine haze behind every mode. Default ON. */
   atmosphere: boolean;
   setAtmosphere: (value: boolean) => void;
+  /** Haze at about half strength. Default ON. Ignored when atmosphere is off. */
+  softAtmosphere: boolean;
+  setSoftAtmosphere: (value: boolean) => void;
 };
 
 const Ctx = createContext<MotionCtx>({
   dataSaver: false, setDataSaver: () => {},
   autoDim: true, setAutoDim: () => {},
   atmosphere: true, setAtmosphere: () => {},
+  softAtmosphere: true, setSoftAtmosphere: () => {},
 });
 
 export function MotionProvider({ children }: { children: ReactNode }) {
   const [dataSaver, setDS] = useState(false);
   const [autoDim, setAD] = useState(true);
   const [atmosphere, setAT] = useState(true);
+  const [softAtmosphere, setSA] = useState(true);
 
   useEffect(() => {
     getDataSaver().then(setDS);
     getAutoDim().then(setAD);
     getAtmosphere().then(setAT);
+    getSoftAtmosphere().then(setSA);
   }, []);
 
   const setDataSaver = (value: boolean) => {
@@ -46,8 +52,13 @@ export function MotionProvider({ children }: { children: ReactNode }) {
     setAtmosphereStored(value);
   };
 
+  const setSoftAtmosphere = (value: boolean) => {
+    setSA(value);
+    setSoftAtmosphereStored(value);
+  };
+
   return (
-    <Ctx.Provider value={{ dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere }}>
+    <Ctx.Provider value={{ dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere }}>
       {children}
     </Ctx.Provider>
   );

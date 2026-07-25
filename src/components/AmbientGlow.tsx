@@ -46,7 +46,7 @@ export function AmbientGlow({ active, beat, color, hero = true, trackKey }: {
 }) {
   const breath = useRef(new Animated.Value(0)).current;
   const beatPulse = useRef(new Animated.Value(0)).current;
-  const { atmosphere } = useMotion();
+  const { atmosphere, softAtmosphere } = useMotion();
 
   // Song-transition hold: a new title means the old song just ended — the
   // 5s poll can't see the ~1s silent gap itself, so the moment the title
@@ -99,9 +99,13 @@ export function AmbientGlow({ active, beat, color, hero = true, trackKey }: {
 
   // Profile toggle: some drivers want the scene without the smoke.
   if (!atmosphere) return null;
+  // ...and most want less of it. "Softer Atmosphere" scales the whole layer
+  // rather than each haze, so the shapes and timing are untouched and only
+  // the weight changes.
+  const strength = softAtmosphere ? 0.5 : 1;
 
   return (
-    <>
+    <View style={[StyleSheet.absoluteFill, { opacity: strength }]} pointerEvents="none">
     {/* Hero halo — the cassette-style orb behind the mode's centrepiece.
         Turned off (hero={false}) in modes whose scene already owns that
         space (Cassette's own orb, Horizon's sun). */}
@@ -154,7 +158,7 @@ export function AmbientGlow({ active, beat, color, hero = true, trackKey }: {
         <Haze id="agBeat" color={color} />
       </Animated.View>
     </View>
-    </>
+    </View>
   );
 }
 

@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Brightness from 'expo-brightness';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -44,25 +44,31 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // ── Card bar geometry ─────────────────────────────────────────────────────────
 const BAR_COUNT   = 30;
+// Chunkier segments with a wider dark gap than before — on a real LED meter
+// the gap is a substantial fraction of the pitch, and that is most of what
+// makes it read as discrete lamps rather than a striped bar.
 const SEGMENT_H   = 5;
-const GAP_H       = 2;
-const UNIT        = SEGMENT_H + GAP_H;   // 7px per LED segment
+const GAP_H       = 3;
+const UNIT        = SEGMENT_H + GAP_H;   // 8px per LED segment
 const MAX_SEGS    = 16;
 const MIN_SEGS    = 2;
 const MAX_H       = MAX_SEGS * UNIT;
 const MIN_H       = MIN_SEGS * UNIT;
 const CARD_BAR_W  = Math.floor((SCREEN_W - 48) / BAR_COUNT) - 2;
-const CARD_GAPS   = Array.from({ length: MAX_SEGS - 1 }, (_, i) => SEGMENT_H + i * UNIT);
 
 // ── Fullscreen bar geometry — must match the vizSection height below,
 // otherwise the tallest bars get clipped at the top ─────────────────────────
-const VIZ_H       = Math.round(SCREEN_H * 0.26);
-const FS_MAX_SEGS = Math.max(20, Math.floor(VIZ_H / UNIT));
+const VIZ_H       = Math.round(SCREEN_H * 0.30);
+/** How tall the mirrored reflection is, as a fraction of the bars. */
+const REFLECT_RATIO = 0.42;
+/** The meter is sized so the bars AND their reflection fit inside vizSection,
+ *  which clips. Size the bars to VIZ_H alone and the reflection pushes the
+ *  peaks straight out of the top of the box. */
+const FS_MAX_SEGS = Math.max(14, Math.floor((VIZ_H + 9) / (UNIT * (1 + REFLECT_RATIO))));
 const FS_MAX_H    = FS_MAX_SEGS * UNIT;
 const FS_MIN_H    = MIN_H;
 // 24px side margins + the row's 2px gaps, so the first/last bars never clip.
 const FS_BAR_W    = Math.floor((SCREEN_W - 48 - (BAR_COUNT - 1) * 2) / BAR_COUNT);
-const FS_GAPS     = Array.from({ length: FS_MAX_SEGS - 1 }, (_, i) => SEGMENT_H + i * UNIT);
 
 // ── Bar animation helpers ─────────────────────────────────────────────────────
 
@@ -80,6 +86,12 @@ function barDur(i: number): number {
   return 380 + Math.floor(Math.abs(Math.sin(i * 1.7 + 0.4)) * 280);
 }
 
+/** Snap a bar height to a whole number of LED segments — a real meter lands on
+ *  a lamp, never half way up one. */
+function snap(h: number, minH: number): number {
+  return Math.max(minH, Math.round(h / UNIT) * UNIT);
+}
+
 function startBarAnims(
   values: Animated.Value[],
   bellFn: (i: number) => number,
@@ -93,10 +105,10 @@ function startBarAnims(
       // Native driver: the values only feed transform interpolations in Bars,
       // so the whole loop runs off the JS thread — no per-frame layout work.
       Animated.loop(Animated.sequence([
-        Animated.timing(anim, { toValue: maxH,                         duration: dur,        easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(anim, { toValue: minH + (maxH - minH) * 0.18, duration: dur * 0.65, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(anim, { toValue: maxH * 0.6,                   duration: dur * 0.5,  easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(anim, { toValue: minH,                         duration: dur * 0.75, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: snap(maxH, minH),                         duration: dur,        easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: snap(minH + (maxH - minH) * 0.18, minH), duration: dur * 0.65, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: snap(maxH * 0.6, minH),                   duration: dur * 0.5,  easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: minH,                                     duration: dur * 0.75, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])).start();
     }, i * 14);
     timers.current.push(t);
@@ -114,11 +126,47 @@ function stopBarAnims(
 
 // ── Shared sub-components ─────────────────────────────────────────────────────
 
-function GapStrips({ gaps, bgColor }: { gaps: number[]; bgColor: string }) {
+function mixHex(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ar = (pa >> 16) & 255, ag = (pa >> 8) & 255, ab = pa & 255;
+  const br = (pb >> 16) & 255, bg = (pb >> 8) & 255, bb = pb & 255;
+  const r = Math.round(ar + (br - ar) * t), g = Math.round(ag + (bg - ag) * t), bl = Math.round(ab + (bb - ab) * t);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
+}
+
+/** One lamp's colour, sampled up the three-stop station palette. */
+function segColor(colors: [string, string, string], t: number): string {
+  return t < 0.5 ? mixHex(colors[0], colors[1], t * 2) : mixHex(colors[1], colors[2], (t - 0.5) * 2);
+}
+
+/** The lamps of one bar, bottom to top. Static — built once per geometry. */
+function buildSegments(maxH: number, colors: [string, string, string]) {
+  const n = Math.max(1, Math.floor(maxH / UNIT));
+  return Array.from({ length: n }, (_, i) => ({
+    bottom: i * UNIT,
+    color: segColor(colors, n === 1 ? 1 : i / (n - 1)),
+  }));
+}
+
+/** Lamps drawn as real rectangles with real gaps between them.
+ *
+ *  The old build faked the gaps by painting strips of the BACKGROUND colour
+ *  over a solid gradient — which meant that in fullscreen, where the
+ *  background is a photo and the strip colour was 'transparent', the gaps
+ *  simply never appeared and the bars were solid. Actual gaps also let the
+ *  station artwork through between lamps, which is most of the retro look. */
+function Lamps({ segs, dim }: { segs: ReturnType<typeof buildSegments>; dim?: boolean }) {
   return (
     <>
-      {gaps.map((bottom) => (
-        <View key={bottom} style={{ position: 'absolute', left: 0, right: 0, height: GAP_H, bottom, backgroundColor: bgColor }} />
+      {segs.map((s) => (
+        <View
+          key={s.bottom}
+          style={{
+            position: 'absolute', left: 0, right: 0, bottom: s.bottom, height: SEGMENT_H, borderRadius: 1.5,
+            backgroundColor: dim ? 'rgba(8,10,20,0.55)' : s.color,
+            ...(dim ? { borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.045)' } : null),
+          }}
+        />
       ))}
     </>
   );
@@ -132,37 +180,49 @@ function GapStrips({ gaps, bgColor }: { gaps: number[]; bgColor: string }) {
 // an inner counter-slide keeps the gradient anchored to the bottom — same
 // look, no layout work. React.memo keeps the per-second clock re-renders of
 // the parent from rebuilding 30 gradient stacks.
-const Bars = React.memo(function Bars({ values, barW, maxH, gaps, bgColor, colors }: {
+const Bars = React.memo(function Bars({ values, barW, maxH, colors, track = true, cap = true }: {
   values: Animated.Value[];
   barW: number;
   maxH: number;
-  gaps: number[];
-  bgColor: string;
   colors?: [string, string, string];
+  /** Draw the unlit lamps above the level. This is the single strongest retro
+   *  cue in the references — a hi-fi meter always shows its whole scale. */
+  track?: boolean;
+  /** The peak lamp riding the top of the bar. */
+  cap?: boolean;
 }) {
   const barColors = colors ?? ['#00BFFF', '#8A2BE2', '#FF00AA'];
+  const segs = useMemo(() => buildSegments(maxH, barColors), [maxH, barColors.join()]);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: maxH }}>
       {values.map((anim, i) => {
         const rise    = anim.interpolate({ inputRange: [0, maxH], outputRange: [maxH, 0] });
         const counter = anim.interpolate({ inputRange: [0, maxH], outputRange: [-maxH, 0] });
+        const capY    = anim.interpolate({ inputRange: [0, maxH], outputRange: [0, -(maxH - UNIT)], extrapolate: 'clamp' });
         return (
-          <View key={i} style={{ width: barW, height: maxH, overflow: 'hidden' }}>
+          <View key={i} style={{ width: barW, height: maxH }}>
+            {track && <Lamps segs={segs} dim />}
             {/* The window itself must clip — it slides down while the content
-                counter-slides up, so the gradient stays anchored and only the
-                bottom `h` pixels show. Without overflow here the two motions
+                counter-slides up, so the lamps stay anchored to the bottom and
+                only the lit ones show. Without overflow here the two motions
                 cancel and the bar renders full-height. */}
-            <Animated.View style={{ width: barW, height: maxH, overflow: 'hidden', transform: [{ translateY: rise }] }}>
-              <Animated.View style={{ width: barW, height: maxH, transform: [{ translateY: counter }] }}>
-                <LinearGradient
-                  colors={barColors}
-                  start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }}
-                  style={[StyleSheet.absoluteFill, { borderRadius: 3 }]}
-                />
-                <GapStrips gaps={gaps} bgColor={bgColor} />
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 3 }]} />
+            <View style={{ width: barW, height: maxH, overflow: 'hidden' }}>
+              <Animated.View style={{ width: barW, height: maxH, overflow: 'hidden', transform: [{ translateY: rise }] }}>
+                <Animated.View style={{ width: barW, height: maxH, transform: [{ translateY: counter }] }}>
+                  <Lamps segs={segs} />
+                </Animated.View>
               </Animated.View>
-            </Animated.View>
+            </View>
+            {cap && (
+              <Animated.View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute', left: 0, right: 0, bottom: 0, height: SEGMENT_H, borderRadius: 1.5,
+                  backgroundColor: '#ffffff', opacity: 0.82,
+                  transform: [{ translateY: capY }],
+                }}
+              />
+            )}
           </View>
         );
       })}
@@ -172,10 +232,41 @@ const Bars = React.memo(function Bars({ values, barW, maxH, gaps, bgColor, color
   prev.values === next.values &&
   prev.barW === next.barW &&
   prev.maxH === next.maxH &&
-  prev.bgColor === next.bgColor &&
-  prev.gaps.length === next.gaps.length &&
+  prev.track === next.track &&
+  prev.cap === next.cap &&
   (prev.colors?.join() ?? '') === (next.colors?.join() ?? ''),
 );
+
+/** The bars plus their mirrored reflection below the baseline, fading out —
+ *  straight from the references, and the thing that makes it read as a unit
+ *  sitting on a glossy black deck rather than bars floating on artwork.
+ *  The reflection re-uses the SAME Animated.Values, so it costs extra views
+ *  but no extra animations. */
+function BarsWithReflection(props: React.ComponentProps<typeof Bars> & { reflectH?: number }) {
+  const { reflectH, ...bars } = props;
+  const rh = reflectH ?? Math.round(props.maxH * REFLECT_RATIO);
+  return (
+    <View>
+      <Bars {...bars} />
+      <View style={{ height: rh, overflow: 'hidden', marginTop: 3 }} pointerEvents="none">
+        {/* No vertical offset here. scaleY(-1) already puts the bars' BOTTOM
+            lamps at the top of this box, right against the baseline, which is
+            what a reflection shows. Nudging the box up instead reveals the far
+            end of the flip — the bars' tops — so short bars vanish entirely
+            and tall ones appear detached below the meter. */}
+        <View style={{ transform: [{ scaleY: -1 }], height: props.maxH }}>
+          <Bars {...bars} track={false} cap={false} />
+        </View>
+        {/* Fade the reflection out as it falls away from the baseline. */}
+        <LinearGradient
+          colors={['rgba(4,4,12,0.35)', 'rgba(4,4,12,0.82)', 'rgba(4,4,12,1)']}
+          locations={[0, 0.55, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
+    </View>
+  );
+}
 
 // Slim volume slider with fade-in-on-touch
 // ── Violet progress bar ───────────────────────────────────────────────────────
@@ -283,7 +374,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const lsBarW     = Math.max(3, Math.floor(lsRightW / BAR_COUNT) - 2);
   const lsMaxSegs  = Math.max(20, Math.floor(winH / UNIT));
   const lsMaxH     = lsMaxSegs * UNIT;
-  const lsGaps     = Array.from({ length: lsMaxSegs - 1 }, (_, i) => SEGMENT_H + i * UNIT);
   const lsBellMaxH = useCallback((i: number) => {
     const t = (i - (BAR_COUNT - 1) / 2) / (BAR_COUNT / 4.2);
     return Math.round(MIN_SEGS + (lsMaxSegs - MIN_SEGS) * Math.exp(-0.5 * t * t)) * UNIT;
@@ -560,8 +650,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
                 values={fsValues}
                 barW={lsBarW}
                 maxH={lsMaxH}
-                gaps={lsGaps}
-                bgColor="#060612"
                 colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
               />
               <FloatingNotes playing={playing} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
@@ -655,12 +743,10 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           <View style={{ flex: 1 }} pointerEvents="none" />
 
           <View style={fs.vizSection}>
-            <Bars
+            <BarsWithReflection
               values={fsValues}
               barW={FS_BAR_W}
               maxH={FS_MAX_H}
-              gaps={FS_GAPS}
-              bgColor="transparent"
               colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
             />
             <FloatingNotes playing={playing} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
@@ -807,7 +893,7 @@ export function EqualizerModeCard() {
           <Ionicons name="play" size={9} color="rgba(255,255,255,0.4)" />
           <Text style={card.tapHintText}>tap to open</Text>
         </View>
-        <Bars values={cardValues} barW={CARD_BAR_W} maxH={MAX_H} gaps={CARD_GAPS} bgColor="#111111" />
+        <Bars values={cardValues} barW={CARD_BAR_W} maxH={MAX_H} />
       </TouchableOpacity>
       <View style={card.footer}>
         <View style={card.titleRow}>
@@ -839,7 +925,7 @@ export function EqualizerModePreview() {
         <Ionicons name={active ? 'pause' : 'play'} size={9} color="rgba(255,255,255,0.4)" />
         <Text style={card.tapHintText}>{active ? 'tap to stop' : 'tap to play'}</Text>
       </View>
-      <Bars values={values} barW={CARD_BAR_W} maxH={MAX_H} gaps={CARD_GAPS} bgColor="#111111" />
+      <Bars values={values} barW={CARD_BAR_W} maxH={MAX_H} />
     </TouchableOpacity>
   );
 }

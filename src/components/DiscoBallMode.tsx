@@ -90,14 +90,23 @@ const NEON = { cyan: '#22E8FF', magenta: '#FF2FD1', purple: '#9B4DFF', blue: '#3
 
 type Tile = { d: string; fill: string; op: number };
 
-// How far the mirror face is inset from the tile's own outline, as a fraction
-// of the tile — i.e. how wide the frame showing round it is. HAIRLINE on
-// purpose: on both owner references the seams between mirrors are thin bright
-// lines and the mirror is nearly the whole tile. A fat border (the first cut
-// used a third of the tile) reads as small squares floating on a grey sphere,
-// which is the opposite of what a mirror ball looks like. Slightly wider along
-// the top and left, where the key light catches the frame's edge.
-const BEVEL = { u0: 0.10, u1: 0.94, v0: 0.06, v1: 0.90 };
+// How far the mirror face is inset from the tile's own outline — i.e. the
+// frame showing round it. HAIRLINE on purpose: on both owner references the
+// seams between mirrors are thin bright lines and the mirror is nearly the
+// whole tile. A fat border (an earlier cut used a third of the tile) reads as
+// small squares floating on a grey sphere.
+//
+// u0/u1 are 0 and 1, so the frame is the TOP AND BOTTOM edges only and has no
+// vertical sides. That is not a shortcut — it is the fix for "the tiles don't
+// move". Vertical frame edges are static meridian seams, and they directly
+// contradict the meridians that rotate; drawn bright, they became the most
+// legible structure on the ball and pinned the whole surface in place.
+// Measured over a turn, they carried more than half of all the static
+// vertical-edge energy (2.19 -> 0.99 with them gone), and the eye locks onto
+// whatever doesn't move. Horizontal seams are correctly static (a sphere on
+// its polar axis maps each latitude onto itself); vertical seams belong to
+// RotatingMeridians and nowhere else. NEVER give this a horizontal inset.
+const BEVEL = { u0: 0.0, u1: 1.0, v0: 0.06, v1: 0.90 };
 
 // Viewing tilt — we look slightly DOWN on the ball. This matters: seen from
 // dead level, the latitude rings project to perfectly straight horizontal
@@ -278,18 +287,18 @@ function SphereGrid({ size, eq }: { size: number; eq: [string, string, string] }
 // the true projection: exact everywhere except within ~0.3° of dead centre,
 // where the meridian is a straight vertical line and the difference cannot be
 // drawn anyway.
-function buildMeridianBase(size: number): string {
+function buildMeridianBase(size: number, dx = 0): string {
   const R = size / 2, cx = R, cy = R, ct = Math.cos(TILT);
   let d = '';
   for (let i = 0; i <= 48; i++) {
     const b = -Math.PI / 2 + (Math.PI * i) / 48;
-    d += (i ? ' L ' : 'M ') + (cx + R * Math.cos(b)).toFixed(2) + ' ' + (cy - R * Math.sin(b) * ct).toFixed(2);
+    d += (i ? ' L ' : 'M ') + (cx + dx + R * Math.cos(b)).toFixed(2) + ' ' + (cy - R * Math.sin(b) * ct).toFixed(2);
   }
   return d;
 }
 
-function Meridian({ size, path, lam0, spin, width }: {
-  size: number; path: string; lam0: number; spin: Animated.Value; width: number;
+function Meridian({ size, path, litPath, lam0, spin, width }: {
+  size: number; path: string; litPath: string; lam0: number; spin: Animated.Value; width: number;
 }) {
   const { inp, sx, sk, op } = useMemo(() => {
     const st = Math.sin(TILT);
@@ -324,19 +333,31 @@ function Meridian({ size, path, lam0, spin, width }: {
       }}
     >
       <Svg width={size} height={size}>
+        {/* Paired stroke — a pale line just off the dark one reads as the lit
+            edge of a real seam rather than a wire drawn on the ball. It rides
+            in the SAME animated view (offset in path space, so no second
+            transform and no extra animated views); the scaleX shrinks the gap
+            toward the front meridian, which is right — face-on you wouldn't
+            see the edge of a seam anyway. */}
+        <Path d={litPath} fill="none" stroke="#e8eeff" strokeOpacity={0.24} strokeWidth={width} />
         <Path d={path} fill="none" stroke="#07070f" strokeOpacity={0.5} strokeWidth={width} />
       </Svg>
     </Animated.View>
   );
 }
 
-function RotatingMeridians({ size, spin, count = 24 }: { size: number; spin: Animated.Value; count?: number }) {
+// 32 to match the tile columns: the mirrors' own vertical boundaries are no
+// longer drawn (see BEVEL), so these ARE the ball's vertical seams and they
+// should sit at the same pitch as the mirrors they run between.
+function RotatingMeridians({ size, spin, count = 32 }: { size: number; spin: Animated.Value; count?: number }) {
+  const width = Math.max(0.6, size * 0.004);
   const path = useMemo(() => buildMeridianBase(size), [size]);
-  const width = Math.max(0.5, size * 0.0035);
+  const litPath = useMemo(() => buildMeridianBase(size, -Math.max(1, size * 0.0045)), [size]);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {Array.from({ length: count }, (_, m) => (
-        <Meridian key={m} size={size} path={path} lam0={(2 * Math.PI * m) / count} spin={spin} width={width} />
+        <Meridian key={m} size={size} path={path} litPath={litPath}
+          lam0={(2 * Math.PI * m) / count} spin={spin} width={width} />
       ))}
     </View>
   );

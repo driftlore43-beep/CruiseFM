@@ -162,7 +162,7 @@ function buildSphereTiles(size: number): Tile[] {
       // sphere's edge falls away instead of ending in a hard ring. Kept well
       // short of opaque: the travelling light below has to show through, or
       // the ball stops looking like it's turning.
-      tiles.push({ d, fill, op: 0.28 + Math.min(0.38, c.nz * 0.52) });
+      tiles.push({ d, fill, op: 0.18 + Math.min(0.26, c.nz * 0.36) });
     }
   }
   return tiles;
@@ -192,15 +192,30 @@ function LightPatches({ size, spin, eq }: { size: number; spin: Animated.Value; 
   // is deliberate: a rightward drag scrubs forward, and the surface following
   // the finger in that same direction is what makes the scrub feel physical.
   const scrollX = spin.interpolate({ inputRange: [0, 1], outputRange: [-size, 0] });
-  const blobs = useMemo(() => Array.from({ length: 14 }, (_, i) => {
-    const tight = hash01(i * 1.97 + 0.4) > 0.44;
-    return {
-      x: hash01(i * 3.71 + 0.37) * size,
-      y: hash01(i * 8.13 + 2.11) * size,
-      r: size * (tight ? 0.05 + hash01(i * 4.31) * 0.045 : 0.15 + hash01(i * 6.73) * 0.13),
-      g: tight ? 'lpHot' : (i % 2 ? 'lpSoft' : 'lpCool'),
-    };
-  }), [size]);
+  const blobs = useMemo(() => {
+    const out = Array.from({ length: 14 }, (_, i) => {
+      const tight = hash01(i * 1.97 + 0.4) > 0.44;
+      return {
+        x: hash01(i * 3.71 + 0.37) * size,
+        y: hash01(i * 8.13 + 2.11) * size,
+        r: size * (tight ? 0.05 + hash01(i * 4.31) * 0.045 : 0.15 + hash01(i * 6.73) * 0.13),
+        g: tight ? 'lpHot' : (i % 2 ? 'lpSoft' : 'lpCool'),
+      };
+    });
+    // Four big soft washes on top of the small stuff. The little hot spots
+    // give per-mirror sparkle, but they're too fine to carry the rotation on
+    // their own — these are the broad bright regions sweeping round that let
+    // you see the ball turning from across the car.
+    for (let i = 0; i < 4; i++) {
+      out.push({
+        x: hash01(i * 13.7 + 5.1) * size,
+        y: hash01(i * 11.3 + 3.9) * size,
+        r: size * (0.34 + hash01(i * 17.1) * 0.14),
+        g: 'lpBig',
+      });
+    }
+    return out;
+  }, [size]);
 
   return (
     <Animated.View pointerEvents="none" style={{ position: 'absolute', width: size * 2, height: size, transform: [{ translateX: scrollX }] }}>
@@ -222,6 +237,11 @@ function LightPatches({ size, spin, eq }: { size: number; spin: Animated.Value; 
             <Stop offset="0%" stopColor={eq[0]} stopOpacity="0.7" />
             <Stop offset="100%" stopColor={eq[0]} stopOpacity="0" />
           </RadialGradient>
+          <RadialGradient id="lpBig" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />
+            <Stop offset="60%" stopColor="#ffffff" stopOpacity="0.34" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </RadialGradient>
         </Defs>
         <Rect x={0} y={0} width={size * 2} height={size} fill="#08070f" />
         {/* Four copies, not two. The strip has to be exactly periodic over
@@ -239,9 +259,12 @@ function LightPatches({ size, spin, eq }: { size: number; spin: Animated.Value; 
 }
 
 const WASH_CYCLE_MS = 15000; // full first-hue -> second -> third -> first loop
-// Held back on purpose — at higher values the mood tint flattens the facet
-// contrast and the ball stops reading as mirrors catching light.
-const WASH_PEAK_OPACITY = 0.44;
+// Held WAY back on purpose. This is a flat colour slab over the whole ball,
+// so every point of opacity here directly cancels the travelling light
+// underneath. At 0.44 a quarter-turn only moved the median pixel by 6/255 —
+// the ball was genuinely rotating and simply could not be seen to. Measured
+// again at 0.22 it's ~17/255, which reads clearly.
+const WASH_PEAK_OPACITY = 0.22;
 
 // The station's own eqColors, cycled as three translucent washes over the
 // pale tiles — this is what reads as "the ball's colour shifting" in the
@@ -449,8 +472,12 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
       {/* Fixed lighting — never scrolls, so it reads as a real light source */}
       <Svg width={size} height={size} viewBox="0 0 100 100" style={StyleSheet.absoluteFill} pointerEvents="none">
         <Defs>
+          {/* The dark outer stops are what make the ball read as round, so
+              they stay. The inner WHITE stop does not — it was a flat 50%
+              wash sitting exactly where the travelling light lives, and it
+              was a big part of why the turn was invisible. */}
           <RadialGradient id="dbShade" cx="0.36" cy="0.3" r="0.9">
-            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.5" />
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.12" />
             <Stop offset="0.4" stopColor={eq[1]} stopOpacity="0.1" />
             <Stop offset="0.78" stopColor="#050208" stopOpacity="0.32" />
             <Stop offset="1" stopColor="#020104" stopOpacity="0.75" />
@@ -462,8 +489,8 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
           {/* Soft-edged, so the mirrors still read through the hotspot
               instead of it sitting on the ball like a painted blob */}
           <RadialGradient id="dbHot" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.5" />
-            <Stop offset="0.45" stopColor="#ffffff" stopOpacity="0.22" />
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.26" />
+            <Stop offset="0.45" stopColor="#ffffff" stopOpacity="0.11" />
             <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
           </RadialGradient>
         </Defs>

@@ -287,7 +287,11 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   const topPad = Math.max(insets.top, 20);
 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
-  const caseSize = Math.min(winW * 0.78, winH * 0.40, 340);
+  // Bigger than the ball (0.62w / 0.34h) on purpose: the ball is a circle in
+  // open space, this is a square object, so it needs more of the frame to
+  // carry the same weight. Height-capped at 0.44 so the smallest phones don't
+  // squeeze the title and transport below it.
+  const caseSize = Math.min(winW * 0.86, winH * 0.44, 380);
   const discSize = caseSize * 0.85;
   const discSizeRef = useRef(discSize);
   discSizeRef.current = discSize;

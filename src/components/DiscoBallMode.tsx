@@ -776,6 +776,15 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const wrap01 = (v: number) => ((v % 1) + 1) % 1;
   const readAnim = (a: Animated.Value) => (a as unknown as { __getValue?: () => number }).__getValue?.() ?? 0;
 
+  // Where the turn has got to, derived from the clock rather than read back
+  // from the animation — see the long note on the rotation effect below.
+  const phaseRef = useRef(0);       // phase banked when the current run began
+  const runStartRef = useRef(0);    // Date.now() at the start of that run
+  const turningRef = useRef(false); // is a steady turn currently running?
+  const readPhase = () => (turningRef.current
+    ? wrap01(phaseRef.current + (Date.now() - runStartRef.current) / BALL_SPIN_MS)
+    : wrap01(phaseRef.current));
+
   const ballPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
@@ -788,9 +797,14 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         scrub.begin();
         setScrubbing(true);
         if (SPIN_DEBUG) setDragCount((n) => n + 1);
-        // One-time read of where the turn currently sits, so the ball
-        // carries on from its present angle instead of jumping.
-        spin.stopAnimation((v) => { spinBaseRef.current = wrap01(v); });
+        // Where the turn currently sits, so the ball carries on from its
+        // present angle instead of jumping. Synchronous — no native read.
+        const at = readPhase();
+        spinBaseRef.current = at;
+        phaseRef.current = at;
+        turningRef.current = false;
+        spin.stopAnimation();
+        spin.setValue(at);
       },
       onPanResponderMove: (_, g) => {
         const size = ballSizeRef.current;
@@ -798,7 +812,9 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         // The surface tracks the finger 1:1 — drag a ball-width, turn a
         // ball-width. Wrapped, because the scroll only has one texture
         // width to play with.
-        spin.setValue(wrap01(spinBaseRef.current + g.dx / size));
+        const at = wrap01(spinBaseRef.current + g.dx / size);
+        spin.setValue(at);
+        phaseRef.current = at;   // so the turn resumes from where the finger left it
         // A ball-width of drag covers a fifth of the song: fast enough to
         // cross a track in a few swipes, slow enough to land on a chorus.
         const pct = Math.max(0, Math.min(1, progressBaseRef.current + g.dx / (size * 5)));
@@ -832,54 +848,77 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
     return () => fieldLoop.stop();
   }, [visible]);
 
-  // Ball rotation — starts and stops with the music, and picks up exactly
-  // where it stopped rather than snapping back to zero. stopAnimation's
-  // callback is a ONE-TIME read of the current value (no per-frame listener,
-  // so no JS-thread cost); we finish the partial turn, then hand over to the
-  // steady loop.
+  // Ball rotation — starts and stops with the music, and picks up where it
+  // left off rather than snapping back to zero.
+  //
+  // The phase is tracked HERE, from the wall clock, and never read back from
+  // the animation. That is the whole point of this design. The obvious way
+  // to resume — ask `spin.stopAnimation(cb)` where the value got to — hands
+  // you the answer ASYNCHRONOUSLY for a native-driven value, and if that
+  // answer never arrives, the callback that would have started the next
+  // animation never runs and the ball silently stops forever. That is
+  // exactly what happened on device: measured frozen at phase 0.851 for
+  // four seconds while the gate said it should be turning, and a play/pause
+  // tap was the only thing that revived it. The turn is perfectly linear at
+  // a known duration, so elapsed time gives the phase exactly, with no round
+  // trip and nothing to go missing. Every path below starts an animation
+  // SYNCHRONOUSLY — there is no longer any way to land in a state where the
+  // ball is stopped and nothing is scheduled to move it.
   //
   // `spin` must stay within 0..1: the surface scroll maps that range onto
   // exactly one texture width, so letting it drift past 1 would scroll the
-  // ball off the end of its own two-copy strip. Every target below is
-  // clamped for that reason.
+  // ball off the end of its own two-copy strip.
   useEffect(() => {
     if (!visible) return;
     // While a finger is on the ball the drag owns the rotation — don't fight
     // it. Releasing re-runs this effect, which resumes from the angle the
     // user left the ball at.
-    if (scrubbing) { spin.stopAnimation(); return; }
+    if (scrubbing) return;
+
+    const phase = readPhase();
+    spin.setValue(phase);
+    phaseRef.current = phase;
+
     let cancelled = false;
     let current: Animated.CompositeAnimation | null = null;
 
-    spin.stopAnimation((v) => {
-      if (cancelled) return;
-      const from = v - Math.floor(v);
-      spin.setValue(from);
-
-      if (!spinning) {
-        // Power cut to the motor — coast a fraction of a turn and settle.
-        current = Animated.timing(spin, {
-          toValue: Math.min(1, from + 0.03), duration: 1100,
-          easing: Easing.out(Easing.quad), useNativeDriver: true,
-        });
-        current.start();
-        return;
-      }
-
-      const finishTurn = Animated.timing(spin, {
-        toValue: 1, duration: BALL_SPIN_MS * (1 - from), easing: Easing.linear, useNativeDriver: true,
+    if (!spinning) {
+      turningRef.current = false;
+      // Power cut to the motor — coast a fraction of a turn and settle.
+      const to = Math.min(1, phase + 0.03);
+      current = Animated.timing(spin, {
+        toValue: to, duration: 1100, easing: Easing.out(Easing.quad), useNativeDriver: true,
       });
-      current = finishTurn;
-      finishTurn.start(({ finished }) => {
-        if (!finished || cancelled) return;
-        spin.setValue(0);
-        const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: BALL_SPIN_MS, easing: Easing.linear, useNativeDriver: true }));
-        current = loop;
-        loop.start();
-      });
+      current.start(({ finished }) => { if (finished) phaseRef.current = to % 1; });
+      return () => { current?.stop(); };
+    }
+
+    turningRef.current = true;
+    runStartRef.current = Date.now();
+    const finishTurn = Animated.timing(spin, {
+      toValue: 1, duration: BALL_SPIN_MS * (1 - phase), easing: Easing.linear, useNativeDriver: true,
+    });
+    current = finishTurn;
+    finishTurn.start(({ finished }) => {
+      if (!finished || cancelled) return;
+      spin.setValue(0);
+      phaseRef.current = 0;
+      runStartRef.current = Date.now();
+      const loop = Animated.loop(Animated.timing(spin, {
+        toValue: 1, duration: BALL_SPIN_MS, easing: Easing.linear, useNativeDriver: true,
+      }));
+      current = loop;
+      loop.start();
     });
 
-    return () => { cancelled = true; current?.stop(); };
+    return () => {
+      cancelled = true;
+      // Bank the phase before killing the animation, so the next run resumes
+      // from the right angle without having to ask anyone.
+      phaseRef.current = readPhase();
+      turningRef.current = false;
+      current?.stop();
+    };
   }, [visible, spinning, scrubbing]);
 
   useEffect(() => {

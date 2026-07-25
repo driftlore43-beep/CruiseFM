@@ -27,6 +27,9 @@ import { SeekBar } from '@/components/SeekBar';
 
 const SCREEN_H = Dimensions.get('window').height;
 const DEMO_DURATION_MS = 214000;
+// One full turn of the ball. Fast enough to read as driven by the music,
+// slow enough to still feel like a heavy hanging ball rather than a toy.
+const BALL_SPIN_MS = 9500;
 
 function formatMs(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -61,13 +64,9 @@ function mixHex(a: string, b: string, t: number): string {
   return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
 }
 
-// Neutral, pale cel-shading palette — no baked hue. The moving ColorCycleWash
+// Neutral, pale shading ramp — no baked hue. The moving ColorCycleWash
 // (below) tints this at playback time, so the same tiles work for any station.
-const ZONE_WHITE = '#ffffff';
-const ZONE_LIGHT = '#e9eefa';
-const ZONE_MID   = '#b7c1da';
-const ZONE_DARK  = '#7a83a2';
-const STROKE_COLOR = '#f6f8ff';
+const SHADE_RAMP = ['#39405c', '#5d6786', '#8b96b6', '#bcc6e2', '#e8eeff', '#ffffff'];
 
 // Fixed neon accent set for the moving reflections/bokeh — a deliberate
 // departure from the "always the station's own eqColors" rule elsewhere:
@@ -77,101 +76,139 @@ const STROKE_COLOR = '#f6f8ff';
 // rather than a totally unrelated palette bolted on.
 const NEON = { cyan: '#22E8FF', magenta: '#FF2FD1', purple: '#9B4DFF', blue: '#3D6BFF' } as const;
 
-type Tile = { d: string; fill: string };
+type Tile = { d: string; fill: string; op: number };
 
-// Chunky geodesic tiles in curved latitude rows (soccer-ball taper — fewer,
-// narrower tiles near the poles), each shaded into one of four HARD zones
-// (no gradients) so the roundness reads at a glance, like a cel-shaded
-// sticker rather than a photoreal mirror ball. One period, `size` wide —
-// the seam-tiling contract below is unchanged from the original dot grid.
-function buildDiscoTiles(size: number): Tile[] {
-  const rows = 9, maxCols = 10, minCols = 3;
+// Viewing tilt — we look slightly DOWN on the ball. This matters: seen from
+// dead level, the latitude rings project to perfectly straight horizontal
+// lines and the ball reads as a flat brick wall (the old build's problem).
+// A little tilt is what makes the rows arc and the columns converge at the
+// top pole, exactly like the reference photo.
+const TILT = 0.30;                       // ~17°
+
+// Real sphere projection — every tile is a quad between two latitudes and
+// two longitudes, projected through the sphere and back-face culled. That's
+// what gives genuine 3D: rows compress toward the poles, columns pinch
+// together at the top, and tiles squash to slivers at the silhouette. Built
+// ONCE per size (useMemo) and never animated — a static grid costs nothing
+// per frame, and on a real mirror ball the grid barely appears to move
+// anyway; what you actually see travelling is the light across the facets
+// (that's the scrolling LightPatches layer underneath).
+function buildSphereTiles(size: number): Tile[] {
+  const R = size / 2, cx = R, cy = R;
+  const ROWS = 17, COLS = 32;   // ~240 visible facets after back-face culling
+  const st = Math.sin(TILT), ct = Math.cos(TILT);
+
+  // Key light from the upper-left front, matching the fixed highlight below.
+  const ln = Math.hypot(-0.42, 0.58, 0.70);
+  const lx = -0.42 / ln, ly = 0.58 / ln, lz = 0.70 / ln;
+
+  // lat/lon -> screen point + view-space normal (the sphere's own normal).
+  const project = (beta: number, lam: number) => {
+    const cb = Math.cos(beta);
+    const x0 = cb * Math.sin(lam);
+    const y0 = Math.sin(beta);
+    const z0 = cb * Math.cos(lam);
+    const y1 = y0 * ct - z0 * st;
+    const z1 = y0 * st + z0 * ct;
+    return { x: cx + R * x0, y: cy - R * y1, z: z1, nx: x0, ny: y1, nz: z1 };
+  };
+
   const tiles: Tile[] = [];
+  for (let j = 0; j < ROWS; j++) {
+    const b0 = -Math.PI / 2 + (Math.PI * j) / ROWS;
+    const b1 = -Math.PI / 2 + (Math.PI * (j + 1)) / ROWS;
+    for (let k = 0; k < COLS; k++) {
+      const l0 = (2 * Math.PI * k) / COLS;
+      const l1 = (2 * Math.PI * (k + 1)) / COLS;
+      const p00 = project(b0, l0), p01 = project(b0, l1);
+      const p11 = project(b1, l1), p10 = project(b1, l0);
+      // Back-face cull — anything past the horizon is on the far side.
+      if (p00.z <= 0.02 || p01.z <= 0.02 || p11.z <= 0.02 || p10.z <= 0.02) continue;
 
-  // Latitude bands compress near the poles, open up through the equator.
-  const weights: number[] = [];
-  for (let r = 0; r < rows; r++) {
-    const v = (r + 0.5) / rows;
-    const phi = (v - 0.5) * Math.PI;
-    weights.push(Math.max(0.4, Math.cos(phi)));
-  }
-  const weightSum = weights.reduce((a, b) => a + b, 0);
-  const rowTops: number[] = [];
-  let cursor = 0;
-  for (let r = 0; r < rows; r++) { rowTops.push(cursor); cursor += (weights[r] / weightSum) * size; }
-  rowTops.push(size);
+      const d = `M ${p00.x.toFixed(2)} ${p00.y.toFixed(2)} `
+              + `L ${p01.x.toFixed(2)} ${p01.y.toFixed(2)} `
+              + `L ${p11.x.toFixed(2)} ${p11.y.toFixed(2)} `
+              + `L ${p10.x.toFixed(2)} ${p10.y.toFixed(2)} Z`;
 
-  for (let r = 0; r < rows; r++) {
-    const yTop = rowTops[r], yBot = rowTops[r + 1], rowH = yBot - yTop;
-    const v = (r + 0.5) / rows;
-    const phi = (v - 0.5) * Math.PI;
+      // Lambert shading off the tile's own normal, quantised into the ramp
+      // so it stays stylised rather than photoreal, plus per-mirror jitter
+      // (real balls never have two neighbouring tiles the same brightness).
+      const c = project((b0 + b1) / 2, (l0 + l1) / 2);
+      const lambert = Math.max(0, c.nx * lx + c.ny * ly + c.nz * lz);
+      const jitter = (hash01(j * 31.7 + k * 7.31) - 0.5) * 1.3;
+      const level = Math.max(0, Math.min(SHADE_RAMP.length - 1,
+        Math.round(lambert * (SHADE_RAMP.length - 1) + jitter)));
 
-    // Fewer, narrower tiles near the poles — the soccer-ball UV taper.
-    const cols = Math.max(minCols, Math.round(maxCols * Math.cos(phi)));
-    const cellW = size / cols;
-    const stagger = r % 2 ? cellW / 2 : 0;
+      // A minority of mirrors pick up a neon cast, like the reference's
+      // pink/blue/lilac facets — the rest stay silver.
+      const hueRoll = hash01(j * 5.13 + k * 11.27);
+      const base = SHADE_RAMP[level];
+      const fill = hueRoll > 0.74
+        ? mixHex(base, [NEON.magenta, NEON.cyan, NEON.purple, NEON.blue][k % 4], 0.28)
+        : base;
 
-    // One sine period per `size`, shared phase across rows, so the dome
-    // curvature lines up perfectly at the copy-to-copy seam.
-    const bowAmp = rowH * (0.06 + 0.10 * (1 - Math.cos(phi)));
-    const bow = (x: number) => bowAmp * Math.sin((2 * Math.PI * x) / size);
-
-    // col runs -1..cols-1: the col=-1 tile is the seam-tiling trick that
-    // made the original dot grid tile seamlessly, kept unchanged here.
-    for (let c = -1; c < cols; c++) {
-      const xLeft = c * cellW + stagger, xRight = xLeft + cellW, xMid = xLeft + cellW / 2;
-      const topL = yTop + bow(xLeft), topR = yTop + bow(xRight), topM = yTop + bow(xMid) - rowH * 0.035;
-      const botL = yBot + bow(xLeft), botR = yBot + bow(xRight), botM = yBot + bow(xMid) + rowH * 0.035;
-
-      const d = `M ${xLeft.toFixed(2)} ${topL.toFixed(2)} `
-              + `Q ${xMid.toFixed(2)} ${topM.toFixed(2)} ${xRight.toFixed(2)} ${topR.toFixed(2)} `
-              + `L ${xRight.toFixed(2)} ${botR.toFixed(2)} `
-              + `Q ${xMid.toFixed(2)} ${botM.toFixed(2)} ${xLeft.toFixed(2)} ${botL.toFixed(2)} Z`;
-
-      // Shading keyed on (row, cMod) only — cMod wraps col=-1 onto the same
-      // class as the true last column, so fill matches exactly at the seam.
-      const cMod = ((c % cols) + cols) % cols;
-      const frac = cols > 1 ? cMod / (cols - 1) : 0.5;
-
-      // Hard zones, not a gradient: a left-bright/right-dark 3/4 key-light
-      // tendency, a clumped hash so zones read as hand-placed blobs, and one
-      // hotspot cluster pushed to pure white for the specular patch.
-      let bias = 0.80 - frac * 0.95 + (0.5 - v) * 0.30;
-      const clump = hash01(r * 12.9 + Math.floor(cMod / 2) * 5.7 + Math.floor(v * 3) * 2.1);
-      bias += (clump - 0.5) * 0.6;
-      const hotspot = Math.exp(-(((frac - 0.36) ** 2) / 0.045 + ((v - 0.32) ** 2) / 0.05));
-      bias += hotspot * 0.95;
-
-      const fill = bias > 0.80 ? ZONE_WHITE : bias > 0.44 ? ZONE_LIGHT : bias > 0.14 ? ZONE_MID : ZONE_DARK;
-      tiles.push({ d, fill });
+      // Facets near the silhouette sit at a glancing angle — dimmer, so the
+      // sphere's edge falls away instead of ending in a hard ring.
+      tiles.push({ d, fill, op: 0.42 + Math.min(0.46, c.nz * 0.62) });
     }
   }
   return tiles;
 }
 
-// One period of the facet texture — drawn once, never touched again. Three
-// static passes fake a rounded bevel per tile (a real per-edge bevel needs a
-// blur/shadow filter RN doesn't have): a soft dark offset copy reads as a
-// recessed seam, then the fill+outline, then a thin bright inner rim so each
-// facet catches the light like real beveled glass. All one-time SVG nodes —
-// zero per-frame cost, same CPU-safety rule as everywhere else in this app.
-function MirrorBallFace({ size }: { size: number }) {
-  const tiles = useMemo(() => buildDiscoTiles(size), [size]);
-  const strokeW = Math.max(1, size * 0.007);
-  const bevelOffset = `translate(${(size * 0.006).toFixed(2)} ${(size * 0.009).toFixed(2)})`;
+// The static mirror grid. Semi-transparent on purpose: the scrolling light
+// underneath shows through and gets carved into individual facets by these
+// tiles' dark seams — which is exactly how a real disco ball reads.
+function SphereGrid({ size }: { size: number }) {
+  const tiles = useMemo(() => buildSphereTiles(size), [size]);
+  const seam = Math.max(0.5, size * 0.0035);
   return (
-    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <Rect x={0} y={0} width={size} height={size} fill="#0a0912" />
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFill} pointerEvents="none">
       {tiles.map((t, i) => (
-        <Path key={`s${i}`} d={t.d} fill="#000000" fillOpacity={0.24} transform={bevelOffset} />
-      ))}
-      {tiles.map((t, i) => (
-        <Path key={i} d={t.d} fill={t.fill} stroke={STROKE_COLOR} strokeOpacity={0.85} strokeWidth={strokeW * 1.3} strokeLinejoin="round" />
-      ))}
-      {tiles.map((t, i) => (
-        <Path key={`h${i}`} d={t.d} fill="none" stroke="#ffffff" strokeOpacity={0.32} strokeWidth={strokeW * 0.5} strokeLinejoin="round" />
+        <Path key={i} d={t.d} fill={t.fill} fillOpacity={t.op} stroke="#07070f" strokeOpacity={0.5} strokeWidth={seam} strokeLinejoin="round" />
       ))}
     </Svg>
+  );
+}
+
+// The one moving layer on the ball: soft light patches (plus a few tight hot
+// spots that read as individual mirrors catching the beam) scrolling behind
+// the static grid. Two identical copies, one native-driver translateX loop
+// — the seam-tiling contract from the original build, unchanged.
+function LightPatches({ size, spin, eq }: { size: number; spin: Animated.Value; eq: [string, string, string] }) {
+  const scrollX = spin.interpolate({ inputRange: [0, 1], outputRange: [0, -size] });
+  const blobs = useMemo(() => Array.from({ length: 11 }, (_, i) => {
+    const tight = hash01(i * 1.97 + 0.4) > 0.5;
+    return {
+      x: hash01(i * 3.71 + 0.37) * size,
+      y: hash01(i * 8.13 + 2.11) * size,
+      r: size * (tight ? 0.05 + hash01(i * 4.31) * 0.045 : 0.15 + hash01(i * 6.73) * 0.13),
+      g: tight ? 'lpHot' : (i % 2 ? 'lpSoft' : 'lpCool'),
+    };
+  }), [size]);
+
+  return (
+    <Animated.View pointerEvents="none" style={{ position: 'absolute', width: size * 2, height: size, transform: [{ translateX: scrollX }] }}>
+      <Svg width={size * 2} height={size}>
+        <Defs>
+          <RadialGradient id="lpHot" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+            <Stop offset="40%" stopColor="#ffffff" stopOpacity="0.4" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </RadialGradient>
+          <RadialGradient id="lpSoft" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </RadialGradient>
+          <RadialGradient id="lpCool" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={eq[0]} stopOpacity="0.6" />
+            <Stop offset="100%" stopColor={eq[0]} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect x={0} y={0} width={size * 2} height={size} fill="#0d0c1a" />
+        {blobs.map((b, i) => <Circle key={`a${i}`} cx={b.x} cy={b.y} r={b.r} fill={`url(#${b.g})`} />)}
+        {blobs.map((b, i) => <Circle key={`b${i}`} cx={b.x + size} cy={b.y} r={b.r} fill={`url(#${b.g})`} />)}
+      </Svg>
+    </Animated.View>
   );
 }
 
@@ -206,57 +243,56 @@ function ColorCycleWash({ size, eq }: { size: number; eq: [string, string, strin
   );
 }
 
-// A static 4-point sparkle path + glow, drawn once — only opacity/scale animate.
-function SparklePath({ boxSize }: { boxSize: number }) {
-  return (
-    <Svg width={boxSize} height={boxSize} viewBox="0 0 100 100">
-      <Defs>
-        <RadialGradient id="dbGlow" cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor="#ffffff" stopOpacity={0.55} />
-          <Stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <Circle cx={50} cy={50} r={50} fill="url(#dbGlow)" />
-      <Path fill="#ffffff" d="M50 2 C55 33 67 45 98 50 C67 55 55 67 50 98 C45 67 33 55 2 50 C33 45 45 33 50 2 Z" />
-    </Svg>
-  );
-}
-
-function GlintStar({ size, leftPct, topPct, boxPct, period, phase = 0, minScale = 0.7, minOpacity = 0.35 }: {
-  size: number; leftPct: number; topPct: number; boxPct: number; period: number; phase?: number; minScale?: number; minOpacity?: number;
+// One twinkling speck of glitter. The cross-flare (two hairline bars) is what
+// separates "glitter" from "a dot" — it's the bit that reads as light
+// catching an edge. Opacity + scale only, native driver.
+function Glint({ x, y, r, cross, dur, delay, color, maxOpacity = 0.95 }: {
+  x: number; y: number; r: number; cross: boolean; dur: number; delay: number; color: string; maxOpacity?: number;
 }) {
   const t = useRef(new Animated.Value(0)).current;
-  const boxSize = size * boxPct;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
-      Animated.delay(phase),
-      Animated.timing(t, { toValue: 1, duration: period / 2, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      Animated.timing(t, { toValue: 0, duration: period / 2, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.delay(delay),
+      Animated.timing(t, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(t, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ]));
     loop.start();
     return () => loop.stop();
   }, []);
-  const opacity = t.interpolate({ inputRange: [0, 1], outputRange: [minOpacity, 1] });
-  const scale = t.interpolate({ inputRange: [0, 1], outputRange: [minScale, 1] });
+  const opacity = t.interpolate({ inputRange: [0, 1], outputRange: [0.06, maxOpacity] });
+  const scale = t.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] });
+  const box = r * (cross ? 7 : 2);
   return (
     <Animated.View pointerEvents="none" style={{
-      position: 'absolute', left: size * leftPct - boxSize / 2, top: size * topPct - boxSize / 2,
-      width: boxSize, height: boxSize, opacity, transform: [{ scale }],
+      position: 'absolute', left: x - box / 2, top: y - box / 2, width: box, height: box,
+      alignItems: 'center', justifyContent: 'center', opacity, transform: [{ scale }],
     }}>
-      <SparklePath boxSize={boxSize} />
+      {cross && <View style={{ position: 'absolute', width: box, height: 1, backgroundColor: color, opacity: 0.45 }} />}
+      {cross && <View style={{ position: 'absolute', width: 1, height: box, backgroundColor: color, opacity: 0.45 }} />}
+      <View style={{
+        width: r * 2, height: r * 2, borderRadius: r, backgroundColor: color,
+        shadowColor: color, shadowOpacity: 0.9, shadowRadius: r * 2.4, shadowOffset: { width: 0, height: 0 },
+      }} />
     </Animated.View>
   );
 }
 
-// Two prominent glints sitting right at the edge of the highlight patch —
-// positions/sizes measured off the reference (a big one + a smaller companion
-// just above-left), replacing the old four small twinkle dots.
-function OnBallGlints({ size }: { size: number }) {
+// Fine glitter ON the ball — individual mirrors catching the light. Sits
+// inside the highlight's half of the sphere where a real key light would
+// actually produce flashes, rather than scattered evenly.
+function BallGlitter({ size }: { size: number }) {
+  const specks = useMemo(() => Array.from({ length: 9 }, (_, i) => ({
+    x: size * (0.26 + hash01(i * 4.11 + 1.3) * 0.52),
+    y: size * (0.18 + hash01(i * 7.53 + 0.7) * 0.5),
+    r: 1 + hash01(i * 2.9) * 1.8,
+    cross: hash01(i * 6.1) > 0.45,
+    dur: 900 + Math.floor(hash01(i * 3.3) * 1100),
+    delay: Math.floor(hash01(i * 8.7) * 2200),
+  })), [size]);
   return (
-    <>
-      <GlintStar size={size} leftPct={0.64} topPct={0.42} boxPct={0.19} period={3000} phase={0} minScale={0.7} minOpacity={0.35} />
-      <GlintStar size={size} leftPct={0.575} topPct={0.30} boxPct={0.10} period={3600} phase={700} minScale={0.6} minOpacity={0.25} />
-    </>
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {specks.map((s, i) => <Glint key={i} {...s} color="#ffffff" />)}
+    </View>
   );
 }
 
@@ -364,15 +400,14 @@ function BallBloom({ size, color, pulse }: { size: number; color: string; pulse:
 }
 
 function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, string, string]; spin: Animated.Value; pulse: Animated.Value }) {
-  const scrollX = spin.interpolate({ inputRange: [0, 1], outputRange: [0, -size] });
-
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#0a0912' }}>
-      {/* Scrolling surface — two identical copies, one continuous loop */}
-      <Animated.View style={{ flexDirection: 'row', width: size * 2, height: size, transform: [{ translateX: scrollX }] }}>
-        <MirrorBallFace size={size} />
-        <MirrorBallFace size={size} />
-      </Animated.View>
+      {/* The moving layer: light travelling across the surface as it turns */}
+      <LightPatches size={size} spin={spin} eq={eq} />
+
+      {/* The sphere itself — a fixed, properly-projected mirror grid that
+          carves the light beneath it into individual facets */}
+      <SphereGrid size={size} />
 
       {/* Colour cycle — the station's own mood colours washing through,
           above the tiles, below the fixed highlight so it stays clean */}
@@ -393,21 +428,28 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
             <Stop offset="1" stopColor="#020104" stopOpacity="0.75" />
           </RadialGradient>
           <RadialGradient id="dbWarm" cx="0.74" cy="0.8" r="0.55">
-            <Stop offset="0" stopColor="#FFA83C" stopOpacity="0.3" />
+            <Stop offset="0" stopColor="#FFA83C" stopOpacity="0.16" />
             <Stop offset="1" stopColor="#FFA83C" stopOpacity="0" />
+          </RadialGradient>
+          {/* Soft-edged, so the mirrors still read through the hotspot
+              instead of it sitting on the ball like a painted blob */}
+          <RadialGradient id="dbHot" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.5" />
+            <Stop offset="0.45" stopColor="#ffffff" stopOpacity="0.22" />
+            <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
           </RadialGradient>
         </Defs>
         <Circle cx={50} cy={50} r={50} fill="url(#dbShade)" />
         <Circle cx={50} cy={50} r={50} fill="url(#dbWarm)" />
-        <Ellipse cx={36} cy={30} rx={14} ry={9} fill="#ffffff" fillOpacity={0.42} />
+        <Ellipse cx={36} cy={30} rx={19} ry={13} fill="url(#dbHot)" />
         <Circle cx={50} cy={50} r={49} fill="none" stroke="#ffffff" strokeOpacity={0.16} strokeWidth={1} />
       </Svg>
 
       {/* Lens flare — subtle, along the same light axis as the highlight */}
       <LensFlare size={size} pulse={pulse} />
 
-      {/* On-ball sparkle — two prominent glints at the highlight's edge */}
-      <OnBallGlints size={size} />
+      {/* Fine glitter on the mirrors themselves */}
+      <BallGlitter size={size} />
     </View>
   );
 }
@@ -532,6 +574,37 @@ function BokehField({ count, eq, live, winW, winH }: {
   );
 }
 
+// ── Star dust — a fine glitter haze hanging in the room ─────────────────────
+// Deliberately different from the bokeh (big, soft, out-of-focus) and the
+// light field (bigger coloured dots that orbit): these are tiny, sharp and
+// numerous, most of them with a hairline cross-flare, densest around the
+// ball and thinning out toward the edges of the screen.
+function StarDust({ count, live, winW, winH, tint }: {
+  count: number; live: Animated.Value; winW: number; winH: number; tint: string;
+}) {
+  const specks = useMemo(() => Array.from({ length: count }, (_, i) => {
+    // Polar scatter around the ball's centre so the dust crowds the light
+    // source, with a golden-angle spread that never clumps.
+    const ang = ((i * 137.508) % 360) * (Math.PI / 180);
+    const rad = 0.10 + Math.sqrt(hash01(i * 2.77 + 0.9)) * 0.62;
+    return {
+      x: winW * (0.5 + Math.cos(ang) * rad * 0.95),
+      y: winH * (0.42 + Math.sin(ang) * rad * 0.72),
+      r: 0.8 + hash01(i * 5.31) * 1.6,
+      cross: hash01(i * 3.97) > 0.62,
+      dur: 800 + Math.floor(hash01(i * 6.19) * 1500),
+      delay: Math.floor(hash01(i * 9.41) * 2600),
+      color: hash01(i * 7.07) > 0.78 ? tint : '#ffffff',
+    };
+  }), [count, winW, winH, tint]);
+
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity: live }]} pointerEvents="none">
+      {specks.map((s, i) => <Glint key={i} {...s} maxOpacity={0.85} />)}
+    </Animated.View>
+  );
+}
+
 // ── Volumetric light shafts — a couple of very faint cone gradients falling
 // from above the ball, slowly counter-rotating against the light field for
 // parallax. Pure static SVG under one native rotate loop — the "haze in a
@@ -602,25 +675,71 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
 
   useEffect(() => { if (visible) getStationPlaylist(station.id).then(setLinked); }, [visible, station.id]);
 
-  // Continuous native-driver rotations — GPU only, no CPU per frame. The
-  // ball turns slowly and deliberately (14s/rev) — a fast spin read as a
-  // toy, this reads as a real hanging mirror ball.
+  // The room lights up while the music plays, dims between/at rest.
+  const lightsOn = playing && !musicSwitching;
+  // The ball only turns while audio is genuinely playing — pause the music
+  // and it coasts to a stop, exactly like the power being cut to the motor.
+  const spinning = lightsOn && (spotify.track?.isPlaying ?? true);
+
+  // Ambient loops that run the whole time the mode is open.
   useEffect(() => {
     if (!visible) return;
-    const ballLoop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 14000, easing: Easing.linear, useNativeDriver: true }));
     const fieldLoop = Animated.loop(Animated.timing(fieldSpin, { toValue: 1, duration: 26000, easing: Easing.linear, useNativeDriver: true }));
     const bobLoop = Animated.loop(Animated.sequence([
       Animated.timing(bob, { toValue: 1, duration: 2100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       Animated.timing(bob, { toValue: 0, duration: 2100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ]));
-    ballLoop.start();
     fieldLoop.start();
     bobLoop.start();
-    return () => { ballLoop.stop(); fieldLoop.stop(); bobLoop.stop(); };
+    return () => { fieldLoop.stop(); bobLoop.stop(); };
   }, [visible]);
 
-  // The room lights up while the music plays, dims between/at rest.
-  const lightsOn = playing && !musicSwitching;
+  // Ball rotation — starts and stops with the music, and picks up exactly
+  // where it stopped rather than snapping back to zero. stopAnimation's
+  // callback is a ONE-TIME read of the current value (no per-frame listener,
+  // so no JS-thread cost); we finish the partial turn, then hand over to the
+  // steady loop.
+  //
+  // `spin` must stay within 0..1: the surface scroll maps that range onto
+  // exactly one texture width, so letting it drift past 1 would scroll the
+  // ball off the end of its own two-copy strip. Every target below is
+  // clamped for that reason.
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    let current: Animated.CompositeAnimation | null = null;
+
+    spin.stopAnimation((v) => {
+      if (cancelled) return;
+      const from = v - Math.floor(v);
+      spin.setValue(from);
+
+      if (!spinning) {
+        // Power cut to the motor — coast a fraction of a turn and settle.
+        current = Animated.timing(spin, {
+          toValue: Math.min(1, from + 0.03), duration: 1100,
+          easing: Easing.out(Easing.quad), useNativeDriver: true,
+        });
+        current.start();
+        return;
+      }
+
+      const finishTurn = Animated.timing(spin, {
+        toValue: 1, duration: BALL_SPIN_MS * (1 - from), easing: Easing.linear, useNativeDriver: true,
+      });
+      current = finishTurn;
+      finishTurn.start(({ finished }) => {
+        if (!finished || cancelled) return;
+        spin.setValue(0);
+        const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: BALL_SPIN_MS, easing: Easing.linear, useNativeDriver: true }));
+        current = loop;
+        loop.start();
+      });
+    });
+
+    return () => { cancelled = true; current?.stop(); };
+  }, [visible, spinning]);
+
   useEffect(() => {
     Animated.timing(live, { toValue: lightsOn ? 1 : 0.15, duration: lightsOn ? 900 : 700, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
   }, [lightsOn]);
@@ -630,9 +749,8 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   // (no real audio analysis; gated on Spotify actually reporting playback so
   // it never pulses over silence), kept subtle since this is a lighting
   // accent, not the main show.
-  const beatActive = lightsOn && (spotify.track?.isPlaying ?? true);
   useEffect(() => {
-    if (!beatActive) {
+    if (!spinning) {
       Animated.timing(pulse, { toValue: 0, duration: 700, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
       return;
     }
@@ -642,7 +760,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
     ]));
     loop.start();
     return () => loop.stop();
-  }, [beatActive]);
+  }, [spinning]);
 
   useEffect(() => {
     if (!visible) return;
@@ -692,11 +810,14 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
 
         {/* Orbiting light field — behind the ball, over the whole room */}
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate: fieldRotate }] }]} pointerEvents="none">
-          <LightField count={22} eq={eq} live={live} winW={winW} winH={winH} />
+          <LightField count={12} eq={eq} live={live} winW={winW} winH={winH} />
         </Animated.View>
 
         {/* Floating bokeh — soft out-of-focus particles drifting in the room */}
-        <BokehField count={12} eq={eq} live={live} winW={winW} winH={winH} />
+        <BokehField count={7} eq={eq} live={live} winW={winW} winH={winH} />
+
+        {/* Star dust — the fine glitter haze, densest around the ball */}
+        <StarDust count={30} live={live} winW={winW} winH={winH} tint={eq[0]} />
 
         {/* Drag pill */}
         <View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">

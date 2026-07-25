@@ -90,13 +90,14 @@ const NEON = { cyan: '#22E8FF', magenta: '#FF2FD1', purple: '#9B4DFF', blue: '#3
 
 type Tile = { d: string; fill: string; op: number };
 
-// How far the bright inner face of a mirror is inset from the tile's own
-// outline, as a fraction of the tile. Deliberately ASYMMETRIC: the exposed
-// dark frame is thin along the top/left (a lit rim) and thick along the
-// bottom/right (the tile's own shadow), which is what a bevel actually looks
-// like under a key light from the upper left. Symmetric insets just read as
-// a grid of smaller squares.
-const BEVEL = { u0: 0.13, u1: 0.79, v0: 0.21, v1: 0.87 };
+// How far the mirror face is inset from the tile's own outline, as a fraction
+// of the tile — i.e. how wide the frame showing round it is. HAIRLINE on
+// purpose: on both owner references the seams between mirrors are thin bright
+// lines and the mirror is nearly the whole tile. A fat border (the first cut
+// used a third of the tile) reads as small squares floating on a grey sphere,
+// which is the opposite of what a mirror ball looks like. Slightly wider along
+// the top and left, where the key light catches the frame's edge.
+const BEVEL = { u0: 0.10, u1: 0.94, v0: 0.06, v1: 0.90 };
 
 // Viewing tilt — we look slightly DOWN on the ball. This matters: seen from
 // dead level, the latitude rings project to perfectly straight horizontal
@@ -113,7 +114,7 @@ const TILT = 0.30;                       // ~17°
 // per frame, and on a real mirror ball the grid barely appears to move
 // anyway; what you actually see travelling is the light across the facets
 // (that's the scrolling LightPatches layer underneath).
-function buildSphereTiles(size: number): Tile[] {
+function buildSphereTiles(size: number, eq: [string, string, string]): Tile[] {
   const R = size / 2, cx = R, cy = R;
   const ROWS = 17, COLS = 32;   // ~240 visible facets after back-face culling
   const st = Math.sin(TILT), ct = Math.cos(TILT);
@@ -155,22 +156,31 @@ function buildSphereTiles(size: number): Tile[] {
               + `L ${p11.x.toFixed(2)} ${p11.y.toFixed(2)} `
               + `L ${p10.x.toFixed(2)} ${p10.y.toFixed(2)} Z`;
 
-      // Lambert shading off the tile's own normal, quantised into the ramp
-      // so it stays stylised rather than photoreal, plus per-mirror jitter
-      // (real balls never have two neighbouring tiles the same brightness).
       const c = project((b0 + b1) / 2, (l0 + l1) / 2);
       const lambert = Math.max(0, c.nx * lx + c.ny * ly + c.nz * lz);
-      const jitter = (hash01(j * 31.7 + k * 7.31) - 0.5) * 2.1;
-      const step = Math.max(0, Math.min(SHADE_STEPS - 1,
-        Math.round(lambert * (SHADE_STEPS - 1) + jitter)));
 
-      // A minority of mirrors pick up a neon cast, like the reference's
-      // pink/blue/lilac facets — the rest stay silver.
-      const hueRoll = hash01(j * 5.13 + k * 11.27);
-      const neon = [NEON.magenta, NEON.cyan, NEON.purple, NEON.blue][k % 4];
-      const tint = (s: number) => {
+      // Two DIFFERENT brightness rules, and the split is the whole point of
+      // this pass. On a real ball (both owner references) the frame between
+      // the mirrors is continuous metal, so it shades smoothly — bright on
+      // the lit side, dark on the shadow side, no speckle. The mirrors
+      // themselves each reflect a different part of the room, so neighbours
+      // land wildly apart in brightness. Driving both from one jittered
+      // value, as this did before, made the whole surface speckle together
+      // and lost the lit grid that gives the ball its structure.
+      const frameStep = lambert * (SHADE_STEPS - 1) + 2.6;
+      const faceStep = lambert * (SHADE_STEPS - 1) + (hash01(j * 31.7 + k * 7.31) - 0.5) * 5.2;
+
+      // Colour lives on the mirrors, barely on the frame. The palette is the
+      // station's own mood plus the club-neon set, so the ball still reads as
+      // this station's ball rather than a fixed pink one — but with most
+      // tiles carrying some cast, not the old 26% minority, which is what
+      // left it looking like grey stone next to the references.
+      const palette = [eq[0], eq[1], eq[2], NEON.cyan, NEON.magenta, NEON.purple, NEON.blue];
+      const hue = palette[Math.floor(hash01(j * 2.71 + k * 3.97) * palette.length) % palette.length];
+      const cast = 0.10 + hash01(j * 5.13 + k * 11.27) * 0.34;
+      const tint = (s: number, amount: number) => {
         const base = shadeAt(Math.max(0, Math.min(1, s / (SHADE_STEPS - 1))));
-        return hueRoll > 0.74 ? mixHex(base, neon, 0.28) : base;
+        return amount > 0 ? mixHex(base, hue, amount) : base;
       };
 
       // Facets near the silhouette sit at a glancing angle — dimmer, so the
@@ -179,13 +189,14 @@ function buildSphereTiles(size: number): Tile[] {
       // the ball stops looking like it's turning.
       const depth = Math.min(1, c.nz * 1.35);
 
-      // Each mirror is TWO quads, not one flat fill: a darker full-tile frame
-      // and a brighter inner face inset toward the light. That single extra
-      // path per tile is what stops the surface reading as a smooth painted
-      // sphere — you get a lit edge, a shaded edge and a face between them,
-      // i.e. an actual bevel, for no per-frame cost (the grid is static).
-      tiles.push({ d, fill: tint(step - 2.4), op: 0.13 + 0.17 * depth });
-
+      // Each mirror is TWO paths: the face, and the frame AROUND it. The
+      // frame is a genuine hole-in-the-middle border (even-odd fill), not a
+      // full-tile quad sitting under the face — and that distinction is
+      // load-bearing. The frame is bright, and as a full quad its opacity
+      // would land on the entire ball and cancel the travelling light
+      // underneath, which is the exact failure round 6 had to measure its way
+      // out of. As a border it can be bright enough to read as a lit seam
+      // while the ball's average coverage actually goes DOWN.
       const P = (u: number, v: number) => {
         const a = (1 - u) * (1 - v), b = u * (1 - v), cc = u * v, dd = (1 - u) * v;
         return {
@@ -195,14 +206,13 @@ function buildSphereTiles(size: number): Tile[] {
       };
       const f00 = P(BEVEL.u0, BEVEL.v0), f01 = P(BEVEL.u1, BEVEL.v0);
       const f11 = P(BEVEL.u1, BEVEL.v1), f10 = P(BEVEL.u0, BEVEL.v1);
-      tiles.push({
-        d: `M ${f00.x.toFixed(2)} ${f00.y.toFixed(2)} `
-         + `L ${f01.x.toFixed(2)} ${f01.y.toFixed(2)} `
-         + `L ${f11.x.toFixed(2)} ${f11.y.toFixed(2)} `
-         + `L ${f10.x.toFixed(2)} ${f10.y.toFixed(2)} Z`,
-        fill: tint(step + 1.5),
-        op: 0.12 + 0.16 * depth,
-      });
+      const face = `M ${f00.x.toFixed(2)} ${f00.y.toFixed(2)} `
+                 + `L ${f01.x.toFixed(2)} ${f01.y.toFixed(2)} `
+                 + `L ${f11.x.toFixed(2)} ${f11.y.toFixed(2)} `
+                 + `L ${f10.x.toFixed(2)} ${f10.y.toFixed(2)} Z`;
+
+      tiles.push({ d: `${d} ${face}`, fill: tint(frameStep, cast * 0.3), op: 0.24 + 0.30 * depth });
+      tiles.push({ d: face, fill: tint(faceStep, cast), op: 0.16 + 0.22 * depth });
     }
   }
   return tiles;
@@ -238,17 +248,22 @@ function buildLatitudeArcs(size: number): string[] {
 // the latitude rings. Semi-transparent on purpose so the scrolling light
 // underneath shows through. The vertical seams are NOT here — they rotate,
 // see RotatingMeridians.
-function SphereGrid({ size }: { size: number }) {
-  const tiles = useMemo(() => buildSphereTiles(size), [size]);
+function SphereGrid({ size, eq }: { size: number; eq: [string, string, string] }) {
+  const tiles = useMemo(() => buildSphereTiles(size, eq), [size, eq]);
   const arcs = useMemo(() => buildLatitudeArcs(size), [size]);
   const seam = Math.max(0.5, size * 0.0035);
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFill} pointerEvents="none">
       {tiles.map((t, i) => (
-        <Path key={i} d={t.d} fill={t.fill} fillOpacity={t.op} />
+        // even-odd so the frame paths (outer tile + inner face in one `d`)
+        // punch their own hole and paint only the border
+        <Path key={i} d={t.d} fill={t.fill} fillOpacity={t.op} fillRule="evenodd" />
       ))}
       {arcs.map((d, i) => (
-        <Path key={`a${i}`} d={d} fill="none" stroke="#07070f" strokeOpacity={0.45} strokeWidth={seam} />
+        // Light on the lit side now comes from the tile frames themselves, so
+        // these only need to add a hairline of definition. At the old 0.45
+        // they cut straight through the bright grid.
+        <Path key={`a${i}`} d={d} fill="none" stroke="#07070f" strokeOpacity={0.26} strokeWidth={seam} />
       ))}
     </Svg>
   );
@@ -622,7 +637,7 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
 
       {/* The sphere itself — facet colours and latitude rings, which under an
           axial turn genuinely don't move */}
-      <SphereGrid size={size} />
+      <SphereGrid size={size} eq={eq} />
 
       {/* ...and the seams that DO move: the meridians sweep round with the
           turn, so the grid itself is visibly rotating rather than only the
@@ -666,7 +681,12 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
         <Circle cx={50} cy={50} r={50} fill="url(#dbShade)" />
         <Circle cx={50} cy={50} r={50} fill="url(#dbWarm)" />
         <Ellipse cx={36} cy={30} rx={19} ry={13} fill="url(#dbHot)" />
-        <Circle cx={50} cy={50} r={49} fill="none" stroke="#ffffff" strokeOpacity={0.16} strokeWidth={1} />
+        {/* Rim light in the station's own colour, then a white hairline on
+            top. Both references show the silhouette picking up a saturated
+            edge where the room light wraps round it — without it the ball
+            just ends, instead of turning away. */}
+        <Circle cx={50} cy={50} r={48.4} fill="none" stroke={eq[2]} strokeOpacity={0.34} strokeWidth={2.4} />
+        <Circle cx={50} cy={50} r={49} fill="none" stroke="#ffffff" strokeOpacity={0.18} strokeWidth={1} />
       </Svg>
 
       {/* Lens flare — subtle, along the same light axis as the highlight */}

@@ -196,12 +196,12 @@ export default function ModesScreen() {
           />
         </AnimatedCard>
 
-        <AnimatedCard scrollY={scrollY} onPress={() => open('waves', false)} style={{ marginBottom: 14 }}>
+        <AnimatedCard scrollY={scrollY} onPress={() => open('orb', false)} style={{ marginBottom: 14 }}>
           <CompactModeCard
-            title="Sound Waves Mode"
-            desc="A flowing, glowing waveform that ripples in your station's mood colours."
-            icon="waveform"
-            gradient={['#22b8e6', '#2f6ad0', '#1a2a70']}
+            title="Circular Equaliser Mode"
+            desc="A glowing orb of light that pulses and radiates to your station's mood."
+            icon="circle-slice-8"
+            gradient={['#b23ae6', '#7a2ac0', '#2a1550']}
             locked={false}
           />
         </AnimatedCard>
@@ -242,12 +242,12 @@ export default function ModesScreen() {
           />
         </AnimatedCard>
 
-        <AnimatedCard scrollY={scrollY} onPress={() => open('orb', !isPro)} style={{ marginBottom: 14 }}>
+        <AnimatedCard scrollY={scrollY} onPress={() => open('cd', !isPro)} style={{ marginBottom: 14 }}>
           <CompactModeCard
-            title="Circular Equaliser Mode"
-            desc="A glowing orb of light that pulses and radiates to your station's mood."
-            icon="circle-slice-8"
-            gradient={['#b23ae6', '#7a2ac0', '#2a1550']}
+            title="CD Mode"
+            desc="Your album on a mirrored disc, spinning behind jewel-case plastic."
+            icon="disc"
+            gradient={['#5a6f9a', '#8a4fd0', '#141a2e']}
             locked={!isPro}
             premium
           />

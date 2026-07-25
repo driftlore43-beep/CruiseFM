@@ -12,10 +12,19 @@ export const MODE_CATALOG: ModeInfo[] = [
   { id: 'vinyl',     label: 'Vinyl',       pro: true  },
   { id: 'radio',     label: 'Tuner',       pro: true  },
   { id: 'horizon',   label: 'Horizon',     pro: true  },
-  { id: 'waves',     label: 'Sound Waves', pro: false },
-  { id: 'orb',       label: 'Circular EQ', pro: true  },
+  { id: 'orb',       label: 'Circular EQ', pro: false },
   { id: 'disco',     label: 'Disco Ball',  pro: true  },
+  { id: 'cd',        label: 'CD',          pro: true  },
 ];
+
+/** Modes that no longer exist (retired between releases). A saved cruise
+ *  stores the mode as a bare string, so without this a resume would open
+ *  nothing at all. */
+export const FALLBACK_MODE = 'equalizer';
+
+export function knownMode(mode: string | undefined | null): string {
+  return MODE_CATALOG.some((m) => m.id === mode) ? (mode as string) : FALLBACK_MODE;
+}
 
 export function isProMode(mode: string): boolean {
   return MODE_CATALOG.some((m) => m.id === mode && m.pro);

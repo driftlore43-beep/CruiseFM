@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STATIONS } from '@/constants/stations';
+import { knownMode } from '@/constants/modeCatalog';
 
 const KEY = 'cruise_last_cruise';
 
@@ -38,6 +39,10 @@ export function defaultStationForNow(): string {
 /** The cruise to start when the user taps Start Drive: last one, or the default. */
 export async function resolveCruiseToStart(): Promise<LastCruise> {
   const last = await loadLastCruise();
-  if (last && STATIONS.some((s) => s.id === last.stationId)) return last;
+  // knownMode(): a retired mode (Sound Waves, 25.07) is stored as a bare
+  // string, so a saved cruise can outlive the mode it names.
+  if (last && STATIONS.some((s) => s.id === last.stationId)) {
+    return { ...last, mode: knownMode(last.mode) };
+  }
   return { stationId: defaultStationForNow(), mode: 'equalizer' };
 }

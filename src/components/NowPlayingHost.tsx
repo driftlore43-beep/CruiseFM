@@ -14,9 +14,9 @@ import { CassetteFullscreen } from '@/components/CassetteMode';
 import { DriveCheckCard } from '@/components/DriveCheckCard';
 import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
 import { DiscoBallFullscreen } from '@/components/DiscoBallMode';
+import { CDFullscreen } from '@/components/CDMode';
 import { EqualizerFullscreen } from '@/components/EqualizerMode';
 import { HorizonFullscreen } from '@/components/HorizonMode';
-import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
 import { TunerFullscreen } from '@/components/TunerMode';
 import { VinylFullscreen } from '@/components/VinylMode';
 import { STATIONS } from '@/constants/stations';
@@ -32,9 +32,9 @@ const MODE_META: Record<string, { label: string; icon: string }> = {
   vinyl:     { label: 'Vinyl',       icon: 'album' },
   radio:     { label: 'Tuner',       icon: 'radio-tower' },
   horizon:   { label: 'Horizon',     icon: 'weather-sunset-up' },
-  waves:     { label: 'Sound Waves', icon: 'waveform' },
   orb:       { label: 'Circular EQ', icon: 'chart-donut' },
   disco:     { label: 'Disco Ball',  icon: 'mirror-variant' },
+  cd:        { label: 'CD',          icon: 'disc' },
 };
 
 // ── Spotify-style mini-player — docks above the floating tab bar ──────────────
@@ -245,9 +245,9 @@ export function NowPlayingHost() {
       {mode === 'vinyl' && <VinylFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       {mode === 'radio' && <TunerFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       {mode === 'horizon' && <HorizonFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
-      {mode === 'waves' && <SoundWaveFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       {mode === 'orb' && <CircularWaveFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       {mode === 'disco' && <DiscoBallFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
+      {mode === 'cd' && <CDFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       <MiniPlayer />
       <DriveCheckCard />
       <PlaybackNotice />

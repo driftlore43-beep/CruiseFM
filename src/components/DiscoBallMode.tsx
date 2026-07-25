@@ -67,7 +67,13 @@ function mixHex(a: string, b: string, t: number): string {
 
 // Neutral, pale shading ramp — no baked hue. The moving ColorCycleWash
 // (below) tints this at playback time, so the same tiles work for any station.
-const SHADE_ANCHORS = ['#39405c', '#5d6786', '#8b96b6', '#bcc6e2', '#e8eeff', '#ffffff'];
+// The bottom two anchors are near-black on purpose. An unlit mirror on the
+// owner's reference clip is almost the colour of the room behind it — the ramp
+// used to bottom out at a mid blue-grey (#39405c), which meant no mirror could
+// ever be dark, the whole ball sat at a mid pastel, and the static mosaic was
+// the most visible thing on screen. Raising tile opacity without lowering this
+// floor just makes it worse, not darker.
+const SHADE_ANCHORS = ['#0b0d14', '#1b1f2c', '#39405c', '#6b7593', '#a8b3d0', '#dfe6f8', '#ffffff'];
 // Facet brightness is quantised (cel-shaded, not smooth) but into FINER steps
 // than the anchor list — brightness falls off fastest across the middle of the
 // ball, so with coarse steps the band edge landed on one column and drew a
@@ -126,7 +132,13 @@ const TILT = 0.30;                       // ~17°
 // How many phase buckets the flashing-mirror wave is quantised into, and how
 // wide the lit band is as a fraction of one turn.
 const FLASH_GROUPS = 26;
-const FLASH_WIDTH = 0.07;
+// The lit band is a TRAPEZOID, not a soft bump: full brightness out to
+// FLASH_CORE, then falling to nothing by FLASH_WIDTH. A pure raised cosine
+// only ever put a couple of mirrors at full brightness at any instant — the
+// reference clip has roughly a fifth of the ball blazing at once, and the flat
+// top is what delivers that without widening the band into a vague glow.
+const FLASH_CORE = 0.055;
+const FLASH_WIDTH = 0.13;
 
 function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: Tile[]; flashes: Tile[][] } {
   const R = size / 2, cx = R, cy = R;
@@ -174,22 +186,16 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
       const c = project((b0 + b1) / 2, (l0 + l1) / 2);
       const lambert = Math.max(0, c.nx * lx + c.ny * ly + c.nz * lz);
 
-      // Two DIFFERENT brightness rules, and the split is the whole point of
-      // this pass. On a real ball (both owner references) the frame between
-      // the mirrors is continuous metal, so it shades smoothly — bright on
-      // the lit side, dark on the shadow side, no speckle. The mirrors
-      // themselves each reflect a different part of the room, so neighbours
-      // land wildly apart in brightness. Driving both from one jittered
-      // value, as this did before, made the whole surface speckle together
-      // and lost the lit grid that gives the ball its structure.
-      const frameStep = lambert * (SHADE_STEPS - 1) + 2.6;
-      const faceStep = lambert * (SHADE_STEPS - 1) + (hash01(j * 31.7 + k * 7.31) - 0.5) * 5.2;
+      // The frame between mirrors is continuous metal, so it shades smoothly
+      // with no speckle; each mirror reflects its own bit of the room, so
+      // neighbours land wildly apart. Both are held DOWN, though — see the
+      // note on `depth` below. On the owner's reference clip of a real ball
+      // the unlit mirrors are nearly black and there is no bright grid at all.
+      const frameStep = lambert * (SHADE_STEPS - 1) - 3.6;
+      const faceStep = lambert * (SHADE_STEPS - 1) - 3.4 + (hash01(j * 31.7 + k * 7.31) - 0.5) * 4.4;
 
-      // Colour lives on the mirrors, barely on the frame. The palette is the
-      // station's own mood plus the club-neon set, so the ball still reads as
-      // this station's ball rather than a fixed pink one — but with most
-      // tiles carrying some cast, not the old 26% minority, which is what
-      // left it looking like grey stone next to the references.
+      // Colour lives on the mirrors, barely on the frame — and mostly it lives
+      // on the FLASH, since an unlit mirror shows almost no colour of its own.
       const palette = [eq[0], eq[1], eq[2], NEON.cyan, NEON.magenta, NEON.purple, NEON.blue];
       const hue = palette[Math.floor(hash01(j * 2.71 + k * 3.97) * palette.length) % palette.length];
       const cast = 0.10 + hash01(j * 5.13 + k * 11.27) * 0.34;
@@ -199,19 +205,21 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
       };
 
       // Facets near the silhouette sit at a glancing angle — dimmer, so the
-      // sphere's edge falls away instead of ending in a hard ring. Kept well
-      // short of opaque: the travelling light below has to show through, or
-      // the ball stops looking like it's turning.
+      // sphere's edge falls away instead of ending in a hard ring.
       const depth = Math.min(1, c.nz * 1.35);
 
-      // Each mirror is TWO paths: the face, and the frame AROUND it. The
-      // frame is a genuine hole-in-the-middle border (even-odd fill), not a
-      // full-tile quad sitting under the face — and that distinction is
-      // load-bearing. The frame is bright, and as a full quad its opacity
-      // would land on the entire ball and cancel the travelling light
-      // underneath, which is the exact failure round 6 had to measure its way
-      // out of. As a border it can be bright enough to read as a lit seam
-      // while the ball's average coverage actually goes DOWN.
+      // Each mirror is TWO paths: the face, and the frame AROUND it. The frame
+      // is a genuine hole-in-the-middle border (even-odd fill), not a full-tile
+      // quad sitting under the face — as a full quad its opacity would land on
+      // the entire ball and flatten everything beneath it.
+      //
+      // Both are now DARK and fairly opaque, which is the round-13 rebalance:
+      // the resting ball is a dark object, and essentially all of its
+      // brightness arrives from MirrorFlash. Before this, every mirror sat at
+      // a mid pastel and the mosaic was the most visible thing on screen — so
+      // the eye read a static painted pattern with lights sliding over it,
+      // which is precisely what the owner kept seeing. Anything that makes the
+      // RESTING surface brighter brings that back.
       const P = (u: number, v: number) => {
         const a = (1 - u) * (1 - v), b = u * (1 - v), cc = u * v, dd = (1 - u) * v;
         return {
@@ -226,19 +234,27 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
                  + `L ${f11.x.toFixed(2)} ${f11.y.toFixed(2)} `
                  + `L ${f10.x.toFixed(2)} ${f10.y.toFixed(2)} Z`;
 
-      tiles.push({ d: `${d} ${face}`, fill: tint(frameStep, cast * 0.3), op: 0.24 + 0.30 * depth });
-      tiles.push({ d: face, fill: tint(faceStep, cast), op: 0.16 + 0.22 * depth });
+      tiles.push({ d: `${d} ${face}`, fill: tint(frameStep, cast * 0.25), op: 0.55 + 0.35 * depth });
+      tiles.push({ d: face, fill: tint(faceStep, cast * 0.45), op: 0.55 + 0.35 * depth });
 
       // ...and a BRIGHT copy of the same face, filed into a phase bucket by
       // where it sits across the ball. MirrorFlash fades these in as a band
-      // sweeping left to right, so what travels is individual mirrors
-      // catching the light one after another. The soft light layer underneath
-      // already sweeps, but it is smooth — it slides over the mosaic instead
-      // of being carved up by it, which is why the mirrors themselves read as
-      // dead still. This is the layer that makes them read as turning.
+      // sweeping left to right, so what travels is individual mirrors catching
+      // the light one after another. This layer is now the ball's main source
+      // of light, not a highlight on top of a lit surface.
+      //
+      // The per-mirror amplitude varies hugely and a third of mirrors barely
+      // catch at all: on the reference, a lit mirror sits next to a dead one,
+      // and that contrast is what makes each read as a separate mirror rather
+      // than part of a glowing region.
+      const catchRoll = hash01(j * 4.63 + k * 9.11);
       const px = c.x / size + (hash01(j * 8.17 + k * 2.53) - 0.5) * 0.13;
       const g = ((Math.floor(px * FLASH_GROUPS) % FLASH_GROUPS) + FLASH_GROUPS) % FLASH_GROUPS;
-      flashes[g].push({ d: face, fill: tint(faceStep + 4.5, cast * 0.35), op: 0.26 + 0.42 * depth });
+      flashes[g].push({
+        d: face,
+        fill: mixHex('#ffffff', hue, cast * 0.30),
+        op: (catchRoll > 0.42 ? 0.80 + 0.20 * catchRoll : 0.05 + 0.32 * catchRoll) * (0.6 + 0.4 * depth),
+      });
     }
   }
   return { tiles, flashes };
@@ -291,7 +307,10 @@ function MirrorFlash({ size, groups, spin }: { size: number; groups: Tile[][]; s
       const raw = ((s - p) % 1 + 1) % 1;
       const dist = Math.min(raw, 1 - raw);
       inp.push(s);
-      out.push(dist >= FLASH_WIDTH ? 0 : 0.5 * (1 + Math.cos((Math.PI * dist) / FLASH_WIDTH)));
+      const t = dist <= FLASH_CORE ? 1
+        : dist >= FLASH_WIDTH ? 0
+        : 0.5 * (1 + Math.cos((Math.PI * (dist - FLASH_CORE)) / (FLASH_WIDTH - FLASH_CORE)));
+      out.push(t);
     }
     return { inp, out };
   }), [groups]);
@@ -315,8 +334,7 @@ function MirrorFlash({ size, groups, spin }: { size: number; groups: Tile[][]; s
   );
 }
 
-function SphereGrid({ size, eq, spin }: { size: number; eq: [string, string, string]; spin: Animated.Value }) {
-  const { tiles, flashes } = useMemo(() => buildSphereTiles(size, eq), [size, eq]);
+function SphereGrid({ size, tiles }: { size: number; tiles: Tile[] }) {
   const arcs = useMemo(() => buildLatitudeArcs(size), [size]);
   const seam = Math.max(0.5, size * 0.0035);
   return (
@@ -334,9 +352,6 @@ function SphereGrid({ size, eq, spin }: { size: number; eq: [string, string, str
           <Path key={`a${i}`} d={d} fill="none" stroke="#07070f" strokeOpacity={0.26} strokeWidth={seam} />
         ))}
       </Svg>
-      {/* Above the mirrors, below the seams: the mirrors themselves lighting
-          up in sequence as the ball turns. */}
-      <MirrorFlash size={size} groups={flashes} spin={spin} />
     </View>
   );
 }
@@ -497,17 +512,22 @@ function LightFace({ size, eq, blobs, sfx }: {
           <Stop offset="55%" stopColor="#ffffff" stopOpacity="0.55" />
           <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
         </RadialGradient>
+        {/* All held well down since round 13. This layer used to be the ball's
+            main brightness, showing through semi-transparent tiles — which lit
+            the WHOLE mosaic evenly and made the static pattern the loudest
+            thing on screen. It is now just a broad underglow; the mirrors get
+            their light from MirrorFlash, one at a time. */}
         <RadialGradient id={gid('lpSoft')} cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.62" />
+          <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.34" />
           <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
         </RadialGradient>
         <RadialGradient id={gid('lpCool')} cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor={eq[0]} stopOpacity="0.7" />
+          <Stop offset="0%" stopColor={eq[0]} stopOpacity="0.4" />
           <Stop offset="100%" stopColor={eq[0]} stopOpacity="0" />
         </RadialGradient>
         <RadialGradient id={gid('lpBig')} cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />
-          <Stop offset="60%" stopColor="#ffffff" stopOpacity="0.34" />
+          <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.45" />
+          <Stop offset="60%" stopColor="#ffffff" stopOpacity="0.16" />
           <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
         </RadialGradient>
       </Defs>
@@ -527,7 +547,7 @@ const WASH_CYCLE_MS = 15000; // full first-hue -> second -> third -> first loop
 // underneath. At 0.44 a quarter-turn only moved the median pixel by 6/255 —
 // the ball was genuinely rotating and simply could not be seen to. Measured
 // again at 0.22 it's ~17/255, which reads clearly.
-const WASH_PEAK_OPACITY = 0.22;
+const WASH_PEAK_OPACITY = 0.10;
 
 // The station's own eqColors, cycled as three translucent washes over the
 // pale tiles — this is what reads as "the ball's colour shifting" in the
@@ -714,6 +734,7 @@ function BallBloom({ size, color, pulse }: { size: number; color: string; pulse:
 }
 
 function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, string, string]; spin: Animated.Value; pulse: Animated.Value }) {
+  const { tiles, flashes } = useMemo(() => buildSphereTiles(size, eq), [size, eq]);
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#0a0912' }}>
       {/* The moving layer: light travelling across the surface as it turns */}
@@ -721,7 +742,7 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
 
       {/* The sphere itself — facet colours and latitude rings, which under an
           axial turn genuinely don't move */}
-      <SphereGrid size={size} eq={eq} spin={spin} />
+      <SphereGrid size={size} tiles={tiles} />
 
       {/* ...and the seams that DO move: the meridians sweep round with the
           turn, so the grid itself is visibly rotating rather than only the
@@ -776,6 +797,15 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
             falls off. Nothing here may be a hard ring. */}
         <Circle cx={50} cy={50} r={50} fill="url(#dbRim)" />
       </Svg>
+
+      {/* The mirrors catching the light, ABOVE the shading and the mood wash.
+          Layer order is the whole reason this reads: underneath them, the
+          shade gradient and the wash were knocking the brightest mirror back
+          from ~230 to 199, so nothing on the ball ever looked blown out. On a
+          real ball a lit mirror is the brightest thing in the room — nothing
+          may sit on top of it. Depth falloff is baked into each flash's own
+          opacity instead, so it still obeys the sphere's curvature. */}
+      <MirrorFlash size={size} groups={flashes} spin={spin} />
 
       {/* Lens flare — subtle, along the same light axis as the highlight */}
       <LensFlare size={size} pulse={pulse} />

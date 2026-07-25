@@ -146,7 +146,12 @@ export const STATIONS: Station[] = [
     gradientColors: ['#8a3a05', '#5a1a6a', '#000000'],
     cardGradient: ['#c4461d', '#733061', '#331f47'],
     iconName: 'weather-sunset',
-    eqColors: ['#FF5FB0', '#FF2E96', '#E0187E'],
+    // Golden hour, not neon nightclub. This used to be three hot pinks, which
+    // made it the one station whose accents fought its own artwork and its
+    // burnt-orange gradients — and it turned every warm surface (disco wash,
+    // atmosphere smoke, bloom, EQ bars) magenta. Amber leads now, with pink
+    // kept only as the last stop.
+    eqColors: ['#FFA24B', '#FF6F5A', '#D2467F'],
     glowColor: '#8a3a05',
     image: require('../../assets/stations/sunset.jpg'),
     imageBlur: require('../../assets/stations/blur/sunset.jpg'),

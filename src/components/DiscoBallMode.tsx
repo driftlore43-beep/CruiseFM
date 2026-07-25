@@ -29,7 +29,7 @@ const SCREEN_H = Dimensions.get('window').height;
 const DEMO_DURATION_MS = 214000;
 // One full turn of the ball. Fast enough to read as driven by the music,
 // slow enough to still feel like a heavy hanging ball rather than a toy.
-const BALL_SPIN_MS = 7000;
+const BALL_SPIN_MS = 6000;
 
 
 function formatMs(ms: number): string {
@@ -73,7 +73,7 @@ function mixHex(a: string, b: string, t: number): string {
 // ever be dark, the whole ball sat at a mid pastel, and the static mosaic was
 // the most visible thing on screen. Raising tile opacity without lowering this
 // floor just makes it worse, not darker.
-const SHADE_ANCHORS = ['#0b0d14', '#1b1f2c', '#39405c', '#6b7593', '#a8b3d0', '#dfe6f8', '#ffffff'];
+const SHADE_ANCHORS = ['#101320', '#222738', '#434b68', '#77829f', '#b0bbd6', '#e4eafa', '#ffffff'];
 // Facet brightness is quantised (cel-shaded, not smooth) but into FINER steps
 // than the anchor list — brightness falls off fastest across the middle of the
 // ball, so with coarse steps the band edge landed on one column and drew a
@@ -132,13 +132,26 @@ const TILT = 0.30;                       // ~17°
 // How many phase buckets the flashing-mirror wave is quantised into, and how
 // wide the lit band is as a fraction of one turn.
 const FLASH_GROUPS = 26;
+// The band's phase is the tile's own LONGITUDE, folded into a half-turn.
+//
+// This is what keeps the highlights moving at the ball's own pace. A mirror
+// only spends half a revolution on the visible face, so anything travelling
+// with the surface crosses the face in HALF a turn — which is what the seams
+// do, since they are a true sphere projection. The band used to be keyed to
+// screen x over a WHOLE turn, so it crawled across at half the speed of the
+// spinning grid, and the two visibly disagreed. Longitude also gives the band
+// the right screen speed for free: quick across the middle, slowing into each
+// limb, exactly like the surface. Folding into half a turn means two lit
+// bands, one either side of the ball, so the visible face is never dark.
+const FLASH_PERIOD = 0.5;
 // The lit band is a TRAPEZOID, not a soft bump: full brightness out to
 // FLASH_CORE, then falling to nothing by FLASH_WIDTH. A pure raised cosine
 // only ever put a couple of mirrors at full brightness at any instant — the
 // reference clip has roughly a fifth of the ball blazing at once, and the flat
 // top is what delivers that without widening the band into a vague glow.
-const FLASH_CORE = 0.055;
-const FLASH_WIDTH = 0.13;
+// Both are in turns, so they scale with FLASH_PERIOD, not with 1.
+const FLASH_CORE = 0.034;
+const FLASH_WIDTH = 0.070;
 
 function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: Tile[]; flashes: Tile[][] } {
   const R = size / 2, cx = R, cy = R;
@@ -191,8 +204,8 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
       // neighbours land wildly apart. Both are held DOWN, though — see the
       // note on `depth` below. On the owner's reference clip of a real ball
       // the unlit mirrors are nearly black and there is no bright grid at all.
-      const frameStep = lambert * (SHADE_STEPS - 1) - 3.6;
-      const faceStep = lambert * (SHADE_STEPS - 1) - 3.4 + (hash01(j * 31.7 + k * 7.31) - 0.5) * 4.4;
+      const frameStep = lambert * (SHADE_STEPS - 1) - 3.0;
+      const faceStep = lambert * (SHADE_STEPS - 1) - 2.7 + (hash01(j * 31.7 + k * 7.31) - 0.5) * 4.8;
 
       // Colour lives on the mirrors, barely on the frame — and mostly it lives
       // on the FLASH, since an unlit mirror shows almost no colour of its own.
@@ -235,7 +248,7 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
                  + `L ${f10.x.toFixed(2)} ${f10.y.toFixed(2)} Z`;
 
       tiles.push({ d: `${d} ${face}`, fill: tint(frameStep, cast * 0.25), op: 0.55 + 0.35 * depth });
-      tiles.push({ d: face, fill: tint(faceStep, cast * 0.45), op: 0.55 + 0.35 * depth });
+      tiles.push({ d: face, fill: tint(faceStep, cast * 0.72), op: 0.55 + 0.35 * depth });
 
       // ...and a BRIGHT copy of the same face, filed into a phase bucket by
       // where it sits across the ball. MirrorFlash fades these in as a band
@@ -248,8 +261,10 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
       // and that contrast is what makes each read as a separate mirror rather
       // than part of a glowing region.
       const catchRoll = hash01(j * 4.63 + k * 9.11);
-      const px = c.x / size + (hash01(j * 8.17 + k * 2.53) - 0.5) * 0.13;
-      const g = ((Math.floor(px * FLASH_GROUPS) % FLASH_GROUPS) + FLASH_GROUPS) % FLASH_GROUPS;
+      const lamTurn = (l0 + l1) / 2 / (2 * Math.PI);
+      const jit = (hash01(j * 8.17 + k * 2.53) - 0.5) * 0.022;
+      const pl = (((lamTurn + jit) % FLASH_PERIOD) + FLASH_PERIOD) % FLASH_PERIOD;
+      const g = Math.min(FLASH_GROUPS - 1, Math.floor((pl / FLASH_PERIOD) * FLASH_GROUPS));
       flashes[g].push({
         d: face,
         fill: mixHex('#ffffff', hue, cast * 0.30),
@@ -299,13 +314,13 @@ function buildLatitudeArcs(size: number): string[] {
 // below it.
 function MirrorFlash({ size, groups, spin }: { size: number; groups: Tile[][]; spin: Animated.Value }) {
   const curves = useMemo(() => groups.map((_, g) => {
-    const p = (g + 0.5) / groups.length;
+    const p = ((g + 0.5) / groups.length) * FLASH_PERIOD;
     const inp: number[] = [], out: number[] = [];
     const N = 60;
     for (let i = 0; i <= N; i++) {
       const s = i / N;
-      const raw = ((s - p) % 1 + 1) % 1;
-      const dist = Math.min(raw, 1 - raw);
+      const raw = ((s - p) % FLASH_PERIOD + FLASH_PERIOD) % FLASH_PERIOD;
+      const dist = Math.min(raw, FLASH_PERIOD - raw);
       inp.push(s);
       const t = dist <= FLASH_CORE ? 1
         : dist >= FLASH_WIDTH ? 0
@@ -518,7 +533,7 @@ function LightFace({ size, eq, blobs, sfx }: {
             thing on screen. It is now just a broad underglow; the mirrors get
             their light from MirrorFlash, one at a time. */}
         <RadialGradient id={gid('lpSoft')} cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.34" />
+          <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.44" />
           <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
         </RadialGradient>
         <RadialGradient id={gid('lpCool')} cx="50%" cy="50%" r="50%">
@@ -526,8 +541,8 @@ function LightFace({ size, eq, blobs, sfx }: {
           <Stop offset="100%" stopColor={eq[0]} stopOpacity="0" />
         </RadialGradient>
         <RadialGradient id={gid('lpBig')} cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.45" />
-          <Stop offset="60%" stopColor="#ffffff" stopOpacity="0.16" />
+          <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.50" />
+          <Stop offset="60%" stopColor="#ffffff" stopOpacity="0.19" />
           <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
         </RadialGradient>
       </Defs>
@@ -547,7 +562,7 @@ const WASH_CYCLE_MS = 15000; // full first-hue -> second -> third -> first loop
 // underneath. At 0.44 a quarter-turn only moved the median pixel by 6/255 —
 // the ball was genuinely rotating and simply could not be seen to. Measured
 // again at 0.22 it's ~17/255, which reads clearly.
-const WASH_PEAK_OPACITY = 0.10;
+const WASH_PEAK_OPACITY = 0.14;
 
 // The station's own eqColors, cycled as three translucent washes over the
 // pale tiles — this is what reads as "the ball's colour shifting" in the

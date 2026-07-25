@@ -58,13 +58,8 @@ const CARD_BAR_W  = Math.floor((SCREEN_W - 48) / BAR_COUNT) - 2;
 
 // ── Fullscreen bar geometry — must match the vizSection height below,
 // otherwise the tallest bars get clipped at the top ─────────────────────────
-const VIZ_H       = Math.round(SCREEN_H * 0.30);
-/** How tall the mirrored reflection is, as a fraction of the bars. */
-const REFLECT_RATIO = 0.42;
-/** The meter is sized so the bars AND their reflection fit inside vizSection,
- *  which clips. Size the bars to VIZ_H alone and the reflection pushes the
- *  peaks straight out of the top of the box. */
-const FS_MAX_SEGS = Math.max(14, Math.floor((VIZ_H + 9) / (UNIT * (1 + REFLECT_RATIO))));
+const VIZ_H       = Math.round(SCREEN_H * 0.26);
+const FS_MAX_SEGS = Math.max(14, Math.floor(VIZ_H / UNIT));
 const FS_MAX_H    = FS_MAX_SEGS * UNIT;
 const FS_MIN_H    = MIN_H;
 // 24px side margins + the row's 2px gaps, so the first/last bars never clip.
@@ -155,16 +150,15 @@ function buildSegments(maxH: number, colors: [string, string, string]) {
  *  background is a photo and the strip colour was 'transparent', the gaps
  *  simply never appeared and the bars were solid. Actual gaps also let the
  *  station artwork through between lamps, which is most of the retro look. */
-function Lamps({ segs, dim }: { segs: ReturnType<typeof buildSegments>; dim?: boolean }) {
+function Lamps({ segs }: { segs: ReturnType<typeof buildSegments> }) {
   return (
     <>
       {segs.map((s) => (
         <View
           key={s.bottom}
           style={{
-            position: 'absolute', left: 0, right: 0, bottom: s.bottom, height: SEGMENT_H, borderRadius: 1.5,
-            backgroundColor: dim ? 'rgba(8,10,20,0.55)' : s.color,
-            ...(dim ? { borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.045)' } : null),
+            position: 'absolute', left: 0, right: 0, bottom: s.bottom, height: SEGMENT_H,
+            borderRadius: 1.5, backgroundColor: s.color,
           }}
         />
       ))}
@@ -180,14 +174,11 @@ function Lamps({ segs, dim }: { segs: ReturnType<typeof buildSegments>; dim?: bo
 // an inner counter-slide keeps the gradient anchored to the bottom — same
 // look, no layout work. React.memo keeps the per-second clock re-renders of
 // the parent from rebuilding 30 gradient stacks.
-const Bars = React.memo(function Bars({ values, barW, maxH, colors, track = true, cap = true }: {
+const Bars = React.memo(function Bars({ values, barW, maxH, colors, cap = true }: {
   values: Animated.Value[];
   barW: number;
   maxH: number;
   colors?: [string, string, string];
-  /** Draw the unlit lamps above the level. This is the single strongest retro
-   *  cue in the references — a hi-fi meter always shows its whole scale. */
-  track?: boolean;
   /** The peak lamp riding the top of the bar. */
   cap?: boolean;
 }) {
@@ -201,7 +192,6 @@ const Bars = React.memo(function Bars({ values, barW, maxH, colors, track = true
         const capY    = anim.interpolate({ inputRange: [0, maxH], outputRange: [0, -(maxH - UNIT)], extrapolate: 'clamp' });
         return (
           <View key={i} style={{ width: barW, height: maxH }}>
-            {track && <Lamps segs={segs} dim />}
             {/* The window itself must clip — it slides down while the content
                 counter-slides up, so the lamps stay anchored to the bottom and
                 only the lit ones show. Without overflow here the two motions
@@ -232,41 +222,9 @@ const Bars = React.memo(function Bars({ values, barW, maxH, colors, track = true
   prev.values === next.values &&
   prev.barW === next.barW &&
   prev.maxH === next.maxH &&
-  prev.track === next.track &&
   prev.cap === next.cap &&
   (prev.colors?.join() ?? '') === (next.colors?.join() ?? ''),
 );
-
-/** The bars plus their mirrored reflection below the baseline, fading out —
- *  straight from the references, and the thing that makes it read as a unit
- *  sitting on a glossy black deck rather than bars floating on artwork.
- *  The reflection re-uses the SAME Animated.Values, so it costs extra views
- *  but no extra animations. */
-function BarsWithReflection(props: React.ComponentProps<typeof Bars> & { reflectH?: number }) {
-  const { reflectH, ...bars } = props;
-  const rh = reflectH ?? Math.round(props.maxH * REFLECT_RATIO);
-  return (
-    <View>
-      <Bars {...bars} />
-      <View style={{ height: rh, overflow: 'hidden', marginTop: 3 }} pointerEvents="none">
-        {/* No vertical offset here. scaleY(-1) already puts the bars' BOTTOM
-            lamps at the top of this box, right against the baseline, which is
-            what a reflection shows. Nudging the box up instead reveals the far
-            end of the flip — the bars' tops — so short bars vanish entirely
-            and tall ones appear detached below the meter. */}
-        <View style={{ transform: [{ scaleY: -1 }], height: props.maxH }}>
-          <Bars {...bars} track={false} cap={false} />
-        </View>
-        {/* Fade the reflection out as it falls away from the baseline. */}
-        <LinearGradient
-          colors={['rgba(4,4,12,0.35)', 'rgba(4,4,12,0.82)', 'rgba(4,4,12,1)']}
-          locations={[0, 0.55, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-      </View>
-    </View>
-  );
-}
 
 // Slim volume slider with fade-in-on-touch
 // ── Violet progress bar ───────────────────────────────────────────────────────
@@ -743,7 +701,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           <View style={{ flex: 1 }} pointerEvents="none" />
 
           <View style={fs.vizSection}>
-            <BarsWithReflection
+            <Bars
               values={fsValues}
               barW={FS_BAR_W}
               maxH={FS_MAX_H}

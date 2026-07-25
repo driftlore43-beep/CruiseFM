@@ -276,7 +276,7 @@ export default function ProfileScreen() {
           <View style={[styles.settingsRow, styles.settingsBorder]}>
             <View style={styles.platformRowLeft}>
               <IconChip icon="motion-play-outline" size={34} />
-              <View>
+              <View style={styles.settingsTextBlock}>
                 <Text style={styles.settingsLabel}>Data Saver</Text>
                 <Text style={styles.dataSaverSub}>Still backgrounds · less battery & data</Text>
               </View>
@@ -295,7 +295,7 @@ export default function ProfileScreen() {
           <View style={[styles.settingsRow, styles.settingsBorder]}>
             <View style={styles.platformRowLeft}>
               <IconChip icon="brightness-6" size={34} />
-              <View>
+              <View style={styles.settingsTextBlock}>
                 <Text style={styles.settingsLabel}>Auto-dim while driving</Text>
                 <Text style={styles.dataSaverSub}>Screen eases down after 30s untouched · tap to wake · big battery saver</Text>
               </View>
@@ -314,7 +314,7 @@ export default function ProfileScreen() {
           <View style={[styles.settingsRow, styles.settingsBorder]}>
             <View style={styles.platformRowLeft}>
               <IconChip icon="weather-fog" size={34} />
-              <View>
+              <View style={styles.settingsTextBlock}>
                 <Text style={styles.settingsLabel}>Atmosphere</Text>
                 <Text style={styles.dataSaverSub}>Smoke-machine haze pulsing with the music · off = clean scene</Text>
               </View>
@@ -335,7 +335,7 @@ export default function ProfileScreen() {
             onPress={handlePlatformRowPress}>
             <View style={styles.platformRowLeft}>
               <IconChip icon="music-box-multiple-outline" size={34} />
-              <View>
+              <View style={styles.settingsTextBlock}>
                 <Text style={styles.settingsLabel}>Music Platform</Text>
                 {platformName && (
                   <View style={styles.platformRowMeta}>
@@ -535,18 +535,21 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(155,95,255,0.35)',
     shadowColor: Cruise.violet, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
   },
-  settingsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13 },
+  settingsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 14 },
   settingsBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.10)' },
   settingsLabel: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
   settingsArrow: { color: 'rgba(255,255,255,0.5)', fontSize: 20 },
-  platformRowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  platformRowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
   platformRowMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   platformDotSmall: {
     width: 7, height: 7, borderRadius: 4,
     shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.85, shadowRadius: 4, elevation: 2,
   },
   platformRowName: { color: Cruise.textSecondary, fontSize: 12, fontWeight: '500' },
-  dataSaverSub: { color: Cruise.textSecondary, fontSize: 11.5, marginTop: 2 },
+  // flex:1 is load-bearing — without it a long subtitle keeps its natural
+  // width and runs underneath the switch instead of wrapping short of it.
+  settingsTextBlock: { flex: 1 },
+  dataSaverSub: { color: Cruise.textSecondary, fontSize: 11.5, marginTop: 3, lineHeight: 16 },
   themeRowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   themeColorDot: {
     width: 10, height: 10, borderRadius: 5, marginRight: 4,

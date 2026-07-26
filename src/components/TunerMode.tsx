@@ -23,9 +23,9 @@ import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
+import { DotMatrixText, dmAdvance, dmFit, dmHeight, dmWidth } from '@/components/DotMatrix';
 import { ModeActionRow } from '@/components/ModeActionRow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
-import { MarqueeText } from '@/components/MarqueeText';
 import { SeekBar } from '@/components/SeekBar';
 
 const SCREEN_H = Dimensions.get('window').height;
@@ -172,6 +172,121 @@ function StaticNoise({ width, height, phase, opacity }: { width: number; height:
 }
 
 // ── Fullscreen modal ────────────────────────────────────────────────────────────
+// ── The head-unit display ────────────────────────────────────────────────────
+// Laid out from the owner's two references: a car head unit and an FM
+// receiver. Both are dot-matrix LCDs, so the readout is drawn as real dots
+// (see DotMatrix) rather than set in a font — the visible UNLIT dots are what
+// make it read as a piece of hardware.
+//
+//   [● ON AIR]              SONG TITLE
+//                           ARTIST
+//   STEREO                       TUNED
+//   FM                           92.10
+
+/** One line that scrolls when it doesn't fit, the way a real head unit does.
+ *  A car display would simply cut the title off ("MIDNIGHT MEMO" in the
+ *  owner's photo); scrolling keeps that character while still letting a long
+ *  title be read in full. Transform-only, so it runs on the native driver. */
+function DmLine({ text, width: raw, dot, gap, color, dim }: {
+  text: string; width: number; dot: number; gap: number; color: string; dim?: boolean;
+}) {
+  // Snap the window down to a whole number of characters. A dot-matrix display
+  // has discrete cells, so a window ending mid-glyph — half an "O" against the
+  // edge — instantly breaks the illusion.
+  const cells = Math.max(1, dmFit(raw, dot, gap));
+  const width = cells * dmAdvance(dot, gap) - gap;
+  const full = dmWidth(text, dot, gap);
+  const over = full > width;
+  const x = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    x.setValue(0);
+    if (!over) return;
+    const dist = full - width;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.delay(1400),
+      Animated.timing(x, { toValue: -dist, duration: Math.max(1200, dist * 34), easing: Easing.linear, useNativeDriver: true }),
+      Animated.delay(1100),
+      Animated.timing(x, { toValue: 0, duration: 420, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [text, over, full, width]);
+
+  return (
+    <View style={{ width, height: dmHeight(dot, gap), overflow: 'hidden', alignItems: over ? 'flex-start' : 'flex-end' }}>
+      <Animated.View style={{ transform: [{ translateX: x }] }}>
+        <DotMatrixText text={text} dot={dot} gap={gap} color={color} dim={dim} />
+      </Animated.View>
+    </View>
+  );
+}
+
+function TunerReadout({ width, accent, freq, lock, playing, title, artist, hasTrack }: {
+  width: number; accent: string; freq: number; lock: number; playing: boolean;
+  title: string; artist: string; hasTrack: boolean;
+}) {
+  const onAir = playing && lock > 0.9;
+
+  // The lamp breathes only while a station is locked AND the music is running.
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!onAir) { Animated.timing(pulse, { toValue: 0, duration: 260, useNativeDriver: true }).start(); return; }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [onAir]);
+
+  const PAD = 16;
+  const inner = width - PAD * 2;
+
+  const LAMP = { dot: 1.7, gap: 0.62 };
+  const lampW = dmWidth('ON AIR', LAMP.dot, LAMP.gap);
+  const TITLE = { dot: 2.3, gap: 0.85 };
+  const ART = { dot: 1.7, gap: 0.62 };
+  const SMALL = { dot: 1.7, gap: 0.62 };
+  const BIG = { dot: 4.6, gap: 1.5 };
+
+  // Whatever the lamp and its dot don't use belongs to the song.
+  const titleW = Math.max(60, inner - lampW - 34);
+  const lampOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
+
+  return (
+    <View style={[fs.lcd, { width, borderColor: accent + '2E' }]}>
+      {/* Row 1 — lamp on the left, what's playing on the right */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        <Animated.View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: onAir ? lampOpacity : 0.34 }}>
+          <View style={[fs.lamp, {
+            backgroundColor: onAir ? ON_AIR_RED : 'rgba(255,255,255,0.22)',
+            shadowColor: ON_AIR_RED, shadowOpacity: onAir ? 0.95 : 0, shadowRadius: 6,
+          }]} />
+          <DotMatrixText text="ON AIR" dot={LAMP.dot} gap={LAMP.gap} color={onAir ? '#FF6B5A' : '#9AA3B8'} dim={false} />
+        </Animated.View>
+
+        <View style={{ flex: 1, alignItems: 'flex-end', gap: 6 }}>
+          <DmLine text={hasTrack ? title : 'CRUISE FM'} width={titleW} dot={TITLE.dot} gap={TITLE.gap} color={accent} />
+          <DmLine text={hasTrack ? artist : ''} width={titleW} dot={ART.dot} gap={ART.gap} color={accent} dim={false} />
+        </View>
+      </View>
+
+      {/* Row 2 — the status lamps of a real receiver */}
+      <View style={fs.lcdRow}>
+        <DotMatrixText text="STEREO" dot={SMALL.dot} gap={SMALL.gap} color="#FFA24B" dim opacity={onAir ? 1 : 0.32} />
+        <DotMatrixText text="TUNED" dot={SMALL.dot} gap={SMALL.gap} color={accent} dim opacity={0.3 + lock * 0.7} />
+      </View>
+
+      {/* Row 3 — band and frequency, the biggest thing on the panel */}
+      <View style={[fs.lcdRow, { alignItems: 'flex-end', marginTop: 8 }]}>
+        <DotMatrixText text="FM" dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
+        <DotMatrixText text={freq.toFixed(2)} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
+      </View>
+    </View>
+  );
+}
+
 export function TunerFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
@@ -417,24 +532,18 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
           {/* ── The dial — drag anywhere in this zone to tune ── */}
           <View style={{ flex: 1, justifyContent: 'center' }} {...pan.panHandlers}>
 
-            {/* ON AIR chip */}
-            <View style={{ alignItems: 'center', marginBottom: 6, opacity: 0.25 + lock * 0.75 }}>
-              <View style={[fs.onAirChip, { borderColor: ON_AIR_RED + '99', backgroundColor: ON_AIR_RED + '26' }]}>
-                <View style={[fs.onAirDot, { backgroundColor: lock > 0.9 ? ON_AIR_RED : 'rgba(255,255,255,0.25)' }]} />
-                <Text style={[fs.onAirText, { fontFamily: Fonts.mono, color: lock > 0.9 ? '#fff' : 'rgba(255,255,255,0.5)' }]}>
-                  {lock > 0.9 ? 'ON AIR' : 'TUNING'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Big frequency readout */}
+            {/* The head-unit display */}
             <View style={{ alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-                <Text style={[fs.freqBig, { fontFamily: Fonts.mono, color: accent, opacity: 0.55 + lock * 0.45 }]}>
-                  {freq.toFixed(1)}
-                </Text>
-                <Text style={[fs.freqUnit, { fontFamily: Fonts.mono }]}>FM</Text>
-              </View>
+              <TunerReadout
+                width={Math.min(winW - 44, 400)}
+                accent={accent}
+                freq={freq}
+                lock={lock}
+                playing={playing}
+                title={title}
+                artist={artist}
+                hasTrack={hasTrack}
+              />
               <Text style={[fs.stationName, { opacity: lock, color: '#ffffff' }]} numberOfLines={1}>
                 {nearest.name}
               </Text>
@@ -448,16 +557,16 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
               <FloatingNotes playing={playing && lock > 0.9} color={accent} />
             </View>
 
-            <Text style={[fs.dragHint, { fontFamily: Fonts.mono }]}>DRAG TO TUNE</Text>
+            <Text style={[fs.dragHint, { fontFamily: Fonts.mono }]}>drag to tune</Text>
           </View>
 
-          {/* Song title / mood line */}
-          <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
-            {hasTrack
-              ? <MarqueeText text={title} style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }} />
-              : <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={2}>{title}</Text>}
-            {hasTrack && <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 }} numberOfLines={1}>{artist}</Text>}
-          </View>
+          {/* With a song on the display there's nothing to repeat here — the
+              mood line only appears when there's no track to show. */}
+          {!hasTrack && (
+            <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
+              <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={2}>{title}</Text>
+            </View>
+          )}
 
           {/* Progress — only when a real song is playing through */}
           {hasTrack && (
@@ -554,14 +663,15 @@ const fs = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
   },
-  onAirChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, borderWidth: 1,
+  lcd: {
+    borderRadius: 14,
+    borderWidth: 1,
+    backgroundColor: 'rgba(4,7,16,0.55)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
-  onAirDot: { width: 7, height: 7, borderRadius: 3.5 },
-  onAirText: { fontSize: 10, fontWeight: '800', letterSpacing: 2.5 },
-  freqBig: { fontSize: 76, fontWeight: '800', letterSpacing: -2, lineHeight: 82 },
-  freqUnit: { color: 'rgba(255,255,255,0.45)', fontSize: 18, fontWeight: '800', letterSpacing: 2 },
+  lcdRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
+  lamp: { width: 7, height: 7, borderRadius: 3.5, shadowOffset: { width: 0, height: 0 } },
   stationName: { fontSize: 17, fontWeight: '700', letterSpacing: 0.3, marginTop: 2 },
   dragHint: { color: 'rgba(255,255,255,0.18)', fontSize: 8, fontWeight: '600', letterSpacing: 2, textAlign: 'center', marginTop: 10 },
   time: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },

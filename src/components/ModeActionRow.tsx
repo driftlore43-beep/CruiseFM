@@ -48,7 +48,8 @@ export function ModeActionRow({
   const [sharing, setSharing] = useState(false);
   // The mode's own name for the card. Read from the session rather than passed
   // in by each mode — one less prop for eight callers to keep in step.
-  const modeLabel = MODE_CATALOG.find((m) => m.id === np.session?.mode)?.label ?? 'Cruise FM';
+  const modeId = np.session?.mode ?? 'equalizer';
+  const modeLabel = MODE_CATALOG.find((m) => m.id === modeId)?.label ?? 'Cruise FM';
 
   return (
     <View style={[ar.row, style]}>
@@ -82,6 +83,7 @@ export function ModeActionRow({
         station={station}
         track={track}
         modeLabel={modeLabel}
+        modeId={modeId}
       />
     </View>
   );

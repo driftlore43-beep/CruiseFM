@@ -6,8 +6,8 @@ import {
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import Svg, {
-  ClipPath, Defs, G, Image as SvgImage, LinearGradient as SvgLinearGradient,
-  Path, RadialGradient, Rect, Stop, Text as SvgText,
+  Circle, ClipPath, Defs, Ellipse, G, Image as SvgImage,
+  LinearGradient as SvgLinearGradient, Path, RadialGradient, Rect, Stop, Text as SvgText,
 } from 'react-native-svg';
 
 import type { Station } from '@/constants/stations';
@@ -73,16 +73,152 @@ function wrapLines(text: string, fontSize: number, maxWidth: number, maxLines: n
   return lines;
 }
 
+
+/**
+ * The mode's own artwork, filling the card behind the cover.
+ *
+ * This is what stops the card being a Spotify clone with different colours:
+ * a drive in Mirror Ball should not look like a drive in Cassette. Every
+ * shape is drawn in the STATION's colours, so mode and mood both show — the
+ * mode gives the composition, the station gives the palette.
+ *
+ * Deliberately simple geometry. It sits behind the album art and the type, so
+ * anything fussy just makes the words harder to read.
+ */
+function ModeArt({ modeId, eq, cx, cy, uid }: {
+  modeId: string; eq: [string, string, string]; cx: number; cy: number; uid: string;
+}) {
+  const a = eq[0], b = eq[1], c = eq[2];
+  const ring = (r: number, w: number, col: string, op: number, key: string) => (
+    <Circle key={key} cx={cx} cy={cy} r={r} fill="none" stroke={col} strokeOpacity={op} strokeWidth={w} />
+  );
+
+  switch (modeId) {
+    // Discs — concentric grooves centred on the cover, so the artwork reads
+    // as the label of the record you're playing.
+    case 'cd':
+    case 'vinyl': {
+      const rings = [];
+      for (let i = 0; i < 22; i++) {
+        const r = 360 + i * 26;
+        rings.push(ring(r, i % 4 === 0 ? 3 : 1.4, i % 2 ? a : b, 0.30 - i * 0.010, `g${i}`));
+      }
+      return <>{rings}</>;
+    }
+
+    // A mirror ball: latitude rings plus meridians, with light scattered round it.
+    case 'disco': {
+      const R = 470;
+      const out = [];
+      for (let i = 1; i < 7; i++) {
+        const y = cy - R + (i * 2 * R) / 7;
+        const rr = Math.sqrt(Math.max(1, R * R - (y - cy) * (y - cy)));
+        out.push(<Ellipse key={`la${i}`} cx={cx} cy={y} rx={rr} ry={rr * 0.16} fill="none" stroke={b} strokeOpacity={0.20} strokeWidth={2} />);
+      }
+      for (let i = 0; i < 7; i++) {
+        const k = (i / 6) * 2 - 1;
+        out.push(<Ellipse key={`me${i}`} cx={cx} cy={cy} rx={Math.abs(k) * R} ry={R} fill="none" stroke={a} strokeOpacity={0.16} strokeWidth={2} />);
+      }
+      out.push(<Circle key="rim" cx={cx} cy={cy} r={R} fill="none" stroke={c} strokeOpacity={0.26} strokeWidth={3} />);
+      for (let i = 0; i < 16; i++) {
+        const ang = (i / 16) * Math.PI * 2 + 0.3;
+        const rr = R * (1.16 + (i % 3) * 0.12);
+        out.push(<Circle key={`sp${i}`} cx={cx + Math.cos(ang) * rr} cy={cy + Math.sin(ang) * rr * 0.9} r={i % 3 ? 5 : 9} fill={a} fillOpacity={0.42} />);
+      }
+      return <>{out}</>;
+    }
+
+    // Two reels and the tape running between them.
+    case 'cassette': {
+      // Wider than the cover and pushed low, or the reels sit entirely behind
+      // the artwork and the card just looks like a plain gradient.
+      const y = cy + 210;
+      const rx = 372;
+      return (
+        <>
+          <Rect x={cx - 516} y={y - 250} width={1032} height={500} rx={44} fill="none" stroke={b} strokeOpacity={0.26} strokeWidth={3} />
+          {[cx - rx, cx + rx].map((x, i) => (
+            <G key={i}>
+              <Circle cx={x} cy={y} r={172} fill="none" stroke={a} strokeOpacity={0.34} strokeWidth={3} />
+              <Circle cx={x} cy={y} r={66} fill="none" stroke={a} strokeOpacity={0.44} strokeWidth={3} />
+              {[0, 1, 2].map((k) => (
+                <Path key={k} d={`M ${x} ${y} L ${x + Math.cos((k / 3) * Math.PI * 2 + i) * 172} ${y + Math.sin((k / 3) * Math.PI * 2 + i) * 172}`}
+                  stroke={a} strokeOpacity={0.22} strokeWidth={3} />
+              ))}
+            </G>
+          ))}
+          <Path d={`M ${cx - rx} ${y + 172} L ${cx + rx} ${y + 172}`} stroke={c} strokeOpacity={0.38} strokeWidth={5} />
+        </>
+      );
+    }
+
+    // A meter across the card — the mode is literally bars, so the artwork is too.
+    case 'equalizer': {
+      const bars = [];
+      const n = 26, w = CARD_W / n;
+      for (let i = 0; i < n; i++) {
+        const t = (i - (n - 1) / 2) / (n / 4);
+        const h = 120 + Math.exp(-0.5 * t * t) * 620 * (0.45 + ((i * 37) % 100) / 100 * 0.55);
+        bars.push(<Rect key={i} x={i * w + w * 0.16} y={CARD_H - h} width={w * 0.68} height={h}
+          fill={i % 3 === 0 ? a : i % 3 === 1 ? b : c} fillOpacity={0.15} rx={6} />);
+      }
+      return <>{bars}</>;
+    }
+
+    // Concentric rings pulsing out from the centre.
+    case 'orb': {
+      const out = [];
+      for (let i = 0; i < 9; i++) out.push(ring(300 + i * 78, 3, i % 2 ? a : b, 0.26 - i * 0.022, `o${i}`));
+      return <>{out}</>;
+    }
+
+    // A dial: ticks along a band, like the tuner's own ruler.
+    case 'radio': {
+      const out = [];
+      const y = cy + 300;
+      for (let i = 0; i < 44; i++) {
+        const x = (i / 43) * CARD_W;
+        const tall = i % 5 === 0;
+        out.push(<Rect key={i} x={x - 2} y={y - (tall ? 54 : 26)} width={4} height={tall ? 54 : 26} fill={b} fillOpacity={tall ? 0.34 : 0.18} />);
+      }
+      out.push(<Rect key="base" x={0} y={y} width={CARD_W} height={3} fill={a} fillOpacity={0.26} />);
+      out.push(<Rect key="ndl" x={cx - 3} y={y - 130} width={6} height={190} fill={c} fillOpacity={0.55} rx={3} />);
+      return <>{out}</>;
+    }
+
+    // Sun on a receding grid.
+    case 'horizon': {
+      const out = [];
+      const hy = cy + 250;
+      out.push(<Circle key="sun" cx={cx} cy={hy - 40} r={330} fill="none" stroke={a} strokeOpacity={0.24} strokeWidth={3} />);
+      for (let i = 0; i < 7; i++) {
+        out.push(<Rect key={`s${i}`} x={cx - 330} y={hy - 200 + i * 46} width={660} height={12} fill={b} fillOpacity={0.14} />);
+      }
+      for (let i = 0; i < 9; i++) {
+        const t = i / 8;
+        out.push(<Path key={`p${i}`} d={`M ${cx - 700 + t * 1400} ${CARD_H} L ${cx - 180 + t * 360} ${hy}`}
+          stroke={c} strokeOpacity={0.16} strokeWidth={3} />);
+      }
+      out.push(<Rect key="hz" x={0} y={hy} width={CARD_W} height={3} fill={a} fillOpacity={0.3} />);
+      return <>{out}</>;
+    }
+
+    default:
+      return null;
+  }
+}
+
 /** The card's contents, with no <Svg> wrapper — so the same geometry can be
  *  mounted both in the on-screen preview and in the full-size capture copy.
  *  `uid` namespaces the gradient ids: two Svg roots carrying identical ids at
  *  the same time is a known way to get one of them rendering blank. */
 export function ShareCardBody({
-  station, track, modeLabel, userName, uid = 'p',
+  station, track, modeLabel, modeId, userName, uid = 'p',
 }: {
   station: Station;
   track: NowPlaying | null;
   modeLabel: string;
+  modeId: string;
   userName: string | null;
   uid?: string;
 }) {
@@ -128,6 +264,9 @@ export function ShareCardBody({
 
       <Rect x={0} y={0} width={CARD_W} height={CARD_H} fill={`url(#${gid("scBg")})`} />
       <Rect x={0} y={0} width={CARD_W} height={CARD_H} fill={`url(#${gid("scGlow")})`} />
+
+      {/* The mode's own artwork, behind everything else */}
+      <ModeArt modeId={modeId} eq={eq} cx={CARD_W / 2} cy={artY + ART / 2} uid={uid} />
 
       {/* Station eyebrow */}
       <SvgText x={PAD} y={104} fill="#ffffff" fillOpacity={0.62} fontSize={30} fontWeight="700" letterSpacing={6}>
@@ -194,7 +333,7 @@ export function ShareCardBody({
 
 /** The card at a given width, ready to drop into a layout. */
 export function ShareCard(props: {
-  width: number; station: Station; track: NowPlaying | null; modeLabel: string; userName: string | null;
+  width: number; station: Station; track: NowPlaying | null; modeLabel: string; modeId: string; userName: string | null;
 }) {
   const { width, ...body } = props;
   return (
@@ -219,13 +358,14 @@ export function ShareCard(props: {
  * export a card with an empty cover.
  */
 export function ShareCardSheet({
-  visible, onClose, station, track, modeLabel,
+  visible, onClose, station, track, modeLabel, modeId,
 }: {
   visible: boolean;
   onClose: () => void;
   station: Station;
   track: NowPlaying | null;
   modeLabel: string;
+  modeId: string;
 }) {
   const { width: winW } = useWindowDimensions();
   const [userName, setUserName] = useState<string | null>(null);
@@ -281,7 +421,7 @@ export function ShareCardSheet({
       <Pressable style={sc.backdrop} onPress={onClose}>
         {/* Stop taps on the card itself from dismissing */}
         <Pressable style={sc.body} onPress={() => {}}>
-          <ShareCard width={previewW} station={station} track={track} modeLabel={modeLabel} userName={userName} />
+          <ShareCard width={previewW} station={station} track={track} modeLabel={modeLabel} modeId={modeId} userName={userName} />
 
           <View style={sc.actions}>
             <TouchableOpacity style={[sc.btn, sc.btnPrimary]} onPress={shareCard} activeOpacity={0.85} disabled={busy}>
@@ -307,7 +447,7 @@ export function ShareCardSheet({
       {/* Full-resolution capture copy, parked off-screen. */}
       <View style={sc.offscreen} pointerEvents="none">
         <Svg ref={capRef} width={CARD_W} height={CARD_H} viewBox={`0 0 ${CARD_W} ${CARD_H}`}>
-          <ShareCardBody station={station} track={track} modeLabel={modeLabel} userName={userName} uid="c" />
+          <ShareCardBody station={station} track={track} modeLabel={modeLabel} modeId={modeId} userName={userName} uid="c" />
         </Svg>
       </View>
     </Modal>

@@ -1,0 +1,76 @@
+# Ship an over-the-air update from anywhere — including a phone.
+#
+# This is a BUTTON, not an automation: it only runs when you press "Run
+# workflow" in GitHub (Actions tab, or the GitHub mobile app). Nothing ships
+# on a plain push, so what goes out is still your call.
+#
+# GitHub → Actions → "Ship OTA update" → Run workflow → pick a channel → Run.
+#
+# Note this file is NOT a fingerprint source (unlike app.json, eas.json and
+# package.json), so adding it does not disturb OTA for installed builds.
+
+name: Ship OTA update
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Which channel to publish to'
+        type: choice
+        default: preview
+        options:
+          - preview
+          - production
+      message:
+        description: 'Short note for the update log'
+        type: string
+        default: 'Update from GitHub'
+
+jobs:
+  update:
+    name: eas update --branch ${{ inputs.channel }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse production without a good reason
+        if: inputs.channel == 'production'
+        run: |
+          echo "::warning::Publishing to PRODUCTION. Never do this while the app"
+          echo "::warning::is sitting in App Review — it changes the build Apple is looking at."
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: npm ci
+
+      # The Spotify keys live in EAS, not in the repo (.env is gitignored). If
+      # they aren't set for this environment the update would publish with
+      # empty credentials and quietly break signing in — so stop first.
+      - name: Check the Spotify keys are present
+        run: |
+          set -e
+          vars=$(eas env:list --environment ${{ inputs.channel }} --non-interactive || true)
+          echo "$vars"
+          for key in EXPO_PUBLIC_SPOTIFY_CLIENT_ID EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET; do
+            echo "$vars" | grep -q "$key" || {
+              echo "::error::$key is not set for the '${{ inputs.channel }}' environment in EAS."
+              echo "::error::Add it at expo.dev → your project → Environment variables, then run this again."
+              exit 1
+            }
+          done
+
+      - name: Publish
+        run: >-
+          eas update
+          --branch ${{ inputs.channel }}
+          --environment ${{ inputs.channel }}
+          --message "${{ inputs.message }}"
+          --non-interactive

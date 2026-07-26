@@ -31,6 +31,18 @@ jobs:
     name: eas update --branch ${{ inputs.channel }}
     runs-on: ubuntu-latest
     steps:
+      # "Use workflow from" decides which code gets bundled, and main is a long
+      # way behind the branch the app is actually built from — publishing from
+      # it would push a stale bundle to the owner's phone AND every TestFlight
+      # tester. Hard stop. Remove this once main catches up.
+      - name: Refuse to publish stale code from main
+        if: github.ref_name == 'main'
+        run: |
+          echo "::error::'Use workflow from' was set to main, which is far behind the branch the app is built from."
+          echo "::error::Publishing this would send an old version of Cruise FM to your phone and to TestFlight."
+          echo "::error::Press Run workflow again and choose claude/cruise-fm-v4wk5f instead."
+          exit 1
+
       - name: Refuse production without a good reason
         if: inputs.channel == 'production'
         run: |

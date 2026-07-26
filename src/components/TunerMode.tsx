@@ -23,7 +23,7 @@ import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
-import { DotMatrixText, dmAdvance, dmFit, dmHeight, dmWidth } from '@/components/DotMatrix';
+import { DotMatrixGroup, DotMatrixText, dmAdvance, dmFit, dmHeight, dmWidth } from '@/components/DotMatrix';
 import { ModeActionRow } from '@/components/ModeActionRow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { SeekBar } from '@/components/SeekBar';
@@ -52,6 +52,9 @@ const STATION_FREQS: Record<string, number> = {
 
 const DEMO_DURATION_MS = 214000; // 3:34
 
+/** The dial needle. Deliberately fixed, never the station accent. */
+const NEEDLE_RED = '#FF3B30';
+
 // Classic broadcast-studio red for the ON AIR lamp.
 const ON_AIR_RED = '#FF3B30';
 
@@ -79,11 +82,11 @@ function nearestStation(freq: number) {
 
 // ── The dial ruler — ticks slide under a fixed needle ──────────────────────────
 function DialRuler({ freq, width, color, lock }: { freq: number; width: number; color: string; lock: number }) {
-  const H = 116;
+  const H = 132;
   const midX = width / 2;
-  const baseY = 78;
+  const baseY = 66;          // the bright band both scales hang off
 
-  // Visible tick range (0.1 MHz steps) with a little bleed off both edges.
+  // FM ticks (0.1 MHz steps) with a little bleed off both edges.
   const halfMHz = width / 2 / PX_PER_MHZ + 0.3;
   const from = Math.ceil((freq - halfMHz) * 10);
   const to = Math.floor((freq + halfMHz) * 10);
@@ -95,35 +98,59 @@ function DialRuler({ freq, width, color, lock }: { freq: number; width: number; 
     const x = midX + (f - freq) * PX_PER_MHZ;
     const whole = k % 10 === 0;
     const half = k % 5 === 0;
-    ticks.push({
-      x,
-      h: whole ? 34 : half ? 24 : 14,
-      major: whole,
-      label: whole ? String(Math.round(f)) : undefined,
-    });
+    ticks.push({ x, h: whole ? 22 : half ? 15 : 9, major: whole, label: whole ? String(Math.round(f)) : undefined });
+  }
+
+  // A second, decorative AM scale — every dial worth looking at prints both
+  // bands on one strip with a single needle crossing them. It's cosmetic
+  // (Cruise FM only tunes the FM row), so it's simply mapped across the same
+  // travel at its own rate, which is what makes it drift past at a different
+  // speed as you tune. That mismatch is exactly what a real dial does.
+  const AM_LO = 530, AM_HI = 1600, AM_PX_PER_KHZ = PX_PER_MHZ / 220;
+  const amCentre = AM_LO + ((freq - FREQ_MIN) / (FREQ_MAX - FREQ_MIN)) * (AM_HI - AM_LO);
+  const amHalf = width / 2 / AM_PX_PER_KHZ + 40;
+  const amTicks: { x: number; major: boolean; label?: string }[] = [];
+  const amFrom = Math.ceil((amCentre - amHalf) / 20) * 20;
+  const amTo = Math.floor((amCentre + amHalf) / 20) * 20;
+  for (let a = amFrom; a <= amTo; a += 20) {
+    if (a < AM_LO || a > AM_HI) continue;
+    const x = midX + (a - amCentre) * AM_PX_PER_KHZ;
+    const major = a % 200 === 0;
+    amTicks.push({ x, major, label: major ? String(a) : undefined });
   }
 
   return (
     // pointerEvents none is CRITICAL: on iOS the Svg otherwise swallows
     // touches, so drags starting on the ruler never reach the tune gesture.
     <Svg width={width} height={H} pointerEvents="none">
-      {/* Baseline */}
-      <Line x1={0} y1={baseY} x2={width} y2={baseY} stroke="rgba(255,255,255,0.18)" strokeWidth={1} />
-
-      {/* Ticks */}
-      {ticks.map((t, i) => (
-        <Line
-          key={i}
-          x1={t.x} y1={baseY} x2={t.x} y2={baseY - t.h}
-          stroke={t.major ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.30)'}
-          strokeWidth={t.major ? 1.8 : 1}
-        />
-      ))}
+      {/* FM numbers, in the same matrix type as the head unit above */}
       {ticks.filter((t) => t.label).map((t, i) => (
-        <SvgText key={`l${i}`} x={t.x} y={baseY + 22} fill="rgba(255,255,255,0.55)" fontSize={12} fontWeight="700" textAnchor="middle" fontFamily={Fonts.mono}>
-          {t.label}
-        </SvgText>
+        <DotMatrixGroup key={`fl${i}`} text={t.label!} x={t.x} y={6} dot={2.1} gap={0.8}
+          color="#CFE6FF" anchor="middle" opacity={0.85} />
       ))}
+      <DotMatrixGroup text="FM" x={10} y={6} dot={2.1} gap={0.8} color={color} opacity={0.9} />
+
+      {/* FM ticks hanging down onto the band */}
+      {ticks.map((t, i) => (
+        <Line key={i} x1={t.x} y1={baseY} x2={t.x} y2={baseY - t.h}
+          stroke={t.major ? 'rgba(214,234,255,0.85)' : 'rgba(214,234,255,0.32)'}
+          strokeWidth={t.major ? 2 : 1} />
+      ))}
+
+      {/* The lit band itself */}
+      <Rect x={0} y={baseY} width={width} height={2.5} fill="#9FD8FF" opacity={0.55} />
+
+      {/* AM ticks below the band, then its numbers */}
+      {amTicks.map((t, i) => (
+        <Line key={`a${i}`} x1={t.x} y1={baseY + 4} x2={t.x} y2={baseY + 4 + (t.major ? 14 : 8)}
+          stroke={t.major ? 'rgba(214,234,255,0.6)' : 'rgba(214,234,255,0.22)'}
+          strokeWidth={t.major ? 2 : 1} />
+      ))}
+      {amTicks.filter((t) => t.label).map((t, i) => (
+        <DotMatrixGroup key={`al${i}`} text={t.label!} x={t.x} y={baseY + 22} dot={1.7} gap={0.62}
+          color="#9FD8FF" anchor="middle" opacity={0.5} />
+      ))}
+      <DotMatrixGroup text="AM" x={10} y={baseY + 22} dot={1.7} gap={0.62} color="#9FD8FF" opacity={0.5} />
 
       {/* Station markers — glowing dots in each station's own colour */}
       {STATIONS.map((s) => {
@@ -134,16 +161,20 @@ function DialRuler({ freq, width, color, lock }: { freq: number; width: number; 
         const c = s.eqColors?.[1] ?? '#ffffff';
         return (
           <Fragment key={s.id}>
-            <Circle cx={x} cy={baseY - 46} r={8} fill={c} opacity={0.18} />
-            <Circle cx={x} cy={baseY - 46} r={3.4} fill={c} />
+            <Circle cx={x} cy={baseY - 30} r={7} fill={c} opacity={0.18} />
+            <Circle cx={x} cy={baseY - 30} r={3.2} fill={c} />
           </Fragment>
         );
       })}
 
-      {/* Fixed centre needle */}
-      <Rect x={midX - 8} y={0} width={16} height={H - 26} fill={color} opacity={0.10} rx={8} />
-      <Line x1={midX} y1={6} x2={midX} y2={baseY + 6} stroke={color} strokeWidth={3} strokeLinecap="round" />
-      <Circle cx={midX} cy={baseY + 6} r={4.5} fill={color} opacity={0.5 + lock * 0.5} />
+      {/* The needle. Fixed neon red, NOT the station colour — on every dial
+          worth copying the pointer is the one part that never changes hue,
+          which is what lets your eye find it instantly against the scale. */}
+      <Rect x={midX - 5} y={0} width={10} height={H} fill={NEEDLE_RED} opacity={0.13} rx={5} />
+      <Rect x={midX - 1.6} y={0} width={3.2} height={H} fill={NEEDLE_RED} opacity={0.62} rx={1.6} />
+      <Rect x={midX - 0.6} y={0} width={1.2} height={H} fill="#FFD9D4" opacity={0.85} />
+      <Circle cx={midX} cy={baseY + 1} r={4} fill={NEEDLE_RED} opacity={0.55 + lock * 0.45} />
+      <Circle cx={midX} cy={baseY + 1} r={1.5} fill="#FFE9E6" opacity={0.6 + lock * 0.4} />
     </Svg>
   );
 }
@@ -240,7 +271,7 @@ function TunerReadout({ width, accent, freq, lock, playing, title, artist, hasTr
     return () => loop.stop();
   }, [onAir]);
 
-  const PAD = 16;
+  const PAD = 20;
   const inner = width - PAD * 2;
 
   const LAMP = { dot: 1.7, gap: 0.62 };
@@ -266,7 +297,7 @@ function TunerReadout({ width, accent, freq, lock, playing, title, artist, hasTr
           <DotMatrixText text="ON AIR" dot={LAMP.dot} gap={LAMP.gap} color={onAir ? '#FF6B5A' : '#9AA3B8'} dim={false} />
         </Animated.View>
 
-        <View style={{ flex: 1, alignItems: 'flex-end', gap: 6 }}>
+        <View style={{ flex: 1, alignItems: 'flex-end', gap: 9 }}>
           <DmLine text={hasTrack ? title : 'CRUISE FM'} width={titleW} dot={TITLE.dot} gap={TITLE.gap} color={accent} />
           <DmLine text={hasTrack ? artist : ''} width={titleW} dot={ART.dot} gap={ART.gap} color={accent} dim={false} />
         </View>
@@ -279,7 +310,7 @@ function TunerReadout({ width, accent, freq, lock, playing, title, artist, hasTr
       </View>
 
       {/* Row 3 — band and frequency, the biggest thing on the panel */}
-      <View style={[fs.lcdRow, { alignItems: 'flex-end', marginTop: 8 }]}>
+      <View style={[fs.lcdRow, { alignItems: 'flex-end', marginTop: 16 }]}>
         <DotMatrixText text="FM" dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
         <DotMatrixText text={freq.toFixed(2)} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
       </View>
@@ -526,8 +557,10 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
         {/* Content */}
         <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>
-          {/* No "Playing from" header here — the dial's big frequency + station
-              name already say which station is on air. */}
+          <View style={{ alignItems: 'center', gap: 3, paddingHorizontal: 32, paddingBottom: 10 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 }}>PLAYING FROM</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>{lockedStation.name}</Text>
+          </View>
 
           {/* ── The dial — drag anywhere in this zone to tune ── */}
           <View style={{ flex: 1, justifyContent: 'center' }} {...pan.panHandlers}>
@@ -544,13 +577,10 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
                 artist={artist}
                 hasTrack={hasTrack}
               />
-              <Text style={[fs.stationName, { opacity: lock, color: '#ffffff' }]} numberOfLines={1}>
-                {nearest.name}
-              </Text>
             </View>
 
             {/* Ruler + static */}
-            <View style={{ marginTop: 10 }}>
+            <View style={{ marginTop: 28 }}>
               <DialRuler freq={freq} width={winW} color={accent} lock={lock} />
               <StaticNoise width={winW} height={116} phase={phase} opacity={offAir * 0.55} />
               {/* Notes only flow once the needle locks onto a station */}
@@ -664,15 +694,14 @@ const fs = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   lcd: {
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     backgroundColor: 'rgba(4,7,16,0.55)',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 22,
   },
-  lcdRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
+  lcdRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 },
   lamp: { width: 7, height: 7, borderRadius: 3.5, shadowOffset: { width: 0, height: 0 } },
-  stationName: { fontSize: 17, fontWeight: '700', letterSpacing: 0.3, marginTop: 2 },
   dragHint: { color: 'rgba(255,255,255,0.18)', fontSize: 8, fontWeight: '600', letterSpacing: 2, textAlign: 'center', marginTop: 10 },
   time: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
   controls: {

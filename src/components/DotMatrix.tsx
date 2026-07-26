@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import Svg, { Rect } from 'react-native-svg';
+import Svg, { G as SvgG, Rect } from 'react-native-svg';
 
 /**
  * A 5×7 dot-matrix display, drawn as real dots.
@@ -99,6 +99,48 @@ export function dmHeight(dot: number, gap: number): number {
  *  so callers truncate rather than shrink. */
 export function dmFit(width: number, dot: number, gap: number): number {
   return Math.max(0, Math.floor((width + gap) / dmAdvance(dot, gap)));
+}
+
+/** The lit/unlit cells of a string, positioned relative to (0,0). Exposed so
+ *  callers already inside an <Svg> can embed matrix text without nesting a
+ *  second Svg root — which react-native-svg doesn't allow. */
+export function dmCells(text: string, dot: number, gap: number, dim: boolean) {
+  const unit = dot + gap;
+  const adv = dmAdvance(dot, gap);
+  const out: { x: number; y: number; on: boolean }[] = [];
+  text.toUpperCase().split('').forEach((ch, i) => {
+    const g = GLYPHS[ch] ?? GLYPHS[' '];
+    for (let r = 0; r < DM_ROWS; r++) {
+      for (let c = 0; c < DM_COLS; c++) {
+        const on = g[r * DM_COLS + c] === '#';
+        if (!on && !dim) continue;
+        out.push({ x: i * adv + c * unit, y: r * unit, on });
+      }
+    }
+  });
+  return out;
+}
+
+/** Matrix text as a <G>, for use inside an existing <Svg>. `anchor` places it
+ *  by its left edge, centre or right edge — dial labels need centring on a
+ *  tick, panel labels need edges. */
+export function DotMatrixGroup({
+  text, x, y, dot, gap, color, dim = false, opacity = 1, anchor = 'start',
+}: {
+  text: string; x: number; y: number; dot: number; gap: number; color: string;
+  dim?: boolean; opacity?: number; anchor?: 'start' | 'middle' | 'end';
+}) {
+  const w = dmWidth(text, dot, gap);
+  const ox = anchor === 'middle' ? x - w / 2 : anchor === 'end' ? x - w : x;
+  const cells = dmCells(text, dot, gap, dim);
+  return (
+    <SvgG opacity={opacity}>
+      {cells.map((c, i) => (
+        <Rect key={i} x={ox + c.x} y={y + c.y} width={dot} height={dot} rx={dot * 0.22}
+          fill={color} fillOpacity={c.on ? 1 : 0.10} />
+      ))}
+    </SvgG>
+  );
 }
 
 /**

@@ -291,7 +291,12 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   // open space, this is a square object, so it needs more of the frame to
   // carry the same weight. Height-capped at 0.44 so the smallest phones don't
   // squeeze the title and transport below it.
-  const caseSize = Math.min(winW * 0.86, winH * 0.44, 380);
+  // Width is what limits this, not height — at 0.93 the case plus its drop
+  // shadow is about as wide as it can go before touching the screen edges.
+  // The height term is deliberately left where it was: on a small phone
+  // (SE-sized) height binds instead, and raising it would push the case into
+  // the controls below.
+  const caseSize = Math.min(winW * 0.93, winH * 0.44, 410);
   const discSize = caseSize * 0.85;
   const discSizeRef = useRef(discSize);
   discSizeRef.current = discSize;

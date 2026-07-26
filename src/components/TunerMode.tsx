@@ -23,6 +23,7 @@ import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
+import { ModeActionRow } from '@/components/ModeActionRow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
 import { SeekBar } from '@/components/SeekBar';
@@ -496,18 +497,13 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
           </View>
 
           {/* Left-aligned action pills — same row, same spot as every mode */}
-          <View style={fs.actionRow}>
-            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
-              <Text style={fs.actionPillBold}>Change Mood</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
-              <Text style={fs.actionPillText} numberOfLines={1}>
-                {spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <ModeActionRow
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            track={spotify.track}
+            stationName={lockedStation.name}
+          />
         </View>
 
         <ModeCloseButton onPress={handleClose} />
@@ -571,7 +567,10 @@ const fs = StyleSheet.create({
   time: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
   controls: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    width: '100%', paddingHorizontal: 30, marginTop: 18,
+    // 14, not 18: the transport sits a touch higher so the pills below get
+    // real breathing room (their own marginTop went 18 -> 26). Don't take it
+    // much lower — the progress bar is directly above.
+    width: '100%', paddingHorizontal: 30, marginTop: 14,
   },
   playBtn: {
     width: 78, height: 78, borderRadius: 39, backgroundColor: '#fff',
@@ -579,14 +578,4 @@ const fs = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 14,
   },
   pauseBar: { width: 8, height: 28, borderRadius: 2, backgroundColor: '#0a0a12' },
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22, alignSelf: 'stretch' },
-  actionPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
-    maxWidth: '58%',
-  },
-  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
-  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
 });

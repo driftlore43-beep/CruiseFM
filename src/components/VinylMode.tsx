@@ -23,6 +23,7 @@ import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
+import { ModeActionRow } from '@/components/ModeActionRow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
@@ -1093,18 +1094,13 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           </View>
 
           {/* Left-aligned action pills — keep the record the focus */}
-          <View style={fs.actionRow}>
-            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
-              <Text style={fs.actionPillBold}>Change Mood</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
-              <Text style={fs.actionPillText} numberOfLines={1}>
-                {spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <ModeActionRow
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            track={spotify.track}
+            stationName={station.name}
+          />
 
         </View>
 
@@ -1165,16 +1161,6 @@ const fs = StyleSheet.create({
 
   tracksBtn:     { marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: V.surfaceBorder, flexDirection: 'row', alignItems: 'center', gap: 8 },
   tracksBtnText: { color: V.textDim, fontSize: 9, fontWeight: '700', letterSpacing: 3 },
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22, alignSelf: 'stretch' },
-  actionPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
-    maxWidth: '58%',
-  },
-  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
-  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
   stationPill: {
     flexDirection: 'row', alignItems: 'center', gap: 7,
     paddingHorizontal: 14, height: 42,

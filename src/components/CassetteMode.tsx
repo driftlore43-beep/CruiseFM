@@ -1069,7 +1069,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
             track={spotify.track}
-            stationName={station.name}
+            station={station}
           />
 
         </View>

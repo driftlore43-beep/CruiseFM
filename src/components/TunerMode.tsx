@@ -502,7 +502,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
             track={spotify.track}
-            stationName={lockedStation.name}
+            station={lockedStation}
           />
         </View>
 

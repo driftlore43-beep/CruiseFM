@@ -778,7 +778,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
             track={spotify.track}
-            stationName={currentStation.name}
+            station={currentStation}
           />
 
         </View>

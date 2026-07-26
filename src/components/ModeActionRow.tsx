@@ -1,6 +1,11 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Platform, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { ShareCardSheet } from '@/components/ShareCard';
+import { MODE_CATALOG } from '@/constants/modeCatalog';
+import type { Station } from '@/constants/stations';
+import { useNowPlaying } from '@/context/NowPlayingContext';
 import type { NowPlaying } from '@/utils/useSpotifyPlayback';
 
 /**
@@ -14,7 +19,8 @@ import type { NowPlaying } from '@/utils/useSpotifyPlayback';
  *
  * The share pill only appears when a real song is playing — with no track
  * there is nothing to share but a mood tagline, and an always-present button
- * that sometimes shares nothing is worse than no button.
+ * that sometimes shares nothing is worse than no button. Tapping it opens a
+ * preview of the card that gets shared, the way Spotify does it.
  */
 
 /** Long playlist names would squeeze the other two pills off the row, so the
@@ -28,27 +34,21 @@ function trim(label: string): string {
 }
 
 export function ModeActionRow({
-  onChangeMood, onPickPlaylist, playlistLabel, track, stationName, style,
+  onChangeMood, onPickPlaylist, playlistLabel, track, station, style,
 }: {
   onChangeMood: () => void;
   onPickPlaylist: () => void;
   playlistLabel: string;
   /** The live Spotify track, or null. Drives whether sharing is offered. */
   track: NowPlaying | null;
-  stationName: string;
+  station: Station;
   style?: object;
 }) {
-  async function handleShare() {
-    if (!track) return;
-    const line = track.artist ? `${track.title} — ${track.artist}` : track.title;
-    try {
-      await Share.share({
-        message: `${line}\n\nOn ${stationName} · Cruise FM`,
-      });
-    } catch {
-      // User cancelled, or the sheet couldn't open — nothing to recover from.
-    }
-  }
+  const np = useNowPlaying();
+  const [sharing, setSharing] = useState(false);
+  // The mode's own name for the card. Read from the session rather than passed
+  // in by each mode — one less prop for eight callers to keep in step.
+  const modeLabel = MODE_CATALOG.find((m) => m.id === np.session?.mode)?.label ?? 'Cruise FM';
 
   return (
     <View style={[ar.row, style]}>
@@ -63,7 +63,7 @@ export function ModeActionRow({
       </TouchableOpacity>
 
       {!!track && (
-        <TouchableOpacity onPress={handleShare} style={[ar.pill, ar.pillIcon]} activeOpacity={0.85}
+        <TouchableOpacity onPress={() => setSharing(true)} style={[ar.pill, ar.pillIcon]} activeOpacity={0.85}
           accessibilityLabel="Share this song" accessibilityRole="button">
           {/* Ionicons' `share-outline` is the iOS box-with-an-arrow; Android's
               own share glyph is the three-node one, so each platform gets the
@@ -75,6 +75,14 @@ export function ModeActionRow({
           />
         </TouchableOpacity>
       )}
+
+      <ShareCardSheet
+        visible={sharing}
+        onClose={() => setSharing(false)}
+        station={station}
+        track={track}
+        modeLabel={modeLabel}
+      />
     </View>
   );
 }

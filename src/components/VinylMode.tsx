@@ -1099,7 +1099,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
             track={spotify.track}
-            stationName={station.name}
+            station={station}
           />
 
         </View>

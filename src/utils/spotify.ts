@@ -286,6 +286,26 @@ export async function getPlaybackState() {
 // Playlist names by id — tiny session cache so the "playing from" pill can
 // name the playlist actually feeding the music without a fetch per poll.
 const playlistNameCache: Record<string, string> = {};
+const PROFILE_NAME_KEY = 'cruise_spotify_display_name';
+let profileNameCache: string | null = null;
+
+/** The listener's Spotify display name, for the share card's "X is listening
+ *  on …" line. Cached in memory and on disk — it never changes mid-drive, and
+ *  the card must not wait on a network round trip to render. Returns null when
+ *  Spotify isn't connected, and callers fall back to a name-free line. */
+export async function getProfileName(): Promise<string | null> {
+  if (profileNameCache) return profileNameCache;
+  const stored = await AsyncStorage.getItem(PROFILE_NAME_KEY);
+  if (stored) { profileNameCache = stored; return stored; }
+  const data = await spotifyFetch('/me');
+  const name: string | null = data?.display_name ?? null;
+  if (name) {
+    profileNameCache = name;
+    AsyncStorage.setItem(PROFILE_NAME_KEY, name).catch(() => {});
+  }
+  return name;
+}
+
 export async function getPlaylistName(playlistId: string): Promise<string | null> {
   if (playlistNameCache[playlistId]) return playlistNameCache[playlistId];
   const data = await spotifyFetch(`/playlists/${playlistId}?fields=name`);

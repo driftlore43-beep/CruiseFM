@@ -310,7 +310,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
             track={spotify.track}
-            stationName={station.name}
+            station={station}
           />
         </View>
 

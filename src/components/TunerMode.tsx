@@ -6,7 +6,7 @@ import {
   Animated, Dimensions, Easing, Modal, PanResponder, Platform,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
-import Svg, { Circle, Line, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Line, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MoodSheet } from '@/components/MoodSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
@@ -80,6 +80,15 @@ function nearestStation(freq: number) {
   return { station: best, lock: clamp(1 - bestDist / LOCK_RANGE, 0, 1) };
 }
 
+/** The printed band plates at the left end of the scale. */
+const FM_PLATE_W = 62;
+const AM_PLATE_W = 54;
+
+/** Would a centred scale number collide with the band plate? */
+function underPlate(x: number, label: string, dot: number, gap: number, plateW: number): boolean {
+  return x - dmWidth(label, dot, gap) / 2 < plateW - 6;
+}
+
 // ── The dial ruler — ticks slide under a fixed needle ──────────────────────────
 function DialRuler({ freq, width, color, lock }: { freq: number; width: number; color: string; lock: number }) {
   const H = 132;
@@ -123,12 +132,30 @@ function DialRuler({ freq, width, color, lock }: { freq: number; width: number; 
     // pointerEvents none is CRITICAL: on iOS the Svg otherwise swallows
     // touches, so drags starting on the ruler never reach the tune gesture.
     <Svg width={width} height={H} pointerEvents="none">
-      {/* FM numbers, in the same matrix type as the head unit above */}
-      {ticks.filter((t) => t.label).map((t, i) => (
+      <Defs>
+        {/* The band plates fade out on their right edge instead of ending in a
+            hard line, so ticks dissolve under them the way ink does beneath a
+            printed band marker rather than being sliced off. */}
+        <SvgGradient id="dialPlate" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor="#050912" stopOpacity={0.96} />
+          <Stop offset="0.62" stopColor="#050912" stopOpacity={0.94} />
+          <Stop offset="1" stopColor="#050912" stopOpacity={0} />
+        </SvgGradient>
+      </Defs>
+
+      {/* FM numbers, in the same matrix type as the head unit above. A number
+          that would land under the band plate is dropped outright — half a
+          number showing reads as a different, shorter number ("102" behind the
+          plate became "FM02", "1000" became "000"), which is worse than a gap
+          in the scale. */}
+      {ticks.filter((t) => t.label && !underPlate(t.x, t.label, 2.1, 0.8, FM_PLATE_W)).map((t, i) => (
         <DotMatrixGroup key={`fl${i}`} text={t.label!} x={t.x} y={6} dot={2.1} gap={0.8}
           color="#CFE6FF" anchor="middle" opacity={0.85} />
       ))}
-      <DotMatrixGroup text="FM" x={10} y={6} dot={2.1} gap={0.8} color={color} opacity={0.9} />
+      {/* Band markers sit in a little printed plate at the left edge, exactly
+          as a real dial prints them. */}
+      <Rect x={0} y={0} width={FM_PLATE_W} height={30} fill="url(#dialPlate)" />
+      <DotMatrixGroup text="FM" x={9} y={6} dot={2.1} gap={0.8} color={color} opacity={0.95} />
 
       {/* FM ticks hanging down onto the band */}
       {ticks.map((t, i) => (
@@ -146,11 +173,12 @@ function DialRuler({ freq, width, color, lock }: { freq: number; width: number; 
           stroke={t.major ? 'rgba(214,234,255,0.6)' : 'rgba(214,234,255,0.22)'}
           strokeWidth={t.major ? 2 : 1} />
       ))}
-      {amTicks.filter((t) => t.label).map((t, i) => (
+      {amTicks.filter((t) => t.label && !underPlate(t.x, t.label, 1.7, 0.62, AM_PLATE_W)).map((t, i) => (
         <DotMatrixGroup key={`al${i}`} text={t.label!} x={t.x} y={baseY + 22} dot={1.7} gap={0.62}
           color="#9FD8FF" anchor="middle" opacity={0.5} />
       ))}
-      <DotMatrixGroup text="AM" x={10} y={baseY + 22} dot={1.7} gap={0.62} color="#9FD8FF" opacity={0.5} />
+      <Rect x={0} y={baseY + 16} width={AM_PLATE_W} height={28} fill="url(#dialPlate)" />
+      <DotMatrixGroup text="AM" x={8} y={baseY + 22} dot={1.7} gap={0.62} color="#9FD8FF" opacity={0.6} />
 
       {/* Station markers — glowing dots in each station's own colour */}
       {STATIONS.map((s) => {
@@ -218,8 +246,9 @@ function StaticNoise({ width, height, phase, opacity }: { width: number; height:
  *  A car display would simply cut the title off ("MIDNIGHT MEMO" in the
  *  owner's photo); scrolling keeps that character while still letting a long
  *  title be read in full. Transform-only, so it runs on the native driver. */
-function DmLine({ text, width: raw, dot, gap, color, dim }: {
+function DmLine({ text, width: raw, dot, gap, color, dim, align = 'right' }: {
   text: string; width: number; dot: number; gap: number; color: string; dim?: boolean;
+  align?: 'left' | 'right';
 }) {
   // Snap the window down to a whole number of characters. A dot-matrix display
   // has discrete cells, so a window ending mid-glyph — half an "O" against the
@@ -245,7 +274,10 @@ function DmLine({ text, width: raw, dot, gap, color, dim }: {
   }, [text, over, full, width]);
 
   return (
-    <View style={{ width, height: dmHeight(dot, gap), overflow: 'hidden', alignItems: over ? 'flex-start' : 'flex-end' }}>
+    <View style={{
+      width, height: dmHeight(dot, gap), overflow: 'hidden',
+      alignItems: over || align === 'left' ? 'flex-start' : 'flex-end',
+    }}>
       <Animated.View style={{ transform: [{ translateX: x }] }}>
         <DotMatrixText text={text} dot={dot} gap={gap} color={color} dim={dim} />
       </Animated.View>
@@ -271,36 +303,38 @@ function TunerReadout({ width, accent, freq, lock, playing, title, artist, hasTr
     return () => loop.stop();
   }, [onAir]);
 
-  const PAD = 20;
+  const PAD = 22;
   const inner = width - PAD * 2;
 
   const LAMP = { dot: 1.7, gap: 0.62 };
-  const lampW = dmWidth('ON AIR', LAMP.dot, LAMP.gap);
-  const TITLE = { dot: 2.3, gap: 0.85 };
-  const ART = { dot: 1.7, gap: 0.62 };
+  // The song gets the panel's whole width on its own line rather than sharing
+  // a row with the lamp. Sharing left it about ten characters wide, which is
+  // what kept the title small; full width buys both bigger dots AND more of
+  // the name visible before it has to scroll.
+  const TITLE = { dot: 3.5, gap: 1.15 };
+  const ART = { dot: 2.1, gap: 0.78 };
   const SMALL = { dot: 1.7, gap: 0.62 };
   const BIG = { dot: 4.6, gap: 1.5 };
 
-  // Whatever the lamp and its dot don't use belongs to the song.
-  const titleW = Math.max(60, inner - lampW - 34);
   const lampOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
 
   return (
     <View style={[fs.lcd, { width, borderColor: accent + '2E' }]}>
-      {/* Row 1 — lamp on the left, what's playing on the right */}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-        <Animated.View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: onAir ? lampOpacity : 0.34 }}>
-          <View style={[fs.lamp, {
-            backgroundColor: onAir ? ON_AIR_RED : 'rgba(255,255,255,0.22)',
-            shadowColor: ON_AIR_RED, shadowOpacity: onAir ? 0.95 : 0, shadowRadius: 6,
-          }]} />
-          <DotMatrixText text="ON AIR" dot={LAMP.dot} gap={LAMP.gap} color={onAir ? '#FF6B5A' : '#9AA3B8'} dim={false} />
-        </Animated.View>
+      {/* Row 1 — the ON AIR lamp, on its own line above the song */}
+      <Animated.View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', opacity: onAir ? lampOpacity : 0.34 }}>
+        <View style={[fs.lamp, {
+          backgroundColor: onAir ? ON_AIR_RED : 'rgba(255,255,255,0.22)',
+          shadowColor: ON_AIR_RED, shadowOpacity: onAir ? 0.95 : 0, shadowRadius: 6,
+        }]} />
+        <DotMatrixText text="ON AIR" dot={LAMP.dot} gap={LAMP.gap} color={onAir ? '#FF6B5A' : '#9AA3B8'} dim={false} />
+      </Animated.View>
 
-        <View style={{ flex: 1, alignItems: 'flex-end', gap: 9 }}>
-          <DmLine text={hasTrack ? title : 'CRUISE FM'} width={titleW} dot={TITLE.dot} gap={TITLE.gap} color={accent} />
-          <DmLine text={hasTrack ? artist : ''} width={titleW} dot={ART.dot} gap={ART.gap} color={accent} dim={false} />
-        </View>
+      {/* Row 2 — what's playing, across the full panel */}
+      <View style={{ marginTop: 18, gap: 11 }}>
+        <DmLine text={hasTrack ? title : 'CRUISE FM'} width={inner} dot={TITLE.dot} gap={TITLE.gap} color={accent} align="left" />
+        {hasTrack && !!artist && (
+          <DmLine text={artist} width={inner} dot={ART.dot} gap={ART.gap} color={accent} dim={false} align="left" />
+        )}
       </View>
 
       {/* Row 2 — the status lamps of a real receiver */}
@@ -320,8 +354,14 @@ function TunerReadout({ width, accent, freq, lock, playing, title, artist, hasTr
 
 export function TunerFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
-  const { width: winW } = useWindowDimensions();
+  const { width: winW, height: winH } = useWindowDimensions();
   const topPad = Math.max(insets.top, 20);
+
+  // How far the dial sits below the head unit. The owner wanted it lower, but
+  // the panel and the dial are both fixed-height blocks inside one centred
+  // column, so a flat 52 would run off the bottom of a short phone. Scaled to
+  // the screen: full separation on a big handset, tight on a small one.
+  const dialGap = Math.round(clamp((winH - 640) * 0.18, 14, 56));
 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
   const [freq, setFreq] = useState(STATION_FREQS[stationId ?? 'night-run'] ?? 92.1);
@@ -568,7 +608,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             {/* The head-unit display */}
             <View style={{ alignItems: 'center' }}>
               <TunerReadout
-                width={Math.min(winW - 44, 400)}
+                width={Math.min(winW - 32, 420)}
                 accent={accent}
                 freq={freq}
                 lock={lock}
@@ -580,7 +620,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             </View>
 
             {/* Ruler + static */}
-            <View style={{ marginTop: 28 }}>
+            <View style={{ marginTop: dialGap }}>
               <DialRuler freq={freq} width={winW} color={accent} lock={lock} />
               <StaticNoise width={winW} height={116} phase={phase} opacity={offAir * 0.55} />
               {/* Notes only flow once the needle locks onto a station */}
@@ -697,10 +737,10 @@ const fs = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     backgroundColor: 'rgba(4,7,16,0.55)',
-    paddingHorizontal: 20,
-    paddingVertical: 22,
+    paddingHorizontal: 22,
+    paddingVertical: 26,
   },
-  lcdRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 },
+  lcdRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24 },
   lamp: { width: 7, height: 7, borderRadius: 3.5, shadowOffset: { width: 0, height: 0 } },
   dragHint: { color: 'rgba(255,255,255,0.18)', fontSize: 8, fontWeight: '600', letterSpacing: 2, textAlign: 'center', marginTop: 10 },
   time: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },

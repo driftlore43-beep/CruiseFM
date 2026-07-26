@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  Easing,
   Modal,
   PanResponder,
   Platform,
@@ -64,7 +65,11 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const { theme } = useTheme();
   const { dataSaver } = useMotion();
   const { relinkStationPlaylist } = useNowPlaying();
-  const slideY = useRef(new Animated.Value(SCREEN_H)).current;
+  // The station page pushes in from the RIGHT, like turning to a page rather
+  // than pulling up a sheet. slideY stays because the downward pull-to-dismiss
+  // is muscle memory and the drag pill at the top still promises it.
+  const slideX = useRef(new Animated.Value(SCREEN_W)).current;
+  const slideY = useRef(new Animated.Value(0)).current;
   const [selectedMode, setSelectedMode] = useState('cassette');
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [linkToast, setLinkToast] = useState<string | null>(null);
@@ -80,25 +85,65 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
       setConfirmDelete(false);
       if (station) getStationPlaylist(station.id).then(setLinked);
       getSavedPlatform().then((p) => setSpotifyPlatform(p === 'spotify' || p == null));
-      Animated.spring(slideY, { toValue: 0, useNativeDriver: true, bounciness: 3 }).start();
+      slideY.setValue(0);
+      slideX.setValue(SCREEN_W);
+      // Timing rather than a spring: a page push wants to arrive and stop, not
+      // wobble at the end.
+      Animated.timing(slideX, {
+        toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      }).start();
     }
   }, [visible, station?.id]);
 
+  // Two ways out, each leaving the way it would have come in: swipe back from
+  // the left edge and it slides off to the right, pull down and it drops.
+  // Claiming on MOVE, never on start — capture-on-start is what killed the
+  // back button on the settings pages.
+  const swipeAxis = useRef<'x' | 'y' | null>(null);
+  const closeRef = useRef<(down?: boolean) => void>(() => {});
   const dismissPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
-      onPanResponderMove: (_, g) => { if (g.dy > 0) slideY.setValue(g.dy); },
+      onMoveShouldSetPanResponder: (_, g) => {
+        if (g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx)) return true;
+        // Edge-only, or a rightward drag would fight the horizontal mode strip.
+        return g.x0 < 44 && g.dx > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4;
+      },
+      onPanResponderGrant: () => { swipeAxis.current = null; },
+      onPanResponderMove: (_, g) => {
+        if (!swipeAxis.current) swipeAxis.current = Math.abs(g.dx) > Math.abs(g.dy) ? 'x' : 'y';
+        if (swipeAxis.current === 'x') { if (g.dx > 0) slideX.setValue(g.dx); }
+        else if (g.dy > 0) slideY.setValue(g.dy);
+      },
       onPanResponderRelease: (_, g) => {
-        if (g.dy > 120 || g.vy > 0.8) handleClose();
+        const axis = swipeAxis.current;
+        swipeAxis.current = null;
+        if (axis === 'x') {
+          if (g.dx > SCREEN_W * 0.3 || g.vx > 0.7) closeRef.current(false);
+          else Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
+          return;
+        }
+        if (g.dy > 120 || g.vy > 0.8) closeRef.current(true);
         else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+      },
+      onPanResponderTerminate: () => {
+        swipeAxis.current = null;
+        Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
+        Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
       },
     })
   ).current;
 
-  function handleClose() {
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 300, useNativeDriver: true }).start(onClose);
+  /** `down` sends it out of the bottom; everything else slides it off right. */
+  function handleClose(down = false) {
+    const [value, target] = down ? [slideY, SCREEN_H] : [slideX, SCREEN_W];
+    Animated.timing(value, {
+      toValue: target, duration: 280, easing: Easing.in(Easing.cubic), useNativeDriver: true,
+    }).start(onClose);
   }
+  // The pan responder is built once, so it reaches handleClose through a ref
+  // rather than closing over the first render's copy.
+  closeRef.current = handleClose;
 
   const selectedIsLocked = !isPro && !!MODES.find((m) => m.id === selectedMode)?.pro;
 
@@ -142,8 +187,10 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const needsPlaylist = !linked && spotifyPlatform;
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-      <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={() => handleClose()}>
+      <Animated.View
+        style={[styles.root, { transform: [{ translateX: slideX }, { translateY: slideY }] }]}
+        {...dismissPan.panHandlers}>
 
         {/* Full-bleed blurred station background — motion is a Premium unlock */}
         <StationBackdrop station={station as Station} blurRadius={1.5} motionAllowed={isPro && !dataSaver} />
@@ -165,6 +212,13 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
         <View style={[styles.dragPill, { top: topPad - 8 }]}>
           <View style={styles.pillBar} />
         </View>
+
+        {/* Now that the page slides in from the right it needs the control that
+            goes with that: a back arrow where every pushed page keeps one. The
+            sheet had no visible way out at all before — only the gesture. */}
+        <Pressable style={[styles.backBtn, { top: topPad }]} onPress={() => handleClose()} hitSlop={14}>
+          <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.92)" />
+        </Pressable>
 
         {/* Custom stations: their icon becomes the hero, glowing in their colour */}
         {custom && (
@@ -362,8 +416,16 @@ const styles = StyleSheet.create({
     borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1,
   },
   mineBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 2 },
-  menuBtn: {
+  backBtn: {
     position: 'absolute', left: 20, zIndex: 10,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+  },
+  // Right-hand side: the left slot belongs to the back button now.
+  menuBtn: {
+    position: 'absolute', right: 20, zIndex: 10,
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center', justifyContent: 'center',
@@ -371,7 +433,7 @@ const styles = StyleSheet.create({
   },
   menuBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 19 },
   menuSheet: {
-    position: 'absolute', left: 20, zIndex: 20,
+    position: 'absolute', right: 20, zIndex: 20,
     minWidth: 190, borderRadius: 14, paddingVertical: 4,
     backgroundColor: 'rgba(16,16,30,0.97)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',

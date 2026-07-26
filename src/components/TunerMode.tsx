@@ -10,7 +10,7 @@ import Svg, { Circle, Defs, LinearGradient as SvgGradient, Line, Rect, Stop } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MoodSheet } from '@/components/MoodSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { STATIONS, STATION_FREQS } from '@/constants/stations';
+import { STATIONS, stationDial, type Band } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
@@ -30,14 +30,36 @@ import { SeekBar } from '@/components/SeekBar';
 
 const SCREEN_H = Dimensions.get('window').height;
 
-// ── The FM band ────────────────────────────────────────────────────────────────
-const FREQ_MIN = 87.5;
-const FREQ_MAX = 108.5;
-const PX_PER_MHZ = 110;          // drag sensitivity: pixels per MHz
-const LOCK_RANGE = 0.45;         // MHz within which a station "bleeds in"
+// ── The two bands ─────────────────────────────────────────────────────────────
+//
+// The dial is dual-band, matching the Stations page: AM carries the free
+// stations, FM the premium ones. Frequencies live in constants/stations so the
+// page, the dial and the share card can't drift apart.
+//
+// `px` is how many pixels a drag covers per unit of the band, and it's chosen
+// so both bands take about the same amount of thumb to cross end to end:
+// FM is 21 MHz at 110px each, AM is 1070 kHz at 2.2px each.
+const BAND_CFG: Record<Band, {
+  min: number; max: number; px: number; tick: number; lock: number;
+  label: (v: number) => string;
+}> = {
+  FM: { min: 87.5, max: 108.5, px: 110, tick: 0.1, lock: 0.45, label: (v) => v.toFixed(2) },
+  AM: { min: 530, max: 1600, px: 2.2, tick: 10, lock: 25, label: (v) => String(Math.round(v)) },
+};
 
-// Station dial frequencies live in constants/stations so the share card can
-// draw the same dial without importing the mode (which would be a cycle).
+/** Every tenth tick is a labelled major in both bands — 1 MHz, 100 kHz. */
+const MAJOR_EVERY = 10;
+
+/** Each station's band and dial position, worked out once. */
+const DIAL = new Map(STATIONS.map((s) => [s.id, stationDial(s.id, s.premium)]));
+
+function bandOf(id: string): Band {
+  return DIAL.get(id)?.band ?? 'FM';
+}
+
+function dialValue(id: string): number {
+  return DIAL.get(id)?.value ?? 92.1;
+}
 
 const DEMO_DURATION_MS = 214000; // 3:34
 
@@ -56,17 +78,28 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
 }
 
-/** Nearest station to a frequency + how locked-on we are (0..1). */
-function nearestStation(freq: number) {
-  let best = STATIONS[0];
+/** Nearest station ON THIS BAND, plus how locked-on we are (0..1). The other
+ *  band's stations are invisible to the needle — that's what a band switch
+ *  means on a real receiver. */
+function nearestStation(band: Band, freq: number) {
+  const cfg = BAND_CFG[band];
+  let best: (typeof STATIONS)[number] | null = null;
   let bestDist = Infinity;
   for (const s of STATIONS) {
-    const f = STATION_FREQS[s.id];
-    if (f === undefined) continue;
-    const d = Math.abs(f - freq);
-    if (d < bestDist) { bestDist = d; best = s; }
+    const d = DIAL.get(s.id);
+    if (!d || d.band !== band) continue;
+    const dist = Math.abs(d.value - freq);
+    if (dist < bestDist) { bestDist = dist; best = s; }
   }
-  return { station: best, lock: clamp(1 - bestDist / LOCK_RANGE, 0, 1) };
+  if (!best) return { station: STATIONS[0], lock: 0 };
+  return { station: best, lock: clamp(1 - bestDist / cfg.lock, 0, 1) };
+}
+
+/** The first station on a band, for when the listener flips over to it. */
+function firstOnBand(band: Band) {
+  const list = STATIONS.filter((s) => DIAL.get(s.id)?.band === band)
+    .sort((a, b) => dialValue(a.id) - dialValue(b.id));
+  return list[0] ?? STATIONS[0];
 }
 
 /** The printed band plates at the left end of the scale. */
@@ -79,74 +112,88 @@ function underPlate(x: number, label: string, dot: number, gap: number, plateW: 
 }
 
 // ── The dial ruler — ticks slide under a fixed needle ──────────────────────────
-function DialRuler({ freq, width, color, lock }: { freq: number; width: number; color: string; lock: number }) {
+//
+// The LIVE band is always the top scale, with the station markers on it. The
+// other band is printed below and drifts past at its own rate, exactly as a
+// real dual-band dial does: the needle crosses both, but only one is tuned.
+function DialRuler({ band, freq, width, color, lock }: {
+  band: Band; freq: number; width: number; color: string; lock: number;
+}) {
   const H = 132;
   const midX = width / 2;
   const baseY = 66;          // the bright band both scales hang off
+  const cfg = BAND_CFG[band];
 
-  // FM ticks (0.1 MHz steps) with a little bleed off both edges.
-  const halfMHz = width / 2 / PX_PER_MHZ + 0.3;
-  const from = Math.ceil((freq - halfMHz) * 10);
-  const to = Math.floor((freq + halfMHz) * 10);
+  // Live scale, with a little bleed off both edges.
+  const half = width / 2 / cfg.px + cfg.tick * 4;
+  const from = Math.ceil((freq - half) / cfg.tick);
+  const to = Math.floor((freq + half) / cfg.tick);
 
   const ticks: { x: number; h: number; major: boolean; label?: string }[] = [];
   for (let k = from; k <= to; k++) {
-    const f = k / 10;
-    if (f < FREQ_MIN || f > FREQ_MAX) continue;
-    const x = midX + (f - freq) * PX_PER_MHZ;
-    const whole = k % 10 === 0;
-    const half = k % 5 === 0;
-    ticks.push({ x, h: whole ? 22 : half ? 15 : 9, major: whole, label: whole ? String(Math.round(f)) : undefined });
+    // k * tick accumulates float error at 0.1 steps (92.30000000000001), and
+    // the label is what shows it.
+    const f = Math.round(k * cfg.tick * 1000) / 1000;
+    if (f < cfg.min || f > cfg.max) continue;
+    const x = midX + (f - freq) * cfg.px;
+    const whole = k % MAJOR_EVERY === 0;
+    const halfTick = k % (MAJOR_EVERY / 2) === 0;
+    ticks.push({
+      x, h: whole ? 22 : halfTick ? 15 : 9, major: whole,
+      label: whole ? String(Math.round(f)) : undefined,
+    });
   }
 
-  // A second, decorative AM scale — every dial worth looking at prints both
-  // bands on one strip with a single needle crossing them. It's cosmetic
-  // (Cruise FM only tunes the FM row), so it's simply mapped across the same
-  // travel at its own rate, which is what makes it drift past at a different
-  // speed as you tune. That mismatch is exactly what a real dial does.
-  const AM_LO = 530, AM_HI = 1600, AM_PX_PER_KHZ = PX_PER_MHZ / 220;
-  const amCentre = AM_LO + ((freq - FREQ_MIN) / (FREQ_MAX - FREQ_MIN)) * (AM_HI - AM_LO);
-  const amHalf = width / 2 / AM_PX_PER_KHZ + 40;
-  const amTicks: { x: number; major: boolean; label?: string }[] = [];
-  const amFrom = Math.ceil((amCentre - amHalf) / 20) * 20;
-  const amTo = Math.floor((amCentre + amHalf) / 20) * 20;
-  for (let a = amFrom; a <= amTo; a += 20) {
-    if (a < AM_LO || a > AM_HI) continue;
-    const x = midX + (a - amCentre) * AM_PX_PER_KHZ;
-    const major = a % 200 === 0;
-    amTicks.push({ x, major, label: major ? String(a) : undefined });
+  // The other band, printed. Its whole span is laid across roughly 2.2 screens
+  // so the numbers sit far enough apart to read, and it travels at a different
+  // rate from the live scale — which is exactly what makes a real dial feel
+  // mechanical rather than drawn.
+  const other: Band = band === 'FM' ? 'AM' : 'FM';
+  const oc = BAND_CFG[other];
+  const oPx = (width * 2.2) / (oc.max - oc.min);
+  const t = (freq - cfg.min) / (cfg.max - cfg.min);
+  const oCentre = oc.min + t * (oc.max - oc.min);
+  const oHalf = width / 2 / oPx + oc.tick * 4;
+  // Only label as often as the spacing allows — 78px apart at the least.
+  const oLabelEvery = Math.max(1, Math.ceil(78 / (oc.tick * MAJOR_EVERY * oPx))) * MAJOR_EVERY;
+  const oTicks: { x: number; major: boolean; label?: string }[] = [];
+  const oFrom = Math.ceil((oCentre - oHalf) / oc.tick);
+  const oTo = Math.floor((oCentre + oHalf) / oc.tick);
+  for (let k = oFrom; k <= oTo; k++) {
+    // Halves and majors only. The printed band is laid out much tighter than
+    // the live one, so drawing every tick turned it into a solid grey mass
+    // that out-shouted the scale actually being tuned.
+    if (k % (MAJOR_EVERY / 2) !== 0) continue;
+    const f = Math.round(k * oc.tick * 1000) / 1000;
+    if (f < oc.min || f > oc.max) continue;
+    const major = k % MAJOR_EVERY === 0;
+    oTicks.push({
+      x: midX + (f - oCentre) * oPx, major,
+      label: k % oLabelEvery === 0 ? String(Math.round(f)) : undefined,
+    });
   }
+
+  // Band chips sit in a printed panel at the left edge. Without the backing
+  // plate the scrolling numbers slide straight through the label — "FM" and
+  // "102" collided into "FM02" — and a number half-hidden behind the plate
+  // reads as a different, shorter number, so any number that would overlap it
+  // is dropped outright rather than clipped.
+  const underPlate = (x: number, text: string, dot: number, gap: number, right: number) =>
+    x - dmWidth(text, dot, gap) / 2 < right + 6;
 
   return (
     // pointerEvents none is CRITICAL: on iOS the Svg otherwise swallows
     // touches, so drags starting on the ruler never reach the tune gesture.
     <Svg width={width} height={H} pointerEvents="none">
-      <Defs>
-        {/* The band plates fade out on their right edge instead of ending in a
-            hard line, so ticks dissolve under them the way ink does beneath a
-            printed band marker rather than being sliced off. */}
-        <SvgGradient id="dialPlate" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor="#050912" stopOpacity={0.96} />
-          <Stop offset="0.62" stopColor="#050912" stopOpacity={0.94} />
-          <Stop offset="1" stopColor="#050912" stopOpacity={0} />
-        </SvgGradient>
-      </Defs>
-
-      {/* FM numbers, in the same matrix type as the head unit above. A number
-          that would land under the band plate is dropped outright — half a
-          number showing reads as a different, shorter number ("102" behind the
-          plate became "FM02", "1000" became "000"), which is worse than a gap
-          in the scale. */}
-      {ticks.filter((t) => t.label && !underPlate(t.x, t.label, 2.1, 0.8, FM_PLATE_W)).map((t, i) => (
+      {/* Live scale numbers */}
+      {ticks.filter((t) => t.label && !underPlate(t.x, t.label!, 2.1, 0.8, 40)).map((t, i) => (
         <DotMatrixGroup key={`fl${i}`} text={t.label!} x={t.x} y={6} dot={2.1} gap={0.8}
           color="#CFE6FF" anchor="middle" opacity={0.85} />
       ))}
-      {/* Band markers sit in a little printed plate at the left edge, exactly
-          as a real dial prints them. */}
-      <Rect x={0} y={0} width={FM_PLATE_W} height={30} fill="url(#dialPlate)" />
-      <DotMatrixGroup text="FM" x={9} y={6} dot={2.1} gap={0.8} color={color} opacity={0.95} />
+      <Rect x={0} y={0} width={40} height={30} fill="#050912" opacity={0.9} rx={6} />
+      <DotMatrixGroup text={band} x={9} y={6} dot={2.1} gap={0.8} color={color} opacity={0.95} />
 
-      {/* FM ticks hanging down onto the band */}
+      {/* Live ticks hanging down onto the band */}
       {ticks.map((t, i) => (
         <Line key={i} x1={t.x} y1={baseY} x2={t.x} y2={baseY - t.h}
           stroke={t.major ? 'rgba(214,234,255,0.85)' : 'rgba(214,234,255,0.32)'}
@@ -156,28 +203,28 @@ function DialRuler({ freq, width, color, lock }: { freq: number; width: number; 
       {/* The lit band itself */}
       <Rect x={0} y={baseY} width={width} height={2.5} fill="#9FD8FF" opacity={0.55} />
 
-      {/* AM ticks below the band, then its numbers */}
-      {amTicks.map((t, i) => (
+      {/* The printed band below */}
+      {oTicks.map((t, i) => (
         <Line key={`a${i}`} x1={t.x} y1={baseY + 4} x2={t.x} y2={baseY + 4 + (t.major ? 14 : 8)}
           stroke={t.major ? 'rgba(214,234,255,0.6)' : 'rgba(214,234,255,0.22)'}
           strokeWidth={t.major ? 2 : 1} />
       ))}
-      {amTicks.filter((t) => t.label && !underPlate(t.x, t.label, 1.7, 0.62, AM_PLATE_W)).map((t, i) => (
+      {oTicks.filter((t) => t.label && !underPlate(t.x, t.label!, 1.7, 0.62, 34)).map((t, i) => (
         <DotMatrixGroup key={`al${i}`} text={t.label!} x={t.x} y={baseY + 22} dot={1.7} gap={0.62}
           color="#9FD8FF" anchor="middle" opacity={0.5} />
       ))}
-      <Rect x={0} y={baseY + 16} width={AM_PLATE_W} height={28} fill="url(#dialPlate)" />
-      <DotMatrixGroup text="AM" x={8} y={baseY + 22} dot={1.7} gap={0.62} color="#9FD8FF" opacity={0.6} />
+      <Rect x={0} y={baseY + 18} width={34} height={26} fill="#050912" opacity={0.9} rx={6} />
+      <DotMatrixGroup text={other} x={8} y={baseY + 22} dot={1.7} gap={0.62} color="#9FD8FF" opacity={0.6} />
 
-      {/* Station markers — glowing dots in each station's own colour */}
-      {STATIONS.map((s) => {
-        const f = STATION_FREQS[s.id];
-        if (f === undefined) return null;
-        const x = midX + (f - freq) * PX_PER_MHZ;
+      {/* Station markers — only this band's, in each station's own colour */}
+      {STATIONS.map((st) => {
+        const d = DIAL.get(st.id);
+        if (!d || d.band !== band) return null;
+        const x = midX + (d.value - freq) * cfg.px;
         if (x < -20 || x > width + 20) return null;
-        const c = s.eqColors?.[1] ?? '#ffffff';
+        const c = st.eqColors?.[1] ?? '#ffffff';
         return (
-          <Fragment key={s.id}>
+          <Fragment key={st.id}>
             <Circle cx={x} cy={baseY - 30} r={7} fill={c} opacity={0.18} />
             <Circle cx={x} cy={baseY - 30} r={3.2} fill={c} />
           </Fragment>
@@ -274,9 +321,32 @@ function DmLine({ text, width: raw, dot, gap, color, dim, align = 'right' }: {
   );
 }
 
-function TunerReadout({ width, accent, freq, lock, playing, title, artist, hasTrack }: {
-  width: number; accent: string; freq: number; lock: number; playing: boolean;
-  title: string; artist: string; hasTrack: boolean;
+/** The band button, where a head unit keeps it: on the status row. Tapping a
+ *  band tunes to its first station, which is what a real receiver does — the
+ *  band and the music move together. */
+function BandSwitch({ band, accent, onPick }: { band: Band; accent: string; onPick: (b: Band) => void }) {
+  return (
+    <View style={fs.bandSwitch}>
+      {(['AM', 'FM'] as Band[]).map((b) => {
+        const on = b === band;
+        return (
+          <TouchableOpacity
+            key={b}
+            onPress={() => onPick(b)}
+            activeOpacity={0.8}
+            hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+            style={[fs.bandSeg, on && { backgroundColor: accent + '2A', borderColor: accent + '66' }]}>
+            <DotMatrixText text={b} dot={1.7} gap={0.62} color={on ? accent : '#7A8298'} dim={false} />
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function TunerReadout({ width, accent, band, freq, lock, playing, title, artist, hasTrack, onBand }: {
+  width: number; accent: string; band: Band; freq: number; lock: number; playing: boolean;
+  title: string; artist: string; hasTrack: boolean; onBand: (b: Band) => void;
 }) {
   const onAir = playing && lock > 0.9;
 
@@ -326,16 +396,17 @@ function TunerReadout({ width, accent, freq, lock, playing, title, artist, hasTr
         )}
       </View>
 
-      {/* Row 2 — the status lamps of a real receiver */}
+      {/* Row 2 — band button and the status lamps of a real receiver */}
       <View style={fs.lcdRow}>
+        <BandSwitch band={band} accent={accent} onPick={onBand} />
         <DotMatrixText text="STEREO" dot={SMALL.dot} gap={SMALL.gap} color="#FFA24B" dim opacity={onAir ? 1 : 0.32} />
         <DotMatrixText text="TUNED" dot={SMALL.dot} gap={SMALL.gap} color={accent} dim opacity={0.3 + lock * 0.7} />
       </View>
 
       {/* Row 3 — band and frequency, the biggest thing on the panel */}
       <View style={[fs.lcdRow, { alignItems: 'flex-end', marginTop: 16 }]}>
-        <DotMatrixText text="FM" dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
-        <DotMatrixText text={freq.toFixed(2)} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
+        <DotMatrixText text={band} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
+        <DotMatrixText text={BAND_CFG[band].label(freq)} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
       </View>
     </View>
   );
@@ -353,12 +424,17 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const dialGap = Math.round(clamp((winH - 640) * 0.18, 14, 56));
 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
-  const [freq, setFreq] = useState(STATION_FREQS[stationId ?? 'night-run'] ?? 92.1);
+  const [band, setBand] = useState<Band>(() => bandOf(stationId ?? 'night-run'));
+  const [freq, setFreq] = useState(() => dialValue(stationId ?? 'night-run'));
   const freqRef = useRef(freq);
   useEffect(() => { freqRef.current = freq; }, [freq]);
+  // The pan handler is created once, so it reads the band through a ref rather
+  // than closing over a stale value.
+  const bandRef = useRef(band);
+  useEffect(() => { bandRef.current = band; }, [band]);
 
   const lockedStation = resolveAnyStation(activeId);
-  const { station: nearest, lock } = nearestStation(freq);
+  const { station: nearest, lock } = nearestStation(band, freq);
   const eq = (nearest.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
   const accent = eq[1];
 
@@ -409,9 +485,10 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const cancelSnap = () => { if (snapRaf.current) cancelAnimationFrame(snapRaf.current); snapRaf.current = 0; };
 
   const tuneTo = (f: number) => {
-    const v = clamp(f, FREQ_MIN, FREQ_MAX);
-    // Haptic tick each 0.2 MHz swept (native only)
-    const bucket = Math.round(v * 5);
+    const cfg = BAND_CFG[bandRef.current];
+    const v = clamp(f, cfg.min, cfg.max);
+    // Haptic tick every couple of ticks swept (native only)
+    const bucket = Math.round(v / (cfg.tick * 2));
     if (bucket !== lastTickRef.current) {
       lastTickRef.current = bucket;
       if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
@@ -421,8 +498,8 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
   const snapToNearest = () => {
     cancelSnap();
-    const { station } = nearestStation(freqRef.current);
-    const target = STATION_FREQS[station.id] ?? freqRef.current;
+    const { station } = nearestStation(bandRef.current, freqRef.current);
+    const target = dialValue(station.id);
     const from = freqRef.current;
     const t0 = Date.now();
     const DUR = 340;
@@ -446,9 +523,22 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   // snapping instantly. The music + active station lock in when it arrives.
   const reelTo = (id: string) => {
     cancelSnap();
-    const target = STATION_FREQS[id] ?? freqRef.current;
+    const target = dialValue(id);
+    const toBand = bandOf(id);
+    // Picking a station on the other band flips the dial over first — there is
+    // nothing to sweep across, the scales aren't the same ruler.
+    if (toBand !== bandRef.current) {
+      bandRef.current = toBand;
+      setBand(toBand);
+      setFreq(target);
+      freqRef.current = target;
+      setActiveId(id);
+      npSetStation(id);
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      return;
+    }
     const from = freqRef.current;
-    if (Math.abs(target - from) < 0.05) { setActiveId(id); npSetStation(id); return; }
+    if (Math.abs(target - from) < BAND_CFG[toBand].tick) { setActiveId(id); npSetStation(id); return; }
     const t0 = Date.now();
     const DUR = 720;
     const step = () => {
@@ -488,7 +578,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
           gestureModeRef.current = Math.abs(g.dx) >= Math.abs(g.dy) ? 'tune' : 'dismiss';
         }
         if (gestureModeRef.current === 'tune') {
-          tuneTo(startFreqRef.current - g.dx / PX_PER_MHZ);
+          tuneTo(startFreqRef.current - g.dx / BAND_CFG[bandRef.current].px);
         } else if (gestureModeRef.current === 'dismiss' && g.dy > 0) {
           slideY.setValue(g.dy);
         }
@@ -514,11 +604,30 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     if (!visible) return;
     const id = stationId ?? 'night-run';
     setActiveId(id);
-    setFreq(STATION_FREQS[id] ?? 92.1);
+    const b = bandOf(id);
+    setBand(b);
+    bandRef.current = b;
+    setFreq(dialValue(id));
     slideY.setValue(SCREEN_H);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
     return () => cancelSnap();
   }, [visible]);
+
+  /** Flipping bands tunes straight to that band's first station, the way a
+   *  real receiver does — the band and what you're hearing move together. */
+  const pickBand = (b: Band) => {
+    if (b === bandRef.current) return;
+    cancelSnap();
+    const station = firstOnBand(b);
+    bandRef.current = b;
+    setBand(b);
+    const v = dialValue(station.id);
+    setFreq(v);
+    freqRef.current = v;
+    setActiveId(station.id);
+    npSetStation(station.id);
+    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  };
 
   const handleClose = () => {
     cancelSnap();
@@ -599,6 +708,8 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
               <TunerReadout
                 width={Math.min(winW - 32, 420)}
                 accent={accent}
+                band={band}
+                onBand={pickBand}
                 freq={freq}
                 lock={lock}
                 playing={playing}
@@ -610,7 +721,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
             {/* Ruler + static */}
             <View style={{ marginTop: dialGap }}>
-              <DialRuler freq={freq} width={winW} color={accent} lock={lock} />
+              <DialRuler band={band} freq={freq} width={winW} color={accent} lock={lock} />
               <StaticNoise width={winW} height={116} phase={phase} opacity={offAir * 0.55} />
               {/* Notes only flow once the needle locks onto a station */}
               <FloatingNotes playing={playing && lock > 0.9} color={accent} />
@@ -731,6 +842,12 @@ const fs = StyleSheet.create({
   },
   lcdRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24 },
   lamp: { width: 7, height: 7, borderRadius: 3.5, shadowOffset: { width: 0, height: 0 } },
+  bandSwitch: { flexDirection: 'row', gap: 5 },
+  bandSeg: {
+    paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  },
   dragHint: { color: 'rgba(255,255,255,0.18)', fontSize: 8, fontWeight: '600', letterSpacing: 2, textAlign: 'center', marginTop: 10 },
   time: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
   controls: {

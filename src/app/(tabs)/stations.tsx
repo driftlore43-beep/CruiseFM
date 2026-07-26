@@ -12,7 +12,7 @@ import { GlossSheen } from '@/components/GlossSheen';
 import { PremiumShimmer } from '@/components/PremiumShimmer';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, Fonts, TAB_SAFE_INSET } from '@/constants/theme';
-import { STATIONS, type Station } from '@/constants/stations';
+import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { deleteCustomStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
 import { recordDriveStart } from '@/utils/driveStats';
@@ -90,17 +90,53 @@ function OnAirBanner({ station, onPress }: { station: Station; onPress: () => vo
   );
 }
 
-/** FM-dial section divider — ruler ticks with the label and a frequency. */
-function DialDivider({ label, freq }: { label: string; freq: string }) {
+/**
+ * The page is laid out like a receiver, not a list of cards.
+ *
+ * AM carries the free stations and the ones you make yourself; FM carries the
+ * premium ones. A hairline rail runs down the left with a red marker parked on
+ * whatever's playing, and each station's dial number sits in its own column —
+ * so the number reads first, then the name, exactly like a head unit.
+ */
+
+/** The big band letters, with the printed scale a real dial has beside them. */
+function BandHeader({ band, caption }: { band: Band; caption: string }) {
   return (
-    <View style={styles.dialRow}>
-      <Text style={[styles.dialLabel, { fontFamily: Fonts.mono }]}>{label}</Text>
-      <View style={styles.dialTicks}>
-        {Array.from({ length: 25 }).map((_, i) => (
+    <View style={styles.bandRow}>
+      <View style={styles.railCol} />
+      <Text style={[styles.bandLetters, { fontFamily: Fonts.mono }]}>{band}</Text>
+      <View style={styles.bandTicks}>
+        {Array.from({ length: 22 }).map((_, i) => (
           <View key={i} style={[styles.dialTick, i % 4 === 0 && styles.dialTickTall]} />
         ))}
       </View>
-      <Text style={[styles.dialFreq, { fontFamily: Fonts.mono }]}>{freq}</Text>
+      <Text style={[styles.bandCaption, { fontFamily: Fonts.mono }]}>{caption}</Text>
+    </View>
+  );
+}
+
+/**
+ * One station on the dial: rail, number, then the card.
+ *
+ * The rail line is drawn inside every row rather than once behind the list, so
+ * the rows stack into one continuous line on their own and the red marker
+ * lands on the right station with nothing to measure. It stops 14px short at
+ * the bottom because that's the card's own margin — otherwise the marker
+ * centres on the gap instead of the card.
+ */
+function DialRow({ label, active, children }: { label: string; active: boolean; children: React.ReactNode }) {
+  return (
+    <View style={styles.dialRow}>
+      <View style={styles.railCol}>
+        <View style={styles.railLine} />
+        {active && (
+          <View style={styles.railMarkBox} pointerEvents="none">
+            <View style={styles.railMark} />
+          </View>
+        )}
+      </View>
+      <Text style={[styles.freq, active && styles.freqActive, { fontFamily: Fonts.mono }]}>{label}</Text>
+      <View style={{ flex: 1 }}>{children}</View>
     </View>
   );
 }
@@ -129,8 +165,20 @@ export default function StationsScreen() {
     setPoetry(POETRY[Math.floor(Math.random() * POETRY.length)]);
   }, []));
 
-  const free = STATIONS.filter((s) => !s.premium);
-  const premium = STATIONS.filter((s) => s.premium);
+  // AM = free + the user's own; FM = premium. Both sorted up the dial, the way
+  // a receiver's scale runs, so the numbers on the left always ascend.
+  const amBand = [
+    ...customStations.map((c) => ({ kind: 'custom' as const, station: c, dial: stationDial(c.id, false) })),
+    ...STATIONS.filter((s) => !s.premium).map((s) => ({ kind: 'station' as const, station: s, dial: stationDial(s.id, false) })),
+  ].sort((a, b) => a.dial.value - b.dial.value);
+
+  const fmBand = STATIONS.filter((s) => s.premium)
+    .map((s) => ({ station: s, dial: stationDial(s.id, true) }))
+    .sort((a, b) => a.dial.value - b.dial.value);
+
+  // The red marker parks on whatever's playing, and falls back to the station
+  // that suits the hour when nothing is.
+  const tunedId = np.session?.stationId ?? onAirStation.id;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -156,43 +204,34 @@ export default function StationsScreen() {
           <OnAirBanner station={onAirStation} onPress={() => setSelectedStation(onAirStation)} />
         </View>
 
-        {customStations.length > 0 && (
-          <>
-            <DialDivider label="MY STATIONS" freq="87.9" />
-            {customStations.map((station) => (
-              <CustomStationCard key={station.id} station={station} onPress={() => setSelectedStation(station)} />
-            ))}
-          </>
-        )}
-
-        {free.length > 0 && (
-          <>
-            <DialDivider label="FREE" freq="92.1" />
-            {free.map((station) => (
-              <StationCard key={station.id} station={station} onPress={() => setSelectedStation(station)} />
-            ))}
-          </>
-        )}
-
-        {premium.length > 0 && (
-          <>
-            <DialDivider label="PREMIUM" freq="101.3" />
-            {premium.map((station) =>
-              isPro ? (
-                <StationCard key={station.id} station={station} onPress={() => setSelectedStation(station)} />
-              ) : (
-                <View key={station.id} style={styles.lockedWrapper}>
-                  <StationCard station={station} />
-                  <View style={styles.lockOverlay}>
-                    <PremiumShimmer />
-                    <Ionicons name="lock-closed" size={20} color="#fff" style={styles.lockIcon} />
-                    <Text style={styles.lockText}>Unlock with Premium</Text>
-                  </View>
-                </View>
-              ),
+        <BandHeader band="AM" caption="FREE" />
+        {amBand.map(({ kind, station, dial }) => (
+          <DialRow key={station.id} label={dial.label} active={station.id === tunedId}>
+            {kind === 'custom' ? (
+              <CustomStationCard station={station as CustomStation} onPress={() => setSelectedStation(station)} />
+            ) : (
+              <StationCard station={station as Station} onPress={() => setSelectedStation(station)} />
             )}
-          </>
-        )}
+          </DialRow>
+        ))}
+
+        <BandHeader band="FM" caption="PREMIUM" />
+        {fmBand.map(({ station, dial }) => (
+          <DialRow key={station.id} label={dial.label} active={station.id === tunedId}>
+            {isPro ? (
+              <StationCard station={station} onPress={() => setSelectedStation(station)} />
+            ) : (
+              <View style={styles.lockedWrapper}>
+                <StationCard station={station} />
+                <View style={styles.lockOverlay}>
+                  <PremiumShimmer />
+                  <Ionicons name="lock-closed" size={20} color="#fff" style={styles.lockIcon} />
+                  <Text style={styles.lockText}>Unlock with Premium</Text>
+                </View>
+              </View>
+            )}
+          </DialRow>
+        ))}
 
       </ScrollView>
 
@@ -264,15 +303,16 @@ function CustomStationCard({ station, onPress }: { station: CustomStation; onPre
             <Text style={styles.customIconEmoji}>{station.icon}</Text>
           )}
         </View>
+        {/* Centred to match the station cards beside it on the dial */}
         <View style={styles.customText}>
           <Text style={styles.customName} numberOfLines={1}>{station.name}</Text>
           <Text style={styles.customTagline} numberOfLines={1}>{station.tagline}</Text>
         </View>
         <View style={styles.customChevronBlock}>
-          <View style={[styles.myBadge, { backgroundColor: station.color + '22', borderColor: station.color + '55' }]}>
-            <Text style={[styles.myBadgeText, { color: station.color }]}>MINE</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
+          <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
+        </View>
+        <View style={[styles.myBadge, { backgroundColor: station.color + '22', borderColor: station.color + '55' }]}>
+          <Text style={[styles.myBadgeText, { color: station.color }]}>MINE</Text>
         </View>
       </View>
     </Pressable>
@@ -361,27 +401,90 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // ── FM-dial section dividers ──
+  // ── The dial ──────────────────────────────────────────────────────────────
+  // Rail column, then the number, then the card. RAIL_W + FREQ_W is what the
+  // cards give up, so keep both tight.
+  railCol: {
+    width: 16,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  // Full height on purpose: the rows butt up against each other so their rails
+  // join into one unbroken line down the page.
+  railLine: {
+    position: 'absolute',
+    top: -1,
+    bottom: -1,
+    width: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.13)',
+  },
+  // Stops 14 short of the bottom — that's the card's own margin, so the marker
+  // centres on the card rather than on the gap below it.
+  railMarkBox: {
+    position: 'absolute',
+    top: 0,
+    bottom: 14,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  railMark: {
+    width: 16,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FF3B30',
+    shadowColor: '#FF3B30',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.95,
+    shadowRadius: 7,
+    elevation: 4,
+  },
   dialRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginTop: 10,
-    marginBottom: 14,
-    paddingHorizontal: 2,
+    gap: 6,
   },
-  dialLabel: {
-    color: Cruise.textMuted,
-    fontSize: 10,
+  freq: {
+    width: 46,
+    textAlign: 'right',
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
     fontWeight: '700',
+    letterSpacing: 0.5,
+    // The card carries a 14 bottom margin, so lift the number by half of it to
+    // sit level with the card's middle rather than the row's.
+    marginBottom: 14,
+  },
+  freqActive: { color: '#FF7A70' },
+
+  // ── Band headers ──
+  bandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  bandLetters: {
+    color: Cruise.textPrimary,
+    fontSize: 22,
+    fontWeight: '800',
     letterSpacing: 2,
   },
-  dialTicks: {
+  bandTicks: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     height: 10,
+  },
+  bandCaption: {
+    color: Cruise.amber,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
   },
   dialTick: {
     width: 1,
@@ -391,12 +494,6 @@ const styles = StyleSheet.create({
   dialTickTall: {
     height: 9,
     backgroundColor: 'rgba(255,255,255,0.30)',
-  },
-  dialFreq: {
-    color: Cruise.amber,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
   },
   titleRow: {
     flexDirection: 'row',
@@ -448,40 +545,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Cruise.surface,
     borderRadius: 20,
-    padding: 16,
-    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    gap: 10,
     borderWidth: 1,
   },
   customIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     flexShrink: 0,
   },
-  customIconEmoji: { fontSize: 22 },
-  customText: { flex: 1 },
+  customIconEmoji: { fontSize: 20 },
+  customText: { flex: 1, alignItems: 'center' },
   customName: {
     color: Cruise.textPrimary,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     marginBottom: 3,
+    textAlign: 'center',
   },
   customTagline: {
     color: Cruise.textSecondary,
-    fontSize: 12,
+    fontSize: 11.5,
+    textAlign: 'center',
   },
   customChevronBlock: {
+    width: 42,
     alignItems: 'center',
     gap: 4,
     flexShrink: 0,
   },
+  // Corner-mounted for the same reason the PREMIUM badge is: nothing may share
+  // the name's row, or the name stops being centred.
   myBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
     borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
     borderWidth: 1,
   },
   myBadgeText: {
@@ -497,7 +603,10 @@ const styles = StyleSheet.create({
   lockedWrapper: { position: 'relative' },
   lockOverlay: {
     ...StyleSheet.absoluteFill,
-    borderRadius: 16,
+    // Stop 14 short: that's the card's own bottom margin, and without this the
+    // lock panel hangs below the card it's covering.
+    bottom: 14,
+    borderRadius: 20,
     overflow: 'hidden',          // clip the shimmer sweep to the card's rounded rect
     backgroundColor: 'rgba(8, 15, 51, 0.75)',
     alignItems: 'center',

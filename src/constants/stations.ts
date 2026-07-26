@@ -285,3 +285,42 @@ export function stationFrequency(id: string): number {
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return Math.round((88.1 + (h % 1000) / 1000 * 20) * 10) / 10;
 }
+
+// ── The two bands ─────────────────────────────────────────────────────────────
+//
+// The Stations page is laid out like a real receiver: AM carries the free
+// stations and the ones you make yourself, FM carries the premium ones. That
+// gives the page a reason to look like a dial instead of a second list of
+// cards, and it makes "what do I get for paying" a thing you can see at a
+// glance rather than a badge repeated seven times.
+
+export type Band = 'AM' | 'FM';
+
+/** Where the free stations sit on the AM scale (kHz). */
+export const STATION_AM: Record<string, number> = {
+  'night-run': 810,
+  'sunset': 1010,
+  'daylight': 1240,
+};
+
+function hashOf(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/** A made-up station's AM slot: stable, on the real 540–1600 kHz scale, and
+ *  always a round 10 kHz so it looks like something a receiver would show. */
+export function stationAm(id: string): number {
+  return STATION_AM[id] ?? 540 + (hashOf(id) % 107) * 10;
+}
+
+/** What the dial reads for a station, and which band it's on. */
+export function stationDial(id: string, premium: boolean): { band: Band; label: string; value: number } {
+  if (premium) {
+    const f = stationFrequency(id);
+    return { band: 'FM', label: f.toFixed(1), value: f };
+  }
+  const a = stationAm(id);
+  return { band: 'AM', label: String(a), value: a };
+}

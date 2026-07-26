@@ -120,6 +120,11 @@ function CompactCard({ station, onPress }: { station: Station; onPress?: () => v
 }
 
 // ── Full-width list card ──────────────────────────────────────────────────────
+// Used only by the Stations page, which is laid out like a receiver: the dial
+// number sits outside the card on the left, so the station's name is CENTRED
+// inside it. That means nothing else may share the name's row — the PREMIUM
+// badge moved to the card's own top-right corner, and the block on the right
+// is padded to the icon's width so the middle is genuinely the middle.
 function ListCard({ station, onPress }: { station: Station; onPress?: () => void }) {
   const platformColor = usePlatformColor();
   return (
@@ -159,21 +164,14 @@ function ListCard({ station, onPress }: { station: Station; onPress?: () => void
         {/* Layer 4 — row content */}
         <View style={styles.cardRow}>
           <View style={styles.iconCircle}>
-            <MaterialCommunityIcons name={station.iconName as any} size={24} color="#fff" />
+            <MaterialCommunityIcons name={station.iconName as any} size={22} color="#fff" />
           </View>
 
           <View style={styles.textBlock}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name} numberOfLines={1}>{station.name}</Text>
-              {station.premium && (
-                <View style={styles.premiumBadge}>
-                  <Text style={styles.premiumText}>PREMIUM</Text>
-                </View>
-              )}
-            </View>
+            <Text style={styles.name} numberOfLines={1}>{station.name}</Text>
             <Text style={styles.tagline} numberOfLines={1}>{station.tagline}</Text>
             <View style={styles.tagsRow}>
-              {station.tags.map((tag) => (
+              {station.tags.slice(0, 1).map((tag) => (
                 <View key={tag} style={styles.tag}>
                   <Text style={styles.tagText}>{tag}</Text>
                 </View>
@@ -181,13 +179,15 @@ function ListCard({ station, onPress }: { station: Station; onPress?: () => void
             </View>
           </View>
 
+          {/* Same width as the icon, so the text block sits dead centre */}
           <View style={styles.chevronBlock}>
             {platformColor && (
               <View style={[styles.platformDot, { backgroundColor: platformColor }]} />
             )}
-            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
+            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
           </View>
         </View>
+
 
       </View>
     </Pressable>
@@ -288,13 +288,14 @@ const styles = StyleSheet.create({
   cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    gap: 10,
   },
   iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.10)',
@@ -303,11 +304,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   iconEmoji: { fontSize: 22 },
-  textBlock: { flex: 1, gap: 4 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  name: { color: '#fff', fontSize: 16, fontWeight: '700', flexShrink: 1 },
-  tagline: { color: 'rgba(255,255,255,0.65)', fontSize: 12, lineHeight: 17 },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 2 },
+  textBlock: { flex: 1, gap: 3, alignItems: 'center' },
+  name: { color: '#fff', fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  tagline: { color: 'rgba(255,255,255,0.65)', fontSize: 11.5, lineHeight: 16, textAlign: 'center' },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 2, justifyContent: 'center' },
   tag: {
     backgroundColor: 'rgba(0,0,0,0.35)',
     borderRadius: 20,
@@ -323,6 +323,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   chevronBlock: {
+    width: 42,
     alignItems: 'center',
     gap: 4,
     flexShrink: 0,

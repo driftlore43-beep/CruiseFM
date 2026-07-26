@@ -10,7 +10,7 @@ import Svg, { Circle, Defs, LinearGradient as SvgGradient, Line, Rect, Stop } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MoodSheet } from '@/components/MoodSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { STATIONS } from '@/constants/stations';
+import { STATIONS, STATION_FREQS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
@@ -36,19 +36,8 @@ const FREQ_MAX = 108.5;
 const PX_PER_MHZ = 110;          // drag sensitivity: pixels per MHz
 const LOCK_RANGE = 0.45;         // MHz within which a station "bleeds in"
 
-// Every station lives at a frequency on the dial.
-const STATION_FREQS: Record<string, number> = {
-  'daylight':       90.5,
-  'night-run':      92.1,
-  'after-midnight': 94.7,
-  'sunset':         96.3,
-  'rain-drive':     98.9,
-  'coastal':        101.3,
-  'mountain-pass':  103.5,
-  'downtown':       100.1,
-  'cars-coffee':    105.1,
-  'tunnel':         107.5,
-};
+// Station dial frequencies live in constants/stations so the share card can
+// draw the same dial without importing the mode (which would be a cycle).
 
 const DEMO_DURATION_MS = 214000; // 3:34
 

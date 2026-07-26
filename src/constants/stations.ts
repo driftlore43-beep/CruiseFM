@@ -254,3 +254,34 @@ export const STATIONS: Station[] = [
 ];
 
 export const RECOMMENDED_IDS = ['night-run', 'daylight', 'sunset'];
+
+/**
+ * Where each station sits on the Tuner's FM dial.
+ *
+ * Lives here rather than inside TunerMode because the share card draws the
+ * same dial and needs the same number — and importing it from the mode would
+ * make a cycle (mode → action row → share card → mode).
+ */
+export const STATION_FREQS: Record<string, number> = {
+  'daylight': 90.5,
+  'night-run': 92.1,
+  'after-midnight': 94.7,
+  'sunset': 96.3,
+  'rain-drive': 98.9,
+  'downtown': 100.1,
+  'coastal': 101.3,
+  'mountain-pass': 103.5,
+  'cars-coffee': 105.1,
+  'tunnel': 107.5,
+};
+
+/** A station's dial frequency. Stations the user made up themselves get a
+ *  stable one derived from their id, so the same station always tunes to the
+ *  same place instead of jumping about between screens. */
+export function stationFrequency(id: string): number {
+  const known = STATION_FREQS[id];
+  if (known !== undefined) return known;
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return Math.round((88.1 + (h % 1000) / 1000 * 20) * 10) / 10;
+}

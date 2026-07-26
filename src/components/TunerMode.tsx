@@ -321,9 +321,17 @@ function DmLine({ text, width: raw, dot, gap, color, dim, align = 'right' }: {
   );
 }
 
-/** The band button, where a head unit keeps it: on the status row. Tapping a
- *  band tunes to its first station, which is what a real receiver does — the
- *  band and the music move together. */
+/**
+ * The band button, where a head unit keeps it: on the status row. Tapping a
+ * band tunes to its first station, which is what a real receiver does — the
+ * band and the music move together.
+ *
+ * Styled as two physical keys rather than two more labels. The first version
+ * used the same flat dot-matrix type as STEREO and TUNED beside it, so it read
+ * as printed text and nobody would think to press it: the keys now have a
+ * raised bezel, the pressed one lights up with its own lamp, and the hint
+ * under the dial names the gesture.
+ */
 function BandSwitch({ band, accent, onPick }: { band: Band; accent: string; onPick: (b: Band) => void }) {
   return (
     <View style={fs.bandSwitch}>
@@ -333,10 +341,24 @@ function BandSwitch({ band, accent, onPick }: { band: Band; accent: string; onPi
           <TouchableOpacity
             key={b}
             onPress={() => onPick(b)}
-            activeOpacity={0.8}
-            hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
-            style={[fs.bandSeg, on && { backgroundColor: accent + '2A', borderColor: accent + '66' }]}>
-            <DotMatrixText text={b} dot={1.7} gap={0.62} color={on ? accent : '#7A8298'} dim={false} />
+            activeOpacity={0.65}
+            hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={`${b} band`}
+            accessibilityState={{ selected: on }}
+            style={[
+              fs.bandKey,
+              on && {
+                backgroundColor: accent + '33',
+                borderColor: accent + 'AA',
+                shadowColor: accent,
+                shadowOpacity: 0.75,
+              },
+            ]}>
+            {/* Top-edge catch — what makes a flat rectangle read as a key */}
+            <View style={[fs.bandKeyBevel, on && { backgroundColor: 'rgba(255,255,255,0.34)' }]} />
+            <View style={[fs.bandLamp, { backgroundColor: on ? accent : 'rgba(255,255,255,0.16)' }]} />
+            <DotMatrixText text={b} dot={1.7} gap={0.62} color={on ? '#ffffff' : '#8A93AB'} dim={false} />
           </TouchableOpacity>
         );
       })}
@@ -727,7 +749,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
               <FloatingNotes playing={playing && lock > 0.9} color={accent} />
             </View>
 
-            <Text style={[fs.dragHint, { fontFamily: Fonts.mono }]}>drag to tune</Text>
+            <Text style={[fs.dragHint, { fontFamily: Fonts.mono }]}>tap am / fm  ·  drag to tune</Text>
           </View>
 
           {/* With a song on the display there's nothing to repeat here — the
@@ -842,13 +864,21 @@ const fs = StyleSheet.create({
   },
   lcdRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24 },
   lamp: { width: 7, height: 7, borderRadius: 3.5, shadowOffset: { width: 0, height: 0 } },
-  bandSwitch: { flexDirection: 'row', gap: 5 },
-  bandSeg: {
-    paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  bandSwitch: { flexDirection: 'row', gap: 6 },
+  bandKey: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.09)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.26)',
+    shadowOffset: { width: 0, height: 0 }, shadowRadius: 7,
+    overflow: 'hidden',
   },
-  dragHint: { color: 'rgba(255,255,255,0.18)', fontSize: 8, fontWeight: '600', letterSpacing: 2, textAlign: 'center', marginTop: 10 },
+  bandKeyBevel: {
+    position: 'absolute', top: 0, left: 4, right: 4, height: 1,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  bandLamp: { width: 4, height: 4, borderRadius: 2 },
+  dragHint: { color: 'rgba(255,255,255,0.26)', fontSize: 8, fontWeight: '600', letterSpacing: 1.6, textAlign: 'center', marginTop: 10 },
   time: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
   controls: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

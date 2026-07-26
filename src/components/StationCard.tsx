@@ -127,6 +127,10 @@ function CompactCard({ station, onPress }: { station: Station; onPress?: () => v
 // is padded to the icon's width so the middle is genuinely the middle.
 function ListCard({ station, onPress }: { station: Station; onPress?: () => void }) {
   const platformColor = usePlatformColor();
+  // The station's own mood colour, held back. A full-strength gradient slab is
+  // what the Modes tab does, and having both pages wear it made them twins —
+  // and it shouted over the dial, which is meant to be the loudest thing here.
+  const accent = station.eqColors?.[1] ?? '#5B7BFF';
   return (
     <Pressable
       style={({ pressed }) => [
@@ -137,33 +141,30 @@ function ListCard({ station, onPress }: { station: Station; onPress?: () => void
       onPress={onPress ?? (() => handleStartDrive(station.name))}>
 
       {/* Clip everything to the rounded rect */}
-      <View style={styles.card}>
+      <View style={[styles.card, { borderColor: accent + '44' }]}>
 
-        {/* Layer 1 — mood gradient preview (horizontal) */}
+        {/* Layer 1 — smoked glass. The colour sits ON this rather than
+            replacing it, so the card reads as tinted glass over the dark app. */}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,17,29,0.72)' }]} />
+
+        {/* Layer 2 — the mood, as a wash off the left edge only */}
         <LinearGradient
-          colors={station.cardGradient}
+          colors={[accent + '2E', accent + '10', 'transparent']}
+          locations={[0, 0.42, 0.72]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-        />
-
-        {/* Layer 2 — gentle left scrim for text legibility */}
-        <LinearGradient
-          colors={['rgba(3,3,10,0.20)', 'rgba(3,3,10,0)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
           style={StyleSheet.absoluteFill}
         />
 
         {/* Layer 3 — hairline top-edge highlight */}
         <View style={styles.cardInnerHighlight} />
 
-        {/* Premium cards get a glossy shine on top of their mood colour */}
+        {/* Premium cards get a glossy shine */}
         {station.premium && <GlossSheen />}
 
         {/* Layer 4 — row content */}
         <View style={styles.cardRow}>
-          <View style={styles.iconCircle}>
+          <View style={[styles.iconCircle, { backgroundColor: accent + '22', borderColor: accent + '66' }]}>
             <MaterialCommunityIcons name={station.iconName as any} size={22} color="#fff" />
           </View>
 
@@ -263,16 +264,15 @@ const styles = StyleSheet.create({
   cardShadow: {
     marginBottom: 14,
     borderRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 24,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.34,
+    shadowRadius: 22,
+    elevation: 9,
   },
   card: {
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   cardImageStyle: {
     borderRadius: 20,

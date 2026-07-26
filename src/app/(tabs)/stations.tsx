@@ -294,7 +294,13 @@ function CustomStationCard({ station, onPress }: { station: CustomStation; onPre
         { shadowColor: station.glowColor },
         pressed && styles.pressed,
       ]}>
-      <View style={[styles.customCardInner, { borderColor: station.color + '33' }]}>
+      <View style={[styles.customCardInner, { borderColor: station.color + '44' }]}>
+        <LinearGradient
+          colors={[station.color + '2E', station.color + '10', 'transparent']}
+          locations={[0, 0.42, 0.72]}
+          start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
         <View style={[styles.customIcon, { backgroundColor: station.iconBg, borderColor: station.color + '66' }]}>
           {/* New stations store an icon name; older ones may still hold an emoji. */}
           {/^[a-z]/.test(station.icon) ? (
@@ -535,15 +541,16 @@ const styles = StyleSheet.create({
   customCard: {
     marginBottom: 14,
     borderRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.34,
+    shadowRadius: 22,
+    elevation: 9,
   },
   customCardInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Cruise.surface,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(15,17,29,0.72)',
     borderRadius: 20,
     paddingVertical: 14,
     paddingHorizontal: 12,

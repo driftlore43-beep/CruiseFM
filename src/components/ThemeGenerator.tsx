@@ -80,7 +80,7 @@ function PreviewCard({ draft }: { draft: CruiseTheme }) {
       <View style={pv.inner}>
         <View style={[pv.dot, { backgroundColor: draft.accentColor, shadowColor: draft.accentColor }]} />
         <View style={{ flex: 1, gap: 3 }}>
-          <Text style={[pv.title, { fontFamily: font }]}>Night Run FM</Text>
+          <Text style={[pv.title, { fontFamily: font }]}>Night Run AM</Text>
           <Text style={[pv.sub, { color: draft.accentColor, fontFamily: font }]}>88.7 · Midnight Drive</Text>
         </View>
         <View style={[pv.playBtn, { backgroundColor: draft.accentColor, shadowColor: draft.accentColor }]}>

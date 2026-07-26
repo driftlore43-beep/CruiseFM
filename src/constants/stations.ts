@@ -32,7 +32,7 @@ export type Station = {
 export const STATIONS: Station[] = [
   {
     id: 'night-run',
-    name: 'Night Run FM',
+    name: 'Night Run AM',
     tagline: 'Empty expressways. Violet dashboards.',
     tags: ['dark vibes', 'neon nights'],
     premium: false,
@@ -139,7 +139,7 @@ export const STATIONS: Station[] = [
   },
   {
     id: 'sunset',
-    name: 'Sunset FM',
+    name: 'Sunset AM',
     tagline: 'Golden hour. Open roads.',
     tags: ['sunset glow', 'warm vibes'],
     premium: false,
@@ -230,7 +230,7 @@ export const STATIONS: Station[] = [
   },
   {
     id: 'daylight',
-    name: 'Daylight FM',
+    name: 'Daylight AM',
     tagline: 'Top down. Open road.',
     tags: ['summer', 'sunny'],
     premium: false,

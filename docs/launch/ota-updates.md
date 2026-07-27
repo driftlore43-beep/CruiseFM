@@ -56,18 +56,25 @@ The Spotify keys are not in the project folder. They live on Expo's servers,
 and `--environment preview` is what fetches them. From Expo SDK 55 onwards
 this flag is **required**, and Cruise FM is on SDK 56.
 
-Leave it off and, depending on the version of the tool, you either get a
-straightforward error or it publishes an update with **blank** Spotify keys.
-The second case looks completely successful and then nobody on the channel
-can sign in to Spotify. So: both flags, every time.
+Leave it off and you get asked to pick an environment from a list — and
+**picking the right one does not help**. The keys are only loaded when the
+flag was typed on the command line; the prompt's answer is used for the log
+entry and nothing else. So the update publishes happily with blank Spotify
+keys and sign-in breaks for everyone on the channel.
+
+**If a list of environments appears, the flag was forgotten.** Ctrl+C and run
+it again properly.
 
 To confirm the keys are on the server before publishing:
 ```
 eas env:list --environment preview
 ```
-`EXPO_PUBLIC_SPOTIFY_CLIENT_ID` and `EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET` should
-both be listed. If either is missing, don't publish — add them at expo.dev →
-the Cruise FM project → Environment variables.
+Both `EXPO_PUBLIC_SPOTIFY_CLIENT_ID` and `EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET`
+must be listed **and stored as `plaintext` or `sensitive`**. A key stored as
+`secret` still appears in that list but cannot be read by anything except
+Expo's build machines — so the update would ship it blank while the check
+looked green. Fix the visibility at expo.dev → the Cruise FM project →
+Environment variables before publishing.
 
 ---
 

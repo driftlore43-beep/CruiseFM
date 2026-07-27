@@ -64,21 +64,44 @@ jobs:
       - run: npm ci
 
       # The Spotify keys live in EAS, not in the repo (.env is gitignored). If
-      # they aren't set for this environment the update would publish with
-      # empty credentials and quietly break signing in — so stop first.
-      - name: Check the Spotify keys are present
+      # they aren't READABLE for this environment the update publishes with
+      # empty credentials and quietly breaks signing in — so stop first.
+      #
+      # Presence is not enough, which is why this asks for the values rather
+      # than grepping the names. A variable stored with `secret` visibility
+      # still appears in `env:list` by name, but eas-cli cannot read it back
+      # (only EAS Build can), so it would be inlined as empty while a
+      # name-only check reported green. `--include-sensitive` returns the real
+      # values for plaintext and sensitive vars; anything still masked as
+      # `*****` here is a secret and must have its visibility changed.
+      - name: Check the Spotify keys are present AND readable
         run: |
-          set -e
-          vars=$(eas env:list --environment ${{ inputs.channel }} --non-interactive || true)
-          echo "$vars"
+          set -euo pipefail
+          vars=$(eas env:list --environment ${{ inputs.channel }} --include-sensitive --format short --non-interactive || true)
           for key in EXPO_PUBLIC_SPOTIFY_CLIENT_ID EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET; do
-            echo "$vars" | grep -q "$key" || {
+            # Anchored to "KEY=" so a similarly-named variable can't satisfy it.
+            line=$(echo "$vars" | grep -E "^${key}=" || true)
+            if [ -z "$line" ]; then
               echo "::error::$key is not set for the '${{ inputs.channel }}' environment in EAS."
               echo "::error::Add it at expo.dev → your project → Environment variables, then run this again."
               exit 1
-            }
+            fi
+            value=${line#*=}
+            case "$value" in
+              ''|'*****'*)
+                echo "::error::$key exists but its value cannot be read — it is stored with 'secret' visibility."
+                echo "::error::An update would ship it BLANK and break Spotify sign-in for everyone on this channel."
+                echo "::error::Change it to 'sensitive' at expo.dev → your project → Environment variables."
+                exit 1 ;;
+            esac
+            echo "$key: present and readable"
           done
 
+      # --environment is LOAD-BEARING and nothing here will catch its absence.
+      # eas-cli's own "you forgot --environment" guard for SDK 55+ skips
+      # itself whenever CI or EAS_BUILD is set, and GitHub Actions always sets
+      # CI=true — so removing this flag produces no error, no prompt and no
+      # warning, just an update with empty Spotify credentials. Never drop it.
       - name: Publish
         run: >-
           eas update

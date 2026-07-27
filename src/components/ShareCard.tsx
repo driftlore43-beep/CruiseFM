@@ -6,7 +6,8 @@ import {
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import Svg, {
-  Defs, LinearGradient as SvgLinearGradient, Path, RadialGradient, Rect, Stop, Text as SvgText,
+  Defs, Image as SvgImage, LinearGradient as SvgLinearGradient, Path,
+  RadialGradient, Rect, Stop, Text as SvgText,
 } from 'react-native-svg';
 
 import type { Station } from '@/constants/stations';
@@ -93,6 +94,9 @@ export function ShareCardBody({
   const title = track?.title ?? station.tagline;
   const artist = track?.artist ?? '';
   const art = track?.albumArt ?? null;
+  // Prefer the pre-blurred copy, exactly as StationBackdrop does in the modes.
+  const st = station as Station;
+  const backdrop = st.imageBlur ?? st.image ?? null;
 
   const PAD = 96;
 
@@ -120,9 +124,28 @@ export function ShareCardBody({
           <Stop offset="0" stopColor={wash} stopOpacity="0.34" />
           <Stop offset="1" stopColor={wash} stopOpacity="0" />
         </RadialGradient>
+        {/* The scrim over the photograph. Same shape as the one every mode
+            lays over its own backdrop: clear-ish up top where the object
+            sits, deepening toward the type so the words stay readable. */}
+        <SvgLinearGradient id={gid("scScrim")} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#03040e" stopOpacity="0.72" />
+          <Stop offset="0.34" stopColor="#03040e" stopOpacity="0.60" />
+          <Stop offset="0.62" stopColor="#03040e" stopOpacity="0.74" />
+          <Stop offset="1" stopColor="#03040e" stopOpacity="0.93" />
+        </SvgLinearGradient>
       </Defs>
 
       <Rect x={0} y={0} width={CARD_W} height={CARD_H} fill={`url(#${gid("scBg")})`} />
+      {/* The station's own photograph, blurred, behind everything — because
+          that is what a mode actually looks like on screen: a full-bleed
+          station backdrop with the object on top. Without it the card was a
+          flat gradient and never read as the app. Custom stations have no
+          artwork and simply fall through to the gradient above. */}
+      {!!backdrop && (
+        <SvgImage x={0} y={0} width={CARD_W} height={CARD_H} href={backdrop}
+          preserveAspectRatio="xMidYMid slice" />
+      )}
+      <Rect x={0} y={0} width={CARD_W} height={CARD_H} fill={`url(#${gid("scScrim")})`} />
       <Rect x={0} y={0} width={CARD_W} height={CARD_H} fill={`url(#${gid("scGlow")})`} />
 
       {/* THE MODE. This is the picture — the album art is a part of it, not

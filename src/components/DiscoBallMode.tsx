@@ -5,7 +5,10 @@ import {
   Animated, Dimensions, Easing, Modal, PanResponder,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, {
+  Circle, Defs, Ellipse, LinearGradient as SvgLinearGradient, Path,
+  RadialGradient, Rect, Stop,
+} from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaylistSheet } from '@/components/PlaylistSheet';
@@ -170,7 +173,10 @@ const FLASH_WIDTH = 0.070;
 
 function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: Tile[]; flashes: Tile[][] } {
   const R = size / 2, cx = R, cy = R;
-  const ROWS = 17, COLS = 32;   // ~240 visible facets after back-face culling
+  // Denser than it was (17 x 32) — the owner's reference balls carry many
+  // more, smaller mirrors, and at this count a front-face tile is ~8px wide,
+  // which is small enough to read as a mosaic rather than a tiling.
+  const ROWS = 21, COLS = 40;   // ~380 visible facets after back-face culling
   const st = Math.sin(TILT), ct = Math.cos(TILT);
 
   // Key light from the upper-left front, matching the fixed highlight below.
@@ -269,8 +275,19 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
                  + `L ${f11.x.toFixed(2)} ${f11.y.toFixed(2)} `
                  + `L ${f10.x.toFixed(2)} ${f10.y.toFixed(2)} Z`;
 
+      // Each mirror carries its own little gradient — light falling from its
+      // top-left corner toward the bottom-right, which is what makes a mirror
+      // tile read as glass rather than a coloured square.
+      //
+      // It is a REAL ramp, and it costs exactly one gradient definition for
+      // the whole ball: SVG gradients default to objectBoundingBox units, so
+      // a single `dbFacet` def rescales itself to whichever path references
+      // it. Per-tile gradient defs (~380 of them) were the obvious approach
+      // and the wrong one. A flat two-tone split was tried first and read as
+      // a triangle drawn on every tile, not as a falloff.
       tiles.push({ d: `${d} ${face}`, fill: tint(frameStep, cast * 0.25), op: 0.55 + 0.35 * depth });
-      tiles.push({ d: face, fill: tint(faceStep, cast * 0.72), op: 0.55 + 0.35 * depth });
+      tiles.push({ d: face, fill: tint(faceStep - 0.55, cast * 0.72), op: 0.55 + 0.35 * depth });
+      tiles.push({ d: face, fill: 'url(#dbFacet)', op: 0.42 + 0.30 * depth });
 
       // ...and a BRIGHT copy of the same face, filed into a phase bucket by
       // where it sits across the ball. MirrorFlash fades these in as a band
@@ -287,6 +304,9 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
       const jit = (hash01(j * 8.17 + k * 2.53) - 0.5) * 0.022;
       const pl = (((lamTurn + jit) % FLASH_PERIOD) + FLASH_PERIOD) % FLASH_PERIOD;
       const g = Math.min(FLASH_GROUPS - 1, Math.floor((pl / FLASH_PERIOD) * FLASH_GROUPS));
+      // Below this the mirror's catch tops out around 0.09 opacity — invisible,
+      // and with the denser grid that's a couple of hundred paths for nothing.
+      if (catchRoll <= 0.12) continue;
       flashes[g].push({
         d: face,
         fill: mixHex('#ffffff', hue, cast * 0.30),
@@ -303,7 +323,7 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
 function buildLatitudeArcs(size: number): string[] {
   const R = size / 2, cx = R, cy = R;
   const st = Math.sin(TILT), ct = Math.cos(TILT);
-  const ROWS = 17;
+  const ROWS = 21;   // must match buildSphereTiles
   const out: string[] = [];
   for (let j = 1; j < ROWS; j++) {
     const b = -Math.PI / 2 + (Math.PI * j) / ROWS;
@@ -377,6 +397,18 @@ function SphereGrid({ size, tiles }: { size: number; tiles: Tile[] }) {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          {/* The per-mirror sheen. In objectBoundingBox units (the SVG
+              default), so this ONE definition stretches to fit every facet
+              it's referenced from — a real gradient on ~380 tiles for the
+              price of a single node. Light at the top-left corner, shadow
+              at the bottom-right, matching the ball's key light. */}
+          <SvgLinearGradient id="dbFacet" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.66" />
+            <Stop offset="0.46" stopColor="#ffffff" stopOpacity="0.10" />
+            <Stop offset="1" stopColor="#05060d" stopOpacity="0.42" />
+          </SvgLinearGradient>
+        </Defs>
         {tiles.map((t, i) => (
           // even-odd so the frame paths (outer tile + inner face in one `d`)
           // punch their own hole and paint only the border

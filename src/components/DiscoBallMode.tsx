@@ -78,16 +78,48 @@ function mixHex(a: string, b: string, t: number): string {
 // the most visible thing on screen. Raising tile opacity without lowering this
 // floor just makes it worse, not darker.
 const SHADE_ANCHORS = ['#1b2030', '#333a52', '#59627f', '#8b96b2', '#c2cbe2', '#edf1fd', '#ffffff'];
+
+/**
+ * The ramp above is strongly BLUE, and that was quietly cancelling every warm
+ * station: mixing Sunset's amber and hot pink into a navy grey lands on dusty
+ * mauve, which is exactly what the ball looked like. Tinting harder doesn't
+ * fix it — opposite hues average toward grey however much you add.
+ *
+ * So the ramp itself is rebuilt per station. Each anchor is first flattened to
+ * a pure grey of the same brightness (killing the baked-in blue), then pushed
+ * toward the station's own mid colour by an amount that FALLS OFF with
+ * lightness: the shadows carry the mood, the highlights stay near-white, so a
+ * mirror catching the light still reads as a mirror rather than a coloured
+ * tile. A blue station re-blues itself through the same path, so nothing is
+ * lost for the cool moods.
+ */
+function stationShade(eq: [string, string, string]): string[] {
+  // Deepened, not the raw stop: Mountain Pass's mid colour is pure WHITE, and
+  // mixing that into the shadows lifts the ball's dark end until no mirror can
+  // be dark. Taking the colour down first keeps every station's floor low.
+  const deep = mixHex(eq[1], '#0b0d16', 0.34);
+  return SHADE_ANCHORS.map((c, i) => {
+    const t = i / (SHADE_ANCHORS.length - 1);
+    const p = parseInt(c.slice(1), 16);
+    const g = Math.round(((p >> 16) & 255) * 0.299 + ((p >> 8) & 255) * 0.587 + (p & 255) * 0.114);
+    const grey = `#${((1 << 24) + (g << 16) + (g << 8) + g).toString(16).slice(1)}`;
+    // The falloff is steep on purpose. A shallow one puts heavy colour in the
+    // MID tones too, and since `deep` is a darkened stop that drags the whole
+    // ball down — measured, it roughly halved the share of bright pixels.
+    // Colour in the shadows, brightness kept in the mids and highlights.
+    return mixHex(grey, deep, 0.80 * Math.pow(1 - t, 1.6));
+  });
+}
 // Facet brightness is quantised (cel-shaded, not smooth) but into FINER steps
 // than the anchor list — brightness falls off fastest across the middle of the
 // ball, so with coarse steps the band edge landed on one column and drew a
 // hard vertical line straight down the centre. More steps + per-tile jitter
 // dithers it away while keeping the stylised look.
 const SHADE_STEPS = 10;
-function shadeAt(t: number): string {
-  const x = Math.max(0, Math.min(1, t)) * (SHADE_ANCHORS.length - 1);
-  const i = Math.min(SHADE_ANCHORS.length - 2, Math.floor(x));
-  return mixHex(SHADE_ANCHORS[i], SHADE_ANCHORS[i + 1], x - i);
+function shadeAt(t: number, anchors: string[]): string {
+  const x = Math.max(0, Math.min(1, t)) * (anchors.length - 1);
+  const i = Math.min(anchors.length - 2, Math.floor(x));
+  return mixHex(anchors[i], anchors[i + 1], x - i);
 }
 
 // NOTE (2026-07-26): this mode used to carry a fixed club-neon set
@@ -106,8 +138,12 @@ function stationPalette(eq: [string, string, string]): string[] {
   const out: string[] = [];
   for (const c of eq) {
     out.push(c);
-    out.push(mixHex(c, '#ffffff', 0.42));
-    out.push(mixHex(c, '#141726', 0.34));
+    // Kept nearer the station's own stop than they used to be — the pale
+    // version was mixed 42% into white, which is most of a pastel, and with
+    // nine of these driving every mirror's cast the whole ball drifted toward
+    // dusty. Light and dark, still obviously the same colour.
+    out.push(mixHex(c, '#ffffff', 0.28));
+    out.push(mixHex(c, '#141726', 0.42));
   }
   return out;
 }
@@ -225,9 +261,13 @@ const FLASH_WIDTH = 0.052;
  * catching a beam head-on is mostly white, which is what the reference shows.
  */
 const LAMPS = [
-  { tilt:  0.085, phase: 0.000, hue: 1, sat: 0.10 },   // high and to the left, near-white
-  { tilt: -0.055, phase: 0.167, hue: 4, sat: 0.26 },   // low and to the right, tinted
-  { tilt:  0.020, phase: 0.333, hue: 7, sat: 0.18 },   // near the equator
+  // The beams carry most of the station's colour. A dead mirror shows almost
+  // nothing of its own, so tinting the unlit surface harder only makes the
+  // ball muddy — it's the CAUGHT mirrors that have to be amber and hot pink.
+  // One lamp stays near-white, because a mirror facing a beam head-on is.
+  { tilt:  0.085, phase: 0.000, hue: 1, sat: 0.20 },   // high and to the left, near-white
+  { tilt: -0.055, phase: 0.167, hue: 4, sat: 0.46 },   // low and to the right, tinted
+  { tilt:  0.020, phase: 0.333, hue: 7, sat: 0.36 },   // near the equator
 ];
 
 function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: Tile[]; flashes: Tile[][] } {
@@ -237,6 +277,7 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
   // which is small enough to read as a mosaic rather than a tiling.
   const ROWS = 25, COLS = 48;   // ~380 visible facets after back-face culling
   const st = Math.sin(TILT), ct = Math.cos(TILT);
+  const shade = stationShade(eq);   // this station's own dark-to-light ramp
 
   // Key light from the upper-left front, matching the fixed highlight below.
   const ln = Math.hypot(-0.42, 0.58, 0.70);
@@ -298,10 +339,14 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
       // white station reads as silver and a golden one as gold.
       const palette = stationPalette(eq);
       const hue = palette[Math.floor(hash01(j * 2.71 + k * 3.97) * palette.length) % palette.length];
-      const cast = 0.10 + hash01(j * 5.13 + k * 11.27) * 0.34;
+      const cast = 0.24 + hash01(j * 5.13 + k * 11.27) * 0.56;
       const tint = (s: number, amount: number) => {
-        const base = shadeAt(Math.max(0, Math.min(1, s / (SHADE_STEPS - 1))));
-        return amount > 0 ? mixHex(base, hue, amount) : base;
+        const t = Math.max(0, Math.min(1, s / (SHADE_STEPS - 1)));
+        // `shade` is already this station's own ramp (see stationShade) — the
+        // mood is in the neutral, not painted over a blue-grey one. All this
+        // adds on top is the mirror's own individual cast.
+        const neutral = shadeAt(t, shade);
+        return amount > 0 ? mixHex(neutral, hue, amount) : neutral;
       };
 
       // Facets near the silhouette sit at a glancing angle — dimmer, so the
@@ -345,7 +390,7 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
       // flat two-tone split was tried first and read as a triangle drawn on
       // every tile, not as a falloff. Which of the six a mirror uses is its
       // own — see FACET_DIRS.
-      tiles.push({ d: face, fill: tint(faceStep - 0.55, cast * 0.72), op: 0.55 + 0.35 * depth });
+      tiles.push({ d: face, fill: tint(faceStep - 0.55, cast * 0.95), op: 0.55 + 0.35 * depth });
       tiles.push({ d: face, fill: `url(#dbFacet${facetDir(j, k)})`, op: 0.42 + 0.30 * depth });
 
       // ...and a BRIGHT copy of the same face, filed into a phase bucket by
@@ -430,7 +475,7 @@ function buildLatitudeArcs(size: number): string[] {
 // which makes the sweep wrap seamlessly: as the band leaves the right limb the
 // left limb is already lighting up, exactly like the two-copy light strip
 // below it.
-function MirrorFlash({ size, groups, spin }: { size: number; groups: Tile[][]; spin: Animated.Value }) {
+function MirrorFlash({ size, groups, spin, lit }: { size: number; groups: Tile[][]; spin: Animated.Value; lit: Animated.Value }) {
   const curves = useMemo(() => groups.map((_, g) => {
     const p = ((g + 0.5) / groups.length) * FLASH_PERIOD;
     const inp: number[] = [], out: number[] = [];
@@ -455,7 +500,13 @@ function MirrorFlash({ size, groups, spin }: { size: number; groups: Tile[][]; s
           key={g}
           pointerEvents="none"
           style={[StyleSheet.absoluteFill, {
-            opacity: spin.interpolate({ inputRange: curves[g].inp, outputRange: curves[g].out }),
+            // Multiplied by `lit`, so pause takes the flashes with it. Without
+            // this the spin simply stops and whichever mirrors were caught
+            // stay caught — a paused ball frozen mid-sparkle.
+            opacity: Animated.multiply(
+              spin.interpolate({ inputRange: curves[g].inp, outputRange: curves[g].out }),
+              lit,
+            ),
           }]}
         >
           <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -731,55 +782,68 @@ function ColorCycleWash({ size, eq }: { size: number; eq: [string, string, strin
   );
 }
 
-// One twinkling speck of glitter. The cross-flare (two hairline bars) is what
-// separates "glitter" from "a dot" — it's the bit that reads as light
-// catching an edge. Opacity + scale only, native driver.
-function Glint({ x, y, r, cross, dur, delay, color, maxOpacity = 0.95 }: {
-  x: number; y: number; r: number; cross: boolean; dur: number; delay: number; color: string; maxOpacity?: number;
+function LightStreaks({ live, winW, winH }: {
+  live: Animated.Value; winW: number; winH: number;
 }) {
-  const t = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([
-      Animated.delay(delay),
-      Animated.timing(t, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(t, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, []);
-  const opacity = t.interpolate({ inputRange: [0, 1], outputRange: [0.06, maxOpacity] });
-  const scale = t.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] });
-  const box = r * (cross ? 7 : 2);
-  return (
-    <Animated.View pointerEvents="none" style={{
-      position: 'absolute', left: x - box / 2, top: y - box / 2, width: box, height: box,
-      alignItems: 'center', justifyContent: 'center', opacity, transform: [{ scale }],
-    }}>
-      {cross && <View style={{ position: 'absolute', width: box, height: 1, backgroundColor: color, opacity: 0.45 }} />}
-      {cross && <View style={{ position: 'absolute', width: 1, height: box, backgroundColor: color, opacity: 0.45 }} />}
-      <View style={{
-        width: r * 2, height: r * 2, borderRadius: r, backgroundColor: color,
-        shadowColor: color, shadowOpacity: 0.9, shadowRadius: r * 2.4, shadowOffset: { width: 0, height: 0 },
-      }} />
-    </Animated.View>
-  );
-}
+  const streaks = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
+    // Long enough to run off both edges, so no end is ever visible.
+    len: winW * (1.25 + hash01(i * 3.7) * 0.6),
+    thick: 1 + hash01(i * 9.1) * 1.4,
+    x: winW * (0.1 + hash01(i * 5.3) * 0.8),
+    // Stratified down the screen rather than seven independent rolls — those
+    // put two beams within ten pixels of each other at similar angles, which
+    // reads as one accidental double line.
+    y: winH * (0.10 + ((i + hash01(i * 2.9)) / 7) * 0.74),
+    // Shallow angles only. Steep ones read as scratches on the screen.
+    deg: (hash01(i * 6.7) > 0.5 ? 1 : -1) * (14 + hash01(i * 8.3) * 22),
+    peak: 0.05 + hash01(i * 4.9) * 0.09,
+    dur: 2600 + Math.floor(hash01(i * 7.1) * 3400),
+    delay: Math.floor(hash01(i * 1.9) * 2600),
+  })), [winW, winH]);
 
-// Fine glitter ON the ball — individual mirrors catching the light. Sits
-// inside the highlight's half of the sphere where a real key light would
-// actually produce flashes, rather than scattered evenly.
-function BallGlitter({ size }: { size: number }) {
-  const specks = useMemo(() => Array.from({ length: 9 }, (_, i) => ({
-    x: size * (0.26 + hash01(i * 4.11 + 1.3) * 0.52),
-    y: size * (0.18 + hash01(i * 7.53 + 0.7) * 0.5),
-    r: 1 + hash01(i * 2.9) * 1.8,
-    cross: hash01(i * 6.1) > 0.45,
-    dur: 900 + Math.floor(hash01(i * 3.3) * 1100),
-    delay: Math.floor(hash01(i * 8.7) * 2200),
-  })), [size]);
+  const breath = useRef(streaks.map(() => new Animated.Value(0))).current;
+  useEffect(() => {
+    const loops = streaks.map((st, i) => {
+      const loop = Animated.loop(Animated.sequence([
+        Animated.delay(st.delay),
+        Animated.timing(breath[i], { toValue: 1, duration: st.dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(breath[i], { toValue: 0, duration: st.dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ]));
+      loop.start();
+      return loop;
+    });
+    return () => loops.forEach((l) => l.stop());
+  }, [streaks]);
+
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {specks.map((s, i) => <Glint key={i} {...s} color="#ffffff" />)}
+      {streaks.map((st, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            position: 'absolute',
+            left: st.x - st.len / 2,
+            top: st.y,
+            width: st.len,
+            height: st.thick,
+            opacity: Animated.multiply(
+              breath[i].interpolate({ inputRange: [0, 1], outputRange: [0.012, st.peak] }),
+              live,
+            ),
+            transform: [{ rotate: `${st.deg}deg` }],
+          }}
+        >
+          {/* Faded at both ends. A flat white bar has two hard stops, and if
+              either ever lands on screen it reads as a drawn line rather than
+              light in the air. */}
+          <LinearGradient
+            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0)']}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      ))}
     </View>
   );
 }
@@ -932,7 +996,7 @@ function BallSheen({ size, pulse }: { size: number; pulse: Animated.Value }) {
   );
 }
 
-function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, string, string]; spin: Animated.Value; pulse: Animated.Value }) {
+function MirrorBall({ size, eq, spin, pulse, lit }: { size: number; eq: [string, string, string]; spin: Animated.Value; pulse: Animated.Value; lit: Animated.Value }) {
   const { tiles, flashes } = useMemo(() => buildSphereTiles(size, eq), [size, eq]);
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#0a0912' }}>
@@ -1004,16 +1068,15 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
           real ball a lit mirror is the brightest thing in the room — nothing
           may sit on top of it. Depth falloff is baked into each flash's own
           opacity instead, so it still obeys the sphere's curvature. */}
-      <MirrorFlash size={size} groups={flashes} spin={spin} />
+      <MirrorFlash size={size} groups={flashes} spin={spin} lit={lit} />
 
-      {/* The glossy shine travelling over the mirrors */}
-      <BallSheen size={size} pulse={pulse} />
-
-      {/* Lens flare — subtle, along the same light axis as the highlight */}
-      <LensFlare size={size} pulse={pulse} />
-
-      {/* Fine glitter on the mirrors themselves */}
-      <BallGlitter size={size} />
+      {/* The glossy shine and the flare are both light PLAYING on the ball, so
+          they belong to the music like the flashes do. Paused, the ball is a
+          dull unlit object and nothing may still be sliding across it. */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: lit }]} pointerEvents="none">
+        <BallSheen size={size} pulse={pulse} />
+        <LensFlare size={size} pulse={pulse} />
+      </Animated.View>
     </View>
   );
 }
@@ -1022,8 +1085,9 @@ function MirrorBall({ size, eq, spin, pulse }: { size: number; eq: [string, stri
 // A fixed field of dots; the whole field slowly rotates (one native transform)
 // while each dot twinkles on its own native-driver opacity loop. Zero per-frame
 // CPU — the "sweep" is staggered phases + the group rotation.
-function LightField({ count, eq, live, winW, winH }: {
+function LightField({ count, eq, live, winW, winH, offsetX = 0 }: {
   count: number; eq: [string, string, string]; live: Animated.Value; winW: number; winH: number;
+  offsetX?: number;
 }) {
   const dots = useMemo(() => Array.from({ length: count }, (_, i) => {
     // Deterministic pseudo-scatter (no Math.random — banned & keeps it stable).
@@ -1061,7 +1125,7 @@ function LightField({ count, eq, live, winW, winH }: {
           key={i}
           style={{
             position: 'absolute',
-            left: d.x * winW - d.size / 2,
+            left: d.x * winW - d.size / 2 + offsetX,
             top: d.y * winH - d.size / 2,
             width: d.size, height: d.size, borderRadius: d.size / 2,
             backgroundColor: d.color,
@@ -1137,43 +1201,6 @@ function BokehField({ count, eq, live, winW, winH }: {
     </Animated.View>
   );
 }
-
-// ── Star dust — a fine glitter haze hanging in the room ─────────────────────
-// Deliberately different from the bokeh (big, soft, out-of-focus) and the
-// light field (bigger coloured dots that orbit): these are tiny, sharp and
-// numerous, most of them with a hairline cross-flare, densest around the
-// ball and thinning out toward the edges of the screen.
-function StarDust({ count, live, winW, winH, tint }: {
-  count: number; live: Animated.Value; winW: number; winH: number; tint: string;
-}) {
-  const specks = useMemo(() => Array.from({ length: count }, (_, i) => {
-    // Polar scatter around the ball's centre so the dust crowds the light
-    // source, with a golden-angle spread that never clumps.
-    const ang = ((i * 137.508) % 360) * (Math.PI / 180);
-    const rad = 0.10 + Math.sqrt(hash01(i * 2.77 + 0.9)) * 0.62;
-    return {
-      x: winW * (0.5 + Math.cos(ang) * rad * 0.95),
-      y: winH * (0.42 + Math.sin(ang) * rad * 0.72),
-      r: 0.8 + hash01(i * 5.31) * 1.6,
-      cross: hash01(i * 3.97) > 0.62,
-      dur: 800 + Math.floor(hash01(i * 6.19) * 1500),
-      delay: Math.floor(hash01(i * 9.41) * 2600),
-      color: hash01(i * 7.07) > 0.78 ? tint : '#ffffff',
-    };
-  }), [count, winW, winH, tint]);
-
-  return (
-    <Animated.View style={[StyleSheet.absoluteFill, { opacity: live }]} pointerEvents="none">
-      {specks.map((s, i) => <Glint key={i} {...s} maxOpacity={0.85} />)}
-    </Animated.View>
-  );
-}
-
-// ── Volumetric light shafts — a couple of very faint cone gradients falling
-// from above the ball, slowly counter-rotating against the light field for
-// parallax. Pure static SVG under one native rotate loop — the "haze in a
-// beam of light" cue, kept deliberately subtle so it reads as atmosphere,
-// not a stage effect.
 function VolumetricRays({ size, color }: { size: number; color: string }) {
   const rot = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -1233,7 +1260,6 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
 
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
   const spin = useRef(new Animated.Value(0)).current;       // ball surface scroll (axis spin)
-  const fieldSpin = useRef(new Animated.Value(0)).current;  // dot-field orbit
   const live = useRef(new Animated.Value(0)).current;       // 0 idle → 1 dancing
   const pulse = useRef(new Animated.Value(0)).current;      // 0 rest → 1 on-beat (bloom/reflections)
 
@@ -1317,15 +1343,10 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   // and it coasts to a stop, exactly like the power being cut to the motor.
   const spinning = lightsOn && (spotify.track?.isPlaying ?? true);
 
-  // Ambient loop that runs the whole time the mode is open. The ball itself
-  // does NOT bob — it hangs dead still from its mount, like the real thing;
-  // all of its life comes from the turn and the light.
-  useEffect(() => {
-    if (!visible) return;
-    const fieldLoop = Animated.loop(Animated.timing(fieldSpin, { toValue: 1, duration: 26000, easing: Easing.linear, useNativeDriver: true }));
-    fieldLoop.start();
-    return () => fieldLoop.stop();
-  }, [visible]);
+  // The ball does NOT bob — it hangs dead still from its mount, like the real
+  // thing; all of its life comes from the turn and the light. The room's light
+  // dots used to orbit on their own 26s loop; they now ride `spin`, so there
+  // is nothing left running independently of the music.
 
   // Ball rotation — starts and stops with the music, and picks up where it
   // left off rather than snapping back to zero.
@@ -1401,7 +1422,10 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   }, [visible, spinning, scrubbing]);
 
   useEffect(() => {
-    Animated.timing(live, { toValue: lightsOn ? 1 : 0.15, duration: lightsOn ? 900 : 700, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    // All the way to 0 when the music stops, not 0.15 (owner, 28.07): paused
+    // should be a dull, unlit ball in a dark room — no twinkles, no streaks,
+    // no light dancing on the walls. The light show belongs to the music.
+    Animated.timing(live, { toValue: lightsOn ? 1 : 0, duration: lightsOn ? 900 : 700, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
   }, [lightsOn]);
 
   // Glow intensity + reflections nudge gently on the beat — same simulated
@@ -1450,7 +1474,10 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const title = spotify.track?.title ?? station.tagline;
   const artist = spotify.track?.artist ?? '';
 
-  const fieldRotate = fieldSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  // One screen-width of travel per turn of the ball, in the direction its
+  // surface travels (right). Same Animated.Value, so they can never drift
+  // apart or keep moving after the ball has stopped.
+  const fieldDrift = spin.interpolate({ inputRange: [0, 1], outputRange: [0, winW] });
   const bloomColor = mixHex(eq[1], eq[0], 0.35);
 
   return (
@@ -1466,16 +1493,26 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Orbiting light field — behind the ball, over the whole room */}
-        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate: fieldRotate }] }]} pointerEvents="none">
-          <LightField count={12} eq={eq} live={live} winW={winW} winH={winH} />
+        {/* The light the ball throws around the room. Driven by the SAME spin
+            value as the ball, so the dots travel in the same direction and at
+            the same rate, and stop dead when the ball does — they are its
+            reflections, so they cannot have a life of their own. Two copies a
+            screen apart make the wrap seamless: as one leaves to the right the
+            other is already arriving. */}
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: fieldDrift }] }]} pointerEvents="none">
+          <LightField count={12} eq={eq} live={live} winW={winW} winH={winH} offsetX={0} />
+          <LightField count={12} eq={eq} live={live} winW={winW} winH={winH} offsetX={-winW} />
         </Animated.View>
+
+        {/* Faint diagonal beams — light in the air, the way a shaft shows when
+            it crosses a dark room. These replaced the little twinkling stars,
+            which read as 2D sparkles pasted over the picture. They sit behind
+            the ball and do NOT travel with it: a beam comes from a fixed lamp,
+            so it holds still while the ball's reflections move past it. */}
+        <LightStreaks live={live} winW={winW} winH={winH} />
 
         {/* Floating bokeh — soft out-of-focus particles drifting in the room */}
         <BokehField count={7} eq={eq} live={live} winW={winW} winH={winH} />
-
-        {/* Star dust — the fine glitter haze, densest around the ball */}
-        <StarDust count={30} live={live} winW={winW} winH={winH} tint={eq[0]} />
 
         {/* Drag pill */}
         <View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
@@ -1503,9 +1540,13 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
                   themselves relative to it, not the taller pole+ball stack.
                   Also the scrub target: swipe left/right anywhere on the ball. */}
               <View style={{ width: ballSize, height: ballSize }} {...ballPan.panHandlers}>
-                <VolumetricRays size={ballSize} color={bloomColor} />
-                <BallBloom size={ballSize} color={bloomColor} pulse={pulse} />
-                <MirrorBall size={ballSize} eq={eq} spin={spin} pulse={pulse} />
+                {/* Bloom and beams are light LEAVING the ball, so they fade
+                    out with the music exactly as the flashes do. */}
+                <Animated.View style={[StyleSheet.absoluteFill, { opacity: live }]} pointerEvents="none">
+                  <VolumetricRays size={ballSize} color={bloomColor} />
+                  <BallBloom size={ballSize} color={bloomColor} pulse={pulse} />
+                </Animated.View>
+                <MirrorBall size={ballSize} eq={eq} spin={spin} pulse={pulse} lit={live} />
               </View>
             </View>
           </View>

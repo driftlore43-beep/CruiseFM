@@ -141,18 +141,27 @@ function ListCard({ station, onPress }: { station: Station; onPress?: () => void
       onPress={onPress ?? (() => handleStartDrive(station.name))}>
 
       {/* Clip everything to the rounded rect */}
-      <View style={[styles.card, { borderColor: accent + '44' }]}>
+      <View style={[styles.card, { borderColor: accent + '5C' }]}>
 
         {/* Layer 1 — smoked glass. The colour sits ON this rather than
             replacing it, so the card reads as tinted glass over the dark app. */}
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,17,29,0.72)' }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(13,15,26,0.58)' }]} />
 
-        {/* Layer 2 — the mood, as a wash off the left edge only */}
+        {/* Layer 2 — the mood. Strongest at the left edge and still present at
+            the right, so the card is coloured glass rather than a grey slab
+            with a tinted corner. */}
         <LinearGradient
-          colors={[accent + '2E', accent + '10', 'transparent']}
-          locations={[0, 0.42, 0.72]}
+          colors={[accent + '82', accent + '46', accent + '1A']}
+          locations={[0, 0.55, 1]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* A little top-down lift, so the colour doesn't read as a flat fill */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.07)', 'transparent']}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
 
@@ -164,7 +173,7 @@ function ListCard({ station, onPress }: { station: Station; onPress?: () => void
 
         {/* Layer 4 — row content */}
         <View style={styles.cardRow}>
-          <View style={[styles.iconCircle, { backgroundColor: accent + '22', borderColor: accent + '66' }]}>
+          <View style={[styles.iconCircle, { backgroundColor: accent + '38', borderColor: accent + '99' }]}>
             <MaterialCommunityIcons name={station.iconName as any} size={22} color="#fff" />
           </View>
 
@@ -304,10 +313,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   iconEmoji: { fontSize: 22 },
-  textBlock: { flex: 1, gap: 3, alignItems: 'center' },
-  name: { color: '#fff', fontSize: 16, fontWeight: '800', textAlign: 'center' },
-  tagline: { color: 'rgba(255,255,255,0.65)', fontSize: 11.5, lineHeight: 16, textAlign: 'center' },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 2, justifyContent: 'center' },
+  textBlock: { flex: 1, gap: 3, alignItems: 'flex-start' },
+  name: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  tagline: { color: 'rgba(255,255,255,0.72)', fontSize: 11.5, lineHeight: 16 },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 2 },
   tag: {
     backgroundColor: 'rgba(0,0,0,0.35)',
     borderRadius: 20,
@@ -322,8 +331,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.2,
   },
+  // No longer padded to the icon's width — that only existed to keep the name
+  // centred, and the name is left-aligned now.
   chevronBlock: {
-    width: 42,
+    width: 26,
     alignItems: 'center',
     gap: 4,
     flexShrink: 0,

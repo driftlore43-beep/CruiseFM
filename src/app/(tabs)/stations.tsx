@@ -294,14 +294,19 @@ function CustomStationCard({ station, onPress }: { station: CustomStation; onPre
         { shadowColor: station.glowColor },
         pressed && styles.pressed,
       ]}>
-      <View style={[styles.customCardInner, { borderColor: station.color + '44' }]}>
+      <View style={[styles.customCardInner, { borderColor: station.color + '5C' }]}>
         <LinearGradient
-          colors={[station.color + '2E', station.color + '10', 'transparent']}
-          locations={[0, 0.42, 0.72]}
+          colors={[station.color + '82', station.color + '46', station.color + '1A']}
+          locations={[0, 0.55, 1]}
           start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
           style={StyleSheet.absoluteFill}
         />
-        <View style={[styles.customIcon, { backgroundColor: station.iconBg, borderColor: station.color + '66' }]}>
+        <LinearGradient
+          colors={['rgba(255,255,255,0.07)', 'transparent']}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={[styles.customIcon, { backgroundColor: station.color + '38', borderColor: station.color + '99' }]}>
           {/* New stations store an icon name; older ones may still hold an emoji. */}
           {/^[a-z]/.test(station.icon) ? (
             <MaterialCommunityIcons name={station.icon as any} size={24} color="#fff" />
@@ -455,7 +460,7 @@ const styles = StyleSheet.create({
   freq: {
     width: 46,
     textAlign: 'right',
-    color: 'rgba(255,255,255,0.5)',
+    color: '#FF9A2E',
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -463,7 +468,14 @@ const styles = StyleSheet.create({
     // sit level with the card's middle rather than the row's.
     marginBottom: 14,
   },
-  freqActive: { color: '#FF7A70' },
+  // The tuned station's number burns brighter, the way a lit segment does —
+  // the red marker on the rail already says WHERE, this says HOW LOUD.
+  freqActive: {
+    color: '#FFD79B',
+    textShadowColor: '#FF9A2E',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 9,
+  },
 
   // ── Band headers ──
   bandRow: {
@@ -550,7 +562,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
-    backgroundColor: 'rgba(15,17,29,0.72)',
+    backgroundColor: 'rgba(13,15,26,0.58)',
     borderRadius: 20,
     paddingVertical: 14,
     paddingHorizontal: 12,
@@ -567,21 +579,19 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   customIconEmoji: { fontSize: 20 },
-  customText: { flex: 1, alignItems: 'center' },
+  customText: { flex: 1, alignItems: 'flex-start' },
   customName: {
     color: Cruise.textPrimary,
     fontSize: 16,
     fontWeight: '800',
     marginBottom: 3,
-    textAlign: 'center',
   },
   customTagline: {
-    color: Cruise.textSecondary,
+    color: 'rgba(255,255,255,0.72)',
     fontSize: 11.5,
-    textAlign: 'center',
   },
   customChevronBlock: {
-    width: 42,
+    width: 26,
     alignItems: 'center',
     gap: 4,
     flexShrink: 0,

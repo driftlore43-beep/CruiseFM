@@ -77,7 +77,7 @@ function mixHex(a: string, b: string, t: number): string {
 // ever be dark, the whole ball sat at a mid pastel, and the static mosaic was
 // the most visible thing on screen. Raising tile opacity without lowering this
 // floor just makes it worse, not darker.
-const SHADE_ANCHORS = ['#101320', '#222738', '#434b68', '#77829f', '#b0bbd6', '#e4eafa', '#ffffff'];
+const SHADE_ANCHORS = ['#1b2030', '#333a52', '#59627f', '#8b96b2', '#c2cbe2', '#edf1fd', '#ffffff'];
 // Facet brightness is quantised (cel-shaded, not smooth) but into FINER steps
 // than the anchor list — brightness falls off fastest across the middle of the
 // ball, so with coarse steps the band edge landed on one column and drew a
@@ -202,8 +202,33 @@ const FLASH_PERIOD = 0.5;
 // reference clip has roughly a fifth of the ball blazing at once, and the flat
 // top is what delivers that without widening the band into a vague glow.
 // Both are in turns, so they scale with FLASH_PERIOD, not with 1.
-const FLASH_CORE = 0.034;
-const FLASH_WIDTH = 0.070;
+const FLASH_CORE = 0.012;
+const FLASH_WIDTH = 0.052;
+
+/**
+ * The lamps pointed at the ball.
+ *
+ * A real mirror ball is lit from a few FIXED directions and each mirror
+ * flashes as it swings through a beam — the owner's reference clip shows the
+ * bright zone staying put while individual mirrors wink on and off inside it.
+ *
+ * A static tile grid cannot literally do that (see the note on
+ * buildSphereTiles), but assigning each mirror to ONE lamp gets most of the
+ * way there for free: `tilt` shifts a lamp's timing by latitude, so its lit
+ * mirrors form a DIAGONAL patch rather than a full-height stripe, and three
+ * lamps at different tilts means three separate patches catching at different
+ * moments in different colours instead of one band sweeping past. It costs
+ * nothing — the mirrors simply land in different buckets of the same set.
+ *
+ * `hue` indexes stationPalette(), so the lamps are always the station's own
+ * colours. `sat` is how much of that colour survives in the flash; a mirror
+ * catching a beam head-on is mostly white, which is what the reference shows.
+ */
+const LAMPS = [
+  { tilt:  0.085, phase: 0.000, hue: 1, sat: 0.10 },   // high and to the left, near-white
+  { tilt: -0.055, phase: 0.167, hue: 4, sat: 0.26 },   // low and to the right, tinted
+  { tilt:  0.020, phase: 0.333, hue: 7, sat: 0.18 },   // near the equator
+];
 
 function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: Tile[]; flashes: Tile[][] } {
   const R = size / 2, cx = R, cy = R;
@@ -260,7 +285,7 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
       // note on `depth` below. On the owner's reference clip of a real ball
       // the unlit mirrors are nearly black and there is no bright grid at all.
       const frameStep = lambert * (SHADE_STEPS - 1) - 3.0;
-      const faceStep = lambert * (SHADE_STEPS - 1) - 2.7 + (hash01(j * 31.7 + k * 7.31) - 0.5) * 4.8;
+      const faceStep = lambert * (SHADE_STEPS - 1) - 1.7 + (hash01(j * 31.7 + k * 7.31) - 0.5) * 5.4;
 
       // Colour lives on the mirrors, barely on the frame — and mostly it lives
       // on the FLASH, since an unlit mirror shows almost no colour of its own.
@@ -334,17 +359,34 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
       // and that contrast is what makes each read as a separate mirror rather
       // than part of a glowing region.
       const catchRoll = hash01(j * 4.63 + k * 9.11);
-      const lamTurn = (l0 + l1) / 2 / (2 * Math.PI);
-      const jit = (hash01(j * 8.17 + k * 2.53) - 0.5) * 0.022;
-      const pl = (((lamTurn + jit) % FLASH_PERIOD) + FLASH_PERIOD) % FLASH_PERIOD;
-      const g = Math.min(FLASH_GROUPS - 1, Math.floor((pl / FLASH_PERIOD) * FLASH_GROUPS));
-      // Below this the mirror's catch tops out around 0.09 opacity — invisible,
-      // and with the denser grid that's a couple of hundred paths for nothing.
+      // Below this the mirror's catch is invisible, and with the denser grid
+      // that's a couple of hundred paths for nothing.
       if (catchRoll <= 0.12) continue;
+
+      // Which lamp is this mirror angled to catch? Its `tilt` skews the timing
+      // by latitude, so each lamp's lit mirrors sweep as a diagonal patch.
+      const lamp = LAMPS[Math.floor(hash01(j * 15.73 + k * 4.19) * LAMPS.length) % LAMPS.length];
+      const lamTurn = (l0 + l1) / 2 / (2 * Math.PI);
+      const jit = (hash01(j * 8.17 + k * 2.53) - 0.5) * 0.010;
+      // `phase` staggers the lamps a third of a cycle apart, so their lit
+      // patches peak at different moments. Without it all three caught the
+      // ball's face at once and then all three slid to the limb together,
+      // and the whole ball throbbed from 22% bright down to 4% twice a turn —
+      // a beam on the front of a sphere lights a wide area, the same beam at
+      // the edge lights a sliver. Staggered, the total stays steady while
+      // each patch still sweeps.
+      const raw = lamTurn + lamp.tilt * Math.sin((b0 + b1) / 2) + lamp.phase + jit;
+      const pl = ((raw % FLASH_PERIOD) + FLASH_PERIOD) % FLASH_PERIOD;
+      const g = Math.min(FLASH_GROUPS - 1, Math.floor((pl / FLASH_PERIOD) * FLASH_GROUPS));
+
+      // Brutal contrast, per the reference: a caught mirror goes essentially
+      // pure white, and the one beside it stays dead. A gentle spread of
+      // mid-brightnesses is what made this read as a glow rather than as
+      // separate mirrors.
       flashes[g].push({
         d: face,
-        fill: mixHex('#ffffff', hue, cast * 0.30),
-        op: (catchRoll > 0.42 ? 0.80 + 0.20 * catchRoll : 0.05 + 0.32 * catchRoll) * (0.6 + 0.4 * depth),
+        fill: mixHex('#ffffff', palette[lamp.hue % palette.length], lamp.sat),
+        op: (catchRoll > 0.42 ? 0.94 + 0.06 * catchRoll : 0.02 + 0.12 * catchRoll) * (0.55 + 0.45 * depth),
       });
     }
   }
@@ -438,9 +480,17 @@ function SphereGrid({ size, tiles }: { size: number; tiles: Tile[] }) {
               price of six nodes. */}
           {FACET_DIRS.map((g, i) => (
             <SvgLinearGradient key={i} id={`dbFacet${i}`} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2}>
-              <Stop offset="0" stopColor="#ffffff" stopOpacity="0.66" />
-              <Stop offset="0.46" stopColor="#ffffff" stopOpacity="0.10" />
-              <Stop offset="1" stopColor="#05060d" stopOpacity="0.42" />
+              {/* Six stops, not three. The old ramp fell from white 0.66 to
+                  0.10 across the first 46% and then re-darkened — two steep
+                  segments meeting at a corner, which is the "harsh gradient
+                  line" you can see on the tiles. Easing it through the middle
+                  and softening both ends turns the corner into a curve. */}
+              <Stop offset="0" stopColor="#ffffff" stopOpacity="0.50" />
+              <Stop offset="0.18" stopColor="#ffffff" stopOpacity="0.34" />
+              <Stop offset="0.40" stopColor="#ffffff" stopOpacity="0.15" />
+              <Stop offset="0.58" stopColor="#ffffff" stopOpacity="0.04" />
+              <Stop offset="0.78" stopColor="#05060d" stopOpacity="0.14" />
+              <Stop offset="1" stopColor="#05060d" stopOpacity="0.30" />
             </SvgLinearGradient>
           ))}
         </Defs>

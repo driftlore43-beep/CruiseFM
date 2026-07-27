@@ -126,12 +126,16 @@ export function ShareCardBody({
         </RadialGradient>
         {/* The scrim over the photograph. Same shape as the one every mode
             lays over its own backdrop: clear-ish up top where the object
-            sits, deepening toward the type so the words stay readable. */}
+            sits, deepening toward the type so the words stay readable.
+            Deliberately light through the middle — the first pass ran
+            0.72/0.60/0.74 and buried the photo so completely that the card
+            looked unchanged. Only the last stop needs to be heavy; that's
+            the one the song title sits on. */}
         <SvgLinearGradient id={gid("scScrim")} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#03040e" stopOpacity="0.72" />
-          <Stop offset="0.34" stopColor="#03040e" stopOpacity="0.60" />
-          <Stop offset="0.62" stopColor="#03040e" stopOpacity="0.74" />
-          <Stop offset="1" stopColor="#03040e" stopOpacity="0.93" />
+          <Stop offset="0" stopColor="#03040e" stopOpacity="0.46" />
+          <Stop offset="0.34" stopColor="#03040e" stopOpacity="0.30" />
+          <Stop offset="0.62" stopColor="#03040e" stopOpacity="0.52" />
+          <Stop offset="1" stopColor="#03040e" stopOpacity="0.90" />
         </SvgLinearGradient>
       </Defs>
 

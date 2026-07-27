@@ -29,6 +29,7 @@ import { MarqueeText } from '@/components/MarqueeText';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { MoodSheet } from '@/components/MoodSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
+import { useAppActive } from '@/utils/useAppActive';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -834,13 +835,17 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     return () => { stopSpin(); shimmerLoopRef.current?.stop(); };
   }, [playing]);
 
-  // Safety net — restart spin if it stopped unexpectedly
+  // Safety net — restart spin if it stopped unexpectedly. Stops dead when the
+  // app is backgrounded: a repeating timer is one of the things iOS kills a
+  // background app for, and there is nothing to keep spinning off-screen.
+  const appActive = useAppActive();
   useEffect(() => {
+    if (!appActive) return;
     const interval = setInterval(() => {
       if (playingRef.current && !isSpinning.current) startSpin();
     }, 3000);
     return () => clearInterval(interval);
-  }, [playing]);
+  }, [playing, appActive]);
 
   // Tonearm
   useEffect(() => {

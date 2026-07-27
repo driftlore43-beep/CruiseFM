@@ -61,10 +61,23 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
   const adoptRef = useRef(adoptPlay);
   adoptRef.current = adoptPlay;
 
+  // The poll is owned by a ref rather than a local, because it has to be
+  // stopped and restarted by the AppState listener below as well as by this
+  // effect's own cleanup.
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopPoll = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  };
+  const startPoll = () => {
+    stopPoll();
+    // Battery: callers showing less detail (the mini-player) poll slower —
+    // every network wake costs radio time.
+    pollRef.current = setInterval(() => refreshRef.current(), opts?.pollMs ?? 5000);
+  };
+
   useEffect(() => {
     if (!visible) return;
     cancelledRef.current = false;
-    let interval: ReturnType<typeof setInterval> | null = null;
 
     (async () => {
       const conn = await isSpotifyConnected();
@@ -115,26 +128,38 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
       };
       refreshRef.current = refresh;
       refresh();
-      // Battery: callers showing less detail (the mini-player) poll slower —
-      // every network wake costs radio time.
-      interval = setInterval(refresh, opts?.pollMs ?? 5000);
+      if (AppState.currentState === 'active') startPoll();
     })();
 
     return () => {
       cancelledRef.current = true;
-      if (interval) clearInterval(interval);
+      stopPoll();
     };
   }, [visible]);
 
-  // Smooth re-entry: the moment the app comes back to the foreground, ask
-  // Spotify where things stand instead of waiting out the 5s poll — the
-  // title, progress and play state snap into step before the user notices.
-  // Never triggers a start attempt or the wake note; music already flowing
-  // is left completely alone.
+  /**
+   * The poll runs ONLY while the app is in front of the user.
+   *
+   * This is a crash fix, not a battery tweak. iOS expects a backgrounded app
+   * to fall silent within a few seconds; one that keeps a five-second network
+   * timer running gets SIGKILLed, which is what produced the run of
+   * `bug_type 309` terminations after leaving and re-entering the app. The
+   * process is shot rather than allowed to fail, so Sentry never sees it.
+   *
+   * Coming back also asks Spotify where things stand straight away instead of
+   * waiting out the interval, so the title, progress and play state snap into
+   * step before the user notices. It never triggers a start attempt or the
+   * wake note; music already flowing is left completely alone.
+   */
   useEffect(() => {
     if (!visible) return;
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') refreshRef.current();
+      if (state === 'active') {
+        refreshRef.current();
+        startPoll();
+      } else {
+        stopPoll();
+      }
     });
     return () => sub.remove();
   }, [visible]);

@@ -130,7 +130,7 @@ type Tile = { d: string; fill: string; op: number };
 // whatever doesn't move. Horizontal seams are correctly static (a sphere on
 // its polar axis maps each latitude onto itself); vertical seams belong to
 // RotatingMeridians and nowhere else. NEVER give this a horizontal inset.
-const BEVEL = { u0: 0.0, u1: 1.0, v0: 0.06, v1: 0.90 };
+const BEVEL = { u0: 0.0, u1: 1.0, v0: 0.03, v1: 0.955 };
 
 /**
  * The directions a mirror's own little gradient can run in.
@@ -210,7 +210,7 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
   // Denser than it was (17 x 32) — the owner's reference balls carry many
   // more, smaller mirrors, and at this count a front-face tile is ~8px wide,
   // which is small enough to read as a mosaic rather than a tiling.
-  const ROWS = 21, COLS = 40;   // ~380 visible facets after back-face culling
+  const ROWS = 25, COLS = 48;   // ~380 visible facets after back-face culling
   const st = Math.sin(TILT), ct = Math.cos(TILT);
 
   // Key light from the upper-left front, matching the fixed highlight below.
@@ -320,7 +320,6 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
       // flat two-tone split was tried first and read as a triangle drawn on
       // every tile, not as a falloff. Which of the six a mirror uses is its
       // own — see FACET_DIRS.
-      tiles.push({ d: `${d} ${face}`, fill: tint(frameStep, cast * 0.25), op: 0.55 + 0.35 * depth });
       tiles.push({ d: face, fill: tint(faceStep - 0.55, cast * 0.72), op: 0.55 + 0.35 * depth });
       tiles.push({ d: face, fill: `url(#dbFacet${facetDir(j, k)})`, op: 0.42 + 0.30 * depth });
 
@@ -358,7 +357,7 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
 function buildLatitudeArcs(size: number): string[] {
   const R = size / 2, cx = R, cy = R;
   const st = Math.sin(TILT), ct = Math.cos(TILT);
-  const ROWS = 21;   // must match buildSphereTiles
+  const ROWS = 25;   // must match buildSphereTiles
   const out: string[] = [];
   for (let j = 1; j < ROWS; j++) {
     const b = -Math.PI / 2 + (Math.PI * j) / ROWS;

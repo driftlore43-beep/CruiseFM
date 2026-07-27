@@ -27,14 +27,16 @@ const ICONS = [
   'road-variant', 'city-variant-outline', 'star-four-points', 'flash', 'sunglasses', 'drama-masks',
 ] as const;
 
-// Soft blue glass wash (~20% opacity) laid behind the sheet's cards.
-const CARD_BLUE = ['rgba(94,199,255,0.20)', 'rgba(26,107,181,0.20)'] as const;
+// Neutral glass wash — a faint light-catch from the top-left, same finish as
+// the app's other cards. Replaces the old blue tint so the sheet reads as
+// clear glass over the deep-navy background.
+const GLASS_WASH = ['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.03)'] as const;
 
 function CardWash({ radius }: { radius: number }) {
   return (
     <LinearGradient
-      colors={CARD_BLUE}
-      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      colors={GLASS_WASH}
+      start={{ x: 0, y: 0 }} end={{ x: 0.9, y: 1 }}
       style={[StyleSheet.absoluteFill, { borderRadius: radius }]}
       pointerEvents="none"
     />
@@ -50,6 +52,14 @@ const PALETTES: { label: string; color: string; gradientColors: [string, string,
   { label: 'Slate',    color: '#6b7a99', gradientColors: ['#111118', '#1e2240', '#000000'], glowColor: '#1e2240', iconBg: '#16162a' },
   { label: 'Crimson',  color: '#c0392b', gradientColors: ['#2a0505', '#6a1010', '#000000'], glowColor: '#6a1010', iconBg: '#3a0808' },
   { label: 'Forest',   color: '#27ae60', gradientColors: ['#021a05', '#0d4a1a', '#000000'], glowColor: '#0d4a1a', iconBg: '#0d3a10' },
+  { label: 'Orange',   color: '#FF7A3C', gradientColors: ['#2a1000', '#7a3510', '#000000'], glowColor: '#7a3510', iconBg: '#4a1e08' },
+  { label: 'Pink',     color: '#FF4FA3', gradientColors: ['#2a0518', '#7a1a4a', '#000000'], glowColor: '#7a1a4a', iconBg: '#45102b' },
+  { label: 'Cyan',     color: '#33C5FF', gradientColors: ['#01202e', '#0a5a7a', '#000000'], glowColor: '#0a5a7a', iconBg: '#083a4e' },
+  { label: 'Gold',     color: '#D4AF37', gradientColors: ['#241a02', '#6b5510', '#000000'], glowColor: '#6b5510', iconBg: '#443508' },
+  { label: 'Lavender', color: '#A78BFA', gradientColors: ['#160f2e', '#4a3a8a', '#000000'], glowColor: '#4a3a8a', iconBg: '#2c2158' },
+  { label: 'Coral',    color: '#FF6F61', gradientColors: ['#2a0c08', '#7a2a20', '#000000'], glowColor: '#7a2a20', iconBg: '#4a1710' },
+  { label: 'Mint',     color: '#4ADE80', gradientColors: ['#03200f', '#15683a', '#000000'], glowColor: '#15683a', iconBg: '#0e4425' },
+  { label: 'Ice',      color: '#9AD6FF', gradientColors: ['#0e1a26', '#2e5a7a', '#000000'], glowColor: '#2e5a7a', iconBg: '#1c3a52' },
 ];
 
 type Props = {
@@ -225,7 +235,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
               ))}
             </View>
 
-            <View style={[styles.preview, { backgroundColor: selectedPalette.iconBg, borderColor: selectedPalette.color + '55' }]}>
+            <View style={[styles.preview, { borderColor: selectedPalette.color + '66', shadowColor: selectedPalette.color }]}>
               <CardWash radius={16} />
               <View style={[styles.previewIcon, { backgroundColor: selectedPalette.iconBg, borderColor: selectedPalette.color + '88' }]}>
                 <MaterialCommunityIcons name={selectedIcon as any} size={24} color="#fff" />
@@ -258,7 +268,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   sheet: {
-    backgroundColor: Cruise.midnight,
+    // Near-black deep navy, matching the modes' backdrop — the glass cards
+    // inside read as clear panels over it.
+    backgroundColor: '#060812',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -266,7 +278,7 @@ const styles = StyleSheet.create({
     maxHeight: SCREEN_H * 0.9,
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   handle: {
     width: 36,
@@ -306,7 +318,7 @@ const styles = StyleSheet.create({
   inputWrap: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(94,199,255,0.25)',
+    borderColor: 'rgba(255,255,255,0.14)',
     overflow: 'hidden',
   },
   input: {
@@ -331,7 +343,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: 'rgba(94,199,255,0.20)',
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   paletteRow: {
     flexDirection: 'row',
@@ -358,6 +370,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
     borderWidth: 1,
     overflow: 'hidden',
+    // Really deep blue card under the glass wash, glowing in the chosen colour.
+    backgroundColor: '#070c1e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 8,
   },
   previewIcon: {
     width: 48,

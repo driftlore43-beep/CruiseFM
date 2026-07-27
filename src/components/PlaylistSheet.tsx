@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getUserPlaylists, isSpotifyConnected } from '@/utils/spotify';
@@ -86,6 +86,9 @@ export function PlaylistSheet({
   return (
     <View style={ps.backdrop}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      {/* Lifts the sheet above the keyboard so the paste-a-link bar stays
+          visible while typing — without this the keyboard covered it. */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[ps.sheet, { paddingBottom: insets.bottom + 16 }]}>
         <View style={ps.handle} />
         <Text style={ps.title}>Choose a playlist</Text>
@@ -122,6 +125,7 @@ export function PlaylistSheet({
           </>
         )}
       </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }

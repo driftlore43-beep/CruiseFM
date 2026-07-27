@@ -33,12 +33,26 @@ export function StationBackdrop({
     return (
       <ExpoImage
         source={station.motion}
-        placeholder={station.image}
+        placeholder={station.imageBlur ?? station.image}
         placeholderContentFit="cover"
         contentFit="cover"
         blurRadius={blurRadius}
         cachePolicy="memory-disk"
         style={StyleSheet.absoluteFill}
+      />
+    );
+  }
+  // Pre-blurred asset when we have one: a live blurRadius re-blurs the full
+  // image on the main thread every re-display (mode open, app re-entry) —
+  // Sentry caught iOS killing the app for exactly that. Displaying an
+  // already-blurred JPEG costs the same as any photo.
+  if (station.imageBlur) {
+    return (
+      <ImageBackground
+        source={station.imageBlur}
+        style={StyleSheet.absoluteFill}
+        imageStyle={{ width: '100%', height: '100%' }}
+        resizeMode="cover"
       />
     );
   }

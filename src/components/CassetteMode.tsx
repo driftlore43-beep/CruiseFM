@@ -6,7 +6,10 @@ import {
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Rect as SvgRect, Circle as SvgCircle, Line as SvgLine, Path as SvgPath, Text as SvgText } from 'react-native-svg';
+import Svg, {
+  Rect as SvgRect, Circle as SvgCircle, Line as SvgLine, Path as SvgPath, Text as SvgText,
+  Defs, ClipPath, G, LinearGradient as SvgLinearGradient, Stop,
+} from 'react-native-svg';
 import { Fonts } from '@/constants/theme';
 import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
@@ -18,8 +21,17 @@ import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { MoodSheet } from '@/components/MoodSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
+import { seekTo } from '@/utils/spotify';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { PreviewGate } from '@/components/PreviewGate';
+import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
+import { AmbientGlow } from '@/components/AmbientGlow';
+import { ModeActionRow } from '@/components/ModeActionRow';
+import { ModeCloseButton } from '@/components/ModeCloseButton';
+import { MarqueeText } from '@/components/MarqueeText';
+import { SeekBar } from '@/components/SeekBar';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -276,45 +288,80 @@ const pb = StyleSheet.create({
 
 // ── Reel component — static disc, rotation applied by parent wrapper ──────────
 // A spinning neon reel hub — cog spokes radiating from a glowing centre.
-function NeonReelHub({ size, color }: { size: number; color: string }) {
-  const c = 50;
+// Deterministic scatter for the shell's dust/wear (no Math.random — the
+// speckles must not crawl between renders).
+function ch01(n: number): number {
+  const x = Math.sin(n * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// ── Clear-shell cassette ─────────────────────────────────────────────────────
+// Same lesson as the CD: the shell is NEUTRAL clear polycarbonate and the only
+// colour is the hardware inside it. Everything used to be neon line-art in the
+// station hue, which read as a wireframe; now the station colour lives in the
+// reel hubs and the tape tint, and the shell is glass you can see the road
+// through. Thickness comes from PAIRED strokes — a lit outer edge, a dark line
+// just behind it, then a faint inner highlight.
+const VB_W = 340;
+const VB_H = 210;
+const LX = 118, RX = 224, RY = 118;
+const PACK_BASE = 104;
+
+// Reel hub: station-coloured flange, pale centre, dark drive teeth.
+function ReelHub({ size, color }: { size: number; color: string }) {
   const teeth = [0, 45, 90, 135, 180, 225, 270, 315];
   return (
-    <Svg width={size} height={size} viewBox="0 0 100 100">
-      <SvgCircle cx={c} cy={c} r={20} fill="none" stroke={color} strokeOpacity={0.3} strokeWidth={7} />
-      <SvgCircle cx={c} cy={c} r={20} fill="none" stroke={color} strokeWidth={2.4} />
-      {teeth.map((a) => {
-        const rad = (a * Math.PI) / 180;
+    <Svg width={size} height={size} viewBox="-24 -24 48 48">
+      <SvgCircle cx={0} cy={0} r={19} fill={color} />
+      <SvgCircle cx={0} cy={0} r={19} fill="none" stroke="#ffffff" strokeOpacity={0.40} strokeWidth={1} />
+      {/* one bright arc so the flange reads as moulded, not printed */}
+      <SvgPath d="M -13 -13 A 19 19 0 0 1 6 -18" fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={2} strokeLinecap="round" />
+      <SvgCircle cx={0} cy={0} r={10.5} fill="#f2f5ff" fillOpacity={0.92} />
+      {teeth.map((deg) => {
+        const a = (deg * Math.PI) / 180;
         return (
           <SvgLine
-            key={a}
-            x1={c + Math.cos(rad) * 20} y1={c + Math.sin(rad) * 20}
-            x2={c + Math.cos(rad) * 42} y2={c + Math.sin(rad) * 42}
-            stroke={color} strokeWidth={3} strokeLinecap="round"
+            key={deg}
+            x1={Math.cos(a) * 9} y1={Math.sin(a) * 9}
+            x2={Math.cos(a) * 15.5} y2={Math.sin(a) * 15.5}
+            stroke="#0a0c14" strokeOpacity={0.75} strokeWidth={4.4} strokeLinecap="round"
           />
         );
       })}
-      <SvgCircle cx={c} cy={c} r={6} fill={color} />
+      <SvgCircle cx={0} cy={0} r={6.4} fill="#05070e" />
     </Svg>
   );
 }
 
-// A small neon "×" screw mark.
-function Cross({ cx, cy, r = 2.8, color }: { cx: number; cy: number; r?: number; color: string }) {
+// A recessed Phillips screw in neutral steel, each seated at its own angle.
+function Screw({ cx, cy, r = 4, angle = 0 }: { cx: number; cy: number; r?: number; angle?: number }) {
+  const s = r * 0.6;
+  const a = (angle * Math.PI) / 180, cos = Math.cos(a), sin = Math.sin(a);
   return (
     <>
-      <SvgLine x1={cx - r} y1={cy - r} x2={cx + r} y2={cy + r} stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-      <SvgLine x1={cx - r} y1={cy + r} x2={cx + r} y2={cy - r} stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <SvgCircle cx={cx} cy={cy} r={r + 1.2} fill="#05070e" fillOpacity={0.40} />
+      <SvgCircle cx={cx} cy={cy} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={1.1} />
+      <SvgCircle cx={cx} cy={cy} r={r * 0.62} fill="#ffffff" fillOpacity={0.10} />
+      <SvgLine x1={cx - s * cos} y1={cy - s * sin} x2={cx + s * cos} y2={cy + s * sin} stroke="#ffffff" strokeOpacity={0.62} strokeWidth={1.2} strokeLinecap="round" />
+      <SvgLine x1={cx + s * sin} y1={cy - s * cos} x2={cx - s * sin} y2={cy + s * cos} stroke="#ffffff" strokeOpacity={0.62} strokeWidth={1.2} strokeLinecap="round" />
     </>
   );
 }
 
-// ── Neon cassette body — a transparent outline that glows to the mood colour ───
-const VB_W = 340;
-const VB_H = 210;
+function Sparkle({ cx, cy, s }: { cx: number; cy: number; s: number }) {
+  const k = s * 0.16;
+  return (
+    <SvgPath
+      d={`M ${cx} ${cy - s} Q ${cx + k} ${cy - k} ${cx + s} ${cy} Q ${cx + k} ${cy + k} ${cx} ${cy + s} Q ${cx - k} ${cy + k} ${cx - s} ${cy} Q ${cx - k} ${cy - k} ${cx} ${cy - s} Z`}
+      fill="#ffffff" fillOpacity={0.9}
+    />
+  );
+}
+
+const SHEEN = ['#7CF3D4', '#7FD0FF', '#B9A6FF', '#FF9AE0', '#FFC79C', '#FFF6AE'];
 
 function CassetteBody({
-  size, leftSpin, rightSpin,
+  size, leftSpin, rightSpin, progress,
   color = '#FF3DF0', accent = '#33E1FF',
   songName = 'YOUR SONG NAME', artist = 'CRUISE FM', timeText = '00:00',
 }: {
@@ -329,56 +376,154 @@ function CassetteBody({
 }) {
   const scale = size / VB_W;
   const H = size * (VB_H / VB_W);
-  const LX = 118, RX = 224, RY = 122;
-  const leftReelPx = 92 * scale;
-  const rightReelPx = 72 * scale;
+  const hubPx = 48 * scale;
+
+  const fallbackProgress = useRef(new Animated.Value(0.4)).current;
+  const prog = progress ?? fallbackProgress;
+  const packBase = PACK_BASE * scale;
+  const leftPackScale = prog.interpolate({ inputRange: [0, 1], outputRange: [1, 0.56] });
+  const rightPackScale = prog.interpolate({ inputRange: [0, 1], outputRange: [0.56, 0.94] });
+
+  const dust = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+    x: 14 + ch01(i * 2.7) * (VB_W - 28),
+    y: 14 + ch01(i * 5.9 + 3.1) * (VB_H - 28),
+    r: 0.3 + ch01(i * 8.2) * 0.7,
+    o: 0.06 + ch01(i * 4.4) * 0.14,
+  })), []);
+  const winds = useMemo(() => Array.from({ length: 9 }, (_, i) => (PACK_BASE / 2) * (0.42 + 0.065 * i)), []);
+
+  // The wound tape: dark, faintly station-tinted, with fine winding rings.
+  const pack = (cx: number, packScale: Animated.AnimatedInterpolation<number>) => (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        width: packBase, height: packBase,
+        left: cx * scale - packBase / 2, top: RY * scale - packBase / 2,
+        transform: [{ scale: packScale }],
+      }}
+    >
+      <Svg width={packBase} height={packBase} viewBox={`0 0 ${PACK_BASE} ${PACK_BASE}`}>
+        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill="#0a0c14" fillOpacity={0.80} />
+        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill={color} fillOpacity={0.13} />
+        {winds.map((r, i) => (
+          <SvgCircle key={i} cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.06} strokeWidth={0.7} />
+        ))}
+        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill="none" stroke={color} strokeOpacity={0.42} strokeWidth={1} />
+      </Svg>
+    </Animated.View>
+  );
 
   return (
     <View style={{ width: size, height: H, alignItems: 'center', justifyContent: 'center' }}>
-      <View>
-        <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`}>
-          {/* Body outline — crisp neon line */}
-          <SvgRect x={8} y={8} width={324} height={194} rx={20} fill="none" stroke={color} strokeWidth={2.4} />
+      {/* ── Behind the tape: shell body, internals, the tape path ── */}
+      <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`} style={StyleSheet.absoluteFill}>
+        <Defs>
+          <SvgLinearGradient id="csShell" x1="0" y1="0" x2="0.8" y2="1">
+            <Stop offset="0%" stopColor="#e8eeff" stopOpacity="0.20" />
+            <Stop offset="45%" stopColor="#9fb0d4" stopOpacity="0.10" />
+            <Stop offset="100%" stopColor="#dbe4ff" stopOpacity="0.17" />
+          </SvgLinearGradient>
+          <ClipPath id="csBody"><SvgRect x={8} y={8} width={324} height={194} rx={10} /></ClipPath>
+        </Defs>
+        <G clipPath="url(#csBody)">
+          <SvgRect x={8} y={8} width={324} height={194} fill="url(#csShell)" />
+          {/* internal chassis */}
+          <SvgRect x={60} y={30} width={220} height={150} rx={6} fill="none" stroke="#ffffff" strokeOpacity={0.13} strokeWidth={1} />
+          <SvgLine x1={171} y1={30} x2={171} y2={180} stroke="#ffffff" strokeOpacity={0.10} strokeWidth={1} />
+          {/* tape path — drawn BEFORE the packs so it emerges from under them
+              instead of crossing over the wound tape */}
+          <SvgPath d={`M ${LX} ${RY} L 74 168 L 268 168 L ${RX} ${RY}`} fill="none" stroke="#0a0c14" strokeOpacity={0.62} strokeWidth={3.4} />
+          <SvgLine x1={74} y1={168} x2={268} y2={168} stroke={color} strokeOpacity={0.34} strokeWidth={1} />
+        </G>
+      </Svg>
 
-          {/* Header label box (accent hue) */}
-          <SvgRect x={30} y={26} width={280} height={42} rx={11} fill="none" stroke={accent} strokeWidth={1.5} />
-          <SvgRect x={42} y={37} width={18} height={18} rx={2} fill="none" stroke={color} strokeWidth={1.6} />
-          <SvgText x={188} y={45} fill={accent} textAnchor="middle" fontSize={11} fontWeight="700" fontFamily={Fonts.mono}>{songName}</SvgText>
-          <SvgText x={300} y={60} fill={accent} textAnchor="end" fontSize={8} fontWeight="700" fontFamily={Fonts.mono} opacity={0.85}>{artist}</SvgText>
+      {/* ── The tape itself, breathing with the song ── */}
+      {pack(LX, leftPackScale)}
+      {pack(RX, rightPackScale)}
 
-          {/* Reel window */}
-          <SvgRect x={66} y={86} width={208} height={72} rx={6} fill="none" stroke={color} strokeWidth={1.4} />
-
-          {/* Static reel outer rings */}
-          <SvgCircle cx={LX} cy={RY} r={46} fill="none" stroke={color} strokeOpacity={0.18} strokeWidth={7} />
-          <SvgCircle cx={LX} cy={RY} r={46} fill="none" stroke={color} strokeWidth={2} />
-          <SvgCircle cx={RX} cy={RY} r={36} fill="none" stroke={color} strokeOpacity={0.18} strokeWidth={7} />
-          <SvgCircle cx={RX} cy={RY} r={36} fill="none" stroke={color} strokeWidth={2} />
-
-          {/* Timer */}
-          <SvgText x={170} y={178} fill={accent} textAnchor="middle" fontSize={13} fontWeight="700" fontFamily={Fonts.mono}>{timeText}</SvgText>
-
-          {/* Corner + edge screws */}
-          <Cross cx={26} cy={24} color={accent} />
-          <Cross cx={314} cy={24} color={accent} />
-          <Cross cx={26} cy={186} color={accent} />
-          <Cross cx={314} cy={186} color={accent} />
-          <Cross cx={170} cy={18} r={2.5} color={accent} />
-
-          {/* Bottom access door + buttons */}
-          <SvgPath d="M112 184 L228 184 L216 200 L124 200 Z" fill="none" stroke={color} strokeWidth={1.5} />
-          <SvgRect x={150} y={188} width={16} height={9} rx={3} fill="none" stroke={color} strokeWidth={1.3} />
-          <SvgRect x={174} y={188} width={16} height={9} rx={3} fill="none" stroke={color} strokeWidth={1.3} />
-        </Svg>
-      </View>
-
-      {/* Spinning neon reels overlaid on the wells */}
-      <Animated.View style={{ position: 'absolute', width: leftReelPx, height: leftReelPx, left: LX * scale - leftReelPx / 2, top: RY * scale - leftReelPx / 2, transform: [{ rotate: leftSpin }] }}>
-        <NeonReelHub size={leftReelPx} color={color} />
+      {/* ── Reels ── */}
+      <Animated.View pointerEvents="none" style={{ position: 'absolute', width: hubPx, height: hubPx, left: LX * scale - hubPx / 2, top: RY * scale - hubPx / 2, transform: [{ rotate: leftSpin }] }}>
+        <ReelHub size={hubPx} color={color} />
       </Animated.View>
-      <Animated.View style={{ position: 'absolute', width: rightReelPx, height: rightReelPx, left: RX * scale - rightReelPx / 2, top: RY * scale - rightReelPx / 2, transform: [{ rotate: rightSpin }] }}>
-        <NeonReelHub size={rightReelPx} color={color} />
+      <Animated.View pointerEvents="none" style={{ position: 'absolute', width: hubPx, height: hubPx, left: RX * scale - hubPx / 2, top: RY * scale - hubPx / 2, transform: [{ rotate: rightSpin }] }}>
+        <ReelHub size={hubPx} color={color} />
       </Animated.View>
+
+      {/* ── In front of the tape: the shell's own glass. Reflections belong to
+             the surface nearest you, so they lie OVER the reels. ── */}
+      <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          {SHEEN.map((hue, i) => (
+            <SvgLinearGradient key={i} id={`csIr${i}`} x1="0" y1="0" x2="1" y2="0">
+              <Stop offset="0%" stopColor={hue} stopOpacity="0" />
+              <Stop offset="35%" stopColor={hue} stopOpacity="0.085" />
+              <Stop offset="65%" stopColor={SHEEN[(i + 3) % SHEEN.length]} stopOpacity="0.070" />
+              <Stop offset="100%" stopColor={SHEEN[(i + 1) % SHEEN.length]} stopOpacity="0" />
+            </SvgLinearGradient>
+          ))}
+          <SvgLinearGradient id="csEdge" x1="0" y1="0" x2="0.9" y2="1">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.92" />
+            <Stop offset="30%" stopColor="#ffffff" stopOpacity="0.24" />
+            <Stop offset="62%" stopColor="#ffffff" stopOpacity="0.62" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.22" />
+          </SvgLinearGradient>
+          <SvgLinearGradient id="csLabel" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.50" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.32" />
+          </SvgLinearGradient>
+          <ClipPath id="csBody2"><SvgRect x={8} y={8} width={324} height={194} rx={10} /></ClipPath>
+        </Defs>
+        <G clipPath="url(#csBody2)">
+          {/* iridescent sweeps — wide and heavily overlapped so they read as
+              light on plastic rather than stripes */}
+          {SHEEN.map((_, i) => (
+            <SvgRect key={i} x={-60} y={-90 + i * 44} width={460} height={120} fill={`url(#csIr${i})`} transform="rotate(-18 170 105)" />
+          ))}
+          {/* left tape-guide assembly */}
+          <SvgRect x={30} y={120} width={26} height={58} rx={4} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.26} strokeWidth={1} />
+          <SvgCircle cx={43} cy={134} r={4.4} fill="none" stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
+          <SvgCircle cx={43} cy={150} r={3} fill="none" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.9} />
+          <SvgRect x={37} y={160} width={12} height={12} rx={2} fill={color} fillOpacity={0.55} />
+          {/* guide rollers */}
+          <SvgCircle cx={74} cy={168} r={4.6} fill="none" stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.2} />
+          <SvgCircle cx={268} cy={168} r={4.6} fill="none" stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.2} />
+          {/* bottom access door */}
+          <SvgPath d="M112 182 L228 182 L218 200 L122 200 Z" fill="#ffffff" fillOpacity={0.04} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1.2} />
+          <SvgCircle cx={136} cy={190} r={3.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.34} strokeWidth={1} />
+          <SvgRect x={152} y={186} width={15} height={9} rx={3} fill="#05070e" fillOpacity={0.45} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
+          <SvgRect x={174} y={186} width={15} height={9} rx={3} fill="#05070e" fillOpacity={0.45} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
+          <SvgCircle cx={204} cy={190} r={3.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.34} strokeWidth={1} />
+          {/* label — frosted, with the station colour as its spine */}
+          <SvgRect x={30} y={24} width={280} height={40} rx={4} fill="url(#csLabel)" />
+          <SvgRect x={30} y={24} width={280} height={13} rx={4} fill={color} fillOpacity={0.60} />
+          <SvgRect x={30} y={24} width={280} height={40} rx={4} fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={1} />
+          <SvgText x={40} y={34} fill="#0d1020" fontSize={7} fontWeight="800" fontFamily={Fonts.mono} letterSpacing={1.6}>A · STEREO · C90</SvgText>
+          <SvgText x={40} y={52} fill="#0d1020" fontSize={11} fontWeight="800" fontFamily={Fonts.mono}>
+            {songName.length > 22 ? songName.slice(0, 21) + '…' : songName}
+          </SvgText>
+          <SvgText x={300} y={60} fill="#0d1020" fillOpacity={0.66} fontSize={7} fontWeight="700" fontFamily={Fonts.mono} textAnchor="end">{artist}</SvgText>
+          {/* embossed markings + running time */}
+          <SvgText x={300} y={176} fill="#ffffff" fillOpacity={0.20} fontSize={5} fontFamily={Fonts.mono} textAnchor="end">CR-02 · HIGH BIAS · MADE FOR THE ROAD</SvgText>
+          <SvgText x={170} y={178} fill="#ffffff" fillOpacity={0.72} textAnchor="middle" fontSize={12} fontWeight="700" fontFamily={Fonts.mono}>{timeText}</SvgText>
+          {/* broad glass reflections across the whole face */}
+          <SvgPath d="M 20 8 L 96 8 L 40 202 L 8 202 Z" fill="#ffffff" fillOpacity={0.045} />
+          <SvgPath d="M 250 8 L 282 8 L 214 202 L 190 202 Z" fill="#ffffff" fillOpacity={0.025} />
+          {dust.map((d, i) => <SvgCircle key={i} cx={d.x} cy={d.y} r={d.r} fill="#ffffff" fillOpacity={d.o} />)}
+        </G>
+        {/* moulded edge: lit outer, dark behind, faint inner */}
+        <SvgRect x={8} y={8} width={324} height={194} rx={10} fill="none" stroke="url(#csEdge)" strokeWidth={2.4} />
+        <SvgRect x={11} y={11} width={318} height={188} rx={8} fill="none" stroke="#05070e" strokeOpacity={0.45} strokeWidth={1.2} />
+        <SvgRect x={13.5} y={13.5} width={313} height={183} rx={7} fill="none" stroke="#ffffff" strokeOpacity={0.18} strokeWidth={0.9} />
+        <Screw cx={26} cy={24} angle={12} />
+        <Screw cx={314} cy={24} angle={-31} />
+        <Screw cx={26} cy={186} angle={57} />
+        <Screw cx={314} cy={186} angle={-8} />
+        <Screw cx={170} cy={16} r={2.8} angle={40} />
+        <Sparkle cx={330} cy={12} s={7} />
+        <Sparkle cx={12} cy={196} s={5} />
+        <Sparkle cx={322} cy={198} s={4} />
+      </Svg>
     </View>
   );
 }
@@ -390,7 +535,7 @@ function AmberProgressBar({ progress }: { progress: Animated.Value }) {
   const DOT = 14;
   return (
     <View
-      style={{ flex: 1, height: 36, justifyContent: 'center' }}
+      style={{ width: '100%', height: 36, justifyContent: 'center' }}
       onLayout={(e) => setBarW(e.nativeEvent.layout.width)}
     >
       <View style={{ position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)' }} />
@@ -438,8 +583,15 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const { width: winW, height: winH } = useWindowDimensions();
   const isLandscape = winW > winH;
 
-  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const spotify = useSpotifyPlayback(visible);
+
+  // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
+  useEffect(() => {
+    if (!spotify.connected) return;
+    setShuffle(spotify.shuffleOn);
+    setRepeat(spotify.repeatMode !== 'off');
+  }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
   const [activeId,    setActiveId]    = useState(stationId ?? 'night-run');
   const [activeTrack, setActiveTrack] = useState(1);   // A2 default (index 1)
   const [platform,    setPlatform]    = useState<{ id: PlatformId; name: string; color: string } | null>(null);
@@ -473,11 +625,13 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const startRolling = () => {
     leftReelAnim.setValue(0);
     rightReelAnim.setValue(0);
+    // Real transport physics: the take-up reel (right) starts near-empty, so
+    // it spins faster than the fat supply reel.
     leftLoopRef.current = Animated.loop(
-      Animated.timing(leftReelAnim, { toValue: 1, duration: 1600, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(leftReelAnim, { toValue: 1, duration: 2200, easing: Easing.linear, useNativeDriver: true })
     );
     rightLoopRef.current = Animated.loop(
-      Animated.timing(rightReelAnim, { toValue: 1, duration: 2200, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(rightReelAnim, { toValue: 1, duration: 1500, easing: Easing.linear, useNativeDriver: true })
     );
     leftLoopRef.current.start();
     rightLoopRef.current.start();
@@ -531,7 +685,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   useEffect(() => { activeTrackRef.current = activeTrack; }, [activeTrack]);
 
   const station      = resolveAnyStation(activeId);
-  const currentTrack = SIDE_A_TRACKS[activeTrack];
 
   // ── Start secondary animations (tape flow, glow, progress) ──────────────────
   const startReels = () => {
@@ -540,12 +693,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
       Animated.timing(tapeFlow, { toValue: 1, duration: 500, easing: Easing.linear, useNativeDriver: true })
     );
     tapeFlowLoop.current.start();
-
-    pulseLoop.current = Animated.loop(Animated.sequence([
-      Animated.timing(glowPulse, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-      Animated.timing(glowPulse, { toValue: 0, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-    ]));
-    pulseLoop.current.start();
 
     const remaining = (1 - progressValue.current) * trackMsRef.current;
     progressAnimRef.current = Animated.timing(progress, {
@@ -566,12 +713,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
   const stopReels = () => {
     tapeFlowLoop.current?.stop();
-    pulseLoop.current?.stop();
     progressAnimRef.current?.stop();
-
-    Animated.timing(glowPulse, {
-      toValue: 0, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: false,
-    }).start();
 
     tapeFlow.stopAnimation();
   };
@@ -640,6 +782,13 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     progress.setValue(0);
     progressValue.current = 0;
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
+    // Re-opening from the mini-player: the reel loops die while the modal is
+    // hidden, and `playing` hasn't changed so the [playing] effects never
+    // rekick them — restart everything explicitly if music is going.
+    if (playing) {
+      stopRolling(); stopReels();
+      startRolling(); startReels();
+    }
     return () => { stopReels(); };
   }, [visible]);
 
@@ -670,9 +819,26 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     setPlaying(!playing);
   };
 
+  // Drag-to-seek adapter for the cassette's own progress animation — freeze
+  // the tape while scrubbing, seek the real song on release, then let the
+  // timing (and the next poll) carry on from there.
+  const cassetteScrub = {
+    begin: () => progressAnimRef.current?.stop(),
+    move: (pct: number) => { progress.setValue(pct); progressValue.current = pct; },
+    end: (pct: number) => {
+      progressValue.current = pct;
+      if (realTrackRef.current) seekTo(pct * trackMsRef.current).catch(() => {});
+      const remaining = (1 - pct) * trackMsRef.current;
+      if (playing && remaining > 0) {
+        progressAnimRef.current = Animated.timing(progress, {
+          toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false,
+        });
+        progressAnimRef.current.start();
+      }
+    },
+  };
+
   // Glow: 0.3 → 0.6 range, gentle amber pulse
-  const glowOpacity = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.16, 0.34] });
-  const glowScale   = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] });
 
   const topPad    = Math.max(insets.top, 20);
   const bottomPad = Math.max(insets.bottom, 24) + 24;
@@ -735,7 +901,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
               <Text style={[ls.nowPlaying, { fontFamily: Fonts.mono }]}>NOW PLAYING</Text>
               <Text style={ls.lsStation} numberOfLines={1}>{station.name}</Text>
               <Text style={ls.lsTrack} numberOfLines={1}>
-                {currentTrack.title} — {currentTrack.artist}
+                {spotify.track ? `${spotify.track.title} — ${spotify.track.artist}` : station.tagline}
               </Text>
 
               <View style={{ height: 14 }} />
@@ -789,14 +955,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
             {/* Right column — cassette */}
             <View style={[ls.rightCol, { paddingRight: safeR }]}>
-              <Animated.View style={[fs.glowOrb, {
-                backgroundColor: neonColor,
-                width: cassetteW * 0.9, height: cassetteH * 1.4,
-                borderRadius: cassetteW * 0.45,
-                opacity: playing ? glowOpacity : 0.12,
-                transform: [{ scale: glowScale }],
-              }]} />
-              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={currentTrack.title} artist={currentTrack.artist} timeText={elapsedTxt} />
+              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
             </View>
           </View>
         </View>
@@ -827,47 +986,44 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
           {/* Header — small top-center, Spotify style */}
           <View style={fs.header}>
-            <Text style={fs.headerEyebrow}>PLAYING FROM</Text>
+            <Text style={fs.headerEyebrow}>YOU’RE LISTENING TO</Text>
             <Text style={fs.headerStation}>{station.name}</Text>
           </View>
 
           {/* Cassette hero — flex:1 so it grows to fill available space */}
           <View style={[fs.cassetteWrap, { flex: 1 }]}>
-            <Animated.View style={[fs.glowOrb, {
-              backgroundColor: neonColor,
-              width: cassetteW * 0.85, height: cassetteH * 1.3,
-              borderRadius: cassetteW * 0.42,
-              opacity: playing ? glowOpacity : 0.12,
-              transform: [{ scale: glowScale }],
-            }]} />
             <TouchableOpacity onPress={togglePlay} activeOpacity={0.92}>
-              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={currentTrack.title} artist={currentTrack.artist} timeText={elapsedTxt} />
+              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
             </TouchableOpacity>
             <FloatingNotes playing={playing} color={neonColor} />
           </View>
 
-          {/* Song title — bottom-left, Spotify style */}
+          {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
-            <Text style={fs.trackTitle} numberOfLines={1}>{spotify.track?.title ?? currentTrack.title}</Text>
-            <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track?.artist ?? currentTrack.artist}</Text>
+            {spotify.track
+              ? <MarqueeText text={spotify.track.title} style={fs.trackTitle} />
+              : <Text style={[fs.trackTitle, { fontSize: 20 }]} numberOfLines={2}>{station.tagline}</Text>}
+            {spotify.track && <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track.artist}</Text>}
           </View>
 
-          {/* Tape progress — live counter left, true track length right */}
+          {/* Tape progress — only when a real song is playing through */}
+          {spotify.track && (
           <View style={fs.progressWrap}>
-            <View style={fs.progressRow}>
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono }]}>{elapsedTxt}</Text>
-              <AmberProgressBar progress={progress} />
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono, textAlign: 'right' }]}>{fmtTapeMs(trackMs)}</Text>
+            <SeekBar progress={progress} scrub={cassetteScrub} />
+            <View style={fs.timesBelow}>
+              <Text style={fs.timeText}>{elapsedTxt}</Text>
+              <Text style={fs.timeText}>{fmtTapeMs(trackMs)}</Text>
             </View>
           </View>
+          )}
 
           {/* Controls */}
           <View style={fs.controls}>
             <TouchableOpacity
-              onPress={() => setShuffle((s) => !s)}
+              onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }}
               style={fs.shuffleRepeatBtn}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={26} color={shuffle ? '#C8860A' : '#ffffff'} />
+              <Ionicons name="shuffle" size={26} color={shuffle ? (currentEq?.[1] ?? '#C8860A') : '#ffffff'} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -900,28 +1056,30 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => setRepeat((r) => !r)}
+              onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'track' : 'off'); }}
               style={fs.shuffleRepeatBtn}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="repeat" size={26} color={repeat ? '#C8860A' : '#ffffff'} />
+              <MaterialCommunityIcons name={repeat ? 'repeat-once' : 'repeat'} size={26} color={repeat ? (currentEq?.[1] ?? '#C8860A') : '#ffffff'} />
             </TouchableOpacity>
           </View>
 
           {/* Left-aligned action pills — keeps the tape the focus */}
-          <View style={fs.actionRow}>
-            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
-              <Text style={fs.actionPillBold}>Change Mood</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
-              <Text style={fs.actionPillText} numberOfLines={1}>
-                {linked ? linked.name : 'Add Playlist'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <ModeActionRow
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            track={spotify.track}
+            station={station}
+          />
 
         </View>
+
+        <ModeCloseButton onPress={handleClose} />
+
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
+        <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
+        {handoff && !spotify.track && <HandoffOverlay />}
+        <PreviewGate onSilence={spotify.pause} />
 
         <MoodSheet
           visible={showMood}
@@ -939,6 +1097,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
               await setStationPlaylist(activeId, pl);
               setLinked(pl);
               setShowPicker(false);
+              relinkStationPlaylist(activeId);
             }}
           />
         )}
@@ -965,11 +1124,13 @@ export function CassettePreview() {
   const startRolling = () => {
     leftReelAnim.setValue(0);
     rightReelAnim.setValue(0);
+    // Real transport physics: the take-up reel (right) starts near-empty, so
+    // it spins faster than the fat supply reel.
     leftLoopRef.current = Animated.loop(
-      Animated.timing(leftReelAnim, { toValue: 1, duration: 1600, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(leftReelAnim, { toValue: 1, duration: 2200, easing: Easing.linear, useNativeDriver: true })
     );
     rightLoopRef.current = Animated.loop(
-      Animated.timing(rightReelAnim, { toValue: 1, duration: 2200, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(rightReelAnim, { toValue: 1, duration: 1500, easing: Easing.linear, useNativeDriver: true })
     );
     leftLoopRef.current.start();
     rightLoopRef.current.start();
@@ -1053,7 +1214,7 @@ const fs = StyleSheet.create({
   trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
   trackArtist: { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 },
 
-  cassetteWrap: { alignItems: 'center', gap: 10 },
+  cassetteWrap: { alignItems: 'center', justifyContent: 'center', gap: 10 },
   glowOrb:     { position: 'absolute', alignSelf: 'center' },
 
   playlistBtn: {
@@ -1063,18 +1224,6 @@ const fs = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9,
   },
   playlistBtnText: { color: C.textDim, fontSize: 10, fontWeight: '700', letterSpacing: 2.5 },
-  actionRow: {
-    flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22,
-  },
-  actionPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
-    maxWidth: '58%',
-  },
-  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
-  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
 
   playlistSheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -1103,8 +1252,8 @@ const fs = StyleSheet.create({
   sheetPlatformText: { flex: 1, fontSize: 13, fontWeight: '600' },
 
   progressWrap: { width: '100%', paddingHorizontal: 28, marginTop: 22, marginBottom: 0 },
-  progressRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2, width: 38 },
+  timesBelow:   { flexDirection: 'row', justifyContent: 'space-between', marginTop: -4 },
+  timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2 },
 
   controls:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 28, marginTop: 10, marginBottom: 8, paddingVertical: 4 },
   shuffleRepeatBtn:{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },

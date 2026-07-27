@@ -21,6 +21,11 @@ export const PRIVACY_POLICY: LegalDoc = {
         'If you connect Spotify, you sign in on Spotify’s own page — Cruise FM never sees your password. Spotify gives the app a token, stored only on your device, used to control playback and read your playlists so drives can play your music. You can disconnect at any time in Profile, and you can also revoke access at spotify.com under Apps. Your use of Spotify is governed by Spotify’s own terms and privacy policy.',
     },
     {
+      heading: 'Microphone',
+      body:
+        'Cruise FM does not use the microphone. Nothing is ever listened to, recorded, or analysed — the on-screen visuals run on their own animations.',
+    },
+    {
       heading: 'Purchases',
       body:
         'Cruise FM Premium is billed through the Apple App Store or Google Play. Payment is handled entirely by them — Cruise FM never sees your card details. Subscription status may be processed by RevenueCat, our billing infrastructure provider, which receives only an anonymous purchase record (never your identity or payment details).',
@@ -28,6 +33,10 @@ export const PRIVACY_POLICY: LegalDoc = {
     {
       heading: 'Analytics and advertising',
       body: 'None. Cruise FM contains no analytics, no trackers and no advertising.',
+    },
+    {
+      heading: 'Crash reports',
+      body: 'If the app crashes, an anonymous technical report (device model, OS version, and what the code was doing at the time) is sent to Sentry, our crash-reporting provider, so the bug can be fixed. Crash reports contain no name, no account details, no music history and no location, and are never used for advertising or tracking.',
     },
     {
       heading: 'Children',

@@ -7,6 +7,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Haptics from 'expo-haptics';
 
 import { PaywallShowcase } from '@/components/PaywallShowcase';
+import { MODE_CATALOG } from '@/constants/modeCatalog';
+import { STATIONS } from '@/constants/stations';
 import { Cruise } from '@/constants/theme';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { purchasePremium, restorePremium } from '@/utils/purchases';
@@ -15,11 +17,32 @@ const AMBER      = '#F59E0B';
 const AMBER_SOFT = 'rgba(245,158,11,0.14)';
 const AMBER_LINE = 'rgba(245,158,11,0.35)';
 
+// Everything on this page is DERIVED, never typed out. The last version was
+// written by hand and went stale the moment the line-up changed: it was still
+// selling the Circular EQ (free since 25.07) and had never heard of Mirror
+// Ball, CD, or the premium FM band.
+const PRO_MODES = MODE_CATALOG.filter((m) => m.pro).map((m) => m.label);
+const FREE_MODES = MODE_CATALOG.filter((m) => !m.pro).map((m) => m.label);
+const PREMIUM_STATIONS = STATIONS.filter((s) => s.premium).length;
+
+/** "A, B and C" */
+function list(items: string[]): string {
+  if (items.length < 2) return items[0] ?? '';
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+/** "A, B, C" — for the comparison rows, where space is tighter. */
+const commas = (items: string[]) => items.join(', ');
+
 const FEATURES: { icon: keyof typeof MaterialCommunityIcons.glyphMap; title: string; desc: string }[] = [
   {
     icon: 'album',
-    title: 'Premium Music Modes',
-    desc: 'Vinyl, the Tuner, Horizon and the Circular Wave orb — the richest ways to drive.',
+    title: `${PRO_MODES.length} Premium Visual Modes`,
+    desc: `${list(PRO_MODES)} — the richest ways to drive.`,
+  },
+  {
+    icon: 'radio-tower',
+    title: 'The Whole FM Band',
+    desc: `All ${PREMIUM_STATIONS} premium stations, on top of the free AM dial.`,
   },
   {
     icon: 'palette',
@@ -28,8 +51,8 @@ const FEATURES: { icon: keyof typeof MaterialCommunityIcons.glyphMap; title: str
   },
   {
     icon: 'playlist-music',
-    title: 'Unlimited Playlists',
-    desc: 'Build as many custom stations as your drives demand.',
+    title: 'Unlimited Stations',
+    desc: 'Build as many of your own as your drives demand.',
   },
   {
     icon: 'star-four-points',
@@ -39,13 +62,15 @@ const FEATURES: { icon: keyof typeof MaterialCommunityIcons.glyphMap; title: str
 ];
 
 const COMPARISON: { label: string; free: boolean; premium: boolean }[] = [
-  { label: 'Cassette & Equalizer modes', free: true,  premium: true },
-  { label: 'Basic playback controls',    free: true,  premium: true },
-  { label: 'Badges & achievements',      free: true,  premium: true },
-  { label: 'Vinyl, Tuner, Horizon & Orb',  free: false, premium: true },
-  { label: 'All premium mood themes',    free: false, premium: true },
-  { label: 'Unlimited custom playlists', free: false, premium: true },
-  { label: 'Future premium modes',       free: false, premium: true },
+  { label: commas(FREE_MODES),                         free: true,  premium: true },
+  { label: 'AM band stations',                         free: true,  premium: true },
+  { label: 'Basic playback controls',                  free: true,  premium: true },
+  { label: 'Badges & achievements',                    free: true,  premium: true },
+  { label: commas(PRO_MODES),                          free: false, premium: true },
+  { label: `FM band — ${PREMIUM_STATIONS} stations`,   free: false, premium: true },
+  { label: 'All premium mood themes',                  free: false, premium: true },
+  { label: 'Unlimited custom stations',                free: false, premium: true },
+  { label: 'Future premium modes',                     free: false, premium: true },
 ];
 
 // Alert.alert is a no-op in the browser — fall back to the native web dialog
@@ -171,7 +196,7 @@ export default function PremiumScreen() {
 
           {/* Price */}
           <View style={styles.priceRow}>
-            <Text style={styles.price}>£2.99</Text>
+            <Text style={styles.price}>£1.99</Text>
             <Text style={styles.pricePer}>/ month</Text>
           </View>
           <Text style={styles.trialNote}>7-day free trial · cancel anytime</Text>

@@ -1,0 +1,8 @@
+# Netlify build config — pins the deploy so it never tries to build the Expo
+# app. The site is the static files in website/; there is nothing to compile.
+[build]
+  base = ""
+  publish = "website"
+  command = "echo 'Static site — nothing to build'"
+
+# Applies to production, branch, and PR preview deploys alike.

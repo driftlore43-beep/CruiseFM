@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Brightness from 'expo-brightness';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Cruise } from '@/constants/theme';
+import { Cruise, Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
@@ -32,30 +32,39 @@ import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/u
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { AmbientGlow } from '@/components/AmbientGlow';
+import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { PreviewGate } from '@/components/PreviewGate';
+import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
+import { MarqueeText } from '@/components/MarqueeText';
+import { ModeActionRow } from '@/components/ModeActionRow';
+import { ModeCloseButton } from '@/components/ModeCloseButton';
+import { SeekBar } from '@/components/SeekBar';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // ── Card bar geometry ─────────────────────────────────────────────────────────
 const BAR_COUNT   = 30;
+// Chunkier segments with a wider dark gap than before — on a real LED meter
+// the gap is a substantial fraction of the pitch, and that is most of what
+// makes it read as discrete lamps rather than a striped bar.
 const SEGMENT_H   = 5;
-const GAP_H       = 2;
-const UNIT        = SEGMENT_H + GAP_H;   // 7px per LED segment
+const GAP_H       = 3;
+const UNIT        = SEGMENT_H + GAP_H;   // 8px per LED segment
 const MAX_SEGS    = 16;
 const MIN_SEGS    = 2;
 const MAX_H       = MAX_SEGS * UNIT;
 const MIN_H       = MIN_SEGS * UNIT;
 const CARD_BAR_W  = Math.floor((SCREEN_W - 48) / BAR_COUNT) - 2;
-const CARD_GAPS   = Array.from({ length: MAX_SEGS - 1 }, (_, i) => SEGMENT_H + i * UNIT);
 
 // ── Fullscreen bar geometry — must match the vizSection height below,
 // otherwise the tallest bars get clipped at the top ─────────────────────────
 const VIZ_H       = Math.round(SCREEN_H * 0.26);
-const FS_MAX_SEGS = Math.max(20, Math.floor(VIZ_H / UNIT));
+const FS_MAX_SEGS = Math.max(14, Math.floor(VIZ_H / UNIT));
 const FS_MAX_H    = FS_MAX_SEGS * UNIT;
 const FS_MIN_H    = MIN_H;
 // 24px side margins + the row's 2px gaps, so the first/last bars never clip.
 const FS_BAR_W    = Math.floor((SCREEN_W - 48 - (BAR_COUNT - 1) * 2) / BAR_COUNT);
-const FS_GAPS     = Array.from({ length: FS_MAX_SEGS - 1 }, (_, i) => SEGMENT_H + i * UNIT);
 
 // ── Bar animation helpers ─────────────────────────────────────────────────────
 
@@ -73,6 +82,12 @@ function barDur(i: number): number {
   return 380 + Math.floor(Math.abs(Math.sin(i * 1.7 + 0.4)) * 280);
 }
 
+/** Snap a bar height to a whole number of LED segments — a real meter lands on
+ *  a lamp, never half way up one. */
+function snap(h: number, minH: number): number {
+  return Math.max(minH, Math.round(h / UNIT) * UNIT);
+}
+
 function startBarAnims(
   values: Animated.Value[],
   bellFn: (i: number) => number,
@@ -83,11 +98,13 @@ function startBarAnims(
     const maxH = bellFn(i);
     const dur  = barDur(i);
     const t = setTimeout(() => {
+      // Native driver: the values only feed transform interpolations in Bars,
+      // so the whole loop runs off the JS thread — no per-frame layout work.
       Animated.loop(Animated.sequence([
-        Animated.timing(anim, { toValue: maxH,                         duration: dur,        easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-        Animated.timing(anim, { toValue: minH + (maxH - minH) * 0.18, duration: dur * 0.65, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-        Animated.timing(anim, { toValue: maxH * 0.6,                   duration: dur * 0.5,  easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-        Animated.timing(anim, { toValue: minH,                         duration: dur * 0.75, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+        Animated.timing(anim, { toValue: snap(maxH, minH),                         duration: dur,        easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: snap(minH + (maxH - minH) * 0.18, minH), duration: dur * 0.65, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: snap(maxH * 0.6, minH),                   duration: dur * 0.5,  easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: minH,                                     duration: dur * 0.75, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])).start();
     }, i * 14);
     timers.current.push(t);
@@ -105,77 +122,110 @@ function stopBarAnims(
 
 // ── Shared sub-components ─────────────────────────────────────────────────────
 
-function GapStrips({ gaps, bgColor }: { gaps: number[]; bgColor: string }) {
+function mixHex(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ar = (pa >> 16) & 255, ag = (pa >> 8) & 255, ab = pa & 255;
+  const br = (pb >> 16) & 255, bg = (pb >> 8) & 255, bb = pb & 255;
+  const r = Math.round(ar + (br - ar) * t), g = Math.round(ag + (bg - ag) * t), bl = Math.round(ab + (bb - ab) * t);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
+}
+
+/** One lamp's colour, sampled up the three-stop station palette. */
+function segColor(colors: [string, string, string], t: number): string {
+  return t < 0.5 ? mixHex(colors[0], colors[1], t * 2) : mixHex(colors[1], colors[2], (t - 0.5) * 2);
+}
+
+/** The lamps of one bar, bottom to top. Static — built once per geometry. */
+function buildSegments(maxH: number, colors: [string, string, string]) {
+  const n = Math.max(1, Math.floor(maxH / UNIT));
+  return Array.from({ length: n }, (_, i) => ({
+    bottom: i * UNIT,
+    color: segColor(colors, n === 1 ? 1 : i / (n - 1)),
+  }));
+}
+
+/** Lamps drawn as real rectangles with real gaps between them.
+ *
+ *  The old build faked the gaps by painting strips of the BACKGROUND colour
+ *  over a solid gradient — which meant that in fullscreen, where the
+ *  background is a photo and the strip colour was 'transparent', the gaps
+ *  simply never appeared and the bars were solid. Actual gaps also let the
+ *  station artwork through between lamps, which is most of the retro look. */
+function Lamps({ segs }: { segs: ReturnType<typeof buildSegments> }) {
   return (
     <>
-      {gaps.map((bottom) => (
-        <View key={bottom} style={{ position: 'absolute', left: 0, right: 0, height: GAP_H, bottom, backgroundColor: bgColor }} />
+      {segs.map((s) => (
+        <View
+          key={s.bottom}
+          style={{
+            position: 'absolute', left: 0, right: 0, bottom: s.bottom, height: SEGMENT_H,
+            borderRadius: 1.5, backgroundColor: s.color,
+          }}
+        />
       ))}
     </>
   );
 }
 
-function Bars({ values, barW, maxH, gaps, bgColor, colors }: {
+// Performance-critical: 30 of these animate continuously. The old version
+// animated `height` (JS-driven — a full native layout pass for every bar on
+// every frame, the source of visible lag). This version keeps every layout
+// static and animates only transforms on the native driver, so the whole
+// dance runs on the GPU: a clipping window slides up to reveal the bar while
+// an inner counter-slide keeps the gradient anchored to the bottom — same
+// look, no layout work. React.memo keeps the per-second clock re-renders of
+// the parent from rebuilding 30 gradient stacks.
+const Bars = React.memo(function Bars({ values, barW, maxH, colors, cap = true }: {
   values: Animated.Value[];
   barW: number;
   maxH: number;
-  gaps: number[];
-  bgColor: string;
   colors?: [string, string, string];
+  /** The peak lamp riding the top of the bar. */
+  cap?: boolean;
 }) {
   const barColors = colors ?? ['#00BFFF', '#8A2BE2', '#FF00AA'];
+  const segs = useMemo(() => buildSegments(maxH, barColors), [maxH, barColors.join()]);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: maxH }}>
-      {values.map((anim, i) => (
-        <Animated.View key={i} style={{ width: barW, height: anim, overflow: 'hidden' }}>
-          <View style={{ width: barW, height: maxH, position: 'absolute', bottom: 0 }}>
-            <LinearGradient
-              colors={barColors}
-              start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }}
-              style={[StyleSheet.absoluteFill, { borderRadius: 3 }]}
-            />
-            <GapStrips gaps={gaps} bgColor={bgColor} />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 3 }]} />
+      {values.map((anim, i) => {
+        const rise    = anim.interpolate({ inputRange: [0, maxH], outputRange: [maxH, 0] });
+        const counter = anim.interpolate({ inputRange: [0, maxH], outputRange: [-maxH, 0] });
+        const capY    = anim.interpolate({ inputRange: [0, maxH], outputRange: [0, -(maxH - UNIT)], extrapolate: 'clamp' });
+        return (
+          <View key={i} style={{ width: barW, height: maxH }}>
+            {/* The window itself must clip — it slides down while the content
+                counter-slides up, so the lamps stay anchored to the bottom and
+                only the lit ones show. Without overflow here the two motions
+                cancel and the bar renders full-height. */}
+            <View style={{ width: barW, height: maxH, overflow: 'hidden' }}>
+              <Animated.View style={{ width: barW, height: maxH, overflow: 'hidden', transform: [{ translateY: rise }] }}>
+                <Animated.View style={{ width: barW, height: maxH, transform: [{ translateY: counter }] }}>
+                  <Lamps segs={segs} />
+                </Animated.View>
+              </Animated.View>
+            </View>
+            {cap && (
+              <Animated.View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute', left: 0, right: 0, bottom: 0, height: SEGMENT_H, borderRadius: 1.5,
+                  backgroundColor: '#ffffff', opacity: 0.82,
+                  transform: [{ translateY: capY }],
+                }}
+              />
+            )}
           </View>
-        </Animated.View>
-      ))}
+        );
+      })}
     </View>
   );
-}
-
-function Marquee({ text, textStyle }: { text: string; textStyle?: object }) {
-  const tx   = useRef(new Animated.Value(0)).current;
-  const [textW, setTextW] = useState(0);
-  const [boxW,  setBoxW]  = useState(0);
-  const loop = useRef<Animated.CompositeAnimation | null>(null);
-
-  useEffect(() => {
-    loop.current?.stop();
-    tx.setValue(0);
-    if (textW > boxW && boxW > 0) {
-      const travel = textW + 32;
-      loop.current = Animated.loop(Animated.sequence([
-        Animated.delay(1800),
-        Animated.timing(tx, { toValue: -travel, duration: travel * 22, easing: Easing.linear, useNativeDriver: true }),
-        Animated.delay(500),
-        Animated.timing(tx, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ]));
-      loop.current.start();
-    }
-    return () => loop.current?.stop();
-  }, [textW, boxW]);
-
-  return (
-    <View style={{ overflow: 'hidden', width: '100%' }} onLayout={(e) => setBoxW(e.nativeEvent.layout.width)}>
-      <Animated.Text
-        style={[textStyle, { transform: [{ translateX: tx }] }]}
-        onLayout={(e) => setTextW(e.nativeEvent.layout.width)}
-        numberOfLines={1}>
-        {text}
-      </Animated.Text>
-    </View>
-  );
-}
+}, (prev, next) =>
+  prev.values === next.values &&
+  prev.barW === next.barW &&
+  prev.maxH === next.maxH &&
+  prev.cap === next.cap &&
+  (prev.colors?.join() ?? '') === (next.colors?.join() ?? ''),
+);
 
 // Slim volume slider with fade-in-on-touch
 // ── Violet progress bar ───────────────────────────────────────────────────────
@@ -185,7 +235,7 @@ function VioletProgressBar({ progress }: { progress: Animated.Value }) {
   const DOT = 14;
   return (
     <View
-      style={{ flex: 1, height: 36, justifyContent: 'center' }}
+      style={{ width: '100%', height: 36, justifyContent: 'center' }}
       onLayout={(e) => setBarW(e.nativeEvent.layout.width)}
     >
       <View style={{ position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)' }} />
@@ -255,8 +305,11 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const isLandscape = winW > winH;
 
   const fsValues = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(FS_MIN_H))).current;
+  // Drives the ambient glow's brightness/breath — a big, cheap element that
+  // reads the mic even on slow phones where 30 tiny bars are hard to see.
+  const glowPulse = useRef(new Animated.Value(0.3)).current;
 
-  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const [activeStation, setActiveStation] = useState(stationId ?? 'night-run');
   const [shuffle,       setShuffle]       = useState(false);
   const [repeat,        setRepeat]        = useState(false);
@@ -280,7 +333,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const lsBarW     = Math.max(3, Math.floor(lsRightW / BAR_COUNT) - 2);
   const lsMaxSegs  = Math.max(20, Math.floor(winH / UNIT));
   const lsMaxH     = lsMaxSegs * UNIT;
-  const lsGaps     = Array.from({ length: lsMaxSegs - 1 }, (_, i) => SEGMENT_H + i * UNIT);
   const lsBellMaxH = useCallback((i: number) => {
     const t = (i - (BAR_COUNT - 1) / 2) / (BAR_COUNT / 4.2);
     return Math.round(MIN_SEGS + (lsMaxSegs - MIN_SEGS) * Math.exp(-0.5 * t * t)) * UNIT;
@@ -323,6 +375,18 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
       startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
     }
   }, [isLandscape]);
+
+  // ── Ambient glow breathes slowly while the music plays — steady and calm,
+  //    with no microphone involved. ──
+  useEffect(() => {
+    if (!visible || !playing) { glowPulse.setValue(0.3); return; }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(glowPulse, { toValue: 0.55, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(glowPulse, { toValue: 0.20, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [visible, playing]);
 
   // ── Keep screen awake in landscape ───────────────────────────────────────
   useEffect(() => {
@@ -372,9 +436,16 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
   const spotify = useSpotifyPlayback(visible);
 
+  // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
+  useEffect(() => {
+    if (!spotify.connected) return;
+    setShuffle(spotify.shuffleOn);
+    setRepeat(spotify.repeatMode !== 'off');
+  }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
+
   // Progress rides the shared track clock — real Spotify position when
   // connected, the classic 4-minute demo loop otherwise.
-  const { progress, elapsedMs: currentTimeMs, durationMs } = useTrackClock({
+  const { progress, elapsedMs: currentTimeMs, durationMs, scrub } = useTrackClock({
     visible, playing, track: spotify.track, demoDurationMs: 4 * 60 * 1000,
   });
 
@@ -478,7 +549,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
                 <Text style={ls.lsStation} numberOfLines={1}>{currentStation.name}</Text>
               </View>
               <Text style={ls.lsTrack} numberOfLines={1}>
-                {spotify.track ? `${spotify.track.title} — ${spotify.track.artist}` : 'Carbon Wing — Midnight Pilot'}
+                {spotify.track ? `${spotify.track.title} — ${spotify.track.artist}` : currentStation.tagline}
               </Text>
 
               {/* Spacer */}
@@ -538,8 +609,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
                 values={fsValues}
                 barW={lsBarW}
                 maxH={lsMaxH}
-                gaps={lsGaps}
-                bgColor="#060612"
                 colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
               />
               <FloatingNotes playing={playing} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
@@ -564,21 +633,57 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             tint → transparent) so it has NO hard edge and the blurred image
             stays visible all the way to the bottom. Tinted with the bright
             mid bar colour so it reads as light, never a dark cut-off. */}
-        <LinearGradient
-          colors={[
-            'transparent',
-            (currentStation.eqColors?.[1] ?? currentStation.glowColor) + '26',
-            'transparent',
+        <Animated.View
+          style={[
+            fs.glowBand,
+            { opacity: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }),
+              transform: [{ scaleY: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.4] }) }] },
           ]}
-          locations={[0, 0.5, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={fs.glowBand}
-          pointerEvents="none"
-        />
+          pointerEvents="none">
+          <LinearGradient
+            colors={[
+              'transparent',
+              (currentStation.eqColors?.[1] ?? currentStation.glowColor) + '59',
+              'transparent',
+            ]}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+        </Animated.View>
+
+        {/* Loud-transient bloom — near-invisible when quiet, a bright wash of
+            the station colour on the peaks, so the beat visibly lights the
+            scene even where the bars can't animate smoothly. */}
+        <Animated.View
+          style={[
+            fs.glowBand,
+            { opacity: glowPulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 0.72] }),
+              transform: [{ scaleY: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.25] }) }] },
+          ]}
+          pointerEvents="none">
+          <LinearGradient
+            colors={[
+              'transparent',
+              (currentStation.eqColors?.[2] ?? currentStation.eqColors?.[1] ?? currentStation.glowColor) + 'B3',
+              'transparent',
+            ]}
+            locations={[0.2, 0.5, 0.8]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+        </Animated.View>
 
         {/* Drag pill — swipe down hint */}
         <View style={{ position: 'absolute', top: topPad + 6, left: 0, right: 0, alignItems: 'center', zIndex: 25 }} pointerEvents="none">
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' }} />
+        </View>
+
+        {/* Mode name — top-left corner tag, same treatment as every other mode */}
+        <View style={{ position: 'absolute', top: topPad + 14, left: 20, zIndex: 10 }} pointerEvents="none">
+          <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', letterSpacing: 3, fontFamily: Fonts.mono }}>EQUALIZER</Text>
         </View>
 
         {/* Close button — fixed top right, always visible */}
@@ -588,7 +693,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
           {/* Station — small top-center label, Spotify "Playing From Playlist" style */}
           <View style={fs.identity}>
-            <Text style={fs.identityEyebrow}>PLAYING FROM</Text>
+            <Text style={fs.identityEyebrow}>YOU’RE LISTENING TO</Text>
             <Text style={fs.identityStation}>{currentStation.name}</Text>
           </View>
 
@@ -601,34 +706,36 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               values={fsValues}
               barW={FS_BAR_W}
               maxH={FS_MAX_H}
-              gaps={FS_GAPS}
-              bgColor="transparent"
               colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
             />
             <FloatingNotes playing={playing} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
           </View>
 
-          {/* Song title — bottom-left, Spotify style */}
+          {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
-            <Text style={fs.trackTitle} numberOfLines={1}>{spotify.track?.title ?? 'Carbon Wing'}</Text>
-            <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track?.artist ?? 'Midnight Pilot'}</Text>
+            {spotify.track
+              ? <MarqueeText text={spotify.track.title} style={fs.trackTitle} />
+              : <Text style={[fs.trackTitle, { fontSize: 20 }]} numberOfLines={2}>{currentStation.tagline}</Text>}
+            {spotify.track && <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track.artist}</Text>}
           </View>
 
-          {/* Progress bar */}
+          {/* Progress bar — only when a real song is playing through */}
+          {spotify.track && (
           <View style={fs.progressWrap}>
-            <View style={fs.progressRow}>
+            <SeekBar progress={progress} scrub={scrub} />
+            <View style={fs.timesBelow}>
               <Text style={fs.timeText}>{formatMs(currentTimeMs)}</Text>
-              <VioletProgressBar progress={progress} />
-              <Text style={[fs.timeText, { textAlign: 'right' }]}>{formatMs(durationMs)}</Text>
+              <Text style={fs.timeText}>{formatMs(durationMs)}</Text>
             </View>
           </View>
+          )}
 
           <View style={fs.controls}>
             <TouchableOpacity
               style={fs.shuffleRepeatBtn}
-              onPress={() => setShuffle((s) => !s)}
+              onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={26} color={shuffle ? '#7B38E0' : '#ffffff'} />
+              <Ionicons name="shuffle" size={26} color={shuffle ? (currentStation.eqColors?.[1] ?? '#7B38E0') : '#ffffff'} />
             </TouchableOpacity>
 
             <TouchableOpacity style={fs.skipBtn} activeOpacity={0.75} onPress={spotify.prev}>
@@ -659,27 +766,29 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
             <TouchableOpacity
               style={fs.shuffleRepeatBtn}
-              onPress={() => setRepeat((r) => !r)}
+              onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'track' : 'off'); }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="repeat" size={26} color={repeat ? '#7B38E0' : '#ffffff'} />
+              <MaterialCommunityIcons name={repeat ? 'repeat-once' : 'repeat'} size={26} color={repeat ? (currentStation.eqColors?.[1] ?? '#7B38E0') : '#ffffff'} />
             </TouchableOpacity>
           </View>
 
           {/* Left-aligned action pills — keep the bars the focus */}
-          <View style={fs.actionRow}>
-            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
-              <Text style={fs.actionPillBold}>Change Mood</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
-              <Text style={fs.actionPillText} numberOfLines={1}>
-                {linked ? linked.name : 'Add Playlist'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <ModeActionRow
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            track={spotify.track}
+            station={currentStation}
+          />
 
         </View>
+
+        <ModeCloseButton onPress={handleClose} />
+
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
+        <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
+        {handoff && !spotify.track && <HandoffOverlay />}
+        <PreviewGate onSilence={spotify.pause} />
 
         <MoodSheet
           visible={showMood}
@@ -697,6 +806,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               await setStationPlaylist(activeStation, pl);
               setLinked(pl);
               setShowPicker(false);
+              relinkStationPlaylist(activeStation);
             }}
           />
         )}
@@ -737,7 +847,7 @@ export function EqualizerModeCard() {
           <Ionicons name="play" size={9} color="rgba(255,255,255,0.4)" />
           <Text style={card.tapHintText}>tap to open</Text>
         </View>
-        <Bars values={cardValues} barW={CARD_BAR_W} maxH={MAX_H} gaps={CARD_GAPS} bgColor="#111111" />
+        <Bars values={cardValues} barW={CARD_BAR_W} maxH={MAX_H} />
       </TouchableOpacity>
       <View style={card.footer}>
         <View style={card.titleRow}>
@@ -769,7 +879,7 @@ export function EqualizerModePreview() {
         <Ionicons name={active ? 'pause' : 'play'} size={9} color="rgba(255,255,255,0.4)" />
         <Text style={card.tapHintText}>{active ? 'tap to stop' : 'tap to play'}</Text>
       </View>
-      <Bars values={values} barW={CARD_BAR_W} maxH={MAX_H} gaps={CARD_GAPS} bgColor="#111111" />
+      <Bars values={values} barW={CARD_BAR_W} maxH={MAX_H} />
     </TouchableOpacity>
   );
 }
@@ -899,17 +1009,17 @@ const fs = StyleSheet.create({
     marginTop: 22,
     marginBottom: 0,
   },
-  progressRow: {
+  // Times sit underneath the bar — the shared layout across every mode.
+  timesBelow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginTop: -4,
   },
   timeText: {
     color: '#ffffff',
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.2,
-    width: 38,
   },
 
   // ── Controls ──────────────────────────────────────────────────────────────
@@ -984,16 +1094,6 @@ const fs = StyleSheet.create({
   },
 
   // ── Action pills ──────────────────────────────────────────────────────────
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22 },
-  actionPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
-    maxWidth: '58%',
-  },
-  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
-  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
   // ── Playlist button ───────────────────────────────────────────────────────
   playlistBtn: {
     marginTop: 20,

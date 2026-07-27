@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { GlossSheen } from '@/components/GlossSheen';
+import { MirrorBallGlyph } from '@/components/MirrorBallGlyph';
 import { PremiumShimmer } from '@/components/PremiumShimmer';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useEntitlements } from '@/context/EntitlementsContext';
@@ -100,35 +101,132 @@ function AnimatedCard({
   );
 }
 
+// ── Glitter scattered around a card ───────────────────────────────────────────
+// Deterministic scatter (no Math.random — the specks must not jump about on
+// every re-render), each twinkling on its own native-driver loop. The layer
+// deliberately sits OUTSIDE the card's rounded clip so the sparkle spills past
+// the edges, which is the whole point of "glitter surrounding it".
+function hash01(n: number): number {
+  const x = Math.sin(n * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function Speck({ left, top, r, cross, dur, delay }: {
+  left: `${number}%`; top: `${number}%`; r: number; cross: boolean; dur: number; delay: number;
+}) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.delay(delay),
+      Animated.timing(t, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(t, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  const opacity = t.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.9] });
+  const scale = t.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
+  const box = r * (cross ? 7 : 2);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', left, top, width: box, height: box, marginLeft: -box / 2, marginTop: -box / 2,
+        alignItems: 'center', justifyContent: 'center', opacity, transform: [{ scale }],
+      }}>
+      {/* The hairline cross-flare is what separates "glitter" from "a dot" */}
+      {cross && <View style={{ position: 'absolute', width: box, height: 1, backgroundColor: '#fff', opacity: 0.5 }} />}
+      {cross && <View style={{ position: 'absolute', width: 1, height: box, backgroundColor: '#fff', opacity: 0.5 }} />}
+      <View style={{
+        width: r * 2, height: r * 2, borderRadius: r, backgroundColor: '#fff',
+        shadowColor: '#dbe6ff', shadowOpacity: 0.95, shadowRadius: r * 2.6, shadowOffset: { width: 0, height: 0 },
+      }} />
+    </Animated.View>
+  );
+}
+
+function CardGlitter({ count = 16 }: { count?: number }) {
+  const specks = useMemo(() => Array.from({ length: count }, (_, i) => {
+    // Walk the card's perimeter rather than scattering over the whole box —
+    // glitter dropped at random lands on top of the title and reads as dirt.
+    // Round the edges it frames the card, which is what was asked for.
+    const p = ((i + hash01(i * 1.73) * 0.75) / count) % 1;
+    let x: number, y: number, along: 'h' | 'v';
+    if (p < 0.4)       { x = p / 0.4;                 y = 0; along = 'h'; }
+    else if (p < 0.5)  { x = 1;                       y = (p - 0.4) / 0.1; along = 'v'; }
+    else if (p < 0.9)  { x = 1 - (p - 0.5) / 0.4;     y = 1; along = 'h'; }
+    else               { x = 0;                       y = 1 - (p - 0.9) / 0.1; along = 'v'; }
+    // Drift each speck off its edge so the ring isn't a dotted outline.
+    const off = (hash01(i * 4.91 + 2.2) - 0.4) * 0.22;
+    if (along === 'h') y = Math.max(-0.03, Math.min(1.03, y + (y < 0.5 ? off : -off)));
+    else               x = Math.max(-0.03, Math.min(1.03, x + (x < 0.5 ? off : -off)));
+    return {
+      left: `${Number((x * 100).toFixed(1))}%` as `${number}%`,
+      top: `${Number((y * 100).toFixed(1))}%` as `${number}%`,
+      r: 0.9 + hash01(i * 5.31) * 1.6,
+      cross: hash01(i * 6.07) > 0.42,
+      dur: 850 + Math.floor(hash01(i * 2.23) * 1500),
+      delay: Math.floor(hash01(i * 9.41) * 2600),
+    };
+  }), [count]);
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', left: -10, right: -10, top: -10, bottom: -10 }}>
+      {specks.map((s, i) => <Speck key={i} {...s} />)}
+    </View>
+  );
+}
+
 // ── Compact mode row card ─────────────────────────────────────────────────────
 function CompactModeCard({
   title,
   desc,
   icon,
+  iconNode,
   gradient,
   locked,
   premium = false,
+  silver = false,
+  glitter = false,
 }: {
   title: string;
   desc: string;
-  icon: string;
+  icon?: string;
+  /** Drawn icon, for modes an icon font has no glyph for (the mirror ball). */
+  iconNode?: React.ReactNode;
   gradient: [string, string, string];
   locked: boolean;
   premium?: boolean;
+  /** Frosted white/silver glass instead of a coloured slab. */
+  silver?: boolean;
+  glitter?: boolean;
 }) {
   return (
-    <View style={styles.compactCard}>
-      <LinearGradient colors={gradient} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
-      {premium && <GlossSheen radius={18} />}
-      {locked && <PremiumShimmer />}
-      <View style={styles.compactIconWrap}>
-        <MaterialCommunityIcons name={icon as any} size={22} color="#fff" />
+    // The glow lives on the wrapper, not the card: the card clips its own
+    // children (overflow hidden for the rounded gradient), and on iOS that
+    // clips the shadow with them.
+    <View style={silver && styles.silverGlow}>
+      <View style={[styles.compactCard, silver && styles.silverCard]}>
+        {/* Silver runs on the diagonal — a bright top-left corner falling away
+            to the bottom-right is what makes a neutral wash read as polished
+            metal rather than flat grey. */}
+        <LinearGradient
+          colors={gradient}
+          start={silver ? { x: 0, y: 0 } : { x: 0, y: 0.5 }}
+          end={silver ? { x: 1, y: 1 } : { x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {premium && <GlossSheen radius={18} />}
+        {locked && <PremiumShimmer />}
+        <View style={[styles.compactIconWrap, silver && styles.silverIconWrap]}>
+          {iconNode ?? <MaterialCommunityIcons name={icon as any} size={22} color="#fff" />}
+        </View>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={styles.compactTitle}>{title}</Text>
+          <Text style={styles.compactDesc} numberOfLines={2}>{desc}</Text>
+        </View>
+        {locked && <Ionicons name="lock-closed" size={16} color="rgba(255,255,255,0.55)" style={{ marginLeft: 8 }} />}
       </View>
-      <View style={{ flex: 1, gap: 3 }}>
-        <Text style={styles.compactTitle}>{title}</Text>
-        <Text style={styles.compactDesc} numberOfLines={2}>{desc}</Text>
-      </View>
-      {locked && <Ionicons name="lock-closed" size={16} color="rgba(255,255,255,0.55)" style={{ marginLeft: 8 }} />}
+      {glitter && <CardGlitter />}
     </View>
   );
 }
@@ -196,6 +294,19 @@ export default function ModesScreen() {
           />
         </AnimatedCard>
 
+        <AnimatedCard scrollY={scrollY} onPress={() => open('orb', false)} style={{ marginBottom: 14 }}>
+          <CompactModeCard
+            title="Circular Equaliser Mode"
+            desc="A glowing orb of light that pulses and radiates to your station's mood."
+            icon="circle-slice-8"
+            gradient={['#b23ae6', '#7a2ac0', '#2a1550']}
+            locked={false}
+          />
+        </AnimatedCard>
+
+        {/* ── Premium modes stacked together at the bottom ── */}
+        <Text style={styles.sectionLabel}>PREMIUM</Text>
+
         <AnimatedCard scrollY={scrollY} onPress={() => open('vinyl', !isPro)} style={{ marginBottom: 14 }}>
           <CompactModeCard
             title="Vinyl Record Mode"
@@ -229,24 +340,27 @@ export default function ModesScreen() {
           />
         </AnimatedCard>
 
-        <AnimatedCard scrollY={scrollY} onPress={() => open('waves', false)} style={{ marginBottom: 14 }}>
+        <AnimatedCard scrollY={scrollY} onPress={() => open('cd', !isPro)} style={{ marginBottom: 14 }}>
           <CompactModeCard
-            title="Sound Waves Mode"
-            desc="A flowing, glowing waveform that ripples in your station's mood colours."
-            icon="waveform"
-            gradient={['#22b8e6', '#2f6ad0', '#1a2a70']}
-            locked={false}
+            title="CD Mode"
+            desc="Your album on a mirrored disc, spinning behind jewel-case plastic."
+            icon="disc"
+            gradient={['#5a6f9a', '#8a4fd0', '#141a2e']}
+            locked={!isPro}
+            premium
           />
         </AnimatedCard>
 
-        <AnimatedCard scrollY={scrollY} onPress={() => open('orb', !isPro)} style={{ marginBottom: 14 }}>
+        <AnimatedCard scrollY={scrollY} onPress={() => open('disco', !isPro)} style={{ marginBottom: 14 }}>
           <CompactModeCard
-            title="Circular Equaliser Mode"
-            desc="A glowing orb of light that pulses and radiates to your station's mood."
-            icon="circle-slice-8"
-            gradient={['#b23ae6', '#7a2ac0', '#2a1550']}
+            title="Mirror Ball Mode"
+            desc="A slow-turning mirror ball scattering light across your night drive."
+            iconNode={<MirrorBallGlyph size={26} />}
+            gradient={['rgba(255,255,255,0.30)', 'rgba(203,220,252,0.17)', 'rgba(255,255,255,0.07)']}
             locked={!isPro}
             premium
+            silver
+            glitter
           />
         </AnimatedCard>
 
@@ -266,6 +380,15 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginLeft: 4,
     marginBottom: 18,
+  },
+  sectionLabel: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2.5,
+    marginLeft: 4,
+    marginTop: 8,
+    marginBottom: 12,
   },
 
   // Featured card
@@ -338,6 +461,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.10)',
   },
+  // Frosted silver glass — no colour slab, just white at low opacity over the
+  // app's own dark background, with a bright rim and a cool outward glimmer.
+  silverCard: {
+    borderColor: 'rgba(255,255,255,0.34)',
+    backgroundColor: 'rgba(150,168,205,0.10)',
+  },
+  silverGlow: {
+    borderRadius: 18,
+    shadowColor: '#cfe0ff',
+    shadowOpacity: 0.24,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
   compactIconWrap: {
     width: 44,
     height: 44,
@@ -347,6 +484,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  silverIconWrap: {
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderColor: 'rgba(255,255,255,0.32)',
   },
   compactTitle: {
     color: '#fff',

@@ -18,6 +18,14 @@ import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/u
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { PreviewGate } from '@/components/PreviewGate';
+import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
+import { AmbientGlow } from '@/components/AmbientGlow';
+import { ModeActionRow } from '@/components/ModeActionRow';
+import { ModeCloseButton } from '@/components/ModeCloseButton';
+import { MarqueeText } from '@/components/MarqueeText';
+import { SeekBar } from '@/components/SeekBar';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -147,9 +155,17 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
   const station = resolveAnyStation(activeId);
   const spotify = useSpotifyPlayback(visible);
+
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState(false);
+  useEffect(() => {
+    if (!spotify.connected) return;
+    setShuffle(spotify.shuffleOn);
+    setRepeat(spotify.repeatMode !== 'off');
+  }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
   const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
 
-  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -160,7 +176,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   }, [visible, station.id]);
 
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
-  const { progress, elapsedMs, durationMs } = useTrackClock({
+  const { progress, elapsedMs, durationMs, scrub } = useTrackClock({
     visible, playing, track: spotify.track, demoDurationMs: DEMO_DURATION_MS,
   });
   const playingRef = useRef(false);
@@ -168,7 +184,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
 
   useEffect(() => { playingRef.current = playing; }, [playing]);
 
-  // Scene animation loop — throttled to ~30fps.
+  // Scene animation loop — throttled to ~15fps — each tick re-renders the whole SVG scene on the CPU, and 25fps measured 53-59% sustained CPU (iOS resource reports, 24.07); 15fps looks identical for these slow drifts and halves the burn.
   useEffect(() => {
     if (!visible) return;
     let raf = 0;
@@ -176,11 +192,15 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
     let last = 0;
     const tick = () => {
       const now = Date.now();
-      if (now - last >= 33) {
+      if (now - last >= 66) {
         last = now;
         const target = playingRef.current ? 1 : 0.4;
         ampRef.current += (target - ampRef.current) * 0.08;
-        setPhase((now - start) / 1000);
+        // Battery: once paused and fully wound down, freeze the scene —
+        // zero re-renders until play flips it live again.
+        if (playingRef.current || Math.abs(ampRef.current - target) > 0.01) {
+          setPhase((now - start) / 1000);
+        }
       }
       raf = requestAnimationFrame(tick);
     };
@@ -219,8 +239,10 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const resetTrack = () => progress.setValue(0);
   const togglePlay = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
 
-  const title = spotify.track?.title ?? 'Neon Autobahn';
-  const artist = spotify.track?.artist ?? 'Cruise FM';
+  // Real song when connected, else the mood's own line — never a fake track.
+  const hasTrack = !!spotify.track;
+  const title = spotify.track?.title ?? station.tagline;
+  const artist = spotify.track?.artist ?? '';
   const fill = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   return (
@@ -252,7 +274,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
         {/* Content */}
         <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>
           <View style={{ alignItems: 'center', gap: 3, paddingHorizontal: 32, paddingBottom: 10 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 }}>PLAYING FROM</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 }}>YOU’RE LISTENING TO</Text>
             <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>{station.name}</Text>
           </View>
 
@@ -262,27 +284,29 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             <FloatingNotes playing={playing} color={eq[1]} />
           </View>
 
-          {/* Song title */}
+          {/* Song title / mood line */}
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
-            <Text style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={1}>{title}</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 }} numberOfLines={1}>{artist}</Text>
+            {hasTrack
+              ? <MarqueeText text={title} style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }} />
+              : <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={2}>{title}</Text>}
+            {hasTrack && <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 }} numberOfLines={1}>{artist}</Text>}
           </View>
 
-          {/* Progress */}
+          {/* Progress — only when a real song is playing through */}
+          {hasTrack && (
           <View style={{ width: '100%', paddingHorizontal: 28, marginTop: 18 }}>
-            <View style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' }}>
-              <Animated.View style={{ height: 6, borderRadius: 3, width: fill, backgroundColor: '#fff' }} />
-            </View>
+            <SeekBar progress={progress} scrub={scrub} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 7 }}>
-              <Text style={[fs.time, { fontFamily: Fonts.mono }]}>{formatMs(elapsedMs)}</Text>
-              <Text style={[fs.time, { fontFamily: Fonts.mono }]}>{formatMs(durationMs)}</Text>
+              <Text style={fs.time}>{formatMs(elapsedMs)}</Text>
+              <Text style={fs.time}>{formatMs(durationMs)}</Text>
             </View>
           </View>
+          )}
 
           {/* Controls */}
           <View style={fs.controls}>
-            <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={24} color="rgba(255,255,255,0.85)" />
+            <TouchableOpacity onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Ionicons name="shuffle" size={24} color={shuffle ? eq[1] : 'rgba(255,255,255,0.85)'} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { resetTrack(); spotify.prev(); }} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-previous" size={44} color="#fff" />
@@ -300,25 +324,27 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             <TouchableOpacity onPress={() => { resetTrack(); spotify.next(); }} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-next" size={44} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="repeat" size={24} color="rgba(255,255,255,0.85)" />
+            <TouchableOpacity onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'track' : 'off'); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <MaterialCommunityIcons name={repeat ? 'repeat-once' : 'repeat'} size={24} color={repeat ? eq[1] : 'rgba(255,255,255,0.85)'} />
             </TouchableOpacity>
           </View>
 
           {/* Left-aligned action pills — keep the visual the focus */}
-          <View style={fs.actionRow}>
-            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
-              <Text style={fs.actionPillBold}>Change Mood</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
-              <Text style={fs.actionPillText} numberOfLines={1}>
-                {linked ? linked.name : 'Add Playlist'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <ModeActionRow
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            track={spotify.track}
+            station={station}
+          />
         </View>
+
+        <ModeCloseButton onPress={handleClose} />
+
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} hero={false} color={eq[1]} />
+        <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
+        {handoff && !spotify.track && <HandoffOverlay />}
+        <PreviewGate onSilence={spotify.pause} />
 
         <MoodSheet
           visible={showMood}
@@ -336,6 +362,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
               await setStationPlaylist(station.id, pl);
               setLinked(pl);
               setShowPicker(false);
+              relinkStationPlaylist(station.id);
             }}
           />
         )}
@@ -360,7 +387,10 @@ const fs = StyleSheet.create({
   time: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
   controls: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    width: '100%', paddingHorizontal: 30, marginTop: 18,
+    // 14, not 18: the transport sits a touch higher so the pills below get
+    // real breathing room (their own marginTop went 18 -> 26). Don't take it
+    // much lower — the progress bar is directly above.
+    width: '100%', paddingHorizontal: 30, marginTop: 14,
   },
   playBtn: {
     width: 78, height: 78, borderRadius: 39, backgroundColor: '#fff',
@@ -375,14 +405,4 @@ const fs = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
   playlistBtnText: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22 },
-  actionPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
-    maxWidth: '58%',
-  },
-  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
-  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
 });

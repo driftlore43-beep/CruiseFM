@@ -61,17 +61,23 @@ function CompactCard({ station, onPress }: { station: Station; onPress?: () => v
       {/* Clip everything to the rounded rect */}
       <View style={styles.compactCard}>
 
-        {/* The station's accent palette, full strength */}
+        {/* Smoked-glass base. The accent sits ON this rather than replacing
+            it, so the card reads as tinted glass over the dark app rather
+            than a solid slab of colour. */}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,17,29,0.55)' }]} />
+
+        {/* The station's accent palette, held well back — enough to tell the
+            stations apart at a glance, not enough to shout. */}
         <LinearGradient
           colors={accents}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, { opacity: 0.42 }]}
         />
 
         {/* Bottom scrim for the name */}
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.60)']}
+          colors={['transparent', 'rgba(0,0,0,0.55)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.compactOverlay}
@@ -114,8 +120,17 @@ function CompactCard({ station, onPress }: { station: Station; onPress?: () => v
 }
 
 // ── Full-width list card ──────────────────────────────────────────────────────
+// Used only by the Stations page, which is laid out like a receiver: the dial
+// number sits outside the card on the left, so the station's name is CENTRED
+// inside it. That means nothing else may share the name's row — the PREMIUM
+// badge moved to the card's own top-right corner, and the block on the right
+// is padded to the icon's width so the middle is genuinely the middle.
 function ListCard({ station, onPress }: { station: Station; onPress?: () => void }) {
   const platformColor = usePlatformColor();
+  // The station's own mood colour, held back. A full-strength gradient slab is
+  // what the Modes tab does, and having both pages wear it made them twins —
+  // and it shouted over the dial, which is meant to be the loudest thing here.
+  const accent = station.eqColors?.[1] ?? '#5B7BFF';
   return (
     <Pressable
       style={({ pressed }) => [
@@ -126,48 +141,47 @@ function ListCard({ station, onPress }: { station: Station; onPress?: () => void
       onPress={onPress ?? (() => handleStartDrive(station.name))}>
 
       {/* Clip everything to the rounded rect */}
-      <View style={styles.card}>
+      <View style={[styles.card, { borderColor: accent + '5C' }]}>
 
-        {/* Layer 1 — mood gradient preview (horizontal) */}
+        {/* Layer 1 — smoked glass. The colour sits ON this rather than
+            replacing it, so the card reads as tinted glass over the dark app. */}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(13,15,26,0.58)' }]} />
+
+        {/* Layer 2 — the mood. Strongest at the left edge and still present at
+            the right, so the card is coloured glass rather than a grey slab
+            with a tinted corner. */}
         <LinearGradient
-          colors={station.cardGradient}
+          colors={[accent + '82', accent + '46', accent + '1A']}
+          locations={[0, 0.55, 1]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
           style={StyleSheet.absoluteFill}
         />
-
-        {/* Layer 2 — gentle left scrim for text legibility */}
+        {/* A little top-down lift, so the colour doesn't read as a flat fill */}
         <LinearGradient
-          colors={['rgba(3,3,10,0.20)', 'rgba(3,3,10,0)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
+          colors={['rgba(255,255,255,0.07)', 'transparent']}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
 
         {/* Layer 3 — hairline top-edge highlight */}
         <View style={styles.cardInnerHighlight} />
 
-        {/* Premium cards get a glossy shine on top of their mood colour */}
+        {/* Premium cards get a glossy shine */}
         {station.premium && <GlossSheen />}
 
         {/* Layer 4 — row content */}
         <View style={styles.cardRow}>
-          <View style={styles.iconCircle}>
-            <MaterialCommunityIcons name={station.iconName as any} size={24} color="#fff" />
+          <View style={[styles.iconCircle, { backgroundColor: accent + '38', borderColor: accent + '99' }]}>
+            <MaterialCommunityIcons name={station.iconName as any} size={22} color="#fff" />
           </View>
 
           <View style={styles.textBlock}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name} numberOfLines={1}>{station.name}</Text>
-              {station.premium && (
-                <View style={styles.premiumBadge}>
-                  <Text style={styles.premiumText}>PREMIUM</Text>
-                </View>
-              )}
-            </View>
+            <Text style={styles.name} numberOfLines={1}>{station.name}</Text>
             <Text style={styles.tagline} numberOfLines={1}>{station.tagline}</Text>
             <View style={styles.tagsRow}>
-              {station.tags.map((tag) => (
+              {station.tags.slice(0, 1).map((tag) => (
                 <View key={tag} style={styles.tag}>
                   <Text style={styles.tagText}>{tag}</Text>
                 </View>
@@ -175,13 +189,15 @@ function ListCard({ station, onPress }: { station: Station; onPress?: () => void
             </View>
           </View>
 
+          {/* Same width as the icon, so the text block sits dead centre */}
           <View style={styles.chevronBlock}>
             {platformColor && (
               <View style={[styles.platformDot, { backgroundColor: platformColor }]} />
             )}
-            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
+            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
           </View>
         </View>
+
 
       </View>
     </Pressable>
@@ -200,9 +216,11 @@ const styles = StyleSheet.create({
   compactShadow: {
     marginRight: 14,
     borderRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 22,
+    // Softer, deeper lift than the old neon halo — the glow reads as the
+    // card floating, not as the card being lit from behind.
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.32,
+    shadowRadius: 26,
     elevation: 10,
   },
   compactCard: {
@@ -211,7 +229,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   compactImageStyle: {
     borderRadius: 20,
@@ -235,9 +253,6 @@ const styles = StyleSheet.create({
     fontSize: 15.5,
     fontWeight: '800',
     lineHeight: 20,
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowRadius: 6,
-    textShadowOffset: { width: 0, height: 1 },
   },
   iconCircleSmall: {
     position: 'absolute',
@@ -258,16 +273,15 @@ const styles = StyleSheet.create({
   cardShadow: {
     marginBottom: 14,
     borderRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 24,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.34,
+    shadowRadius: 22,
+    elevation: 9,
   },
   card: {
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   cardImageStyle: {
     borderRadius: 20,
@@ -283,13 +297,14 @@ const styles = StyleSheet.create({
   cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    gap: 10,
   },
   iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.10)',
@@ -298,10 +313,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   iconEmoji: { fontSize: 22 },
-  textBlock: { flex: 1, gap: 4 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  name: { color: '#fff', fontSize: 16, fontWeight: '700', flexShrink: 1 },
-  tagline: { color: 'rgba(255,255,255,0.65)', fontSize: 12, lineHeight: 17 },
+  textBlock: { flex: 1, gap: 3, alignItems: 'flex-start' },
+  name: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  tagline: { color: 'rgba(255,255,255,0.72)', fontSize: 11.5, lineHeight: 16 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 2 },
   tag: {
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -317,7 +331,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.2,
   },
+  // No longer padded to the icon's width — that only existed to keep the name
+  // centred, and the name is left-aligned now.
   chevronBlock: {
+    width: 26,
     alignItems: 'center',
     gap: 4,
     flexShrink: 0,

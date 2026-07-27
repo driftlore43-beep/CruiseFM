@@ -57,7 +57,7 @@ export function FloatingNotes({
     let lastSpawn = 0;
     const tick = () => {
       const now = Date.now();
-      if (now - last >= 33) {
+      if (now - last >= 40) {
         last = now;
         const interval = scrubbing && scrubDir === 'fwd' ? 300 : spawnMs;
         const { w, h } = box.current;

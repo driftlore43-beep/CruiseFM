@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  Easing,
   Modal,
   PanResponder,
   Platform,
@@ -24,7 +25,9 @@ import { GlossSheen } from '@/components/GlossSheen';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { useTheme } from '@/context/ThemeContext';
 import { useMotion } from '@/context/MotionContext';
+import { useNowPlaying } from '@/context/NowPlayingContext';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
+import { getSavedPlatform } from '@/utils/musicPlatform';
 import {
   getStationPlaylist,
   setStationPlaylist,
@@ -44,17 +47,7 @@ function darken(hex: string, amount: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
-type Mode = { id: string; label: string; pro: boolean };
-
-const MODES: Mode[] = [
-  { id: 'cassette',  label: 'Cassette',    pro: false },
-  { id: 'equalizer', label: 'Equalizer',   pro: false },
-  { id: 'vinyl',     label: 'Vinyl',       pro: true  },
-  { id: 'radio',     label: 'Tuner',       pro: true  },
-  { id: 'horizon',   label: 'Horizon',     pro: true  },
-  { id: 'waves',     label: 'Sound Waves', pro: false },
-  { id: 'orb',       label: 'Circular EQ', pro: true  },
-];
+import { MODE_CATALOG as MODES } from '@/constants/modeCatalog';
 
 type Props = {
   station: Station | CustomStation | null;
@@ -71,9 +64,16 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { dataSaver } = useMotion();
-  const slideY = useRef(new Animated.Value(SCREEN_H)).current;
+  const { relinkStationPlaylist } = useNowPlaying();
+  // The station page pushes in from the RIGHT, like turning to a page rather
+  // than pulling up a sheet. slideY stays because the downward pull-to-dismiss
+  // is muscle memory and the drag pill at the top still promises it.
+  const slideX = useRef(new Animated.Value(SCREEN_W)).current;
+  const slideY = useRef(new Animated.Value(0)).current;
   const [selectedMode, setSelectedMode] = useState('cassette');
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
+  const [linkToast, setLinkToast] = useState<string | null>(null);
+  const [spotifyPlatform, setSpotifyPlatform] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -84,29 +84,78 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
       setShowMenu(false);
       setConfirmDelete(false);
       if (station) getStationPlaylist(station.id).then(setLinked);
-      Animated.spring(slideY, { toValue: 0, useNativeDriver: true, bounciness: 3 }).start();
+      getSavedPlatform().then((p) => setSpotifyPlatform(p === 'spotify' || p == null));
+      slideY.setValue(0);
+      slideX.setValue(SCREEN_W);
+      // Timing rather than a spring: a page push wants to arrive and stop, not
+      // wobble at the end.
+      Animated.timing(slideX, {
+        toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      }).start();
     }
   }, [visible, station?.id]);
 
+  // Two ways out, each leaving the way it would have come in: swipe back from
+  // the left edge and it slides off to the right, pull down and it drops.
+  // Claiming on MOVE, never on start — capture-on-start is what killed the
+  // back button on the settings pages.
+  const swipeAxis = useRef<'x' | 'y' | null>(null);
+  const closeRef = useRef<(down?: boolean) => void>(() => {});
   const dismissPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
-      onPanResponderMove: (_, g) => { if (g.dy > 0) slideY.setValue(g.dy); },
+      onMoveShouldSetPanResponder: (_, g) => {
+        if (g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx)) return true;
+        // Edge-only, or a rightward drag would fight the horizontal mode strip.
+        return g.x0 < 44 && g.dx > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4;
+      },
+      onPanResponderGrant: () => { swipeAxis.current = null; },
+      onPanResponderMove: (_, g) => {
+        if (!swipeAxis.current) swipeAxis.current = Math.abs(g.dx) > Math.abs(g.dy) ? 'x' : 'y';
+        if (swipeAxis.current === 'x') { if (g.dx > 0) slideX.setValue(g.dx); }
+        else if (g.dy > 0) slideY.setValue(g.dy);
+      },
       onPanResponderRelease: (_, g) => {
-        if (g.dy > 120 || g.vy > 0.8) handleClose();
+        const axis = swipeAxis.current;
+        swipeAxis.current = null;
+        if (axis === 'x') {
+          if (g.dx > SCREEN_W * 0.3 || g.vx > 0.7) closeRef.current(false);
+          else Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
+          return;
+        }
+        if (g.dy > 120 || g.vy > 0.8) closeRef.current(true);
         else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+      },
+      onPanResponderTerminate: () => {
+        swipeAxis.current = null;
+        Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
+        Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
       },
     })
   ).current;
 
-  function handleClose() {
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 300, useNativeDriver: true }).start(onClose);
+  /** `down` sends it out of the bottom; everything else slides it off right. */
+  function handleClose(down = false) {
+    const [value, target] = down ? [slideY, SCREEN_H] : [slideX, SCREEN_W];
+    Animated.timing(value, {
+      toValue: target, duration: 280, easing: Easing.in(Easing.cubic), useNativeDriver: true,
+    }).start(onClose);
   }
+  // The pan responder is built once, so it reaches handleClose through a ref
+  // rather than closing over the first render's copy.
+  closeRef.current = handleClose;
 
   const selectedIsLocked = !isPro && !!MODES.find((m) => m.id === selectedMode)?.pro;
 
   function handleStartDrive() {
+    // Strict rule: no playlist, no drive. Starting anyway used to inherit
+    // whatever Spotify was already playing, which made stations feel broken.
+    // Instead the button routes straight into the playlist picker.
+    if (needsPlaylist) {
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setShowPicker(true);
+      return;
+    }
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     // Locked mode selected? Launch it anyway as a free preview.
     onStartDrive(selectedMode, selectedIsLocked);
@@ -117,16 +166,31 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   // The sheet's accent follows the station's own mood (its mid EQ colour —
   // the same hue the Tuner and cards use), not the app's fixed violet, so the
   // Visual Mode chips and Start Drive button match the station you're opening.
-  const stationAccent = (station as Station).eqColors?.[1] ?? theme.accentColor;
+  // A station the user made stores its chosen colour on `color` and reaches
+  // this sheet RAW — customToStation (which fills in eqColors) only runs when
+  // a mode resolves it. Without the `color` fallback every custom station's
+  // chips and Start Drive button came out the app's default violet instead of
+  // the colour the user picked.
+  const stationAccent =
+    (station as Station).eqColors?.[1]
+    ?? (station as CustomStation).color
+    ?? theme.accentColor;
 
   const topPad = insets.top + 12;
   const isCustom = !station.image;
   const custom = isCustom ? (station as CustomStation) : null;
-  const needsPlaylist = isCustom && !linked;
+  // Every station — built-in or custom — needs its own playlist before a
+  // drive makes sound. The glowing playlist button + quiet Start Drive make
+  // that the obvious first step. Spotify people only: YouTube Music / Apple
+  // Music / other listeners run music in their own app, so Cruise FM is the
+  // visual companion and Start Drive always proceeds.
+  const needsPlaylist = !linked && spotifyPlatform;
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-      <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={() => handleClose()}>
+      <Animated.View
+        style={[styles.root, { transform: [{ translateX: slideX }, { translateY: slideY }] }]}
+        {...dismissPan.panHandlers}>
 
         {/* Full-bleed blurred station background — motion is a Premium unlock */}
         <StationBackdrop station={station as Station} blurRadius={1.5} motionAllowed={isPro && !dataSaver} />
@@ -148,6 +212,13 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
         <View style={[styles.dragPill, { top: topPad - 8 }]}>
           <View style={styles.pillBar} />
         </View>
+
+        {/* Now that the page slides in from the right it needs the control that
+            goes with that: a back arrow where every pushed page keeps one. The
+            sheet had no visible way out at all before — only the gesture. */}
+        <Pressable style={[styles.backBtn, { top: topPad }]} onPress={() => handleClose()} hitSlop={14}>
+          <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.92)" />
+        </Pressable>
 
         {/* Custom stations: their icon becomes the hero, glowing in their colour */}
         {custom && (
@@ -282,13 +353,24 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.startGradient}>
               <Text style={styles.startBtnText}>
-                {selectedIsLocked ? `Preview ${MODES.find((m) => m.id === selectedMode)?.label}` : 'Start Drive'}
+                {needsPlaylist
+                  ? 'Add a Playlist to Start'
+                  : selectedIsLocked
+                    ? `Preview ${MODES.find((m) => m.id === selectedMode)?.label}`
+                    : 'Start Drive'}
               </Text>
-              <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.9)" />
+              <Ionicons name={needsPlaylist ? 'musical-notes' : 'arrow-forward'} size={18} color="rgba(255,255,255,0.9)" />
             </LinearGradient>
           </Pressable>
 
         </ScrollView>
+
+        {linkToast && (
+          <View style={[styles.linkToast, { bottom: insets.bottom + 24 }]} pointerEvents="none">
+            <MaterialCommunityIcons name="check-circle" size={16} color={SPOTIFY_GREEN} />
+            <Text style={styles.linkToastText} numberOfLines={1}>{linkToast}</Text>
+          </View>
+        )}
 
         {showPicker && (
           <PlaylistSheet
@@ -296,9 +378,18 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
             current={linked}
             onClose={() => setShowPicker(false)}
             onPick={async (pl) => {
+              const changed = linked?.uri !== pl.uri;
               await setStationPlaylist(station.id, pl);
               setLinked(pl);
               setShowPicker(false);
+              if (changed) {
+                if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                // If this station is the drive playing right now, switch to it
+                // live; otherwise it's queued for the next Start Drive.
+                relinkStationPlaylist(station.id);
+                setLinkToast(`Playlist set: ${pl.name}`);
+                setTimeout(() => setLinkToast(null), 2600);
+              }
             }}
           />
         )}
@@ -325,8 +416,16 @@ const styles = StyleSheet.create({
     borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1,
   },
   mineBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 2 },
-  menuBtn: {
+  backBtn: {
     position: 'absolute', left: 20, zIndex: 10,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+  },
+  // Right-hand side: the left slot belongs to the back button now.
+  menuBtn: {
+    position: 'absolute', right: 20, zIndex: 10,
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center', justifyContent: 'center',
@@ -334,7 +433,7 @@ const styles = StyleSheet.create({
   },
   menuBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 19 },
   menuSheet: {
-    position: 'absolute', left: 20, zIndex: 20,
+    position: 'absolute', right: 20, zIndex: 20,
     minWidth: 190, borderRadius: 14, paddingVertical: 4,
     backgroundColor: 'rgba(16,16,30,0.97)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
@@ -351,6 +450,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 16, elevation: 10,
   },
   startBtnQuiet: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' },
+  linkToast: {
+    position: 'absolute', alignSelf: 'center', zIndex: 30,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    maxWidth: '86%',
+    backgroundColor: 'rgba(16,16,26,0.96)',
+    borderRadius: 999, paddingVertical: 11, paddingHorizontal: 18,
+    borderWidth: 1, borderColor: 'rgba(29,185,84,0.5)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 12,
+  },
+  linkToastText: { color: '#fff', fontSize: 13.5, fontWeight: '600', flexShrink: 1 },
 
   stationName: {
     color: '#fff', fontSize: 40, fontWeight: '800',

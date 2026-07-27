@@ -1,19 +1,20 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 
+import { ConnectSpotifyCard } from '@/components/ConnectSpotifyCard';
+import { SpotifyNudgeCard } from '@/components/SpotifyNudgeCard';
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
 import { HeroCard } from '@/components/HeroCard';
 import { StationCard } from '@/components/StationCard';
 import { StationDetailModal } from '@/components/StationDetailModal';
+import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
 import { RECOMMENDED_IDS, STATIONS, type Station } from '@/constants/stations';
-import { getPlatformSkipped } from '@/utils/musicPlatform';
 import {
   loadLastCruise,
   saveLastCruise,
@@ -21,6 +22,7 @@ import {
   type LastCruise,
 } from '@/utils/lastCruise';
 import { recordDriveStart } from '@/utils/driveStats';
+import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { loadCustomStations, resolveAnyStation } from '@/utils/customStations';
 import { DEFAULT_DRIVER_NAME, getDriverName } from '@/utils/driverName';
 
@@ -41,24 +43,10 @@ function stationById(id: string): Station {
   return resolveAnyStation(id);
 }
 
-function SkipBanner({ onDismiss }: { onDismiss: () => void }) {
-  return (
-    <View style={styles.banner}>
-      <Ionicons name="musical-notes" size={16} color="rgba(255,255,255,0.75)" />
-      <Text style={styles.bannerText}>Connect your music platform in Profile settings</Text>
-      <Pressable onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Ionicons name="close" size={16} color="rgba(255,255,255,0.4)" />
-      </Pressable>
-    </View>
-  );
-}
-
-
 export default function CruiseScreen() {
   const insets = useSafeAreaInsets();
   const np = useNowPlaying();
   const { isPro } = useEntitlements();
-  const [showBanner, setShowBanner] = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   // One smart hero: it becomes your last cruise if you have one, otherwise
   // tonight's time-of-day pick. Scene, cue and button all track it.
@@ -67,28 +55,37 @@ export default function CruiseScreen() {
   const [statsKey, setStatsKey] = useState(0);
   const [driverName, setDriverName] = useState(DEFAULT_DRIVER_NAME);
 
-  useEffect(() => {
-    getPlatformSkipped().then((skipped) => { if (skipped) setShowBanner(true); });
-  }, []);
-
   // Refresh on every focus — the name, time of day, last cruise and stats move on.
+  const [focused, setFocused] = useState(false);
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      setFocused(true);
       setTonightPick(stationById(defaultStationForNow()));
       setStatsKey((k) => k + 1);
       getDriverName().then((n) => { if (active) setDriverName(n); });
       loadCustomStations().then(() => loadLastCruise()).then((last) => { if (active) setLastCruise(last); });
-      return () => { active = false; };
+      return () => { active = false; setFocused(false); };
     }, []),
   );
 
+  // Light Spotify pulse-check (slow poll, only while this tab is focused) so
+  // the header equalizer wakes up when music is playing — even before any
+  // Cruise drive has started.
+  const spotify = useSpotifyPlayback(focused, { pollMs: 15000 });
+
   async function launchCruise(cruise: LastCruise) {
-    await saveLastCruise(cruise);
-    setLastCruise(cruise);
-    recordDriveStart(cruise.stationId);
+    // A free user resuming a saved premium-mode drive only gets a taste — it
+    // shouldn't count as a drive or re-save the cruise. (The player enforces
+    // the preview clock either way; this keeps the stats honest too.)
+    const preview = !isPro && isProMode(cruise.mode);
+    if (!preview) {
+      await saveLastCruise(cruise);
+      setLastCruise(cruise);
+      recordDriveStart(cruise.stationId);
+    }
     // np.open also kicks Spotify toward the station's linked playlist.
-    np.open(cruise.mode, cruise.stationId);
+    np.open(cruise.mode, cruise.stationId, { preview });
   }
 
   const heroCruise: LastCruise = lastCruise ?? { stationId: tonightPick.id, mode: 'equalizer' };
@@ -111,10 +108,11 @@ export default function CruiseScreen() {
         showsVerticalScrollIndicator={false}>
         <EqualizerHeader
           stationName={nowStation.name}
-          live={!!np.session}
+          live={!!np.session || !!spotify.track?.isPlaying}
           accent={nowStation.eqColors?.[1]}
         />
-        {showBanner && <SkipBanner onDismiss={() => setShowBanner(false)} />}
+        <ConnectSpotifyCard />
+        <SpotifyNudgeCard />
         <Text style={styles.greeting}>Welcome back, {driverName}</Text>
         <HeroCard
           onStartDrive={handleStartDrive}

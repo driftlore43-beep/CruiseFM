@@ -18,6 +18,8 @@ import { SettingsSheet, type SettingsPage } from '@/components/SettingsSheet';
 import { GlossSheen } from '@/components/GlossSheen';
 import { getDriveLog, getDriveStats } from '@/utils/driveStats';
 import { judgeBadges, type JudgedBadge } from '@/constants/badges';
+import { isFounder } from '@/utils/founder';
+import { appVersionLabel } from '@/utils/appVersion';
 import { DEFAULT_DRIVER_NAME, getDriverName, initialsFor } from '@/utils/driverName';
 
 function stationName(id: string | null): string {
@@ -104,7 +106,7 @@ function useMusicPlatformInfo() {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { dataSaver, setDataSaver } = useMotion();
+  const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere } = useMotion();
   const { devFreePreview, setDevFreePreview } = useEntitlements();
   const { name: platformName, color: platformColor, refresh: refreshPlatform } = useMusicPlatformInfo();
   const [selectorVisible, setSelectorVisible] = useState(false);
@@ -119,13 +121,17 @@ export default function ProfileScreen() {
       let active = true;
       getDriveStats().then((s) => { if (active) setStats(s); });
       getDriverName().then((n) => { if (active) setDriverNameState(n); });
-      getDriveLog().then((log) => { if (active) setBadges(judgeBadges(log)); });
+      Promise.all([getDriveLog(), isFounder()]).then(([log, founder]) => {
+        if (active) setBadges(judgeBadges(log, { founder }));
+      });
       return () => { active = false; };
     }, []),
   );
 
   const earnedCount = badges.filter((b) => b.earned).length;
-  const judgeable = badges.filter((b) => !b.reserved).length;
+  // Reserved badges only join the denominator once actually granted, so the
+  // count never reads "12 of 11".
+  const judgeable = badges.filter((b) => !b.reserved || b.earned).length;
 
   const STATS: { label: string; value: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
     { label: 'Total Drives',     value: String(stats?.totalDrives ?? 0),        icon: 'steering' },
@@ -270,7 +276,7 @@ export default function ProfileScreen() {
           <View style={[styles.settingsRow, styles.settingsBorder]}>
             <View style={styles.platformRowLeft}>
               <IconChip icon="motion-play-outline" size={34} />
-              <View>
+              <View style={styles.settingsTextBlock}>
                 <Text style={styles.settingsLabel}>Data Saver</Text>
                 <Text style={styles.dataSaverSub}>Still backgrounds · less battery & data</Text>
               </View>
@@ -285,13 +291,73 @@ export default function ProfileScreen() {
             />
           </View>
 
+          {/* Auto-dim toggle — head-unit style screen dimming mid-drive */}
+          <View style={[styles.settingsRow, styles.settingsBorder]}>
+            <View style={styles.platformRowLeft}>
+              <IconChip icon="brightness-6" size={34} />
+              <View style={styles.settingsTextBlock}>
+                <Text style={styles.settingsLabel}>Auto-dim while driving</Text>
+                <Text style={styles.dataSaverSub}>Screen eases down after 30s untouched · tap to wake · big battery saver</Text>
+              </View>
+            </View>
+            <Switch
+              value={autoDim}
+              onValueChange={setAutoDim}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              thumbColor="#fff"
+              ios_backgroundColor="rgba(255,255,255,0.18)"
+              {...({ activeThumbColor: '#fff' } as object)}
+            />
+          </View>
+
+          {/* Atmosphere toggle — the smoke-machine haze in every mode */}
+          <View style={[styles.settingsRow, styles.settingsBorder]}>
+            <View style={styles.platformRowLeft}>
+              <IconChip icon="weather-fog" size={34} />
+              <View style={styles.settingsTextBlock}>
+                <Text style={styles.settingsLabel}>Atmosphere</Text>
+                <Text style={styles.dataSaverSub}>Smoke-machine haze pulsing with the music · off = clean scene</Text>
+              </View>
+            </View>
+            <Switch
+              value={atmosphere}
+              onValueChange={setAtmosphere}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              thumbColor="#fff"
+              ios_backgroundColor="rgba(255,255,255,0.18)"
+              {...({ activeThumbColor: '#fff' } as object)}
+            />
+          </View>
+
+          {/* Softer Atmosphere — sits directly under the Atmosphere toggle it
+              modifies, and hides entirely when the haze is off. */}
+          {atmosphere && (
+          <View style={[styles.settingsRow, styles.settingsBorder]}>
+            <View style={styles.platformRowLeft}>
+              <IconChip icon="blur" size={34} />
+              <View style={styles.settingsTextBlock}>
+                <Text style={styles.settingsLabel}>Softer Atmosphere</Text>
+                <Text style={styles.dataSaverSub}>Half-strength haze · off = the full smoke machine</Text>
+              </View>
+            </View>
+            <Switch
+              value={softAtmosphere}
+              onValueChange={setSoftAtmosphere}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              thumbColor="#fff"
+              ios_backgroundColor="rgba(255,255,255,0.18)"
+              {...({ activeThumbColor: '#fff' } as object)}
+            />
+          </View>
+          )}
+
           {/* Music Platform row */}
           <Pressable
             style={[styles.settingsRow, styles.settingsBorder]}
             onPress={handlePlatformRowPress}>
             <View style={styles.platformRowLeft}>
               <IconChip icon="music-box-multiple-outline" size={34} />
-              <View>
+              <View style={styles.settingsTextBlock}>
                 <Text style={styles.settingsLabel}>Music Platform</Text>
                 {platformName && (
                   <View style={styles.platformRowMeta}>
@@ -346,6 +412,8 @@ export default function ProfileScreen() {
             </Pressable>
           ))}
         </View>
+
+        <Text style={styles.versionText}>{appVersionLabel()}</Text>
 
       </ScrollView>
 
@@ -489,18 +557,21 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(155,95,255,0.35)',
     shadowColor: Cruise.violet, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
   },
-  settingsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13 },
+  settingsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 14 },
   settingsBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.10)' },
   settingsLabel: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
   settingsArrow: { color: 'rgba(255,255,255,0.5)', fontSize: 20 },
-  platformRowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  platformRowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
   platformRowMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   platformDotSmall: {
     width: 7, height: 7, borderRadius: 4,
     shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.85, shadowRadius: 4, elevation: 2,
   },
   platformRowName: { color: Cruise.textSecondary, fontSize: 12, fontWeight: '500' },
-  dataSaverSub: { color: Cruise.textSecondary, fontSize: 11.5, marginTop: 2 },
+  // flex:1 is load-bearing — without it a long subtitle keeps its natural
+  // width and runs underneath the switch instead of wrapping short of it.
+  settingsTextBlock: { flex: 1 },
+  dataSaverSub: { color: Cruise.textSecondary, fontSize: 11.5, marginTop: 3, lineHeight: 16 },
   themeRowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   themeColorDot: {
     width: 10, height: 10, borderRadius: 5, marginRight: 4,
@@ -511,4 +582,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   proBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  versionText: {
+    color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '600',
+    textAlign: 'center', letterSpacing: 0.3, marginTop: 4,
+  },
 });

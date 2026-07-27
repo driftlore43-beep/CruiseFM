@@ -14,6 +14,14 @@ import { PREMIUM_ENTITLEMENT, REVENUECAT_API_KEY } from '@/constants/config';
 let Purchases: any = null;
 let configured = false;
 
+// RevenueCat's sandbox "Test Store" keys (test_…) are only permitted in debug
+// builds. In a release build (preview/production), calling configure() with a
+// test key makes the SDK pop a "Wrong API Key" dialog and force-close the app
+// to protect test purchases — and it does so at the native layer, so a JS
+// try/catch can't stop it. Detect that combination and simply skip billing
+// until a real platform key (goog_…/appl_…) is in place.
+const IS_TEST_KEY = REVENUECAT_API_KEY.startsWith('test_');
+
 function sdk(): any | null {
   if (Platform.OS === 'web') return null;
   if (Purchases) return Purchases;
@@ -30,6 +38,10 @@ function sdk(): any | null {
 export function initPurchases(): void {
   const P = sdk();
   if (!P || configured) return;
+  // A test key in a release build would force-close the app (see note above),
+  // so leave billing unconfigured. Free tier + OWNER_MODE bypass still work;
+  // there just aren't any live purchases until the real key ships.
+  if (IS_TEST_KEY && !__DEV__) return;
   try {
     P.configure({ apiKey: REVENUECAT_API_KEY });
     configured = true;

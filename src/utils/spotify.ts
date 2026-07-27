@@ -283,6 +283,37 @@ export async function getPlaybackState() {
   return spotifyFetch('/me/player');
 }
 
+// Playlist names by id — tiny session cache so the "playing from" pill can
+// name the playlist actually feeding the music without a fetch per poll.
+const playlistNameCache: Record<string, string> = {};
+const PROFILE_NAME_KEY = 'cruise_spotify_display_name';
+let profileNameCache: string | null = null;
+
+/** The listener's Spotify display name, for the share card's "X is listening
+ *  on …" line. Cached in memory and on disk — it never changes mid-drive, and
+ *  the card must not wait on a network round trip to render. Returns null when
+ *  Spotify isn't connected, and callers fall back to a name-free line. */
+export async function getProfileName(): Promise<string | null> {
+  if (profileNameCache) return profileNameCache;
+  const stored = await AsyncStorage.getItem(PROFILE_NAME_KEY);
+  if (stored) { profileNameCache = stored; return stored; }
+  const data = await spotifyFetch('/me');
+  const name: string | null = data?.display_name ?? null;
+  if (name) {
+    profileNameCache = name;
+    AsyncStorage.setItem(PROFILE_NAME_KEY, name).catch(() => {});
+  }
+  return name;
+}
+
+export async function getPlaylistName(playlistId: string): Promise<string | null> {
+  if (playlistNameCache[playlistId]) return playlistNameCache[playlistId];
+  const data = await spotifyFetch(`/playlists/${playlistId}?fields=name`);
+  const name = data?.name ?? null;
+  if (name) playlistNameCache[playlistId] = name;
+  return name;
+}
+
 export async function play(contextUri?: string) {
   return spotifyFetch('/me/player/play', 'PUT', contextUri ? { context_uri: contextUri } : undefined);
 }
@@ -300,6 +331,7 @@ export type StartResult =
   | 'premium-required'
   | 'restricted'      // account not on the dev-mode allowlist
   | 'handoff'         // playlist handed to the Spotify app (set by the caller)
+  | 'no-playlist'     // station has no linked playlist — nothing to play (set by the caller)
   | 'error';
 
 /**
@@ -377,6 +409,14 @@ export async function pause() {
 
 export async function seekTo(positionMs: number) {
   return spotifyFetch(`/me/player/seek?position_ms=${Math.max(0, Math.round(positionMs))}`, 'PUT');
+}
+
+export async function setShuffle(state: boolean) {
+  return spotifyFetch(`/me/player/shuffle?state=${state ? 'true' : 'false'}`, 'PUT');
+}
+
+export async function setRepeat(state: 'off' | 'context' | 'track') {
+  return spotifyFetch(`/me/player/repeat?state=${state}`, 'PUT');
 }
 
 export async function skipNext() {

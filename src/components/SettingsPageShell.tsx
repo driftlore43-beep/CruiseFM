@@ -1,9 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { Animated, Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Cruise } from '@/constants/theme';
+
+const SCREEN_W = Dimensions.get('window').width;
 
 export function SettingsPageShell({
   title, onBack, children,
@@ -14,8 +17,48 @@ export function SettingsPageShell({
 }) {
   const insets = useSafeAreaInsets();
 
+  // Settings live in a modal, so the iOS edge-swipe-back doesn't exist here —
+  // recreate it. Move-based claiming loses to the native ScrollView on iOS
+  // (the same lesson as the Tuner dial), so a swipe STARTING at the left edge
+  // is claimed outright in the capture phase — the ScrollView never sees it —
+  // while swipes elsewhere still get the move-based fallback when available.
+  // onBack changes as sub-pages open, so the once-created responder reads it
+  // through a ref.
+  const slideX = useRef(new Animated.Value(0)).current;
+  const onBackRef = useRef(onBack);
+  onBackRef.current = onBack;
+  const EDGE = 44;
+  const backPan = useRef(
+    PanResponder.create({
+      // Claim in the CAPTURE phase — but only once a rightward drag from the
+      // left edge is confirmed (g.x0 = where the touch started). Claiming on
+      // touch-start would also swallow TAPS at the edge and kill the back
+      // button; claiming on confirmed movement lets taps through while still
+      // beating the ScrollView to the gesture.
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: (_, g) =>
+        g.x0 < EDGE && g.dx > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
+      onMoveShouldSetPanResponder: (_, g) => g.dx > 14 && Math.abs(g.dx) > Math.abs(g.dy) * 1.6,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, g) => { if (g.dx > 0) slideX.setValue(g.dx); },
+      onPanResponderRelease: (_, g) => {
+        if (g.dx > 70 || g.vx > 0.5) {
+          Animated.timing(slideX, { toValue: SCREEN_W, duration: 180, useNativeDriver: true }).start(() => {
+            slideX.setValue(0);
+            onBackRef.current();
+          });
+        } else {
+          Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
+      },
+    })
+  ).current;
+
   return (
-    <View style={styles.root}>
+    <Animated.View style={[styles.root, { transform: [{ translateX: slideX }] }]} {...backPan.panHandlers}>
       <LinearGradient
         colors={[Cruise.deepNavy, Cruise.charcoal, '#08080f']}
         start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
@@ -36,7 +79,7 @@ export function SettingsPageShell({
           {children}
         </ScrollView>
       </SafeAreaView>
-    </View>
+    </Animated.View>
   );
 }
 

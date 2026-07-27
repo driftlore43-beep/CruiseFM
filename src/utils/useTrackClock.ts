@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 
+import { seekTo } from './spotify';
 import type { NowPlaying } from './useSpotifyPlayback';
+
+/** Drag-to-seek hooks a progress bar can call: freeze on grab, follow the
+ * finger, then seek the real song (and restart the clock) on release. */
+export type ScrubApi = {
+  begin: () => void;
+  move: (pct: number) => void;
+  end: (pct: number) => void;
+};
 
 /**
  * The shared progress clock behind every mode's progress bar.
@@ -59,6 +68,25 @@ export function useTrackClock(opts: {
     });
   };
 
+  const trackRef = useRef(track);
+  useEffect(() => { trackRef.current = track; }, [track]);
+
+  // Stable ref object: every captured function only touches refs, so the
+  // first-render closures stay correct for the component's whole life.
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+  const scrub = useRef<ScrubApi>({
+    begin: () => { anim.current?.stop(); },
+    move: (pct: number) => { progress.setValue(clamp01(pct)); },
+    end: (pct: number) => {
+      const p = clamp01(pct);
+      const ms = p * durationRef.current;
+      // Real song → actually seek Spotify; demo bar just moves.
+      if (trackRef.current?.durationMs != null) seekTo(ms).catch(() => {});
+      if (playingRef.current) startFrom(ms);
+      else progress.setValue(p);
+    },
+  }).current;
+
   useEffect(() => {
     if (!visible) { anim.current?.stop(); return; }
     if (track?.progressMs != null) {
@@ -80,5 +108,5 @@ export function useTrackClock(opts: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, playing, track?.progressMs, track?.syncedAt, track?.title, durationMs]);
 
-  return { progress, elapsedMs, durationMs };
+  return { progress, elapsedMs, durationMs, scrub };
 }

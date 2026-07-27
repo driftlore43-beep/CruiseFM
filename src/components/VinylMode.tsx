@@ -2,9 +2,9 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Svg, { Circle as SvgCircle, Path } from 'react-native-svg';
+import Svg, { Circle as SvgCircle, G, Path, Rect as SvgRect } from 'react-native-svg';
 import {
-  Animated, Dimensions, Easing, Modal, PanResponder, ScrollView, StyleSheet,
+  Animated, Dimensions, Easing, Image, Modal, PanResponder, ScrollView, StyleSheet,
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,9 +19,17 @@ import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { seekTo } from '@/utils/spotify';
 import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { PreviewGate } from '@/components/PreviewGate';
+import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
+import { AmbientGlow } from '@/components/AmbientGlow';
+import { ModeActionRow } from '@/components/ModeActionRow';
+import { ModeCloseButton } from '@/components/ModeCloseButton';
+import { MarqueeText } from '@/components/MarqueeText';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { MoodSheet } from '@/components/MoodSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
+import { useAppActive } from '@/utils/useAppActive';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -63,7 +71,7 @@ const VINYL_ACCENTS: Record<string, string> = {
   'mountain-pass':  '#FFFFFF', // crisp white
   'cars-coffee':    '#8B5A2B', // coffee brown
   'night-run':      '#2B4CFF', // deep blue
-  'coastal':        '#7CD4FF', // light sky blue
+  'coastal':        '#FF7A3C', // golden-hour orange (matches the warm moods)
 };
 
 /** '#RRGGBB' → 'rgba(r,g,b,a)' — for animated colour interpolation. */
@@ -109,7 +117,8 @@ function SparkleField({ size }: { size: number }) {
 
 // ── Vinyl disc — clean bold design ───────────────────────────────────────────
 function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: number; spin: Animated.AnimatedInterpolation<string>; accent?: string; showLabel?: boolean }) {
-  const cSize = Math.min(80, size * 0.30);
+  // A touch over true-to-life (real label ≈ 33%) — matches the fullscreen deck.
+  const cSize = Math.min(135, size * 0.40);
   const cR    = cSize / 2;
 
   const cx = size / 2;
@@ -148,12 +157,19 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
           {[0.56, 0.62, 0.68, 0.73, 0.78, 0.86, 0.90].map((f, i) => (
             <SvgCircle key={i} cx={cx} cy={cx} r={r * f} fill="none" stroke={accent} strokeOpacity={i % 2 ? 0.24 : 0.14} strokeWidth={0.8} />
           ))}
-          {/* Faint pressing marks — the surface itself, so the spin still
-              reads as the disc turns beneath the stationary light */}
-          <Path d={`M ${pt(37, r * 0.55)} L ${pt(37, r * 0.94)}`} stroke="rgba(255,255,255,0.10)" strokeWidth={1} strokeLinecap="round" />
-          <Path d={`M ${pt(203, r * 0.60)} L ${pt(203, r * 0.88)}`} stroke="rgba(255,255,255,0.07)" strokeWidth={0.8} strokeLinecap="round" />
-          <SvgCircle cx={cx + r * 0.42} cy={cx - r * 0.31} r={1.4} fill="rgba(255,255,255,0.22)" />
-          <SvgCircle cx={cx - r * 0.58} cy={cx + r * 0.22} r={1.1} fill="rgba(255,255,255,0.16)" />
+          {/* Pressing marks — asymmetric surface texture, brighter than the
+              grooves, so the spin reads at a glance instead of only the
+              label appearing to turn */}
+          <Path d={`M ${pt(37, r * 0.50)} L ${pt(37, r * 0.95)}`} stroke="rgba(255,255,255,0.20)" strokeWidth={1.3} strokeLinecap="round" />
+          <Path d={`M ${pt(203, r * 0.58)} L ${pt(203, r * 0.90)}`} stroke="rgba(255,255,255,0.14)" strokeWidth={1} strokeLinecap="round" />
+          <Path d={`M ${pt(130, r * 0.44)} L ${pt(130, r * 0.70)}`} stroke="rgba(255,255,255,0.12)" strokeWidth={0.8} strokeLinecap="round" />
+          <Path d={`M ${pt(305, r * 0.62)} L ${pt(305, r * 0.85)}`} stroke="rgba(255,255,255,0.10)" strokeWidth={0.8} strokeLinecap="round" />
+          <SvgCircle cx={cx + r * 0.42} cy={cx - r * 0.31} r={1.6} fill="rgba(255,255,255,0.32)" />
+          <SvgCircle cx={cx - r * 0.58} cy={cx + r * 0.22} r={1.3} fill="rgba(255,255,255,0.24)" />
+          <SvgCircle cx={cx - r * 0.20} cy={cx - r * 0.66} r={1} fill="rgba(255,255,255,0.20)" />
+          <SvgCircle cx={cx + r * 0.66} cy={cx + r * 0.14} r={0.9} fill="rgba(255,255,255,0.18)" />
+          <SvgCircle cx={cx + r * 0.10} cy={cx + r * 0.72} r={1.1} fill="rgba(0,0,0,0.18)" />
+          <SvgCircle cx={cx - r * 0.48} cy={cx - r * 0.48} r={0.9} fill="rgba(0,0,0,0.14)" />
         </Svg>
         {/* Center label — rendered inside disc when showLabel=true (preview card) */}
         {showLabel && (
@@ -193,35 +209,30 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
 
 // ── Tonearm (shared between preview and fullscreen) ───────────────────────────
 function Tonearm({
-  armLen, armW, headW, headH, pivotX, pivotY, rotation, color = '#222222',
+  armLen, armW, headW, headH, pivotX, pivotY, rotation,
 }: {
   armLen: number; armW: number; headW: number; headH: number;
   pivotX: number; pivotY: number;
   rotation: Animated.AnimatedInterpolation<string>;
-  /** Solid mood colour for the arm + headshell. */
-  color?: string;
 }) {
-  const cwW = Math.max(16, armW * 2.2);
-  const cwH = Math.max(10, armW * 1.4);
+  // Hardware is silver/graphite regardless of mood — reads as real hi-fi kit.
+  const cwW = Math.max(16, armW * 2.6);
+  const cwH = Math.max(10, armW * 1.6);
+  // Faint-J geometry: straight shaft, one gentle hook in to the groove.
+  const BEND  = Math.min(17, armLen * 0.08);
+  const svgW  = headW + BEND * 2 + 28;
+  const scx   = svgW / 2;
+  const ex    = scx - BEND;
+  const TOP   = cwH + 8;               // headroom for the counterweight
+  const eyy   = TOP + armLen * 0.90;
+  const svgH  = TOP + armLen + headH + 16;
+  const armPath = `M ${scx} ${TOP + 8} L ${scx} ${TOP + armLen * 0.58} C ${scx} ${TOP + armLen * 0.76}, ${ex} ${TOP + armLen * 0.72}, ${ex} ${eyy}`;
+  const innerW  = Math.max(1, armW * 0.55);
+  const screwR  = Math.max(1, headW * 0.08);
+  const bandH   = Math.max(2.5, headH * 0.2);
   return (
     <View pointerEvents="none" style={{ position: 'absolute', top: pivotY, left: pivotX - armW / 2 }}>
-      {/* Drop shadow — slightly offset clone of arm behind the real arm */}
-      <Animated.View style={{
-        position: 'absolute',
-        width: armW, height: armLen,
-        top: 5, left: 3,
-        opacity: 0.45,
-        transform: [
-          { translateY: -(armLen / 2) },
-          { rotate: rotation },
-          { translateY: armLen / 2 },
-        ],
-      }}>
-        <View style={{ position: 'absolute', top: 0, left: 0, width: armW, height: armLen - headH + 4, backgroundColor: '#000', borderRadius: 3 }} />
-        <View style={{ position: 'absolute', bottom: -4, left: -(headW / 2 - armW / 2), width: headW + 2, height: headH + 2, backgroundColor: '#000', borderRadius: 3 }} />
-      </Animated.View>
-
-      {/* Main arm */}
+      {/* Whole arm (shadow + shaft + headshell + counterweight) rotates about the pivot */}
       <Animated.View style={{
         width: armW, height: armLen,
         transform: [
@@ -230,50 +241,75 @@ function Tonearm({
           { translateY: armLen / 2 },
         ],
       }}>
-        {/* Counterweight — at back end of arm */}
-        <View style={{
-          position: 'absolute',
-          top: -cwH / 2 - 2,
-          left: -(cwW / 2 - armW / 2),
-          width: cwW, height: cwH,
-          backgroundColor: '#1e1e1e',
-          borderRadius: 4,
-          borderWidth: 1, borderColor: '#3a3a3a',
-        }} />
-        {/* Arm body — solid mood colour */}
-        <View style={{ position: 'absolute', top: 0, left: 0, width: armW, height: armLen - headH, backgroundColor: color, borderRadius: 3 }} />
-        {/* Highlight stripe */}
-        <View style={{ position: 'absolute', top: 8, left: 1.5, width: 1.5, height: armLen - headH - 16, backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 1 }} />
-        {/* Headshell — wide flat block, mood colour */}
-        <View style={{
-          position: 'absolute', bottom: 0,
-          left: -(headW / 2 - armW / 2),
-          width: headW, height: headH,
-          backgroundColor: color,
-          borderRadius: 3,
-          borderWidth: 1, borderColor: 'rgba(0,0,0,0.35)',
-        }}>
-          <View style={{ position: 'absolute', top: 3, left: 3, right: 3, height: headH - 10, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 2 }} />
-          {/* Stylus shank */}
-          <View style={{ position: 'absolute', bottom: -6, left: headW / 2 - 1.5, width: 3, height: 7, backgroundColor: '#CCC', borderRadius: 1 }} />
-          {/* Needle bright tip */}
-          <View style={{ position: 'absolute', bottom: -11, left: headW / 2 - 1, width: 2, height: 5, backgroundColor: '#FFF', borderRadius: 1 }} />
-        </View>
+        <Svg
+          width={svgW} height={svgH}
+          style={{ position: 'absolute', top: -(TOP + 8), left: armW / 2 - scx }}
+        >
+          {/* Drop shadow — offset dark clone of shaft and headshell */}
+          <G transform="translate(3,5)" opacity={0.4}>
+            <Path d={armPath} stroke="#000" strokeWidth={armW} fill="none" strokeLinecap="round" />
+            <G transform={`rotate(-18 ${ex} ${eyy})`}>
+              <SvgRect x={ex - headW / 2} y={eyy - 2} width={headW} height={headH} rx={3.5} fill="#000" />
+            </G>
+          </G>
+          {/* Counterweight — knurled cylinder behind the pivot */}
+          <SvgRect x={scx - cwW / 2} y={2} width={cwW} height={cwH} rx={cwH * 0.3} fill="#202024" stroke="#3a3a40" strokeWidth={1} />
+          <SvgRect x={scx - cwW / 2} y={2 + cwH * 0.42} width={cwW} height={cwH * 0.2} fill="#4a4a52" />
+          {[-0.32, -0.11, 0.11, 0.32].map((f, i) => (
+            <Path key={i} d={`M ${scx + cwW * f} 2 V ${2 + cwH}`} stroke="#333338" strokeWidth={1.3} />
+          ))}
+          {/* Shaft — brushed silver: dark edge, bright core, hot stripe */}
+          <Path d={armPath} stroke="#84848E" strokeWidth={armW} fill="none" strokeLinecap="round" />
+          <Path d={armPath} stroke="#E8E8EE" strokeWidth={innerW} fill="none" strokeLinecap="round" />
+          <Path d={armPath} stroke="rgba(255,255,255,0.85)" strokeWidth={Math.max(1, armW * 0.16)} fill="none" strokeLinecap="round" transform="translate(-1.5,0)" />
+          {/* Headshell — graphite cartridge: silver mount band, screws, vents, stylus */}
+          <G transform={`rotate(-18 ${ex} ${eyy})`}>
+            <SvgRect x={ex - headW / 2} y={eyy - 2} width={headW} height={headH} rx={3.5} fill="#26262c" stroke="#0e0e12" strokeWidth={1} />
+            <SvgRect x={ex - headW / 2} y={eyy - 2} width={headW} height={bandH * 1.4} rx={3} fill="#9C9CA6" />
+            <SvgCircle cx={ex - headW / 2 + headW * 0.24} cy={eyy + headH * 0.34} r={screwR} fill="#8A8A94" />
+            <SvgCircle cx={ex + headW / 2 - headW * 0.24} cy={eyy + headH * 0.34} r={screwR} fill="#8A8A94" />
+            <SvgRect x={ex - headW / 2 + headW * 0.18} y={eyy + headH * 0.48} width={headW * 0.64} height={bandH} rx={bandH / 2} fill="#111116" />
+            <SvgRect x={ex - headW / 2 + headW * 0.18} y={eyy + headH * 0.66} width={headW * 0.64} height={bandH} rx={bandH / 2} fill="#111116" />
+            <SvgRect x={ex - headW * 0.16} y={eyy + headH - 4} width={headW * 0.32} height={6} rx={1} fill="#B9B9C2" />
+            <Path d={`M ${ex} ${eyy + headH + 2} l ${headW * 0.11} ${headH * 0.2} l ${-headW * 0.22} 0 Z`} fill="#FFF" />
+          </G>
+        </Svg>
       </Animated.View>
 
-      {/* Pivot base — flat illustration style: grey circle with lighter center */}
-      <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: '#2a2a2a', borderWidth: 1, borderColor: '#444', top: -11, left: armW / 2 - 11, zIndex: 10,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.8, shadowRadius: 4, elevation: 6,
-      }} />
-      <View style={{ position: 'absolute', width: 12, height: 12, borderRadius: 6, backgroundColor: '#3e3e3e', top: -6, left: armW / 2 - 6, zIndex: 11 }} />
-      <View style={{ position: 'absolute', width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#585858', top: -2.5, left: armW / 2 - 2.5, zIndex: 12 }} />
+      {/* Pivot base — fixed round plate with screws, bearing and anti-skate
+          dial (does not swing with the arm) */}
+      {(() => {
+        const R = Math.max(11, armW * 1.7);
+        const dialR = Math.max(3.5, R * 0.32);
+        const bw = R * 2 + dialR * 2 + 8;
+        const bcx = R;
+        return (
+          <Svg
+            width={bw} height={R * 2 + 4}
+            style={{ position: 'absolute', top: -R, left: armW / 2 - R, zIndex: 10 }}
+            pointerEvents="none"
+          >
+            <SvgCircle cx={bcx} cy={R} r={R} fill="#232327" stroke="#3d3d44" strokeWidth={1.5} />
+            {[[-0.52, -0.42], [0.52, -0.42], [-0.52, 0.42], [0.52, 0.42]].map(([fx, fy], i) => (
+              <SvgCircle key={i} cx={bcx + R * fx} cy={R + R * fy} r={Math.max(1.2, R * 0.1)} fill="#6E6E78" />
+            ))}
+            {/* Anti-skate dial off the plate's shoulder */}
+            <SvgCircle cx={bcx + R + dialR + 2} cy={R + R * 0.24} r={dialR} fill="#33333a" stroke="#55555e" strokeWidth={1.2} />
+            <Path d={`M ${bcx + R + dialR + 2} ${R + R * 0.24 - dialR + 1.5} V ${R + R * 0.24}`} stroke="#9C9CA6" strokeWidth={1.3} />
+            {/* Bearing housing + spindle cap with a glint */}
+            <SvgCircle cx={bcx} cy={R} r={R * 0.5} fill="#2e2e34" stroke="#4a4a52" strokeWidth={1} />
+            <SvgCircle cx={bcx} cy={R} r={R * 0.24} fill="#55555e" />
+            <SvgCircle cx={bcx - R * 0.08} cy={R - R * 0.08} r={Math.max(1, R * 0.08)} fill="#8A8A94" />
+          </Svg>
+        );
+      })()}
     </View>
   );
 }
 
 // ── Fullscreen turntable hero ─────────────────────────────────────────────────
 function TurntableHero({
-  platSize, spin, tonearmAnim, glowOpacity, ringShimmer, raysSpin, labelRotate, playing, panHandlers, scrubbing, scrubDir, accent = V.gold, labelText = 'NIGHT RUN FM',
+  platSize, spin, tonearmAnim, glowOpacity, ringShimmer, raysSpin, labelRotate, playing, panHandlers, scrubbing, scrubDir, accent = V.gold, labelText = 'NIGHT RUN FM', albumArt = null, progressAnim,
 }: {
   platSize: number;
   spin: Animated.AnimatedInterpolation<string>;
@@ -286,21 +322,35 @@ function TurntableHero({
   panHandlers: any;
   scrubbing: boolean;
   scrubDir: 'fwd' | 'bwd' | null;
-  /** Station mood colour — rim, ring, rays, notes and tonearm all take it. */
+  /** Station mood colour — rim, ring, rays and notes all take it. */
   accent?: string;
+  /** Album cover URL — fills the centre label like a picture disc. */
+  albumArt?: string | null;
+  /** Track progress 0..1 — the arm creeps toward the label as the song plays. */
+  progressAnim?: Animated.Value;
   /** Station name printed on the red centre label. */
   labelText?: string;
 }) {
   const recSize  = platSize * 0.865;
   const armLen   = platSize * 0.70;
-  const armW     = 9;
-  const headW    = 18;
-  const headH    = 24;
+  const armW     = 10;
+  const headW    = 20;
+  const headH    = 26;
   const pivotX   = platSize * 0.935;
   const pivotY   = platSize * 0.048;
   // 0 = parked clear of the record (negative swings right, off the platter),
   // 1 = stylus resting on the outer groove (small positive).
-  const armRot   = tonearmAnim.interpolate({ inputRange: [0, 1], outputRange: ['-16deg', '4deg'] });
+  // Parked at -16°; the stylus drops onto the outer grooves (6°, clearly
+  // inside the rim — needles never sit on the edge), then creeps toward the
+  // label as the song progresses, exactly like a real pressing. The creep is
+  // gated by tonearmAnim so a parked arm never wanders.
+  const armAngle = Animated.add(
+    tonearmAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 6] }),
+    progressAnim
+      ? Animated.multiply(tonearmAnim, Animated.multiply(progressAnim, 5))
+      : new Animated.Value(0),
+  );
+  const armRot = armAngle.interpolate({ inputRange: [-16, 11], outputRange: ['-16deg', '11deg'] });
   const platOff  = (platSize - recSize) / 2;
   const rayLen   = recSize / 2;
   const rayPivot = recSize / 2 - rayLen / 2;
@@ -333,8 +383,10 @@ function TurntableHero({
           }} />
         ))}
       </Animated.View>
-      {/* Single thick pulsing mood ring — color interpolated, not opacity */}
-      <Animated.View style={{
+      {/* Single thick pulsing mood ring — color interpolated, not opacity.
+          pointerEvents none is LOAD-BEARING: this view covers the whole
+          record, and without it every tap/scrub on the vinyl died here. */}
+      <Animated.View pointerEvents="none" style={{
         position: 'absolute',
         width: recSize + 20, height: recSize + 20, borderRadius: (recSize + 20) / 2,
         borderWidth: 10,
@@ -346,28 +398,38 @@ function TurntableHero({
       }} />
       {/* Center label — independent spin, sits above the record */}
       {(() => {
-        const cSize = Math.min(80, recSize * 0.27);
+        // Well over true-to-life (real label ≈ 33%) — the album art is the
+        // star, give it the room (owner calls, 23–24.07).
+        const cSize = Math.min(170, recSize * 0.45);
         const cR    = cSize / 2;
         return (
           <Animated.View pointerEvents="none" style={{
             position: 'absolute',
             width: cSize, height: cSize, borderRadius: cR,
-            backgroundColor: '#8B0000', borderWidth: 1, borderColor: '#6B0000',
+            backgroundColor: '#8B0000', borderWidth: 1, borderColor: albumArt ? 'rgba(0,0,0,0.55)' : '#6B0000',
             alignItems: 'center', justifyContent: 'center',
             top: platSize / 2 - cR, left: platSize / 2 - cR,
             transform: [{ rotate: labelRotate }],
             overflow: 'hidden',
           }}>
-            <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 1.2 }}>COLUMBIA</Text>
-            <Text style={{ position: 'absolute', top: cR * 0.50, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: Math.max(8, cSize * 0.145), fontWeight: '800', letterSpacing: 0.4 }}>CRUISE FM</Text>
-            <Text style={{ position: 'absolute', top: cR * 1.22, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: Math.max(4, cSize * 0.075), letterSpacing: 0.4 }} numberOfLines={1}>{labelText}</Text>
-            <View style={{ position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', top: cR - 3, left: cR - 3 }} />
+            {albumArt ? (
+              // Album cover fills the label — picture-disc style, MD-free.
+              <Image source={{ uri: albumArt }} style={{ position: 'absolute', width: cSize, height: cSize }} resizeMode="cover" />
+            ) : (
+              <>
+                <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 1.2 }}>COLUMBIA</Text>
+                <Text style={{ position: 'absolute', top: cR * 0.50, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: Math.max(8, cSize * 0.145), fontWeight: '800', letterSpacing: 0.4 }}>CRUISE FM</Text>
+                <Text style={{ position: 'absolute', top: cR * 1.22, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: Math.max(4, cSize * 0.075), letterSpacing: 0.4 }} numberOfLines={1}>{labelText}</Text>
+              </>
+            )}
+            {/* Spindle hole stays on top of art and label alike */}
+            <View style={{ position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', top: cR - 3, left: cR - 3, borderWidth: 1, borderColor: 'rgba(0,0,0,0.4)' }} />
           </Animated.View>
         );
       })()}
       {/* Floating music notes */}
       <FloatingNotes playing={playing} emitter="ring" ringRadius={recSize / 2} scrubbing={scrubbing} scrubDir={scrubDir} color={accent} />
-      <Tonearm armLen={armLen} armW={armW} headW={headW} headH={headH} pivotX={pivotX} pivotY={pivotY} rotation={armRot} color={accent} />
+      <Tonearm armLen={armLen} armW={armW} headW={headW} headH={headH} pivotX={pivotX} pivotY={pivotY} rotation={armRot} />
     </View>
   );
 }
@@ -394,7 +456,7 @@ function ScrubProgressBar({ progress, isScrubbing, onLayout, panHandlers }: {
 
   return (
     <View
-      style={{ flex: 1, height: 36, justifyContent: 'center' }}
+      style={{ width: '100%', height: 36, justifyContent: 'center' }}
       onLayout={(e) => { setBarWidth(e.nativeEvent.layout.width); onLayout(e); }}
       {...panHandlers}
     >
@@ -464,8 +526,15 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
 
-  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const spotify = useSpotifyPlayback(visible);
+
+  // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
+  useEffect(() => {
+    if (!spotify.connected) return;
+    setShuffle(spotify.shuffleOn);
+    setRepeat(spotify.repeatMode !== 'off');
+  }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
   const [activeId,      setActiveId]      = useState(stationId ?? 'night-run');
   const [activeTrack,   setActiveTrack]   = useState(0);
   const [platform,      setPlatform]      = useState<{ id: PlatformId; name: string; color: string } | null>(null);
@@ -530,6 +599,11 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const recordCenterY     = useRef(0);
   const lastAngle         = useRef<number | null>(null);
   const accumulatedRotation = useRef(0);
+  // Tap detection: a still, quick touch on the record toggles play/pause
+  // (like tapping the cassette body) instead of registering as a zero scrub.
+  const tapStartRef       = useRef(0);
+  const movedDegRef       = useRef(0);
+  const togglePlayRef     = useRef(() => {});
 
   const _getAngleFromCenter = (touchX: number, touchY: number) =>
     Math.atan2(touchY - recordCenterY.current, touchX - recordCenterX.current) * (180 / Math.PI);
@@ -553,6 +627,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           recordCenterX.current = pX + w / 2;
           recordCenterY.current = pY + h / 2;
         });
+        tapStartRef.current = Date.now();
+        movedDegRef.current = 0;
         scrubStartPosRef.current = progressValue.current * trackMsRef.current;
         progressAnimRef.current?.stop();
         stopSpin();
@@ -570,6 +646,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         const diff  = _angleDiff(angle, lastAngle.current);
         lastAngle.current = angle;
         accumulatedRotation.current += diff;
+        movedDegRef.current += Math.abs(diff);
 
         // 360° = 5 seconds of track
         const trackMs = trackMsRef.current;
@@ -588,12 +665,21 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
       },
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (_evt, g) => {
         lastAngle.current = null;
         scrubbingRef.current = false;
         setIsScrubbing(false);
         setScrubDir(null);
         if (scrubFadeTimerRef.current) clearTimeout(scrubFadeTimerRef.current);
+        // A still, quick touch is a TAP: the record doubles as a play/pause
+        // button, matching the cassette body. Judged by FINGER TRAVEL in
+        // pixels (not rotation degrees — near the record's centre a tiny
+        // wobble reads as many degrees and taps kept registering as scrubs).
+        if (Math.hypot(g.dx, g.dy) < 12 && Date.now() - tapStartRef.current < 450) {
+          scrubIndicatorAnim.setValue(0);
+          togglePlayRef.current();
+          return;
+        }
         scrubFadeTimerRef.current = setTimeout(() => {
           Animated.timing(scrubIndicatorAnim, { toValue: 0, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
         }, 1000);
@@ -612,6 +698,9 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       },
     })
   ).current;
+
+  // Re-bound every render so the tap always sees fresh play state.
+  togglePlayRef.current = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
 
   const progressPanRef = useRef(
     PanResponder.create({
@@ -746,13 +835,17 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     return () => { stopSpin(); shimmerLoopRef.current?.stop(); };
   }, [playing]);
 
-  // Safety net — restart spin if it stopped unexpectedly
+  // Safety net — restart spin if it stopped unexpectedly. Stops dead when the
+  // app is backgrounded: a repeating timer is one of the things iOS kills a
+  // background app for, and there is nothing to keep spinning off-screen.
+  const appActive = useAppActive();
   useEffect(() => {
+    if (!appActive) return;
     const interval = setInterval(() => {
       if (playingRef.current && !isSpinning.current) startSpin();
     }, 3000);
     return () => clearInterval(interval);
-  }, [playing]);
+  }, [playing, appActive]);
 
   // Tonearm
   useEffect(() => {
@@ -760,7 +853,9 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       toValue: playing ? 1 : 0,
       duration: playing ? 1200 : 900,
       easing: playing ? Easing.out(Easing.cubic) : Easing.inOut(Easing.ease),
-      useNativeDriver: true,
+      // JS driver: the arm angle is combined with the (JS-driven) track
+      // progress for the inward creep — Animated can't mix drivers.
+      useNativeDriver: false,
     }).start();
   }, [playing]);
 
@@ -826,6 +921,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   })).current;
 
   const topPad       = Math.max(insets.top, 20);
+  const bottomPad    = Math.max(insets.bottom, 24) + 24;
 
   const _restartProgressFrom = (posMs: number, trackMs: number) => {
     const remaining = trackMs - posMs;
@@ -928,11 +1024,11 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           <View style={fs.dragPill} />
         </View>
 
-        <View style={{ flex: 1, paddingTop: topPad + 52, alignItems: 'center' }}>
+        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: bottomPad, alignItems: 'center' }}>
 
           {/* ── Header — small top-center, Spotify style ── */}
           <View style={fs.header}>
-            <Text style={fs.headerEyebrow}>PLAYING FROM</Text>
+            <Text style={fs.headerEyebrow}>YOU’RE LISTENING TO</Text>
             <Text style={fs.headerStation}>{station.name}</Text>
           </View>
 
@@ -943,31 +1039,37 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
               panHandlers={recordPanRef.panHandlers} scrubbing={isScrubbing} scrubDir={scrubDir}
               accent={VINYL_ACCENTS[station.id] ?? station.eqColors?.[1] ?? V.gold}
               labelText={station.name.toUpperCase()}
+              albumArt={spotify.track?.albumArt ?? null}
+              progressAnim={progress}
             />
           </View>
 
-          {/* Song title — bottom-left, Spotify style */}
+          {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
-            <Text style={fs.trackTitle} numberOfLines={1}>{spotify.track?.title ?? currentTrack.title}</Text>
-            <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track?.artist ?? currentTrack.artist}</Text>
+            {spotify.track
+              ? <MarqueeText text={spotify.track.title} style={fs.trackTitle} />
+              : <Text style={[fs.trackTitle, { fontSize: 20 }]} numberOfLines={2}>{station.tagline}</Text>}
+            {spotify.track && <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track.artist}</Text>}
           </View>
 
+          {spotify.track && (
           <View style={fs.progressWrap}>
-            <View style={fs.progressRow}>
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono }]}>{formatMs(currentTimeMs)}</Text>
-              <ScrubProgressBar
-                progress={progress} isScrubbing={isScrubbing}
-                onLayout={(e) => { progressBarWidthRef.current = e.nativeEvent.layout.width; }}
-                panHandlers={progressPanRef.panHandlers}
-              />
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono, textAlign: 'right' }]}>{formatMs(trackMs)}</Text>
+            <ScrubProgressBar
+              progress={progress} isScrubbing={isScrubbing}
+              onLayout={(e) => { progressBarWidthRef.current = e.nativeEvent.layout.width; }}
+              panHandlers={progressPanRef.panHandlers}
+            />
+            <View style={fs.timesBelow}>
+              <Text style={fs.timeText}>{formatMs(currentTimeMs)}</Text>
+              <Text style={fs.timeText}>{formatMs(trackMs)}</Text>
             </View>
           </View>
+          )}
 
           {/* Controls */}
           <View style={fs.controls}>
-            <TouchableOpacity onPress={() => setShuffle((s) => !s)} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={26} color={shuffle ? V.gold : '#ffffff'} />
+            <TouchableOpacity onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Ionicons name="shuffle" size={26} color={shuffle ? (station.eqColors?.[1] ?? V.gold) : '#ffffff'} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { setActiveTrack((t) => Math.max(0, t - 1)); spotify.prev(); }} style={fs.skipBtn} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-previous" size={48} color="#fff" />
@@ -991,26 +1093,28 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             <TouchableOpacity onPress={() => { setActiveTrack((t) => Math.min(VINYL_TRACKS.length - 1, t + 1)); spotify.next(); }} style={fs.skipBtn} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-next" size={48} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setRepeat((r) => !r)} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="repeat" size={26} color={repeat ? V.gold : '#ffffff'} />
+            <TouchableOpacity onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'track' : 'off'); }} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <MaterialCommunityIcons name={repeat ? 'repeat-once' : 'repeat'} size={26} color={repeat ? (station.eqColors?.[1] ?? V.gold) : '#ffffff'} />
             </TouchableOpacity>
           </View>
 
           {/* Left-aligned action pills — keep the record the focus */}
-          <View style={fs.actionRow}>
-            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
-              <Text style={fs.actionPillBold}>Change Mood</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
-              <Text style={fs.actionPillText} numberOfLines={1}>
-                {linked ? linked.name : 'Add Playlist'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <ModeActionRow
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            track={spotify.track}
+            station={station}
+          />
 
         </View>
+
+        <ModeCloseButton onPress={handleClose} />
+
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={station.eqColors?.[1] ?? V.gold} />
+        <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
+        {handoff && !spotify.track && <HandoffOverlay />}
+        <PreviewGate onSilence={spotify.pause} />
 
         <MoodSheet
           visible={showMood}
@@ -1028,6 +1132,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
               await setStationPlaylist(activeId, pl);
               setLinked(pl);
               setShowPicker(false);
+              relinkStationPlaylist(activeId);
             }}
           />
         )}
@@ -1049,10 +1154,10 @@ const fs = StyleSheet.create({
   trackBlock:  { alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 16, paddingBottom: 4, alignItems: 'flex-start' },
   trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
   trackArtist: { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 },
-  turntableWrap:{ alignItems: 'center', width: '100%' },
+  turntableWrap:{ flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%' },
   progressWrap: { width: '100%', paddingHorizontal: 28, marginTop: 22, marginBottom: 0 },
-  progressRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2, width: 38 },
+  timesBelow:   { flexDirection: 'row', justifyContent: 'space-between', marginTop: -4 },
+  timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2 },
   controls:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 28, marginTop: 10, marginBottom: 8, paddingVertical: 4 },
   shuffleRepeatBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   skipBtn:      { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
@@ -1061,16 +1166,6 @@ const fs = StyleSheet.create({
 
   tracksBtn:     { marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: V.surfaceBorder, flexDirection: 'row', alignItems: 'center', gap: 8 },
   tracksBtnText: { color: V.textDim, fontSize: 9, fontWeight: '700', letterSpacing: 3 },
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22, alignSelf: 'stretch' },
-  actionPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
-    maxWidth: '58%',
-  },
-  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
-  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
   stationPill: {
     flexDirection: 'row', alignItems: 'center', gap: 7,
     paddingHorizontal: 14, height: 42,
@@ -1154,7 +1249,7 @@ export function VinylModePreview() {
           <VinylDisc size={PV_RECORD} spin={staticRotate} showLabel />
         </Animated.View>
         {/* Tonearm — positioned in same container but outside spinning view */}
-        <Tonearm armLen={PV_ARM_LEN} armW={2} headW={9} headH={13} pivotX={PV_PIVOT_X} pivotY={PV_PIVOT_Y} rotation={armRot} />
+        <Tonearm armLen={PV_ARM_LEN} armW={2.5} headW={9} headH={13} pivotX={PV_PIVOT_X} pivotY={PV_PIVOT_Y} rotation={armRot} />
       </View>
 
       <VinylFullscreen visible={modalOpen} onClose={handleModalClose} />

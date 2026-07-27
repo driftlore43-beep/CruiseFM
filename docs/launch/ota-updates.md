@@ -41,14 +41,33 @@ features), just publish an update:
 
 ```
 git pull origin claude/cruise-fm-v4wk5f
-eas update --branch preview -m "short note about what changed"
+eas update --branch preview --environment preview -m "short note about what changed"
 ```
 
 Testers get it automatically the next time they close and reopen the app —
 usually within minutes. No new build, no Play Store, no reinstalling.
 
 Use `-m` to leave yourself a note, e.g.
-`eas update --branch preview -m "new badges + vinyl polish"`.
+`eas update --branch preview --environment preview -m "new badges + vinyl polish"`.
+
+### `--environment preview` is not optional — and leaving it off fails quietly
+
+The Spotify keys are not in the project folder. They live on Expo's servers,
+and `--environment preview` is what fetches them. From Expo SDK 55 onwards
+this flag is **required**, and Cruise FM is on SDK 56.
+
+Leave it off and, depending on the version of the tool, you either get a
+straightforward error or it publishes an update with **blank** Spotify keys.
+The second case looks completely successful and then nobody on the channel
+can sign in to Spotify. So: both flags, every time.
+
+To confirm the keys are on the server before publishing:
+```
+eas env:list --environment preview
+```
+`EXPO_PUBLIC_SPOTIFY_CLIENT_ID` and `EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET` should
+both be listed. If either is missing, don't publish — add them at expo.dev →
+the Cruise FM project → Environment variables.
 
 ---
 
@@ -69,8 +88,10 @@ say "this one needs a new build," otherwise assume `eas update` is all it takes.
 
 Same idea, different branch name so live users and testers stay separate:
 
-- Testers on the closed-test build: `eas update --branch preview -m "..."`
-- Real users after launch:          `eas update --branch production -m "..."`
+- Testers on the closed-test build:
+  `eas update --branch preview --environment preview -m "..."`
+- Real users after launch:
+  `eas update --branch production --environment production -m "..."`
 
 Keep test changes on `preview` until you've seen them yourself, then publish
 the same to `production` when you're happy.

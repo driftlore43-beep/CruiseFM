@@ -132,12 +132,46 @@ type Tile = { d: string; fill: string; op: number };
 // RotatingMeridians and nowhere else. NEVER give this a horizontal inset.
 const BEVEL = { u0: 0.0, u1: 1.0, v0: 0.06, v1: 0.90 };
 
-// Viewing tilt — we look slightly DOWN on the ball. This matters: seen from
-// dead level, the latitude rings project to perfectly straight horizontal
-// lines and the ball reads as a flat brick wall (the old build's problem).
-// A little tilt is what makes the rows arc and the columns converge at the
-// top pole, exactly like the reference photo.
-const TILT = 0.30;                       // ~17°
+/**
+ * The directions a mirror's own little gradient can run in.
+ *
+ * On both reference balls the tiles do NOT all shade the same way — each
+ * mirror sits at its own angle and catches the room differently, and that
+ * disagreement is most of what stops the surface looking printed. One shared
+ * direction (what round 15 shipped) made every facet lean the same way.
+ *
+ * Still only six gradient definitions for the whole ball: SVG gradients are
+ * in objectBoundingBox units, so each one rescales to whichever facet uses
+ * it. The pick is weighted toward the first two so the ball still reads as
+ * lit from the upper left rather than as random noise.
+ */
+export const FACET_DIRS = [
+  { x1: '0', y1: '0', x2: '1', y2: '1' },   // top-left -> bottom-right (key light)
+  { x1: '1', y1: '0', x2: '0', y2: '1' },   // top-right -> bottom-left
+  { x1: '0', y1: '0', x2: '1', y2: '0' },   // left -> right
+  { x1: '0', y1: '0', x2: '0', y2: '1' },   // top -> bottom
+  { x1: '0', y1: '1', x2: '1', y2: '0' },   // bottom-left -> top-right
+  { x1: '1', y1: '1', x2: '0', y2: '0' },   // bottom-right -> top-left
+];
+
+function facetDir(j: number, k: number): number {
+  const r = hash01(j * 6.71 + k * 13.37);
+  return r < 0.34 ? 0 : r < 0.56 ? 1 : r < 0.72 ? 2 : r < 0.86 ? 3 : r < 0.95 ? 4 : 5;
+}
+
+// Viewing tilt — essentially HEAD ON (owner, 27.07). It used to be 0.30 (~17°)
+// so we looked down on the ball and its top cap and rosette were on show.
+//
+// The old comment here warned that dead-level would make the latitude rings
+// project to straight horizontal lines and read as a flat brick wall. That
+// was true of the old build, which faked the surface with a scrolling texture
+// strip. It is NOT true now: the tiles are a genuine sphere projection, so
+// the columns still pinch toward the silhouette and the shading still falls
+// off, and rendering it at 0.30 / 0.10 / 0.04 / 0 side by side showed no loss
+// of roundness at all. A sliver of tilt is kept so the rings retain a whisper
+// of arc and the poles never land exactly on the silhouette (z = 0 there,
+// which is the degenerate case for the back-face cull).
+const TILT = 0.05;                       // ~3°, effectively head on
 
 // Real sphere projection — every tile is a quad between two latitudes and
 // two longitudes, projected through the sphere and back-face culled. That's
@@ -279,15 +313,16 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
       // top-left corner toward the bottom-right, which is what makes a mirror
       // tile read as glass rather than a coloured square.
       //
-      // It is a REAL ramp, and it costs exactly one gradient definition for
-      // the whole ball: SVG gradients default to objectBoundingBox units, so
-      // a single `dbFacet` def rescales itself to whichever path references
-      // it. Per-tile gradient defs (~380 of them) were the obvious approach
-      // and the wrong one. A flat two-tone split was tried first and read as
-      // a triangle drawn on every tile, not as a falloff.
+      // It is a REAL ramp, and it costs six gradient definitions for the
+      // whole ball: SVG gradients default to objectBoundingBox units, so each
+      // `dbFacetN` rescales itself to whichever path references it. Per-tile
+      // defs (~380 of them) were the obvious approach and the wrong one. A
+      // flat two-tone split was tried first and read as a triangle drawn on
+      // every tile, not as a falloff. Which of the six a mirror uses is its
+      // own — see FACET_DIRS.
       tiles.push({ d: `${d} ${face}`, fill: tint(frameStep, cast * 0.25), op: 0.55 + 0.35 * depth });
       tiles.push({ d: face, fill: tint(faceStep - 0.55, cast * 0.72), op: 0.55 + 0.35 * depth });
-      tiles.push({ d: face, fill: 'url(#dbFacet)', op: 0.42 + 0.30 * depth });
+      tiles.push({ d: face, fill: `url(#dbFacet${facetDir(j, k)})`, op: 0.42 + 0.30 * depth });
 
       // ...and a BRIGHT copy of the same face, filed into a phase bucket by
       // where it sits across the ball. MirrorFlash fades these in as a band
@@ -398,16 +433,17 @@ function SphereGrid({ size, tiles }: { size: number; tiles: Tile[] }) {
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFill} pointerEvents="none">
         <Defs>
-          {/* The per-mirror sheen. In objectBoundingBox units (the SVG
-              default), so this ONE definition stretches to fit every facet
-              it's referenced from — a real gradient on ~380 tiles for the
-              price of a single node. Light at the top-left corner, shadow
-              at the bottom-right, matching the ball's key light. */}
-          <SvgLinearGradient id="dbFacet" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.66" />
-            <Stop offset="0.46" stopColor="#ffffff" stopOpacity="0.10" />
-            <Stop offset="1" stopColor="#05060d" stopOpacity="0.42" />
-          </SvgLinearGradient>
+          {/* The per-mirror sheen, in six directions. objectBoundingBox units
+              (the SVG default) means each definition stretches to fit every
+              facet that references it — real gradients on ~380 tiles for the
+              price of six nodes. */}
+          {FACET_DIRS.map((g, i) => (
+            <SvgLinearGradient key={i} id={`dbFacet${i}`} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2}>
+              <Stop offset="0" stopColor="#ffffff" stopOpacity="0.66" />
+              <Stop offset="0.46" stopColor="#ffffff" stopOpacity="0.10" />
+              <Stop offset="1" stopColor="#05060d" stopOpacity="0.42" />
+            </SvgLinearGradient>
+          ))}
         </Defs>
         {tiles.map((t, i) => (
           // even-odd so the frame paths (outer tile + inner face in one `d`)

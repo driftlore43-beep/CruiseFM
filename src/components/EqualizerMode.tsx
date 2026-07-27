@@ -693,7 +693,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
           {/* Station — small top-center label, Spotify "Playing From Playlist" style */}
           <View style={fs.identity}>
-            <Text style={fs.identityEyebrow}>PLAYING FROM</Text>
+            <Text style={fs.identityEyebrow}>YOU’RE LISTENING TO</Text>
             <Text style={fs.identityStation}>{currentStation.name}</Text>
           </View>
 

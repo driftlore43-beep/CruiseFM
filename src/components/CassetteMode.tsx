@@ -986,7 +986,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
           {/* Header — small top-center, Spotify style */}
           <View style={fs.header}>
-            <Text style={fs.headerEyebrow}>PLAYING FROM</Text>
+            <Text style={fs.headerEyebrow}>YOU’RE LISTENING TO</Text>
             <Text style={fs.headerStation}>{station.name}</Text>
           </View>
 

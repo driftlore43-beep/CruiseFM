@@ -7,6 +7,7 @@ import { useFocusEffect } from 'expo-router';
 import { useFonts } from 'expo-font';
 
 import { CreateStationModal } from '@/components/CreateStationModal';
+import { GlassPane, mixHex, smoke, specularSpot } from '@/components/GlassPane';
 import { StationDetailModal } from '@/components/StationDetailModal';
 import { GlossSheen } from '@/components/GlossSheen';
 import { useNowPlaying } from '@/context/NowPlayingContext';
@@ -190,40 +191,45 @@ function StationRow({
       <View
         style={[
           styles.rowCard,
-          { borderColor: tuned ? accent + 'AA' : 'rgba(255,255,255,0.14)' },
+          { borderColor: tuned ? accent + 'AA' : mine ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.14)' },
           locked && styles.rowLocked,
         ]}>
         {mine ? (
           <>
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#10121c' }]} />
-            {/* Full-colour wash (owner's pick, 28.07, from the three-strength
-                prototype): the chosen colour owns the whole card, still
-                deepest on the left where the display sits. */}
+            {/* The Modes cards' glass finish, in the station's chosen colour
+                (owner, 28.07): a smoked diagonal ramp under the shared
+                GlassPane, full colour like the modes wear theirs. */}
             <LinearGradient
-              colors={[custom!.color + 'C4', custom!.color + '73', custom!.color + '2E']}
-              locations={[0, 0.55, 1]}
+              colors={[
+                smoke(mixHex(custom!.color, '#ffffff', 0.18)),
+                smoke(custom!.color),
+                smoke(mixHex(custom!.color, '#0b0d16', 0.38)),
+              ]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <GlassPane spot={specularSpot(station.name)} uid={`yst${station.id.replace(/\W/g, '')}`} />
+          </>
+        ) : (
+          <>
+            <ImageBackground
+              source={(station as Station).image}
+              style={StyleSheet.absoluteFill}
+              imageStyle={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+            {/* The photo glass: deepest on the left where the display sits,
+                easing off so the photograph breathes on the right. */}
+            <LinearGradient
+              colors={locked
+                ? ['rgba(8,8,14,0.92)', 'rgba(8,8,14,0.78)', 'rgba(8,8,14,0.6)']
+                : ['rgba(8,8,14,0.88)', 'rgba(8,8,14,0.68)', 'rgba(8,8,14,0.46)']}
+              locations={[0, 0.45, 1]}
               start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
               style={StyleSheet.absoluteFill}
             />
           </>
-        ) : (
-          <ImageBackground
-            source={(station as Station).image}
-            style={StyleSheet.absoluteFill}
-            imageStyle={{ width: '100%', height: '100%' }}
-            resizeMode="cover"
-          />
         )}
-        {/* The glass: deepest on the left where the display sits, easing off
-            so the photograph breathes on the right. */}
-        <LinearGradient
-          colors={locked
-            ? ['rgba(8,8,14,0.92)', 'rgba(8,8,14,0.78)', 'rgba(8,8,14,0.6)']
-            : ['rgba(8,8,14,0.88)', 'rgba(8,8,14,0.68)', 'rgba(8,8,14,0.46)']}
-          locations={[0, 0.45, 1]}
-          start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-        />
         {/* The tuning needle: a red line standing the full height of the
             playing card's left edge — the page's single glowing marker. */}
         {tuned && <View style={styles.tunedLine} pointerEvents="none" />}

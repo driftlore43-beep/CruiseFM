@@ -10,8 +10,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 
+import { GlassPane, smoke, specularSpot } from '@/components/GlassPane';
 import { MirrorBallGlyph } from '@/components/MirrorBallGlyph';
 import { PremiumShimmer } from '@/components/PremiumShimmer';
 import { useNowPlaying } from '@/context/NowPlayingContext';
@@ -184,72 +184,6 @@ function CardGlitter({ count = 16 }: { count?: number }) {
 // bright rim) plus the reference pane's specular hot-spot on the top edge and
 // the cool glints near the bottom corners.
 
-function mixHex(a: string, b: string, t: number): string {
-  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
-  const ch = (sh: number) => Math.round(((pa >> sh) & 255) + (((pb >> sh) & 255) - ((pa >> sh) & 255)) * t);
-  return `#${((1 << 24) + (ch(16) << 16) + (ch(8) << 8) + ch(0)).toString(16).slice(1)}`;
-}
-// Held to a LIGHT touch (owner, 28.07: the first mix — 0.42 slate + a white
-// lift — came out washed and pastel). The white lift is gone entirely (white
-// is what pastels a colour), and the slate mix only takes the neon edge off.
-const smoke = (c: string) => mixHex(c, '#4a4f62', 0.18);
-
-/**
- * The glass layers, drawn over a card's gradient. `spot` (0-100) places the
- * specular core along the top edge — varied per card so the page doesn't
- * look stamped out of one die. `uid` namespaces the Svg gradient id: several
- * of these are on screen at once, and duplicate ids across Svg roots are a
- * known way to get one rendering blank.
- */
-function GlassPane({ spot, uid }: { spot: number; uid: string }) {
-  return (
-    <>
-      {/* light gathers at the top, a hint of shadow grounds the bottom */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.20)', 'rgba(255,255,255,0.05)', 'transparent', 'rgba(0,0,0,0.16)']}
-        locations={[0, 0.28, 0.6, 1]}
-        start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-        style={StyleSheet.absoluteFill} pointerEvents="none"
-      />
-      {/* ambient catch across the top-left corner */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.16)', 'transparent']}
-        start={{ x: 0, y: 0 }} end={{ x: 0.55, y: 0.55 }}
-        style={StyleSheet.absoluteFill} pointerEvents="none"
-      />
-      {/* hairline along the very top edge, burning brightest at one point */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.95)', 'rgba(255,255,255,0.55)', 'rgba(255,255,255,0.12)']}
-        locations={[0, Math.max(0.05, Math.min(0.9, spot / 100)), Math.min(0.95, spot / 100 + 0.13), 1]}
-        start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-        style={styles.glassTopline} pointerEvents="none"
-      />
-      {/* the specular bloom sitting on that point (no blur filter in RN — a
-          small radial gradient stands in for it) */}
-      <Svg width={70} height={14} style={[styles.glassHotspot, { left: `${spot - 9}%` }]} pointerEvents="none">
-        <Defs>
-          <RadialGradient id={`ghs${uid}`} cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.8" />
-            <Stop offset="0.7" stopColor="#ffffff" stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-        <Ellipse cx={35} cy={7} rx={35} ry={7} fill={`url(#ghs${uid})`} />
-      </Svg>
-      {/* cool glints near the bottom corners, from the reference pane */}
-      <LinearGradient
-        colors={['rgba(160,240,255,0)', 'rgba(160,240,255,0.55)', 'rgba(160,240,255,0)']}
-        start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-        style={styles.glassGlintL} pointerEvents="none"
-      />
-      <LinearGradient
-        colors={['rgba(160,240,255,0)', 'rgba(190,245,255,0.45)', 'rgba(160,240,255,0)']}
-        start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-        style={styles.glassGlintR} pointerEvents="none"
-      />
-    </>
-  );
-}
-
 // ── Compact mode row card ─────────────────────────────────────────────────────
 function CompactModeCard({
   title,
@@ -278,9 +212,7 @@ function CompactModeCard({
   // the Cruise page's colour temperature. The specular point sits somewhere
   // different on each card, derived from the title so it's stable.
   const smoked = gradient.map(smoke) as [string, string, string];
-  let h = 0;
-  for (let i = 0; i < title.length; i++) h = (h * 31 + title.charCodeAt(i)) >>> 0;
-  const spot = 22 + (h % 46);
+  const spot = specularSpot(title);
 
   return (
     // The shadow lives on the wrapper, not the card: the card clips its own
@@ -561,34 +493,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 16,
     elevation: 8,
-  },
-  glassTopline: {
-    position: 'absolute',
-    top: 0,
-    left: '7%',
-    right: '7%',
-    height: 1.5,
-    borderRadius: 1,
-  },
-  glassHotspot: {
-    position: 'absolute',
-    top: -6,
-  },
-  glassGlintL: {
-    position: 'absolute',
-    bottom: 0,
-    left: '6%',
-    width: '26%',
-    height: 2,
-    borderRadius: 2,
-  },
-  glassGlintR: {
-    position: 'absolute',
-    bottom: 0,
-    right: '4%',
-    width: '20%',
-    height: 2,
-    borderRadius: 2,
   },
   trailRow: {
     marginLeft: 'auto',

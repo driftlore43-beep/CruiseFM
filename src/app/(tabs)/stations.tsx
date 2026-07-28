@@ -199,15 +199,16 @@ function StationRow({
             {/* The Modes cards' glass finish, in the station's chosen colour
                 (owner, 28.07): a smoked diagonal ramp under the shared
                 GlassPane, full colour like the modes wear theirs. */}
-            {/* The CHOSEN colour is the ramp's brightest stop — the glass
-                sheen already adds white on top, and lightening the stop as
-                well pushed every card toward pastel (owner, 28.07: "the
-                colours are much brighter than the selected colours"). */}
+            {/* The SAME deep ramp the home page's Continue Drive card uses
+                (owner, 28.07: the two must match) — every created station
+                stores gradientColors, a near-black ramp with the colour in
+                the middle stop. The bright accent swatch was tried twice and
+                always came out lighter than the colour actually chosen. */}
             <LinearGradient
-              colors={[
-                smoke(custom!.color),
-                smoke(mixHex(custom!.color, '#0b0d16', 0.22)),
-                smoke(mixHex(custom!.color, '#0b0d16', 0.48)),
+              colors={custom!.gradientColors ?? [
+                mixHex(custom!.color, '#05060d', 0.8),
+                mixHex(custom!.color, '#0b0d16', 0.45),
+                '#000000',
               ]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFill}

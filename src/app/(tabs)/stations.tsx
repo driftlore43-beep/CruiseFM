@@ -556,12 +556,14 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(255,255,255,0.9)',
     textShadowRadius: 12,
   },
+  // The modes page's original title spec, verbatim (owner's pick, 28.07) —
+  // keep in step with compactTitle in modes.tsx. The shadow stays because
+  // these names sit over photographs.
   rowName: {
     flexShrink: 1,
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.2,
+    fontSize: 15.5,
+    fontWeight: '800',
     textShadowColor: 'rgba(0,0,0,0.55)',
     textShadowRadius: 8,
   },

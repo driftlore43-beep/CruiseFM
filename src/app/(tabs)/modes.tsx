@@ -505,16 +505,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
-  // Identical spec to the Stations page's rowName — the two pages' titles
-  // must render as one voice (owner, 28.07: different size + weight read as
-  // different fonts even though both are the system face).
+  // The shared title voice for BOTH tabs (owner, 28.07): the modes page's
+  // original spec won — the stations page's rowName copies this exactly, so
+  // change them together or the pages drift apart again.
   compactTitle: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-    textShadowColor: 'rgba(0,0,0,0.55)',
-    textShadowRadius: 8,
+    fontSize: 15.5,
+    fontWeight: '800',
   },
   compactDesc: {
     color: 'rgba(255,255,255,0.65)',

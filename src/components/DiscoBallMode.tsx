@@ -78,11 +78,14 @@ function mixHex(a: string, b: string, t: number): string {
 // coloured sphere rather than a mirrored one — a real ball stays silver in a
 // red room, it just carries red reflections.
 //
-// Slightly cool rather than dead grey, which is what polished chrome is, and
-// with a very wide range: the bottom anchors are near-black so an unlit
-// mirror really is dark, the top is pure white so a lit one blows out. That
-// spread IS the metallic look — a narrow ramp reads as matte plastic.
-const SHADE_ANCHORS = ['#07080d', '#161a23', '#2f3541', '#5d6577', '#9aa3b4', '#d5dbe6', '#ffffff'];
+// DEAD NEUTRAL, deliberately. The first chrome ramp was "slightly cool"
+// silver — i.e. blue-tinted — and on a warm station's backdrop those
+// blue-grey mirrors read as TEAL (owner screenshot, Sunset AM, 28.07).
+// A hue that only shows on half the stations is worse than no hue. The
+// metallic look comes from the WIDE range (near-black shadows, blown-white
+// highlights) and the per-tile scatter, never from tinting the greys —
+// a narrow ramp reads as matte plastic, a tinted one as coloured glass.
+const SHADE_ANCHORS = ['#0a0a0b', '#191a1b', '#343537', '#646568', '#a2a3a5', '#dcdcde', '#ffffff'];
 // Facet brightness is quantised (cel-shaded, not smooth) but into FINER steps
 // than the anchor list — brightness falls off fastest across the middle of the
 // ball, so with coarse steps the band edge landed on one column and drew a
@@ -116,7 +119,9 @@ function stationPalette(eq: [string, string, string]): string[] {
     // nine of these driving every mirror's cast the whole ball drifted toward
     // dusty. Light and dark, still obviously the same colour.
     out.push(mixHex(c, '#ffffff', 0.28));
-    out.push(mixHex(c, '#141726', 0.42));
+    // Deepened toward a NEUTRAL dark. This used to mix toward #141726 — a
+    // navy — which dragged every station's deep variant off-hue toward teal.
+    out.push(mixHex(c, '#161617', 0.42));
   }
   return out;
 }
@@ -527,8 +532,8 @@ function SphereGrid({ size, tiles }: { size: number; tiles: Tile[] }) {
               <Stop offset="0.18" stopColor="#ffffff" stopOpacity="0.34" />
               <Stop offset="0.40" stopColor="#ffffff" stopOpacity="0.15" />
               <Stop offset="0.58" stopColor="#ffffff" stopOpacity="0.04" />
-              <Stop offset="0.78" stopColor="#05060d" stopOpacity="0.14" />
-              <Stop offset="1" stopColor="#05060d" stopOpacity="0.30" />
+              <Stop offset="0.78" stopColor="#060606" stopOpacity="0.14" />
+              <Stop offset="1" stopColor="#060606" stopOpacity="0.30" />
             </SvgLinearGradient>
           ))}
         </Defs>
@@ -541,7 +546,7 @@ function SphereGrid({ size, tiles }: { size: number; tiles: Tile[] }) {
           // Light on the lit side now comes from the tile frames themselves, so
           // these only need to add a hairline of definition. At the old 0.45
           // they cut straight through the bright grid.
-          <Path key={`a${i}`} d={d} fill="none" stroke="#07070f" strokeOpacity={0.26} strokeWidth={seam} />
+          <Path key={`a${i}`} d={d} fill="none" stroke="#08080a" strokeOpacity={0.26} strokeWidth={seam} />
         ))}
       </Svg>
     </View>
@@ -609,8 +614,8 @@ function Meridian({ size, path, litPath, lam0, spin, width }: {
             transform and no extra animated views); the scaleX shrinks the gap
             toward the front meridian, which is right — face-on you wouldn't
             see the edge of a seam anyway. */}
-        <Path d={litPath} fill="none" stroke="#e8eeff" strokeOpacity={0.24} strokeWidth={width} />
-        <Path d={path} fill="none" stroke="#07070f" strokeOpacity={0.5} strokeWidth={width} />
+        <Path d={litPath} fill="none" stroke="#eeeff2" strokeOpacity={0.24} strokeWidth={width} />
+        <Path d={path} fill="none" stroke="#08080a" strokeOpacity={0.5} strokeWidth={width} />
       </Svg>
     </Animated.View>
   );
@@ -723,7 +728,7 @@ function LightFace({ size, eq, blobs, sfx }: {
           <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
         </RadialGradient>
       </Defs>
-      <Rect x={0} y={0} width={size} height={size} fill="#08070f" />
+      <Rect x={0} y={0} width={size} height={size} fill="#080809" />
       {[-1, 0, 1].map((k) =>
         blobs.map((b, i) => (
           <Circle key={`${k}_${i}`} cx={b.x + k * size} cy={b.y} r={b.r} fill={`url(#${gid(b.g)})`} />
@@ -1126,7 +1131,7 @@ function BallSheen({ size, pulse }: { size: number; pulse: Animated.Value }) {
 function MirrorBall({ size, eq, spin, pulse, lit }: { size: number; eq: [string, string, string]; spin: Animated.Value; pulse: Animated.Value; lit: Animated.Value }) {
   const { tiles, flashes } = useMemo(() => buildSphereTiles(size, eq), [size, eq]);
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#0a0912' }}>
+    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#0b0b0c' }}>
       {/* The moving layer: light travelling across the surface as it turns */}
       <LightPatches size={size} spin={spin} eq={eq} />
 
@@ -1162,8 +1167,8 @@ function MirrorBall({ size, eq, spin, pulse, lit }: { size: number; eq: [string,
           <RadialGradient id="dbShade" cx="0.36" cy="0.3" r="0.9">
             <Stop offset="0" stopColor="#ffffff" stopOpacity="0.12" />
             <Stop offset="0.4" stopColor="#ffffff" stopOpacity="0.04" />
-            <Stop offset="0.78" stopColor="#050208" stopOpacity="0.34" />
-            <Stop offset="1" stopColor="#020104" stopOpacity="0.78" />
+            <Stop offset="0.78" stopColor="#040404" stopOpacity="0.34" />
+            <Stop offset="1" stopColor="#020202" stopOpacity="0.78" />
           </RadialGradient>
           {/* Rim light picks up the room, so it may be mood-coloured — it is
               a thin falloff at the silhouette, not a wash over the face. */}

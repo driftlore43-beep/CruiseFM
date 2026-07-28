@@ -490,22 +490,26 @@ const styles = StyleSheet.create({
 
   // ── Station rows ──────────────────────────────────────────────────────────
   rowShadow: {
-    borderRadius: 16,
-    marginBottom: 11,
+    borderRadius: 18,
+    marginBottom: 12,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 5,
     shadowColor: '#000',
   },
+  // Sized to sit alongside the Modes page's cards (its compact cards land at
+  // ~78pt with an 18pt radius) — at the old 18px padding these read as
+  // condensed strips next to them (owner, 28.07).
   rowCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1,
-    paddingVertical: 18,
+    minHeight: 78,
+    paddingVertical: 20,
     paddingHorizontal: 16,
   },
   // Dimmer, not grey: the photo and colour stay visible behind the padlock

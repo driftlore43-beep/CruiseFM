@@ -4,12 +4,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
+import { useFonts } from 'expo-font';
 
-import { StationCard } from '@/components/StationCard';
 import { CreateStationModal } from '@/components/CreateStationModal';
 import { StationDetailModal } from '@/components/StationDetailModal';
 import { GlossSheen } from '@/components/GlossSheen';
-import { PremiumShimmer } from '@/components/PremiumShimmer';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, Fonts, TAB_SAFE_INSET } from '@/constants/theme';
 import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
@@ -20,14 +19,33 @@ import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
 
 const FREE_CUSTOM_LIMIT = 3;
 
-// One line of road poetry per visit, rotating on each focus.
-const POETRY = [
-  'Pick a feeling, not a genre.',
-  'Every road has a frequency.',
-  'The city sounds different after midnight.',
-  'Somewhere, a road is waiting.',
-  'Tune the drive to the mood.',
-];
+/**
+ * The page is a lit head unit (design settled with the owner 28.07 after a
+ * long prototype run — see AGENTS.md):
+ *
+ *   - every station is a photo-glass card: its own artwork under dark glass,
+ *     deepest on the left where the number and name sit
+ *   - dial numbers are a REAL seven-segment display face (DSEG7), premium
+ *     white, with the unlit ghost segments behind them — the ghosts are what
+ *     make it read as hardware, same lesson as the Equalizer's unlit lamps
+ *   - the AM/FM band letters are the fourteen-segment face (DSEG14) in the
+ *     accent amber, ghosted the same way ('~' is DSEG14's all-segments glyph)
+ *   - names and icons are white; icons sit in a fixed column at the card's
+ *     right edge, arrow/padlock outermost — everything on strict columns
+ *   - ONE glow on the whole page: the tuned station (red full-height line on
+ *     its left edge, station-colour rim, white-hot number)
+ *   - locked FM cards keep their photo and colour, just dimmer behind a
+ *     drawn padlock — the premium band stays a shop window, not a grey list
+ *
+ * The DSEG fonts ship as bundled assets (SIL OFL licence alongside them in
+ * assets/fonts/), loaded with expo-font — no native change, normal OTA.
+ */
+
+// Every number shares one column so digits right-align down the whole page
+// and every name starts at the same x — AM, YOUR STATIONS and FM as one dial.
+const NUM_COL_W = 64;
+const ICON_SLOT_W = 28;
+const CTRL_SLOT_W = 16;
 
 // Time-flavoured tagline for the station currently "on air".
 const ON_AIR_LINES: Record<string, string> = {
@@ -91,20 +109,30 @@ function OnAirBanner({ station, onPress }: { station: Station; onPress: () => vo
 }
 
 /**
- * The page is laid out like a receiver, not a list of cards.
- *
- * AM carries the free stations and the ones you make yourself; FM carries the
- * premium ones. A hairline rail runs down the left with a red marker parked on
- * whatever's playing, and each station's dial number sits in its own column —
- * so the number reads first, then the name, exactly like a head unit.
+ * A dial number on the segment display: the unlit ghost behind, the lit
+ * digits in front, both right-aligned to the shared column edge. AM ghosts
+ * four whole digits; FM ghosts the 888.8 a real tuner shows.
  */
+function LcdNumber({ label, band, tuned, lcd }: { label: string; band: Band; tuned: boolean; lcd: boolean }) {
+  const family = lcd ? 'DSEG7' : Fonts.mono;
+  return (
+    <View style={styles.numCol}>
+      {lcd && (
+        <Text style={[styles.numGhost, { fontFamily: family }]}>{band === 'FM' ? '888.8' : '8888'}</Text>
+      )}
+      <Text style={[styles.numLit, { fontFamily: family }, tuned && styles.numLitTuned]}>{label}</Text>
+    </View>
+  );
+}
 
-/** The big band letters, with the printed scale a real dial has beside them. */
-function BandHeader({ band, caption }: { band: Band; caption: string }) {
+/** The big segment-face band letters with the printed tick scale beside them. */
+function BandHeader({ band, caption, lcd }: { band: Band; caption: string; lcd: boolean }) {
   return (
     <View style={styles.bandRow}>
-      <View style={styles.railCol} />
-      <Text style={[styles.bandLetters, { fontFamily: Fonts.mono }]}>{band}</Text>
+      <View>
+        {lcd && <Text style={[styles.bandGhost, { fontFamily: 'DSEG14' }]}>~~</Text>}
+        <Text style={[styles.bandLetters, { fontFamily: lcd ? 'DSEG14' : Fonts.mono }]}>{band}</Text>
+      </View>
       <View style={styles.bandTicks}>
         {Array.from({ length: 22 }).map((_, i) => (
           <View key={i} style={[styles.dialTick, i % 4 === 0 && styles.dialTickTall]} />
@@ -115,17 +143,10 @@ function BandHeader({ band, caption }: { band: Band; caption: string }) {
   );
 }
 
-/**
- * A small printed label inside a band — used to set the user's own stations
- * apart from the built-in ones. Carries the rail line so the dial's left
- * edge runs through it unbroken.
- */
+/** Small printed label separating the user's own stations from the built-ins. */
 function SubHeader({ label }: { label: string }) {
   return (
     <View style={styles.subheadRow}>
-      <View style={styles.railCol}>
-        <View style={styles.railLine} />
-      </View>
       <Text style={[styles.subheadText, { fontFamily: Fonts.mono }]}>{label}</Text>
       <View style={styles.subheadRule} />
     </View>
@@ -133,28 +154,104 @@ function SubHeader({ label }: { label: string }) {
 }
 
 /**
- * One station on the dial: rail, number, then the card.
+ * One station: photo under dark glass, number, name, white icon column.
  *
- * The rail line is drawn inside every row rather than once behind the list, so
- * the rows stack into one continuous line on their own and the red marker
- * lands on the right station with nothing to measure. It stops 14px short at
- * the bottom because that's the card's own margin — otherwise the marker
- * centres on the gap instead of the card.
+ * `mine` (custom stations) have no artwork — they get a quiet wash of their
+ * own colour over the same dark base instead, so they sit on the dial looking
+ * like everything else.
  */
-function DialRow({ label, active, children }: { label: string; active: boolean; children: React.ReactNode }) {
+function StationRow({
+  station, dial, tuned, locked, lcd, onPress,
+}: {
+  station: Station | CustomStation;
+  dial: { band: Band; label: string };
+  tuned: boolean;
+  locked?: boolean;
+  lcd: boolean;
+  onPress?: () => void;
+}) {
+  const custom = (station as CustomStation).image === null ? (station as CustomStation) : null;
+  const mine = !!custom;
+  const accent = station.eqColors?.[1] ?? (custom?.color ?? Cruise.amber);
+  // Icon: built-ins store an MCI glyph name; custom stations store either an
+  // MCI name (new) or an emoji (old ones).
+  const iconName = mine ? custom!.icon : (station as Station).iconName;
+  const isGlyph = /^[a-z]/.test(iconName);
+
   return (
-    <View style={styles.dialRow}>
-      <View style={styles.railCol}>
-        <View style={styles.railLine} />
-        {active && (
-          <View style={styles.railMarkBox} pointerEvents="none">
-            <View style={styles.railMark} />
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [
+        styles.rowShadow,
+        tuned && { shadowColor: accent, shadowOpacity: 0.55, shadowRadius: 16, elevation: 8 },
+        pressed && onPress ? styles.pressed : null,
+      ]}>
+      <View
+        style={[
+          styles.rowCard,
+          { borderColor: tuned ? accent + 'AA' : 'rgba(255,255,255,0.14)' },
+          locked && styles.rowLocked,
+        ]}>
+        {mine ? (
+          <>
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#10121c' }]} />
+            <LinearGradient
+              colors={[custom!.color + '4D', custom!.color + '1F', 'rgba(16,18,28,0)']}
+              locations={[0, 0.55, 1]}
+              start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </>
+        ) : (
+          <ImageBackground
+            source={(station as Station).image}
+            style={StyleSheet.absoluteFill}
+            imageStyle={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+          />
+        )}
+        {/* The glass: deepest on the left where the display sits, easing off
+            so the photograph breathes on the right. */}
+        <LinearGradient
+          colors={locked
+            ? ['rgba(8,8,14,0.92)', 'rgba(8,8,14,0.78)', 'rgba(8,8,14,0.6)']
+            : ['rgba(8,8,14,0.88)', 'rgba(8,8,14,0.68)', 'rgba(8,8,14,0.46)']}
+          locations={[0, 0.45, 1]}
+          start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* The tuning needle: a red line standing the full height of the
+            playing card's left edge — the page's single glowing marker. */}
+        {tuned && <View style={styles.tunedLine} pointerEvents="none" />}
+
+        <LcdNumber label={dial.label} band={dial.band} tuned={tuned} lcd={lcd} />
+        <Text style={styles.rowName} numberOfLines={1}>{station.name}</Text>
+        {mine && (
+          <View style={styles.mineChip}>
+            <Text style={styles.mineChipText}>MINE</Text>
           </View>
         )}
+        <View style={styles.rowTrail}>
+          <View style={styles.iconSlot}>
+            {isGlyph ? (
+              <MaterialCommunityIcons name={iconName as any} size={20} color="rgba(255,255,255,0.92)" style={styles.iconShadow} />
+            ) : (
+              <View style={styles.emojiBadge}>
+                <Text style={styles.emojiText}>{iconName}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.ctrlSlot}>
+            {locked ? (
+              <MaterialCommunityIcons name="lock" size={14} color="rgba(255,255,255,0.6)" />
+            ) : (
+              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
+            )}
+          </View>
+        </View>
       </View>
-      <Text style={[styles.freq, active && styles.freqActive, { fontFamily: Fonts.mono }]}>{label}</Text>
-      <View style={{ flex: 1 }}>{children}</View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -167,8 +264,15 @@ export default function StationsScreen() {
   const { isPro } = useEntitlements();
   const insets = useSafeAreaInsets();
 
+  // The segment-display faces, bundled in assets/fonts (OFL licence there
+  // too). Until they're ready — a frame or two at most — numbers fall back to
+  // the mono face and the ghost segments simply don't render.
+  const [lcd] = useFonts({
+    DSEG7: require('../../../assets/fonts/DSEG7Classic-Bold.ttf'),
+    DSEG14: require('../../../assets/fonts/DSEG14Classic-Bold.ttf'),
+  });
+
   const [onAirStation, setOnAirStation] = useState<Station>(() => stationById(defaultStationForNow()));
-  const [poetry, setPoetry] = useState(POETRY[0]);
 
   async function fetchCustom() {
     const loaded = await loadCustomStations();
@@ -179,14 +283,10 @@ export default function StationsScreen() {
   useFocusEffect(useCallback(() => {
     fetchCustom();
     setOnAirStation(stationById(defaultStationForNow()));
-    setPoetry(POETRY[Math.floor(Math.random() * POETRY.length)]);
   }, []));
 
   // AM = free + the user's own; FM = premium. Sorted up the dial within each
-  // group, the way a receiver's scale runs — but the user's own creations sit
-  // in their own block UNDER the defaults rather than interleaved by
-  // frequency (owner, 28.07: made stations were getting lost among the
-  // built-in ones).
+  // group; the user's creations sit in their own block under the defaults.
   const amDefaults = STATIONS.filter((s) => !s.premium)
     .map((s) => ({ station: s, dial: stationDial(s.id, false) }))
     .sort((a, b) => a.dial.value - b.dial.value);
@@ -198,7 +298,7 @@ export default function StationsScreen() {
     .map((s) => ({ station: s, dial: stationDial(s.id, true) }))
     .sort((a, b) => a.dial.value - b.dial.value);
 
-  // The red marker parks on whatever's playing, and falls back to the station
+  // The red line parks on whatever's playing, falling back to the station
   // that suits the hour when nothing is.
   const tunedId = np.session?.stationId ?? onAirStation.id;
 
@@ -211,10 +311,7 @@ export default function StationsScreen() {
 
         <View style={styles.headerBlock}>
           <View style={styles.titleRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.title}>What's the mood?</Text>
-              <Text style={styles.poetry}>{poetry}</Text>
-            </View>
+            <Text style={styles.title}>Now tuning</Text>
             <Pressable
               style={({ pressed }) => [styles.createBtn, pressed && styles.pressed]}
               onPress={() => setShowCreate(true)}
@@ -226,35 +323,40 @@ export default function StationsScreen() {
           <OnAirBanner station={onAirStation} onPress={() => setSelectedStation(onAirStation)} />
         </View>
 
-        <BandHeader band="AM" caption="FREE" />
+        <BandHeader band="AM" caption="FREE" lcd={lcd} />
         {amDefaults.map(({ station, dial }) => (
-          <DialRow key={station.id} label={dial.label} active={station.id === tunedId}>
-            <StationCard station={station} onPress={() => setSelectedStation(station)} />
-          </DialRow>
+          <StationRow
+            key={station.id}
+            station={station}
+            dial={dial}
+            tuned={station.id === tunedId}
+            lcd={lcd}
+            onPress={() => setSelectedStation(station)}
+          />
         ))}
         {amCustom.length > 0 && <SubHeader label="YOUR STATIONS" />}
         {amCustom.map(({ station, dial }) => (
-          <DialRow key={station.id} label={dial.label} active={station.id === tunedId}>
-            <CustomStationCard station={station} onPress={() => setSelectedStation(station)} />
-          </DialRow>
+          <StationRow
+            key={station.id}
+            station={station}
+            dial={dial}
+            tuned={station.id === tunedId}
+            lcd={lcd}
+            onPress={() => setSelectedStation(station)}
+          />
         ))}
 
-        <BandHeader band="FM" caption="PREMIUM" />
+        <BandHeader band="FM" caption="PREMIUM" lcd={lcd} />
         {fmBand.map(({ station, dial }) => (
-          <DialRow key={station.id} label={dial.label} active={station.id === tunedId}>
-            {isPro ? (
-              <StationCard station={station} onPress={() => setSelectedStation(station)} />
-            ) : (
-              <View style={styles.lockedWrapper}>
-                <StationCard station={station} />
-                <View style={styles.lockOverlay}>
-                  <PremiumShimmer />
-                  <Ionicons name="lock-closed" size={20} color="#fff" style={styles.lockIcon} />
-                  <Text style={styles.lockText}>Unlock with Premium</Text>
-                </View>
-              </View>
-            )}
-          </DialRow>
+          <StationRow
+            key={station.id}
+            station={station}
+            dial={dial}
+            tuned={station.id === tunedId}
+            locked={!isPro}
+            lcd={lcd}
+            onPress={isPro ? () => setSelectedStation(station) : undefined}
+          />
         ))}
 
       </ScrollView>
@@ -309,51 +411,6 @@ export default function StationsScreen() {
   );
 }
 
-function CustomStationCard({ station, onPress }: { station: CustomStation; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.customCard,
-        { shadowColor: station.glowColor },
-        pressed && styles.pressed,
-      ]}>
-      <View style={[styles.customCardInner, { borderColor: station.color + '5C' }]}>
-        <LinearGradient
-          colors={[station.color + '82', station.color + '46', station.color + '1A']}
-          locations={[0, 0.55, 1]}
-          start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <LinearGradient
-          colors={['rgba(255,255,255,0.07)', 'transparent']}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={[styles.customIcon, { backgroundColor: station.color + '38', borderColor: station.color + '99' }]}>
-          {/* New stations store an icon name; older ones may still hold an emoji. */}
-          {/^[a-z]/.test(station.icon) ? (
-            <MaterialCommunityIcons name={station.icon as any} size={24} color="#fff" />
-          ) : (
-            <Text style={styles.customIconEmoji}>{station.icon}</Text>
-          )}
-        </View>
-        {/* Centred to match the station cards beside it on the dial */}
-        <View style={styles.customText}>
-          <Text style={styles.customName} numberOfLines={1}>{station.name}</Text>
-          <Text style={styles.customTagline} numberOfLines={1}>{station.tagline}</Text>
-        </View>
-        <View style={styles.customChevronBlock}>
-          <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
-        </View>
-        <View style={[styles.myBadge, { backgroundColor: station.color + '22', borderColor: station.color + '55' }]}>
-          <Text style={[styles.myBadgeText, { color: station.color }]}>MINE</Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: {
     // Transparent like every other tab, so the shared near-black root shows
@@ -371,12 +428,7 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '800',
     letterSpacing: -0.5,
-  },
-  poetry: {
-    color: Cruise.textSecondary,
-    fontSize: 13.5,
-    fontStyle: 'italic',
-    marginTop: 5,
+    flex: 1,
   },
 
   // ── On Air banner ──
@@ -436,70 +488,119 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // ── The dial ──────────────────────────────────────────────────────────────
-  // Rail column, then the number, then the card. RAIL_W + FREQ_W is what the
-  // cards give up, so keep both tight.
-  railCol: {
-    width: 16,
-    alignSelf: 'stretch',
+  // ── Station rows ──────────────────────────────────────────────────────────
+  rowShadow: {
+    borderRadius: 16,
+    marginBottom: 11,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 5,
+    shadowColor: '#000',
+  },
+  rowCard: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 14,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
   },
-  // Full height on purpose: the rows butt up against each other so their rails
-  // join into one unbroken line down the page.
-  railLine: {
-    position: 'absolute',
-    top: -1,
-    bottom: -1,
-    width: 5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.13)',
+  // Dimmer, not grey: the photo and colour stay visible behind the padlock
+  // so the premium band still sells itself.
+  rowLocked: {
+    opacity: 0.72,
   },
-  // Stops 14 short of the bottom — that's the card's own margin, so the marker
-  // centres on the card rather than on the gap below it.
-  railMarkBox: {
+  tunedLine: {
     position: 'absolute',
-    top: 0,
-    bottom: 14,
     left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  railMark: {
-    width: 16,
-    height: 6,
-    borderRadius: 3,
+    top: 0,
+    bottom: 0,
+    width: 4,
     backgroundColor: '#FF3B30',
     shadowColor: '#FF3B30',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.95,
-    shadowRadius: 7,
-    elevation: 4,
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  dialRow: {
+  numCol: {
+    width: NUM_COL_W,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  numGhost: {
+    position: 'absolute',
+    right: 0,
+    fontSize: 17,
+    color: 'rgba(255,255,255,0.15)',
+  },
+  numLit: {
+    fontSize: 17,
+    color: '#EDF0F5',
+    textShadowColor: 'rgba(255,255,255,0.3)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 5,
+  },
+  numLitTuned: {
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(255,255,255,0.9)',
+    textShadowRadius: 12,
+  },
+  rowName: {
+    flexShrink: 1,
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowRadius: 8,
+  },
+  mineChip: {
+    borderWidth: 1,
+    borderColor: 'rgba(180,195,255,0.55)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  mineChipText: {
+    color: '#cdd8ff',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  rowTrail: {
+    marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 10,
   },
-  freq: {
-    width: 46,
-    textAlign: 'right',
-    color: '#FF9A2E',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    // The card carries a 14 bottom margin, so lift the number by half of it to
-    // sit level with the card's middle rather than the row's.
-    marginBottom: 14,
+  iconSlot: {
+    width: ICON_SLOT_W,
+    alignItems: 'center',
   },
-  // The tuned station's number burns brighter, the way a lit segment does —
-  // the red marker on the rail already says WHERE, this says HOW LOUD.
-  freqActive: {
-    color: '#FFD79B',
-    textShadowColor: '#FF9A2E',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 9,
+  // Keeps white icons legible when a bright photo sits behind them.
+  iconShadow: {
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 4,
   },
+  ctrlSlot: {
+    width: CTRL_SLOT_W,
+    alignItems: 'center',
+  },
+  emojiBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emojiText: { fontSize: 13 },
 
   // ── Band headers ──
   bandRow: {
@@ -510,10 +611,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   bandLetters: {
-    color: Cruise.textPrimary,
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: 2,
+    color: Cruise.amber,
+    fontSize: 19,
+  },
+  bandGhost: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    fontSize: 19,
+    color: 'rgba(245,158,11,0.16)',
   },
   bandTicks: {
     flex: 1,
@@ -539,7 +645,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 2,
-    marginLeft: 8,
   },
   subheadRule: {
     flex: 1,
@@ -585,105 +690,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 32,
   },
-  sectionLabel: {
-    color: Cruise.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 2,
-    marginBottom: 10,
-    marginTop: 8,
-  },
   pressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
-  customCard: {
-    marginBottom: 14,
-    borderRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.34,
-    shadowRadius: 22,
-    elevation: 9,
-  },
-  customCardInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(13,15,26,0.58)',
-    borderRadius: 20,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    gap: 10,
-    borderWidth: 1,
-  },
-  customIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    flexShrink: 0,
-  },
-  customIconEmoji: { fontSize: 20 },
-  customText: { flex: 1, alignItems: 'flex-start' },
-  customName: {
-    color: Cruise.textPrimary,
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 3,
-  },
-  customTagline: {
-    color: 'rgba(255,255,255,0.72)',
-    fontSize: 11.5,
-  },
-  customChevronBlock: {
-    width: 26,
-    alignItems: 'center',
-    gap: 4,
-    flexShrink: 0,
-  },
-  // Corner-mounted for the same reason the PREMIUM badge is: nothing may share
-  // the name's row, or the name stops being centred.
-  myBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderWidth: 1,
-  },
-  myBadgeText: {
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  customChevron: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 26,
-    lineHeight: 28,
-  },
-  lockedWrapper: { position: 'relative' },
-  lockOverlay: {
-    ...StyleSheet.absoluteFill,
-    // Stop 14 short: that's the card's own bottom margin, and without this the
-    // lock panel hangs below the card it's covering.
-    bottom: 14,
-    borderRadius: 20,
-    overflow: 'hidden',          // clip the shimmer sweep to the card's rounded rect
-    backgroundColor: 'rgba(8, 15, 51, 0.75)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  lockIcon: { fontSize: 22 },
-  lockText: {
-    color: Cruise.amber,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  empty: {
-    color: Cruise.textMuted,
-    textAlign: 'center',
-    marginTop: 48,
-    fontSize: 14,
-  },
 });

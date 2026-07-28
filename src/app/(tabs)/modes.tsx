@@ -189,7 +189,10 @@ function mixHex(a: string, b: string, t: number): string {
   const ch = (sh: number) => Math.round(((pa >> sh) & 255) + (((pb >> sh) & 255) - ((pa >> sh) & 255)) * t);
   return `#${((1 << 24) + (ch(16) << 16) + (ch(8) << 8) + ch(0)).toString(16).slice(1)}`;
 }
-const smoke = (c: string) => mixHex(mixHex(c, '#4a4f62', 0.42), '#ffffff', 0.06);
+// Held to a LIGHT touch (owner, 28.07: the first mix — 0.42 slate + a white
+// lift — came out washed and pastel). The white lift is gone entirely (white
+// is what pastels a colour), and the slate mix only takes the neon edge off.
+const smoke = (c: string) => mixHex(c, '#4a4f62', 0.18);
 
 /**
  * The glass layers, drawn over a card's gradient. `spot` (0-100) places the

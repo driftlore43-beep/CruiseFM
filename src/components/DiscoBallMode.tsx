@@ -238,9 +238,14 @@ const LAMPS = [
   // nothing of its own, so tinting the unlit surface harder only makes the
   // ball muddy — it's the CAUGHT mirrors that have to be amber and hot pink.
   // One lamp stays near-white, because a mirror facing a beam head-on is.
+  // The two coloured lamps use the station's FIRST and LAST stops at full
+  // strength, not the lightened palette variants (hue 4/7) they started on —
+  // lightened stops made Sunset's lit mirrors a washed coral when the owner
+  // wanted its actual amber and magenta (28.07). Index 0 and 6 are the raw
+  // eq[0] and eq[2] in stationPalette's layout.
   { tilt:  0.085, phase: 0.000, hue: 1, sat: 0.05 },   // the KEY light: white, and it stays white
-  { tilt: -0.055, phase: 0.167, hue: 4, sat: 0.52 },   // low and to the right, mood-coloured
-  { tilt:  0.020, phase: 0.333, hue: 7, sat: 0.40 },   // near the equator, mood-coloured
+  { tilt: -0.055, phase: 0.167, hue: 0, sat: 0.58 },   // low and to the right, first stop (Sunset: amber)
+  { tilt:  0.020, phase: 0.333, hue: 6, sat: 0.46 },   // near the equator, last stop (Sunset: magenta)
 ];
 
 function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: Tile[]; flashes: Tile[][] } {
@@ -750,8 +755,11 @@ function ColourReflections({ size, eq, lit }: { size: number; eq: [string, strin
     // r=40 (of a 100 viewBox) one patch is 80% of the diameter and you are
     // back to a tinted sphere.
     r: 13 + hash01(i * 3.37 + 2.9) * 15,
-    color: eq[i % 3],
-    peak: 0.16 + hash01(i * 9.7) * 0.14,
+    // First and last stops weighted over the middle one — the outer stops
+    // are where a station's character lives (Sunset: amber and magenta; its
+    // middle coral mostly just averages them).
+    color: eq[[0, 2, 1, 0, 2][i % 5]],
+    peak: 0.20 + hash01(i * 9.7) * 0.16,
     dur: 3800 + Math.floor(hash01(i * 5.5) * 4200),
     delay: Math.floor(hash01(i * 2.3) * 3600),
   })), [eq]);
@@ -814,9 +822,12 @@ function MirrorGlints({ size, lit }: { size: number; lit: Animated.Value }) {
       x: size * (0.46 + Math.cos(a) * rr - 0.03),
       y: size * (0.46 + Math.sin(a) * rr - 0.04),
       span: size * (0.13 + hash01(i * 8.9) * 0.13),
-      peak: 0.55 + hash01(i * 4.7) * 0.45,
-      // ~0.5s alight; the rest of the period it is not there at all.
-      period: 3400 + Math.floor(hash01(i * 2.9) * 4200),
+      peak: 0.5 + hash01(i * 4.7) * 0.4,
+      // Slow shine, not a camera flash (owner, 28.07 — the first cut popped
+      // in 170ms and read as strobing). Each glint blooms over ~a second,
+      // lingers by the shape of the sine easing, and takes even longer to
+      // let go; the long period between shines is what keeps them special.
+      period: 3600 + Math.floor(hash01(i * 2.9) * 4600),
       delay: Math.floor(hash01(i * 5.3) * 5200),
     };
   }), [size]);
@@ -826,8 +837,8 @@ function MirrorGlints({ size, lit }: { size: number; lit: Animated.Value }) {
     const loops = glints.map((g, i) => {
       const loop = Animated.loop(Animated.sequence([
         Animated.delay(g.delay),
-        Animated.timing(t[i], { toValue: 1, duration: 170, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(t[i], { toValue: 0, duration: 380, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        Animated.timing(t[i], { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(t[i], { toValue: 0, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
         Animated.delay(g.period),
       ]));
       loop.start();
@@ -840,26 +851,55 @@ function MirrorGlints({ size, lit }: { size: number; lit: Animated.Value }) {
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {glints.map((g, i) => {
         const opacity = Animated.multiply(t[i].interpolate({ inputRange: [0, 1], outputRange: [0, g.peak] }), lit);
-        const scale = t[i].interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] });
-        const arm = { position: 'absolute' as const, backgroundColor: '#ffffff' };
+        const scale = t[i].interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
+        const armH = Math.max(1.5, g.span * 0.014);
         return (
           <Animated.View
             key={i}
             style={{
               position: 'absolute', left: g.x - g.span / 2, top: g.y - g.span / 2,
               width: g.span, height: g.span, opacity, transform: [{ scale }],
-              alignItems: 'center', justifyContent: 'center',
             }}
           >
-            {/* Two crossed hairlines and a small hot core. The arms have to be
-                THIN — anything thick reads as a plus sign drawn on the ball
-                rather than light blooming through a lens. */}
-            <View style={[arm, { left: 0, right: 0, height: 1, top: g.span / 2 - 0.5 }]} />
-            <View style={[arm, { top: 0, bottom: 0, width: 1, left: g.span / 2 - 0.5 }]} />
-            <View style={{
-              width: g.span * 0.26, height: g.span * 0.26, borderRadius: g.span * 0.13,
-              backgroundColor: '#ffffff',
-            }} />
+            {/* EVERYTHING here is falloff — that is the whole fix. The first
+                version was two hard 1px lines and a solid white dot, which on
+                device read as a plus sign drawn on the mirrors (owner
+                screenshot, 28.07). On the reference flare nothing has an
+                edge: the core sits inside a wide soft halo and the arms fade
+                to nothing before they end. So the halo+core is one radial
+                gradient (per-glint id — 11 separate Svg roots, and duplicate
+                ids across roots render blank), and each arm is a gradient
+                that is transparent at both tips, inset from the box so its
+                reach stays inside the halo's. */}
+            <Svg width={g.span} height={g.span} style={StyleSheet.absoluteFill}>
+              <Defs>
+                <RadialGradient id={`dbGlintHalo${i}`} cx="50%" cy="50%" r="50%">
+                  <Stop offset="0" stopColor="#ffffff" stopOpacity="0.95" />
+                  <Stop offset="0.14" stopColor="#ffffff" stopOpacity="0.6" />
+                  <Stop offset="0.4" stopColor="#ffffff" stopOpacity="0.18" />
+                  <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+                </RadialGradient>
+              </Defs>
+              <Circle cx={g.span / 2} cy={g.span / 2} r={g.span / 2} fill={`url(#dbGlintHalo${i})`} />
+            </Svg>
+            {/* Vertical arm reaches further than the horizontal one, like the
+                reference — a perfectly even cross reads as a marker. */}
+            <View style={{ position: 'absolute', left: g.span / 2 - armH / 2, top: g.span * 0.02, width: armH, height: g.span * 0.96 }}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0)']}
+                locations={[0, 0.5, 1]}
+                start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </View>
+            <View style={{ position: 'absolute', top: g.span / 2 - armH / 2, left: g.span * 0.16, height: armH, width: g.span * 0.68 }}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.75)', 'rgba(255,255,255,0)']}
+                locations={[0, 0.5, 1]}
+                start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </View>
           </Animated.View>
         );
       })}

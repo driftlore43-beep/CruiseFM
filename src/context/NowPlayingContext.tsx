@@ -101,6 +101,8 @@ type NowPlayingCtx = {
   expand: () => void;
   /** Station switched from inside a mode — keeps the mini-player honest. */
   setStationId: (stationId: string) => void;
+  /** Swap the visual mode mid-drive, leaving the music completely alone. */
+  setMode: (mode: string) => void;
   /** End the session entirely (mini-player ✕) — banks the drive. */
   stop: () => void;
   /** Bumps whenever the user touches a playback control — the
@@ -272,6 +274,17 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     startStationMusic(stationId, { breath: true });
   }, [startStationMusic]);
 
+  // Change Mode mid-drive: purely visual — the song keeps playing untouched,
+  // which is the whole difference from open() (that restarts station music).
+  // Preview is recomputed so a free user picking a premium mode gets the
+  // usual taste-then-gate, and returns to a full drive on a free mode.
+  const setMode = useCallback((mode: string) => {
+    const current = sessionRef.current;
+    if (!current || current.mode === mode) return;
+    const preview = !isProRef.current && isProMode(mode);
+    setSession({ ...current, mode, preview });
+  }, []);
+
   const stop = useCallback(() => {
     setSession(null);
     setExpanded(false);
@@ -304,8 +317,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching }),
-    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching],
+    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, setMode, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching }),
+    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, setMode, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

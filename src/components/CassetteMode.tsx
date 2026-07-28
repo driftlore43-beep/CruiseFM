@@ -18,7 +18,7 @@ import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
-import { MoodSheet } from '@/components/MoodSheet';
+import { ModeSheet } from '@/components/ModeSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { seekTo } from '@/utils/spotify';
@@ -1081,12 +1081,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />
 
-        <MoodSheet
-          visible={showMood}
-          activeId={activeId}
-          onSelect={(id) => { setActiveId(id); npSetStation(id); setShowMood(false); }}
-          onClose={() => setShowMood(false)}
-        />
+        <ModeSheet visible={showMood} onClose={() => setShowMood(false)} />
 
         {showPicker && (
           <PlaylistSheet

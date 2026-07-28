@@ -36,7 +36,7 @@ function trim(label: string): string {
 export function ModeActionRow({
   onChangeMood, onPickPlaylist, playlistLabel, track, station, style,
 }: {
-  onChangeMood: () => void;
+  onChangeMood: () => void; // opens the mode sheet (historic prop name)
   onPickPlaylist: () => void;
   playlistLabel: string;
   /** The live Spotify track, or null. Drives whether sharing is offered. */
@@ -55,7 +55,7 @@ export function ModeActionRow({
     <View style={[ar.row, style]}>
       <TouchableOpacity onPress={onChangeMood} style={ar.pill} activeOpacity={0.85}>
         <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
-        <Text style={ar.pillBold}>Change Mood</Text>
+        <Text style={ar.pillBold}>Change Mode</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={onPickPlaylist} style={[ar.pill, ar.pillFlex]} activeOpacity={0.85}>

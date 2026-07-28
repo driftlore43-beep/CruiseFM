@@ -12,7 +12,7 @@ import Svg, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { MoodSheet } from '@/components/MoodSheet';
+import { ModeSheet } from '@/components/ModeSheet';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { Fonts } from '@/constants/theme';
@@ -1840,12 +1840,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />
 
-        <MoodSheet
-          visible={showMood}
-          activeId={activeId}
-          onSelect={(id) => { setActiveId(id); npSetStation(id); setShowMood(false); }}
-          onClose={() => setShowMood(false)}
-        />
+        <ModeSheet visible={showMood} onClose={() => setShowMood(false)} />
 
         {showPicker && (
           <PlaylistSheet

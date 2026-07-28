@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Line, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MoodSheet } from '@/components/MoodSheet';
+import { ModeSheet } from '@/components/ModeSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { STATIONS, stationDial, type Band } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
@@ -814,15 +814,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />
 
-        <MoodSheet
-          visible={showMood}
-          activeId={activeId}
-          onSelect={(id) => {
-            setShowMood(false);
-            reelTo(id);
-          }}
-          onClose={() => setShowMood(false)}
-        />
+        <ModeSheet visible={showMood} onClose={() => setShowMood(false)} />
 
         {showPicker && (
           <PlaylistSheet

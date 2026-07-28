@@ -10,8 +10,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 
-import { GlossSheen } from '@/components/GlossSheen';
 import { MirrorBallGlyph } from '@/components/MirrorBallGlyph';
 import { PremiumShimmer } from '@/components/PremiumShimmer';
 import { useNowPlaying } from '@/context/NowPlayingContext';
@@ -176,6 +176,77 @@ function CardGlitter({ count = 16 }: { count?: number }) {
   );
 }
 
+// ── The "F" glass finish (owner's pick, 28.07) ───────────────────────────────
+//
+// The mode gradients smoked toward slate — the same mute the Cruise page's
+// Recommended cards use — under a genuine pane of glass: the home cards'
+// gloss recipe (top sheen falling to a grounding shadow, corner light-catch,
+// bright rim) plus the reference pane's specular hot-spot on the top edge and
+// the cool glints near the bottom corners.
+
+function mixHex(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ch = (sh: number) => Math.round(((pa >> sh) & 255) + (((pb >> sh) & 255) - ((pa >> sh) & 255)) * t);
+  return `#${((1 << 24) + (ch(16) << 16) + (ch(8) << 8) + ch(0)).toString(16).slice(1)}`;
+}
+const smoke = (c: string) => mixHex(mixHex(c, '#4a4f62', 0.42), '#ffffff', 0.06);
+
+/**
+ * The glass layers, drawn over a card's gradient. `spot` (0-100) places the
+ * specular core along the top edge — varied per card so the page doesn't
+ * look stamped out of one die. `uid` namespaces the Svg gradient id: several
+ * of these are on screen at once, and duplicate ids across Svg roots are a
+ * known way to get one rendering blank.
+ */
+function GlassPane({ spot, uid }: { spot: number; uid: string }) {
+  return (
+    <>
+      {/* light gathers at the top, a hint of shadow grounds the bottom */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.20)', 'rgba(255,255,255,0.05)', 'transparent', 'rgba(0,0,0,0.16)']}
+        locations={[0, 0.28, 0.6, 1]}
+        start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill} pointerEvents="none"
+      />
+      {/* ambient catch across the top-left corner */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.16)', 'transparent']}
+        start={{ x: 0, y: 0 }} end={{ x: 0.55, y: 0.55 }}
+        style={StyleSheet.absoluteFill} pointerEvents="none"
+      />
+      {/* hairline along the very top edge, burning brightest at one point */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.95)', 'rgba(255,255,255,0.55)', 'rgba(255,255,255,0.12)']}
+        locations={[0, Math.max(0.05, Math.min(0.9, spot / 100)), Math.min(0.95, spot / 100 + 0.13), 1]}
+        start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+        style={styles.glassTopline} pointerEvents="none"
+      />
+      {/* the specular bloom sitting on that point (no blur filter in RN — a
+          small radial gradient stands in for it) */}
+      <Svg width={70} height={14} style={[styles.glassHotspot, { left: `${spot - 9}%` }]} pointerEvents="none">
+        <Defs>
+          <RadialGradient id={`ghs${uid}`} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.8" />
+            <Stop offset="0.7" stopColor="#ffffff" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Ellipse cx={35} cy={7} rx={35} ry={7} fill={`url(#ghs${uid})`} />
+      </Svg>
+      {/* cool glints near the bottom corners, from the reference pane */}
+      <LinearGradient
+        colors={['rgba(160,240,255,0)', 'rgba(160,240,255,0.55)', 'rgba(160,240,255,0)']}
+        start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+        style={styles.glassGlintL} pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['rgba(160,240,255,0)', 'rgba(190,245,255,0.45)', 'rgba(160,240,255,0)']}
+        start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+        style={styles.glassGlintR} pointerEvents="none"
+      />
+    </>
+  );
+}
+
 // ── Compact mode row card ─────────────────────────────────────────────────────
 function CompactModeCard({
   title,
@@ -200,22 +271,27 @@ function CompactModeCard({
   silver?: boolean;
   glitter?: boolean;
 }) {
+  // Every card's gradient is smoked toward slate and runs on the diagonal —
+  // the Cruise page's colour temperature. The specular point sits somewhere
+  // different on each card, derived from the title so it's stable.
+  const smoked = gradient.map(smoke) as [string, string, string];
+  let h = 0;
+  for (let i = 0; i < title.length; i++) h = (h * 31 + title.charCodeAt(i)) >>> 0;
+  const spot = 22 + (h % 46);
+
   return (
-    // The glow lives on the wrapper, not the card: the card clips its own
+    // The shadow lives on the wrapper, not the card: the card clips its own
     // children (overflow hidden for the rounded gradient), and on iOS that
     // clips the shadow with them.
-    <View style={silver && styles.silverGlow}>
-      <View style={[styles.compactCard, silver && styles.silverCard]}>
-        {/* Silver runs on the diagonal — a bright top-left corner falling away
-            to the bottom-right is what makes a neutral wash read as polished
-            metal rather than flat grey. */}
+    <View style={[styles.cardShadow, silver && styles.silverGlow]}>
+      <View style={styles.compactCard}>
         <LinearGradient
-          colors={gradient}
-          start={silver ? { x: 0, y: 0 } : { x: 0, y: 0.5 }}
-          end={silver ? { x: 1, y: 1 } : { x: 1, y: 0.5 }}
+          colors={smoked}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-        {premium && <GlossSheen radius={18} />}
+        <GlassPane spot={spot} uid={title.replace(/\W/g, '')} />
         {locked && <PremiumShimmer />}
         <View style={{ flex: 1, gap: 3 }}>
           <Text style={styles.compactTitle}>{title}</Text>
@@ -366,7 +442,7 @@ export default function ModesScreen() {
             title="Mirror Ball Mode"
             desc="A slow-turning mirror ball scattering light across your night drive."
             iconNode={<MirrorBallGlyph size={26} />}
-            gradient={['rgba(255,255,255,0.30)', 'rgba(203,220,252,0.17)', 'rgba(255,255,255,0.07)']}
+            gradient={['#c8d2e2', '#9aa6ba', '#5a6274']}
             locked={!isPro}
             premium
             silver
@@ -465,13 +541,51 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    borderRadius: 18,
+    // The home cards' geometry: big soft corners, and the bright border IS
+    // the glass rim.
+    borderRadius: 22,
     overflow: 'hidden',
     minHeight: 84,
     paddingVertical: 20,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: 'rgba(255,255,255,0.30)',
+  },
+  cardShadow: {
+    borderRadius: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  glassTopline: {
+    position: 'absolute',
+    top: 0,
+    left: '7%',
+    right: '7%',
+    height: 1.5,
+    borderRadius: 1,
+  },
+  glassHotspot: {
+    position: 'absolute',
+    top: -6,
+  },
+  glassGlintL: {
+    position: 'absolute',
+    bottom: 0,
+    left: '6%',
+    width: '26%',
+    height: 2,
+    borderRadius: 2,
+  },
+  glassGlintR: {
+    position: 'absolute',
+    bottom: 0,
+    right: '4%',
+    width: '20%',
+    height: 2,
+    borderRadius: 2,
   },
   trailRow: {
     marginLeft: 'auto',
@@ -493,10 +607,6 @@ const styles = StyleSheet.create({
   },
   // Frosted silver glass — no colour slab, just white at low opacity over the
   // app's own dark background, with a bright rim and a cool outward glimmer.
-  silverCard: {
-    borderColor: 'rgba(255,255,255,0.34)',
-    backgroundColor: 'rgba(150,168,205,0.10)',
-  },
   silverGlow: {
     borderRadius: 18,
     shadowColor: '#cfe0ff',

@@ -196,8 +196,11 @@ function StationRow({
         {mine ? (
           <>
             <View style={[StyleSheet.absoluteFill, { backgroundColor: '#10121c' }]} />
+            {/* Full-colour wash (owner's pick, 28.07, from the three-strength
+                prototype): the chosen colour owns the whole card, still
+                deepest on the left where the display sits. */}
             <LinearGradient
-              colors={[custom!.color + '4D', custom!.color + '1F', 'rgba(16,18,28,0)']}
+              colors={[custom!.color + 'C4', custom!.color + '73', custom!.color + '2E']}
               locations={[0, 0.55, 1]}
               start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
               style={StyleSheet.absoluteFill}

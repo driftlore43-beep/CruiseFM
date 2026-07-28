@@ -116,6 +116,23 @@ function BandHeader({ band, caption }: { band: Band; caption: string }) {
 }
 
 /**
+ * A small printed label inside a band — used to set the user's own stations
+ * apart from the built-in ones. Carries the rail line so the dial's left
+ * edge runs through it unbroken.
+ */
+function SubHeader({ label }: { label: string }) {
+  return (
+    <View style={styles.subheadRow}>
+      <View style={styles.railCol}>
+        <View style={styles.railLine} />
+      </View>
+      <Text style={[styles.subheadText, { fontFamily: Fonts.mono }]}>{label}</Text>
+      <View style={styles.subheadRule} />
+    </View>
+  );
+}
+
+/**
  * One station on the dial: rail, number, then the card.
  *
  * The rail line is drawn inside every row rather than once behind the list, so
@@ -165,12 +182,17 @@ export default function StationsScreen() {
     setPoetry(POETRY[Math.floor(Math.random() * POETRY.length)]);
   }, []));
 
-  // AM = free + the user's own; FM = premium. Both sorted up the dial, the way
-  // a receiver's scale runs, so the numbers on the left always ascend.
-  const amBand = [
-    ...customStations.map((c) => ({ kind: 'custom' as const, station: c, dial: stationDial(c.id, false) })),
-    ...STATIONS.filter((s) => !s.premium).map((s) => ({ kind: 'station' as const, station: s, dial: stationDial(s.id, false) })),
-  ].sort((a, b) => a.dial.value - b.dial.value);
+  // AM = free + the user's own; FM = premium. Sorted up the dial within each
+  // group, the way a receiver's scale runs — but the user's own creations sit
+  // in their own block UNDER the defaults rather than interleaved by
+  // frequency (owner, 28.07: made stations were getting lost among the
+  // built-in ones).
+  const amDefaults = STATIONS.filter((s) => !s.premium)
+    .map((s) => ({ station: s, dial: stationDial(s.id, false) }))
+    .sort((a, b) => a.dial.value - b.dial.value);
+  const amCustom = customStations
+    .map((c) => ({ station: c, dial: stationDial(c.id, false) }))
+    .sort((a, b) => a.dial.value - b.dial.value);
 
   const fmBand = STATIONS.filter((s) => s.premium)
     .map((s) => ({ station: s, dial: stationDial(s.id, true) }))
@@ -205,13 +227,15 @@ export default function StationsScreen() {
         </View>
 
         <BandHeader band="AM" caption="FREE" />
-        {amBand.map(({ kind, station, dial }) => (
+        {amDefaults.map(({ station, dial }) => (
           <DialRow key={station.id} label={dial.label} active={station.id === tunedId}>
-            {kind === 'custom' ? (
-              <CustomStationCard station={station as CustomStation} onPress={() => setSelectedStation(station)} />
-            ) : (
-              <StationCard station={station as Station} onPress={() => setSelectedStation(station)} />
-            )}
+            <StationCard station={station} onPress={() => setSelectedStation(station)} />
+          </DialRow>
+        ))}
+        {amCustom.length > 0 && <SubHeader label="YOUR STATIONS" />}
+        {amCustom.map(({ station, dial }) => (
+          <DialRow key={station.id} label={dial.label} active={station.id === tunedId}>
+            <CustomStationCard station={station} onPress={() => setSelectedStation(station)} />
           </DialRow>
         ))}
 
@@ -503,6 +527,26 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 2,
+  },
+  subheadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  subheadText: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginLeft: 8,
+  },
+  subheadRule: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginLeft: 10,
+    marginRight: 2,
   },
   dialTick: {
     width: 1,

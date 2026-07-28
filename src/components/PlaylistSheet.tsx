@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getUserPlaylists, isSpotifyConnected } from '@/utils/spotify';
@@ -65,6 +65,22 @@ export function PlaylistSheet({
   onPick: (pl: LinkedPlaylist) => void;
 }) {
   const insets = useSafeAreaInsets();
+
+  // Gesture trap. The sheet is drawn INSIDE screens that have their own
+  // pull-down-to-dismiss (the station page, every visual mode), and those
+  // claim any vertical drag the playlist ScrollView declines — which it does
+  // whenever the list is at its top, or too short to scroll at all. Result:
+  // scrolling the playlists sometimes dragged the whole page away underneath
+  // the sheet (owner, 28.07). This claims those declined drags first and
+  // simply swallows them; the list itself is deeper, so real scrolling still
+  // wins the gesture before the trap is ever asked. The few-pixel threshold
+  // keeps slightly-wobbly taps working as taps.
+  const gestureTrap = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 6 || Math.abs(g.dx) > 6,
+    onPanResponderTerminationRequest: () => false,
+  })).current;
+
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [playlists, setPlaylists] = useState<LinkedPlaylist[]>([]);
@@ -89,7 +105,7 @@ export function PlaylistSheet({
       {/* Lifts the sheet above the keyboard so the paste-a-link bar stays
           visible while typing — without this the keyboard covered it. */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={[ps.sheet, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={[ps.sheet, { paddingBottom: insets.bottom + 16 }]} {...gestureTrap.panHandlers}>
         <View style={ps.handle} />
         <Text style={ps.title}>Choose a playlist</Text>
         <Text style={ps.sub}>for {stationName}</Text>

@@ -217,14 +217,24 @@ function CompactModeCard({
         />
         {premium && <GlossSheen radius={18} />}
         {locked && <PremiumShimmer />}
-        <View style={[styles.compactIconWrap, silver && styles.silverIconWrap]}>
-          {iconNode ?? <MaterialCommunityIcons name={icon as any} size={22} color="#fff" />}
-        </View>
         <View style={{ flex: 1, gap: 3 }}>
           <Text style={styles.compactTitle}>{title}</Text>
-          <Text style={styles.compactDesc} numberOfLines={2}>{desc}</Text>
+          <Text style={styles.compactDesc} numberOfLines={1}>{desc}</Text>
         </View>
-        {locked && <Ionicons name="lock-closed" size={16} color="rgba(255,255,255,0.55)" style={{ marginLeft: 8 }} />}
+        {/* Same furniture as the Stations page (owner, 28.07): bare white
+            icon in a fixed column at the card's right edge — no ring around
+            it — then the arrow (the page slides in from the right), or the
+            padlock when locked, outermost in its own slot. */}
+        <View style={styles.trailRow}>
+          <View style={styles.iconSlot}>
+            {iconNode ?? <MaterialCommunityIcons name={icon as any} size={22} color="rgba(255,255,255,0.92)" style={styles.iconShadow} />}
+          </View>
+          <View style={styles.ctrlSlot}>
+            {locked
+              ? <Ionicons name="lock-closed" size={14} color="rgba(255,255,255,0.6)" />
+              : <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />}
+          </View>
+        </View>
       </View>
       {glitter && <CardGlitter />}
     </View>
@@ -311,7 +321,7 @@ export default function ModesScreen() {
           <CompactModeCard
             title="Vinyl Record Mode"
             desc="Rotating analogue record with warm ambient glow and tactile presence."
-            icon="album"
+            icon="record-player"
             gradient={['#c05a20', '#8a3a18', '#3a180a']}
             locked={!isPro}
             premium
@@ -457,9 +467,29 @@ const styles = StyleSheet.create({
     gap: 14,
     borderRadius: 18,
     overflow: 'hidden',
-    padding: 16,
+    minHeight: 84,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  trailRow: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  iconSlot: {
+    width: 28,
+    alignItems: 'center',
+  },
+  iconShadow: {
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 4,
+  },
+  ctrlSlot: {
+    width: 16,
+    alignItems: 'center',
   },
   // Frosted silver glass — no colour slab, just white at low opacity over the
   // app's own dark background, with a bright rim and a cool outward glimmer.
@@ -474,20 +504,6 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
-  },
-  compactIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  silverIconWrap: {
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderColor: 'rgba(255,255,255,0.32)',
   },
   compactTitle: {
     color: '#fff',

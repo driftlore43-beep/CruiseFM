@@ -498,8 +498,8 @@ const styles = StyleSheet.create({
     elevation: 5,
     shadowColor: '#000',
   },
-  // Sized to sit alongside the Modes page's cards (its compact cards land at
-  // ~78pt with an 18pt radius) — at the old 18px padding these read as
+  // Sized to sit alongside the Modes page's cards (both card families share an
+  // exact 84pt minimum height and 18pt radius — keep them in step) — at the old 18px padding these read as
   // condensed strips next to them (owner, 28.07).
   rowCard: {
     flexDirection: 'row',
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1,
-    minHeight: 78,
+    minHeight: 84,
     paddingVertical: 20,
     paddingHorizontal: 16,
   },

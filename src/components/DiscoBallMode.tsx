@@ -36,6 +36,10 @@ const DEMO_DURATION_MS = 214000;
 // Anything quicker reads as a toy spinning, and it also makes the light
 // sweeping across the room look frantic rather than like stage lighting.
 const BALL_SPIN_MS = 15000;
+// How long the controls stay up after you last touched the screen. Long
+// enough to read the song and reach the skip button; short enough that the
+// ball is alone in the dark for most of a drive.
+const CHROME_REST_MS = 6000;
 
 
 function formatMs(ms: number): string {
@@ -1700,6 +1704,41 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const resetTrack = () => progress.setValue(0);
   const togglePlay = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
 
+  // ── The controls rest ──────────────────────────────────────────────────
+  // After a few untouched seconds of playback the header, transport and pills
+  // fade out and leave the ball alone in the dark. That is the shot this mode
+  // was built for and nobody could ever see it, because the buttons sat on
+  // top of it for the whole drive. Any touch anywhere brings them back.
+  //
+  // Deliberately opacity-only: nothing moves, so the ball does not shift when
+  // the chrome comes and goes, and the fade runs on the native driver.
+  const chrome = useRef(new Animated.Value(1)).current;
+  const [chromeRested, setChromeRested] = useState(false);
+  const restTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sheetOpen = showMood || showPicker;
+
+  const wakeChrome = () => {
+    if (restTimer.current) { clearTimeout(restTimer.current); restTimer.current = null; }
+    setChromeRested(false);
+    Animated.timing(chrome, { toValue: 1, duration: 170, useNativeDriver: true }).start();
+    // Only ever rests during playback: a paused drive is one you are looking
+    // at, and hiding the play button from someone who just paused is rude.
+    if (playing && !sheetOpen) {
+      restTimer.current = setTimeout(() => {
+        setChromeRested(true);
+        Animated.timing(chrome, {
+          toValue: 0, duration: 1100, easing: Easing.out(Easing.quad), useNativeDriver: true,
+        }).start();
+      }, CHROME_REST_MS);
+    }
+  };
+
+  useEffect(() => {
+    if (!visible) return;
+    wakeChrome();
+    return () => { if (restTimer.current) { clearTimeout(restTimer.current); restTimer.current = null; } };
+  }, [visible, playing, sheetOpen]);
+
   const hasTrack = !!spotify.track;
   const title = spotify.track?.title ?? station.tagline;
   const artist = spotify.track?.artist ?? '';
@@ -1712,16 +1751,41 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
 
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
-      <Animated.View style={[{ flex: 1, backgroundColor: '#04040c' }, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
+      <Animated.View
+        style={[{ flex: 1, backgroundColor: '#04040c' }, { transform: [{ translateY: slideY }] }]}
+        {...dismissPan.panHandlers}
+        /* A passive touch sniffer: it never claims the gesture (always false),
+           it just notices that a finger landed anywhere on the screen and
+           brings the rested controls back. Must sit on the root so it sees
+           taps on the ball, the buttons and the empty dark alike. */
+        onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
 
-        <StationBackdrop station={station} blurRadius={2.5} />
-        {/* Club-dark wash — deeper than other modes so the light dots pop */}
-        <LinearGradient
-          colors={['rgba(2,2,10,0.55)', 'rgba(2,2,10,0.42)', 'rgba(2,2,10,0.6)', 'rgba(2,2,10,0.72)', 'rgba(2,2,10,0.8)']}
-          locations={[0, 0.4, 0.65, 0.85, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+        {/* THE ROOM IS DARK (owner, 29.07). Every mirror ball worth copying is
+            photographed in a black room, and that is not decoration — a beam
+            only reads as a beam if there is darkness for it to cross. This
+            mode used to sit on the station photograph at the same strength as
+            the other seven, so the ball was competing with a lit picture and
+            the light shafts read as pale lines drawn on top of it.
+            The photograph survives at a whisper, purely as the mood's colour
+            temperature; the dark falls off from behind the ball outwards, so
+            the middle of the screen still has some depth to it rather than
+            being flat black. */}
+        <View style={[StyleSheet.absoluteFill, { opacity: 0.16 }]} pointerEvents="none">
+          <StationBackdrop station={station} blurRadius={2.5} />
+        </View>
+        {/* Explicit width/height, not just absoluteFill: an Svg with no size
+            falls back to an intrinsic one and the wash lands as a black box
+            in the top-left corner. */}
+        <Svg width={winW} height={winH} style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Defs>
+            <RadialGradient id="dbRoom" cx="50%" cy="30%" r="78%">
+              <Stop offset="0" stopColor="#14162a" stopOpacity="0.52" />
+              <Stop offset="0.62" stopColor="#020206" stopOpacity="0.92" />
+              <Stop offset="1" stopColor="#000000" stopOpacity="1" />
+            </RadialGradient>
+          </Defs>
+          <Rect x={0} y={0} width={winW} height={winH} fill="url(#dbRoom)" />
+        </Svg>
 
         {/* The light the ball throws around the room. Driven by the SAME spin
             value as the ball, so the dots travel in the same direction and at
@@ -1745,19 +1809,19 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         <BokehField count={9} eq={eq} live={live} winW={winW} winH={winH} />
 
         {/* Drag pill */}
-        <View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
+        <Animated.View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10, opacity: chrome }} pointerEvents="none">
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
-        </View>
+        </Animated.View>
 
-        <View style={[fs.topBar, { top: topPad + 14 }]}>
+        <Animated.View style={[fs.topBar, { top: topPad + 14, opacity: chrome }]} pointerEvents="none">
           <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>MIRROR BALL</Text>
-        </View>
+        </Animated.View>
 
         <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>
-          <View style={{ alignItems: 'center', gap: 3, paddingHorizontal: 32, paddingBottom: 10 }}>
+          <Animated.View style={{ alignItems: 'center', gap: 3, paddingHorizontal: 32, paddingBottom: 10, opacity: chrome }} pointerEvents="none">
             <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 }}>YOU’RE LISTENING TO</Text>
             <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>{station.name}</Text>
-          </View>
+          </Animated.View>
 
           {/* The ball, hanging from a mount, genuinely turning on its axis */}
           {/* paddingBottom lifts the ball off the dead centre of its box —
@@ -1781,6 +1845,10 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             </View>
           </View>
 
+          {/* Everything below the ball rests together. pointerEvents goes off
+              once it's invisible so the first tap only wakes it — you can't
+              hit a skip button you can't see. */}
+          <Animated.View style={{ opacity: chrome }} pointerEvents={chromeRested ? 'none' : 'auto'}>
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
             {hasTrack
               ? <MarqueeText text={title} style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }} />
@@ -1830,10 +1898,18 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             track={spotify.track}
             station={station}
           />
+          </Animated.View>
         </View>
 
 
-        <ModeCloseButton onPress={handleClose} />
+        {/* absoluteFill, not an auto-sized wrapper: the close button positions
+            itself absolutely against its parent, so anything smaller than the
+            screen would move it. */}
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { opacity: chrome, zIndex: 60 }]}
+          pointerEvents={chromeRested ? 'none' : 'box-none'}>
+          <ModeCloseButton onPress={handleClose} />
+        </Animated.View>
 
         <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />

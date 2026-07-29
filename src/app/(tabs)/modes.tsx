@@ -1,263 +1,142 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useRef } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { GlassPane, smoke, specularSpot } from '@/components/GlassPane';
-import { MirrorBallGlyph } from '@/components/MirrorBallGlyph';
-import { PremiumShimmer } from '@/components/PremiumShimmer';
+import { ModeThumb, type ModeThumbId } from '@/components/ModeThumb';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
 
-// ── Spinning cassette reel (featured card visual) ─────────────────────────────
-function Reel({ size = 64 }: { size?: number }) {
-  const spin = useRef(new Animated.Value(0)).current;
+/**
+ * SHOW THE MODE, DON'T DESCRIBE IT (owner's pick, 29.07 — "direction Q",
+ * replacing the glass gradient cards settled on 28.07).
+ *
+ * The old page gave every mode a coloured slab and a sentence, which meant a
+ * new user could not tell what Horizon or Circular EQ were without opening
+ * them — and the modes are the one part of Cruise FM nobody else has. Each
+ * one now carries a still picture of itself (ModeThumb), the newest gets a
+ * large hero, and everything else is a calm list.
+ *
+ * Retired with the slabs: the featured Cassette card, the spinning reels, the
+ * glass pane, the card glitter and the premium shimmer. Cassette is a row
+ * like the others now — the hero slot belongs to whatever is newest, which is
+ * a promise the page can keep, unlike "featured" which never changed.
+ */
 
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(spin, { toValue: 1, duration: 6000, easing: Easing.linear, useNativeDriver: true })
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
+type ModeDef = {
+  id: ModeThumbId;
+  title: string;
+  desc: string;
+  colors: [string, string, string];
+  pro: boolean;
+};
 
-  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+// Order is deliberate: the list reads free-first, and inside each group the
+// modes are ordered roughly by how much there is to look at.
+const MODES: ModeDef[] = [
+  { id: 'equalizer', title: 'Equalizer',   desc: "LED bars pulsing with your station's mood colours.", colors: ['#164a6a', '#2b7fa8', '#6fd6ff'], pro: false },
+  { id: 'orb',       title: 'Circular EQ', desc: 'A glowing orb that pulses and radiates to the beat.', colors: ['#2a1550', '#7a2ac0', '#e07aff'], pro: false },
+  { id: 'cassette',  title: 'Cassette',    desc: 'Spinning reels, retro tuner culture, purple cabin glow.', colors: ['#1c0f3a', '#4b2b8a', '#a07aff'], pro: false },
+  { id: 'vinyl',     title: 'Vinyl',       desc: 'A rotating analogue record with a silver tonearm.', colors: ['#3a180a', '#8a3a18', '#e0813d'], pro: true },
+  { id: 'radio',     title: 'Tuner',       desc: 'Drag the dial — glide between moods and lock on.', colors: ['#1a4a5a', '#3a6aa8', '#6ad6e0'], pro: true },
+  { id: 'horizon',   title: 'Horizon',     desc: 'An endless outrun grid rolling into a glowing sun.', colors: ['#200a45', '#8a2a7a', '#ff5aa0'], pro: true },
+  { id: 'cd',        title: 'CD',          desc: 'Your album on a mirrored disc behind jewel-case plastic.', colors: ['#141a2e', '#5a6f9a', '#b0c6ff'], pro: true },
+  { id: 'disco',     title: 'Mirror Ball', desc: 'A slow-turning mirror ball scattering light across the drive.', colors: ['#22242c', '#8a92a4', '#e8edf6'], pro: true },
+];
 
-  return (
-    <Animated.View style={[reel.wrap, { width: size, height: size, borderRadius: size / 2, transform: [{ rotate }] }]}>
-      {[0, 60, 120].map((deg) => (
-        <View key={deg} style={[reel.spoke, { transform: [{ rotate: `${deg}deg` }] }]} />
-      ))}
-      <View style={reel.hub} />
-    </Animated.View>
-  );
-}
+/** Whichever mode leads the page. Change this when a newer one lands. */
+const HERO_ID: ModeThumbId = 'disco';
 
-const reel = StyleSheet.create({
-  wrap: {
-    borderWidth: 3,
-    borderColor: 'rgba(150,90,255,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  spoke: {
-    position: 'absolute',
-    width: '86%',
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: 'rgba(150,90,255,0.45)',
-  },
-  hub: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(150,90,255,0.8)',
-  },
-});
-
-// ── Card with press-extend + scroll-shrink animation ─────────────────────────
-function AnimatedCard({
-  scrollY,
-  onPress,
-  children,
-  style,
+/**
+ * Press feedback (owner, 29.07 — "direction D"): everything you can tap
+ * settles under your thumb and springs back. It is felt rather than seen and
+ * it is a disproportionate share of what makes an app feel built rather than
+ * assembled. Native driver, so it never stutters against a scroll.
+ */
+function Pressy({
+  onPress, children, style, scaleTo = 0.97,
 }: {
-  scrollY: Animated.Value;
   onPress: () => void;
   children: React.ReactNode;
   style?: object;
+  scaleTo?: number;
 }) {
-  const [layoutY, setLayoutY] = useState(0);
-  const [layoutH, setLayoutH] = useState(1);
-  const pressScale = useRef(new Animated.Value(1)).current;
-
-  // As the card scrolls up toward/off the top edge, it "caves in".
-  const scrollScale = scrollY.interpolate({
-    inputRange: [layoutY - 80, layoutY + layoutH],
-    outputRange: [1, 0.88],
-    extrapolate: 'clamp',
-  });
-
+  const s = useRef(new Animated.Value(1)).current;
+  const to = (v: number) =>
+    Animated.spring(s, { toValue: v, useNativeDriver: true, speed: 42, bounciness: 5 }).start();
   return (
-    <Animated.View
-      onLayout={(e) => { setLayoutY(e.nativeEvent.layout.y); setLayoutH(e.nativeEvent.layout.height); }}
-      style={[{ transform: [{ scale: Animated.multiply(pressScale, scrollScale) }] }, style]}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={() => Animated.spring(pressScale, { toValue: 1.03, useNativeDriver: true, speed: 40, bounciness: 6 }).start()}
-        onPressOut={() => Animated.spring(pressScale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 6 }).start()}>
+    <Animated.View style={[{ transform: [{ scale: s }] }, style]}>
+      <Pressable onPress={onPress} onPressIn={() => to(scaleTo)} onPressOut={() => to(1)}>
         {children}
       </Pressable>
     </Animated.View>
   );
 }
 
-// ── Glitter scattered around a card ───────────────────────────────────────────
-// Deterministic scatter (no Math.random — the specks must not jump about on
-// every re-render), each twinkling on its own native-driver loop. The layer
-// deliberately sits OUTSIDE the card's rounded clip so the sparkle spills past
-// the edges, which is the whole point of "glitter surrounding it".
-function hash01(n: number): number {
-  const x = Math.sin(n * 12.9898) * 43758.5453;
-  return x - Math.floor(x);
-}
-
-function Speck({ left, top, r, cross, dur, delay }: {
-  left: `${number}%`; top: `${number}%`; r: number; cross: boolean; dur: number; delay: number;
-}) {
-  const t = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([
-      Animated.delay(delay),
-      Animated.timing(t, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(t, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, []);
-  const opacity = t.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.9] });
-  const scale = t.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
-  const box = r * (cross ? 7 : 2);
+function HeroMode({ mode, locked, onPress }: { mode: ModeDef; locked: boolean; onPress: () => void }) {
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: 'absolute', left, top, width: box, height: box, marginLeft: -box / 2, marginTop: -box / 2,
-        alignItems: 'center', justifyContent: 'center', opacity, transform: [{ scale }],
-      }}>
-      {/* The hairline cross-flare is what separates "glitter" from "a dot" */}
-      {cross && <View style={{ position: 'absolute', width: box, height: 1, backgroundColor: '#fff', opacity: 0.5 }} />}
-      {cross && <View style={{ position: 'absolute', width: 1, height: box, backgroundColor: '#fff', opacity: 0.5 }} />}
-      <View style={{
-        width: r * 2, height: r * 2, borderRadius: r, backgroundColor: '#fff',
-        shadowColor: '#dbe6ff', shadowOpacity: 0.95, shadowRadius: r * 2.6, shadowOffset: { width: 0, height: 0 },
-      }} />
-    </Animated.View>
-  );
-}
-
-function CardGlitter({ count = 16 }: { count?: number }) {
-  const specks = useMemo(() => Array.from({ length: count }, (_, i) => {
-    // Walk the card's perimeter rather than scattering over the whole box —
-    // glitter dropped at random lands on top of the title and reads as dirt.
-    // Round the edges it frames the card, which is what was asked for.
-    const p = ((i + hash01(i * 1.73) * 0.75) / count) % 1;
-    let x: number, y: number, along: 'h' | 'v';
-    if (p < 0.4)       { x = p / 0.4;                 y = 0; along = 'h'; }
-    else if (p < 0.5)  { x = 1;                       y = (p - 0.4) / 0.1; along = 'v'; }
-    else if (p < 0.9)  { x = 1 - (p - 0.5) / 0.4;     y = 1; along = 'h'; }
-    else               { x = 0;                       y = 1 - (p - 0.9) / 0.1; along = 'v'; }
-    // Drift each speck off its edge so the ring isn't a dotted outline.
-    const off = (hash01(i * 4.91 + 2.2) - 0.4) * 0.22;
-    if (along === 'h') y = Math.max(-0.03, Math.min(1.03, y + (y < 0.5 ? off : -off)));
-    else               x = Math.max(-0.03, Math.min(1.03, x + (x < 0.5 ? off : -off)));
-    return {
-      left: `${Number((x * 100).toFixed(1))}%` as `${number}%`,
-      top: `${Number((y * 100).toFixed(1))}%` as `${number}%`,
-      r: 0.9 + hash01(i * 5.31) * 1.6,
-      cross: hash01(i * 6.07) > 0.42,
-      dur: 850 + Math.floor(hash01(i * 2.23) * 1500),
-      delay: Math.floor(hash01(i * 9.41) * 2600),
-    };
-  }), [count]);
-  return (
-    <View pointerEvents="none" style={{ position: 'absolute', left: -10, right: -10, top: -10, bottom: -10 }}>
-      {specks.map((s, i) => <Speck key={i} {...s} />)}
-    </View>
-  );
-}
-
-// ── The "F" glass finish (owner's pick, 28.07) ───────────────────────────────
-//
-// The mode gradients smoked toward slate — the same mute the Cruise page's
-// Recommended cards use — under a genuine pane of glass: the home cards'
-// gloss recipe (top sheen falling to a grounding shadow, corner light-catch,
-// bright rim) plus the reference pane's specular hot-spot on the top edge and
-// the cool glints near the bottom corners.
-
-// ── Compact mode row card ─────────────────────────────────────────────────────
-function CompactModeCard({
-  title,
-  desc,
-  icon,
-  iconNode,
-  gradient,
-  locked,
-  premium = false,
-  silver = false,
-  glitter = false,
-}: {
-  title: string;
-  desc: string;
-  icon?: string;
-  /** Drawn icon, for modes an icon font has no glyph for (the mirror ball). */
-  iconNode?: React.ReactNode;
-  gradient: [string, string, string];
-  locked: boolean;
-  premium?: boolean;
-  /** Frosted white/silver glass instead of a coloured slab. */
-  silver?: boolean;
-  glitter?: boolean;
-}) {
-  // Every card's gradient is smoked toward slate and runs on the diagonal —
-  // the Cruise page's colour temperature. The specular point sits somewhere
-  // different on each card, derived from the title so it's stable.
-  const smoked = gradient.map(smoke) as [string, string, string];
-  const spot = specularSpot(title);
-
-  return (
-    // The shadow lives on the wrapper, not the card: the card clips its own
-    // children (overflow hidden for the rounded gradient), and on iOS that
-    // clips the shadow with them.
-    <View style={[styles.cardShadow, silver && styles.silverGlow]}>
-      <View style={styles.compactCard}>
+    <Pressy onPress={onPress} style={styles.heroWrap} scaleTo={0.985}>
+      <View style={styles.hero}>
+        <ModeThumb mode={mode.id} size={HERO_ART} colors={mode.colors} uid={`hero${mode.id}`} />
+        {/* The thumb is square; the card is wider, so it is centred behind a
+            scrim that carries the type. A gradient, not a flat wash: a flat
+            one dulls the whole picture to pay for the two lines at the
+            bottom, which is the opposite of showing the mode off. */}
         <LinearGradient
-          colors={smoked}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
+          colors={['rgba(0,0,0,0.15)', 'rgba(0,0,0,0.30)', 'rgba(0,0,0,0.88)']}
+          locations={[0, 0.45, 1]}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          style={styles.heroScrim}
+          pointerEvents="none"
         />
-        <GlassPane spot={spot} uid={title.replace(/\W/g, '')} />
-        {locked && <PremiumShimmer />}
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={styles.compactTitle}>{title}</Text>
-          <Text style={styles.compactDesc} numberOfLines={1}>{desc}</Text>
+        <View style={styles.heroFoot}>
+          <Text style={styles.heroEyebrow}>NEWEST</Text>
+          <Text style={styles.heroTitle}>{mode.title}</Text>
+          <Text style={styles.heroDesc} numberOfLines={1}>{mode.desc}</Text>
         </View>
-        {/* Same furniture as the Stations page (owner, 28.07): bare white
-            icon in a fixed column at the card's right edge — no ring around
-            it — then the arrow (the page slides in from the right), or the
-            padlock when locked, outermost in its own slot. */}
-        <View style={styles.trailRow}>
-          <View style={styles.iconSlot}>
-            {iconNode ?? <MaterialCommunityIcons name={icon as any} size={22} color="rgba(255,255,255,0.92)" style={styles.iconShadow} />}
+        {locked && (
+          <View style={styles.heroLock}>
+            <Ionicons name="lock-closed" size={13} color="rgba(255,255,255,0.85)" />
+            <Text style={styles.heroLockText}>PREMIUM</Text>
           </View>
-          <View style={styles.ctrlSlot}>
-            {locked
-              ? <Ionicons name="lock-closed" size={14} color="rgba(255,255,255,0.6)" />
-              : <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />}
-          </View>
-        </View>
+        )}
       </View>
-      {glitter && <CardGlitter />}
-    </View>
+    </Pressy>
   );
 }
 
-// ── Screen ────────────────────────────────────────────────────────────────────
+function ModeRow({ mode, locked, last, onPress }: {
+  mode: ModeDef; locked: boolean; last: boolean; onPress: () => void;
+}) {
+  return (
+    <Pressy onPress={onPress}>
+      <View style={[styles.row, !last && styles.rowRule]}>
+        <View style={styles.thumbClip}>
+          <ModeThumb mode={mode.id} size={THUMB} colors={mode.colors} uid={`row${mode.id}`} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.rowTitle}>{mode.title}</Text>
+          <Text style={styles.rowDesc} numberOfLines={1}>{mode.desc}</Text>
+        </View>
+        {locked
+          ? <Ionicons name="lock-closed" size={14} color="rgba(255,255,255,0.45)" />
+          : <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.28)" />}
+      </View>
+    </Pressy>
+  );
+}
+
+const THUMB = 62;
+const HERO_H = 250;
+// The art sits above the type rather than behind it — a hero whose subject
+// is half-buried under its own caption reads as a cropped picture.
+const HERO_ART = 202;
+
 export default function ModesScreen() {
   const insets = useSafeAreaInsets();
-  const scrollY = useRef(new Animated.Value(0)).current;
   const np = useNowPlaying();
-
   const { isPro } = useEntitlements();
 
   function open(mode: string, locked: boolean) {
@@ -266,273 +145,153 @@ export default function ModesScreen() {
     np.open(mode, undefined, { preview: locked, paused: !locked });
   }
 
+  const hero = MODES.find((m) => m.id === HERO_ID)!;
+  const free = MODES.filter((m) => !m.pro);
+  const pro = MODES.filter((m) => m.pro);
+
   return (
     <View style={styles.root}>
-      <Animated.ScrollView
+      <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 24, paddingBottom: TAB_SAFE_INSET + insets.bottom }]}
-        showsVerticalScrollIndicator={false}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
-        scrollEventThrottle={16}>
+        contentContainerStyle={{ paddingTop: insets.top + 26, paddingBottom: TAB_SAFE_INSET + insets.bottom }}
+        showsVerticalScrollIndicator={false}>
 
-        <Text style={styles.pageTitle}>Playback Modes</Text>
+        <Text style={styles.pageTitle}>Modes</Text>
 
-        {/* ── Featured: Cassette ── */}
-        <AnimatedCard scrollY={scrollY} onPress={() => open('cassette', false)} style={{ marginBottom: 16 }}>
-          <View style={styles.featuredCard}>
-            <LinearGradient
-              colors={['#241238', '#170d28', '#0d0718']}
-              start={{ x: 0, y: 0 }} end={{ x: 0.8, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.featuredHeader}>
-              <Text style={styles.featuredTitle}>Cassette Tape Mode</Text>
-              <View style={styles.featuredBadge}>
-                <Text style={styles.featuredBadgeText}>FEATURED</Text>
-              </View>
-            </View>
+        <HeroMode mode={hero} locked={hero.pro && !isPro} onPress={() => open(hero.id, hero.pro && !isPro)} />
 
-            <Text style={styles.tapeLabel}>CRUISE FM / SIDE A</Text>
-            <View style={styles.tapeWindow}>
-              <Reel />
-              <Reel />
-            </View>
+        <Text style={styles.section}>INCLUDED</Text>
+        {free.map((m, i) => (
+          <ModeRow key={m.id} mode={m} locked={false} last={i === free.length - 1}
+            onPress={() => open(m.id, false)} />
+        ))}
 
-            <Text style={styles.featuredDesc}>
-              Spinning reels, retro Japanese tuner culture, soft purple cabin glow.
-            </Text>
-          </View>
-        </AnimatedCard>
+        <Text style={styles.section}>PREMIUM</Text>
+        {pro.map((m, i) => (
+          <ModeRow key={m.id} mode={m} locked={!isPro} last={i === pro.length - 1}
+            onPress={() => open(m.id, !isPro)} />
+        ))}
 
-        {/* ── Compact rows ── */}
-        <AnimatedCard scrollY={scrollY} onPress={() => open('equalizer', false)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Equalizer Mode"
-            desc="LED bars pulsing with every station's mood colours."
-            icon="equalizer"
-            gradient={['#164a6a', '#123049', '#0a1a2a']}
-            locked={false}
-          />
-        </AnimatedCard>
-
-        <AnimatedCard scrollY={scrollY} onPress={() => open('orb', false)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Circular Equaliser Mode"
-            desc="A glowing orb of light that pulses and radiates to your station's mood."
-            icon="circle-slice-8"
-            gradient={['#b23ae6', '#7a2ac0', '#2a1550']}
-            locked={false}
-          />
-        </AnimatedCard>
-
-        {/* ── Premium modes stacked together at the bottom ── */}
-        <Text style={styles.sectionLabel}>PREMIUM</Text>
-
-        <AnimatedCard scrollY={scrollY} onPress={() => open('vinyl', !isPro)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Vinyl Record Mode"
-            desc="Rotating analogue record with warm ambient glow and tactile presence."
-            icon="record-player"
-            gradient={['#c05a20', '#8a3a18', '#3a180a']}
-            locked={!isPro}
-            premium
-          />
-        </AnimatedCard>
-
-        <AnimatedCard scrollY={scrollY} onPress={() => open('radio', !isPro)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Tuner Mode"
-            desc="Drag the dial — glide between moods and lock onto a station."
-            icon="radio-tower"
-            gradient={['#6a3ae0', '#3a6aa8', '#1a8a9a']}
-            locked={!isPro}
-            premium
-          />
-        </AnimatedCard>
-
-        <AnimatedCard scrollY={scrollY} onPress={() => open('horizon', !isPro)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Horizon Mode"
-            desc="An endless outrun grid rolling into a glowing sun — all in your station's colours."
-            icon="weather-sunset-up"
-            gradient={['#b02a8a', '#5a1a8a', '#200a45']}
-            locked={!isPro}
-            premium
-          />
-        </AnimatedCard>
-
-        <AnimatedCard scrollY={scrollY} onPress={() => open('cd', !isPro)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="CD Mode"
-            desc="Your album on a mirrored disc, spinning behind jewel-case plastic."
-            icon="disc"
-            gradient={['#5a6f9a', '#8a4fd0', '#141a2e']}
-            locked={!isPro}
-            premium
-          />
-        </AnimatedCard>
-
-        <AnimatedCard scrollY={scrollY} onPress={() => open('disco', !isPro)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Mirror Ball Mode"
-            desc="A slow-turning mirror ball scattering light across your night drive."
-            iconNode={<MirrorBallGlyph size={26} />}
-            gradient={['#c8d2e2', '#9aa6ba', '#5a6274']}
-            locked={!isPro}
-            premium
-            silver
-            glitter
-          />
-        </AnimatedCard>
-
-      </Animated.ScrollView>
-
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: 16 },
   pageTitle: {
     color: Cruise.textPrimary,
-    fontSize: 30,
+    fontSize: 36,
     fontWeight: '800',
-    letterSpacing: -0.5,
-    marginLeft: 4,
-    marginBottom: 18,
+    letterSpacing: -1.3,
+    paddingHorizontal: 22,
+    marginBottom: 24,
   },
-  sectionLabel: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 10,
+  section: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 12.5,
     fontWeight: '800',
-    letterSpacing: 2.5,
-    marginLeft: 4,
-    marginTop: 8,
-    marginBottom: 12,
+    letterSpacing: 3,
+    paddingHorizontal: 22,
+    marginTop: 30,
+    marginBottom: 6,
   },
 
-  // Featured card
-  featuredCard: {
-    borderRadius: 22,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(150,90,255,0.25)',
-    padding: 20,
+  // ── Hero ──────────────────────────────────────────────────────────────────
+  heroWrap: {
+    marginHorizontal: 22,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.5,
+    shadowRadius: 26,
+    elevation: 10,
   },
-  featuredHeader: {
+  hero: {
+    height: HERO_H,
+    borderRadius: 24,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 46,
+    backgroundColor: '#07070c',
+  },
+  heroScrim: {
+    position: 'absolute',
+    left: 0, right: 0, top: 0, bottom: 0,
+  },
+  heroFoot: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 18,
+  },
+  heroEyebrow: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 2.4,
+    marginBottom: 6,
+  },
+  heroTitle: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.7,
+  },
+  heroDesc: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    marginTop: 3,
+  },
+  heroLock: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 18,
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
   },
-  featuredTitle: {
+  heroLockText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+  },
+
+  // ── Rows ──────────────────────────────────────────────────────────────────
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 22,
+  },
+  rowRule: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.10)',
+  },
+  thumbClip: {
+    width: THUMB,
+    height: THUMB,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  rowTitle: {
     color: '#fff',
     fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.2,
+    fontWeight: '600',
+    letterSpacing: -0.4,
   },
-  featuredBadge: {
-    backgroundColor: 'rgba(60,220,230,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(60,220,230,0.45)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  featuredBadgeText: {
-    color: '#3cdce6',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-  },
-  tapeLabel: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 3,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  tapeWindow: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(150,90,255,0.35)',
-    borderRadius: 12,
-    paddingVertical: 18,
-    marginBottom: 18,
-    backgroundColor: 'rgba(150,90,255,0.05)',
-  },
-  featuredDesc: {
-    color: 'rgba(255,255,255,0.55)',
+  rowDesc: {
+    color: 'rgba(255,255,255,0.48)',
     fontSize: 13,
-    lineHeight: 19,
-  },
-
-  // Compact cards
-  compactCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    // The home cards' geometry: big soft corners, and the bright border IS
-    // the glass rim.
-    borderRadius: 22,
-    overflow: 'hidden',
-    minHeight: 84,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.30)',
-  },
-  cardShadow: {
-    borderRadius: 22,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  trailRow: {
-    marginLeft: 'auto',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  iconSlot: {
-    width: 28,
-    alignItems: 'center',
-  },
-  iconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowRadius: 4,
-  },
-  ctrlSlot: {
-    width: 16,
-    alignItems: 'center',
-  },
-  // Frosted silver glass — no colour slab, just white at low opacity over the
-  // app's own dark background, with a bright rim and a cool outward glimmer.
-  silverGlow: {
-    borderRadius: 18,
-    shadowColor: '#cfe0ff',
-    shadowOpacity: 0.24,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-  // The shared title voice for BOTH tabs (owner, 28.07): the modes page's
-  // original spec won — the stations page's rowName copies this exactly, so
-  // change them together or the pages drift apart again.
-  compactTitle: {
-    color: '#fff',
-    fontSize: 15.5,
-    fontWeight: '800',
-  },
-  compactDesc: {
-    color: 'rgba(255,255,255,0.65)',
-    fontSize: 12,
-    lineHeight: 17,
+    marginTop: 2,
   },
 });

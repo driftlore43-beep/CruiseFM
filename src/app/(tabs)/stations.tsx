@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Animated, Dimensions, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useFonts } from 'expo-font';
 
 import { CreateStationModal } from '@/components/CreateStationModal';
-import { GlassPane, mixHex, smoke, specularSpot } from '@/components/GlassPane';
 import { StationDetailModal } from '@/components/StationDetailModal';
 import { GlossSheen } from '@/components/GlossSheen';
 import { useNowPlaying } from '@/context/NowPlayingContext';
@@ -19,24 +18,29 @@ import { recordDriveStart } from '@/utils/driveStats';
 import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
 
 const FREE_CUSTOM_LIMIT = 3;
+const SCREEN_H = Dimensions.get('window').height;
 
 /**
- * The page is a lit head unit (design settled with the owner 28.07 after a
- * long prototype run — see AGENTS.md):
+ * ONE HERO, THEN A QUIET LIST (owner's pick, 29.07 — chosen from renders as
+ * "direction B", replacing the card grid settled on 28.07).
  *
- *   - every station is a photo-glass card: its own artwork under dark glass,
- *     deepest on the left where the number and name sit
- *   - dial numbers are a REAL seven-segment display face (DSEG7), premium
- *     white, with the unlit ghost segments behind them — the ghosts are what
- *     make it read as hardware, same lesson as the Equalizer's unlit lamps
- *   - the AM/FM band letters are the fourteen-segment face (DSEG14) in the
- *     accent amber, ghosted the same way ('~' is DSEG14's all-segments glyph)
- *   - names and icons are white; icons sit in a fixed column at the card's
- *     right edge, arrow/padlock outermost — everything on strict columns
- *   - ONE glow on the whole page: the tuned station (red full-height line on
- *     its left edge, station-colour rim, white-hot number)
- *   - locked FM cards keep their photo and colour, just dimmer behind a
- *     drawn padlock — the premium band stays a shop window, not a grey list
+ *   - the hour's station is a full-bleed photograph filling the top half of
+ *     the screen, with the page title sitting on it and a Tune in button
+ *   - every other station is a list row: dial number, name, its own colour on
+ *     the icon, a hairline underneath. No card, no photo, no rim, no shadow
+ *   - the AM/FM band letters are still the fourteen-segment face (DSEG14) in
+ *     the accent amber, ghosted ('~' is DSEG14's all-segments glyph), and the
+ *     dial numbers are still DSEG7 — the receiver identity lives in the type
+ *     now rather than in eleven pieces of chrome
+ *   - ONE glow on the whole page: the tuned station's red edge line and its
+ *     white-hot number. Everything else is grey until you tune to it
+ *   - locked FM rows are dimmed behind a padlock, never hidden
+ *
+ * WHY THE CARDS WENT: eleven photographs at row height were eleven small busy
+ * rectangles competing with each other, and the page gave no clue which
+ * station mattered. Apple Music's shape — one big thing, then a calm list —
+ * is what "premium" turned out to mean here, and it is also more honest,
+ * since the hour's station really is the recommendation.
  *
  * The DSEG fonts ship as bundled assets (SIL OFL licence alongside them in
  * assets/fonts/), loaded with expo-font — no native change, normal OTA.
@@ -55,6 +59,8 @@ const ON_AIR_LINES: Record<string, string> = {
   'coastal':        'Midday light — the coast is clear.',
   'sunset':         'Golden hour — catch it while it lasts.',
   'night-run':      'City lights on — the night is young.',
+  'daylight':       'Open road, open sky — go somewhere.',
+  'rain-drive':     'Wipers on — slow roads and streetlight glass.',
 };
 
 function stationById(id: string): Station {
@@ -75,34 +81,66 @@ function OnAirDot() {
   return <Animated.View style={[styles.onAirDot, { opacity: pulse }]} />;
 }
 
-/** Letterboxed banner for the station matching this hour — tap to open it. */
-function OnAirBanner({ station, onPress }: { station: Station; onPress: () => void }) {
+/**
+ * The hero: the station matching this hour, as a full-bleed photograph with
+ * the page's title sitting on top of it.
+ *
+ * Design note (owner, 29.07 — "direction B"): the page used to give you
+ * eleven equal cards and let you work out which mattered. One big thing and
+ * then a calm list is the shape every app that feels expensive uses, and it
+ * also happens to be honest — the hour's station IS the recommendation, so
+ * it should look like one.
+ *
+ * The button says "Tune in", not "Start drive", because it opens the station
+ * page rather than starting anything: that page is where the mode is chosen
+ * and where the playlist gate lives. A button that doesn't do what it says
+ * costs more trust than a plainer word costs excitement.
+ */
+function OnAirHero({
+  station, height, topPad, onPress, onCreate,
+}: {
+  station: Station;
+  height: number;
+  topPad: number;
+  onPress: () => void;
+  onCreate: () => void;
+}) {
   const line = ON_AIR_LINES[station.id] ?? `${station.name} is calling.`;
   return (
-    <Pressable
-      style={({ pressed }) => [styles.onAirShadow, { shadowColor: station.glowColor }, pressed && styles.pressed]}
-      onPress={onPress}>
-      <View style={styles.onAirCard}>
-        <ImageBackground
-          source={station.image}
-          style={StyleSheet.absoluteFill}
-          imageStyle={{ width: '100%', height: '100%' }}
-          blurRadius={1}
-          resizeMode="cover"
-        />
-        <LinearGradient
-          colors={['rgba(3,3,12,0.66)', 'rgba(3,3,12,0.18)']}
-          start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <GlossSheen radius={22} />
-        <View style={styles.onAirContent}>
-          <View style={styles.onAirRow}>
-            <OnAirDot />
-            <Text style={[styles.onAirEyebrow, { fontFamily: Fonts.mono }]}>ON AIR THIS HOUR</Text>
-          </View>
-          <Text style={styles.onAirName} numberOfLines={1}>{station.name}</Text>
-          <Text style={styles.onAirLine} numberOfLines={1}>{line}</Text>
+    <Pressable onPress={onPress} style={({ pressed }) => [{ height }, pressed && styles.pressedHero]}>
+      <ImageBackground
+        source={station.image}
+        style={StyleSheet.absoluteFill}
+        imageStyle={{ width: '100%', height: '100%' }}
+        resizeMode="cover"
+      />
+      {/* Two scrims, both needed: the bottom one carries the type, the top one
+          exists purely so "Now tuning" survives a bright sky. */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.72)', 'rgba(0,0,0,0.26)', 'rgba(0,0,0,0.34)', 'rgba(0,0,0,0.74)', 'rgba(0,0,0,0.94)', '#000000']}
+        locations={[0, 0.22, 0.44, 0.72, 0.9, 1]}
+        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[styles.heroTitleRow, { top: topPad + 10 }]}>
+        <Text style={styles.title}>Now tuning</Text>
+        <Pressable
+          style={({ pressed }) => [styles.createBtn, pressed && styles.pressed]}
+          onPress={onCreate}
+          hitSlop={6}>
+          <GlossSheen radius={17} />
+          <Text style={styles.createBtnText}>Create</Text>
+        </Pressable>
+      </View>
+      <View style={styles.heroFoot}>
+        <View style={styles.onAirRow}>
+          <OnAirDot />
+          <Text style={[styles.onAirEyebrow, { fontFamily: Fonts.mono }]}>ON AIR THIS HOUR</Text>
+        </View>
+        <Text style={styles.heroName} numberOfLines={2}>{station.name}</Text>
+        <Text style={styles.heroLine} numberOfLines={1}>{line}</Text>
+        <View style={styles.heroBtn}>
+          <Text style={styles.heroBtnText}>Tune in</Text>
         </View>
       </View>
     </Pressable>
@@ -114,30 +152,29 @@ function OnAirBanner({ station, onPress }: { station: Station; onPress: () => vo
  * digits in front, both right-aligned to the shared column edge. AM ghosts
  * four whole digits; FM ghosts the 888.8 a real tuner shows.
  */
-function LcdNumber({ label, band, tuned, lcd }: { label: string; band: Band; tuned: boolean; lcd: boolean }) {
+function LcdNumber({ label, tuned, lcd }: { label: string; tuned: boolean; lcd: boolean }) {
   const family = lcd ? 'DSEG7' : Fonts.mono;
+  // No ghost segments on the list rows. They earned their place on the old
+  // photo cards, where a lit panel needed unlit siblings to read as hardware;
+  // over plain black they are just grey noise beside every name, and the
+  // brightness difference between the tuned station and the rest is doing
+  // that job now.
   return (
-    <View style={styles.numCol}>
-      {lcd && (
-        <Text style={[styles.numGhost, { fontFamily: family }]}>{band === 'FM' ? '888.8' : '8888'}</Text>
-      )}
-      <Text style={[styles.numLit, { fontFamily: family }, tuned && styles.numLitTuned]}>{label}</Text>
-    </View>
+    <Text
+      style={[styles.numLit, { fontFamily: family }, tuned && styles.numLitTuned]}
+      numberOfLines={1}>
+      {label}
+    </Text>
   );
 }
 
-/** The big segment-face band letters with the printed tick scale beside them. */
+/** Segment-face band letters with their caption. */
 function BandHeader({ band, caption, lcd }: { band: Band; caption: string; lcd: boolean }) {
   return (
     <View style={styles.bandRow}>
       <View>
         {lcd && <Text style={[styles.bandGhost, { fontFamily: 'DSEG14' }]}>~~</Text>}
         <Text style={[styles.bandLetters, { fontFamily: lcd ? 'DSEG14' : Fonts.mono }]}>{band}</Text>
-      </View>
-      <View style={styles.bandTicks}>
-        {Array.from({ length: 22 }).map((_, i) => (
-          <View key={i} style={[styles.dialTick, i % 4 === 0 && styles.dialTickTall]} />
-        ))}
       </View>
       <Text style={[styles.bandCaption, { fontFamily: Fonts.mono }]}>{caption}</Text>
     </View>
@@ -155,20 +192,28 @@ function SubHeader({ label }: { label: string }) {
 }
 
 /**
- * One station: photo under dark glass, number, name, white icon column.
+ * One station on the dial: number, name, its own colour as the icon, and a
+ * hairline underneath. No card, no photograph, no rim.
  *
- * `mine` (custom stations) have no artwork — they get a quiet wash of their
- * own colour over the same dark base instead, so they sit on the dial looking
- * like everything else.
+ * The photograph now lives in exactly one place on this page — the hero — and
+ * that is the point: eleven photographs at row size were eleven small busy
+ * rectangles, and none of them was legible enough to be worth the noise. What
+ * survives per row is the station's own colour on its icon, which is enough
+ * to tell them apart at a glance.
+ *
+ * `mine` (custom stations) have no artwork anyway, so they finally sit in the
+ * list looking exactly like everything else — just with their MINE chip.
  */
 function StationRow({
-  station, dial, tuned, locked, lcd, onPress,
+  station, dial, tuned, locked, lcd, last, onPress,
 }: {
   station: Station | CustomStation;
   dial: { band: Band; label: string };
   tuned: boolean;
   locked?: boolean;
   lcd: boolean;
+  /** Last row in its group — no hairline under it. */
+  last?: boolean;
   onPress?: () => void;
 }) {
   const custom = (station as CustomStation).image === null ? (station as CustomStation) : null;
@@ -184,85 +229,39 @@ function StationRow({
       onPress={onPress}
       disabled={!onPress}
       style={({ pressed }) => [
-        styles.rowShadow,
-        tuned && { shadowColor: accent, shadowOpacity: 0.55, shadowRadius: 16, elevation: 8 },
-        pressed && onPress ? styles.pressed : null,
+        styles.row,
+        !last && styles.rowRule,
+        locked && styles.rowLocked,
+        pressed && onPress ? styles.rowPressed : null,
       ]}>
-      <View
-        style={[
-          styles.rowCard,
-          { borderColor: tuned ? accent + 'AA' : mine ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.14)' },
-          locked && styles.rowLocked,
-        ]}>
-        {mine ? (
-          <>
-            {/* The Modes cards' glass finish, in the station's chosen colour
-                (owner, 28.07): a smoked diagonal ramp under the shared
-                GlassPane, full colour like the modes wear theirs. */}
-            {/* The SAME deep ramp the home page's Continue Drive card uses
-                (owner, 28.07: the two must match) — every created station
-                stores gradientColors, a near-black ramp with the colour in
-                the middle stop. The bright accent swatch was tried twice and
-                always came out lighter than the colour actually chosen. */}
-            <LinearGradient
-              colors={custom!.gradientColors ?? [
-                mixHex(custom!.color, '#05060d', 0.8),
-                mixHex(custom!.color, '#0b0d16', 0.45),
-                '#000000',
-              ]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <GlassPane spot={specularSpot(station.name)} uid={`yst${station.id.replace(/\W/g, '')}`} />
-          </>
-        ) : (
-          <>
-            <ImageBackground
-              source={(station as Station).image}
-              style={StyleSheet.absoluteFill}
-              imageStyle={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-            />
-            {/* The photo glass: deepest on the left where the display sits,
-                easing off so the photograph breathes on the right. */}
-            <LinearGradient
-              colors={locked
-                ? ['rgba(8,8,14,0.92)', 'rgba(8,8,14,0.78)', 'rgba(8,8,14,0.6)']
-                : ['rgba(8,8,14,0.88)', 'rgba(8,8,14,0.68)', 'rgba(8,8,14,0.46)']}
-              locations={[0, 0.45, 1]}
-              start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </>
-        )}
-        {/* The tuning needle: a red line standing the full height of the
-            playing card's left edge — the page's single glowing marker. */}
-        {tuned && <View style={styles.tunedLine} pointerEvents="none" />}
+      {/* The tuning needle: the page's one glowing mark, on the tuned row. */}
+      {tuned && <View style={styles.tunedLine} pointerEvents="none" />}
 
-        <LcdNumber label={dial.label} band={dial.band} tuned={tuned} lcd={lcd} />
-        <Text style={styles.rowName} numberOfLines={1}>{station.name}</Text>
-        {mine && (
-          <View style={styles.mineChip}>
-            <Text style={styles.mineChipText}>MINE</Text>
-          </View>
-        )}
-        <View style={styles.rowTrail}>
-          <View style={styles.iconSlot}>
-            {isGlyph ? (
-              <MaterialCommunityIcons name={iconName as any} size={20} color="rgba(255,255,255,0.92)" style={styles.iconShadow} />
-            ) : (
-              <View style={styles.emojiBadge}>
-                <Text style={styles.emojiText}>{iconName}</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.ctrlSlot}>
-            {locked ? (
-              <MaterialCommunityIcons name="lock" size={14} color="rgba(255,255,255,0.6)" />
-            ) : (
-              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
-            )}
-          </View>
+      <View style={styles.numCol}>
+        <LcdNumber label={dial.label} tuned={tuned} lcd={lcd} />
+      </View>
+      <Text style={[styles.rowName, tuned && styles.rowNameTuned]} numberOfLines={1}>{station.name}</Text>
+      {mine && (
+        <View style={styles.mineChip}>
+          <Text style={styles.mineChipText}>MINE</Text>
+        </View>
+      )}
+      <View style={styles.rowTrail}>
+        <View style={styles.iconSlot}>
+          {isGlyph ? (
+            <MaterialCommunityIcons name={iconName as any} size={20} color={accent} />
+          ) : (
+            <View style={[styles.emojiBadge, { borderColor: accent + '99' }]}>
+              <Text style={styles.emojiText}>{iconName}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.ctrlSlot}>
+          {locked ? (
+            <MaterialCommunityIcons name="lock" size={14} color="rgba(255,255,255,0.45)" />
+          ) : (
+            <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.28)" />
+          )}
         </View>
       </View>
     </Pressable>
@@ -316,52 +315,52 @@ export default function StationsScreen() {
   // that suits the hour when nothing is.
   const tunedId = np.session?.stationId ?? onAirStation.id;
 
+  // The hero fills the top half of the phone. Clamped so it stays generous on
+  // a small screen without eating a tall one whole.
+  const heroH = Math.max(340, Math.min(SCREEN_H * 0.52, 470));
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <View style={styles.safe}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: TAB_SAFE_INSET + insets.bottom }]}
         showsVerticalScrollIndicator={false}>
 
-        <View style={styles.headerBlock}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>Now tuning</Text>
-            <Pressable
-              style={({ pressed }) => [styles.createBtn, pressed && styles.pressed]}
-              onPress={() => setShowCreate(true)}
-              hitSlop={6}>
-              <GlossSheen radius={17} />
-              <Text style={styles.createBtnText}>Create</Text>
-            </Pressable>
-          </View>
-          <OnAirBanner station={onAirStation} onPress={() => setSelectedStation(onAirStation)} />
-        </View>
+        <OnAirHero
+          station={onAirStation}
+          height={heroH}
+          topPad={insets.top}
+          onPress={() => setSelectedStation(onAirStation)}
+          onCreate={() => setShowCreate(true)}
+        />
 
         <BandHeader band="AM" caption="FREE" lcd={lcd} />
-        {amDefaults.map(({ station, dial }) => (
+        {amDefaults.map(({ station, dial }, i) => (
           <StationRow
             key={station.id}
             station={station}
             dial={dial}
             tuned={station.id === tunedId}
             lcd={lcd}
+            last={i === amDefaults.length - 1 && amCustom.length === 0}
             onPress={() => setSelectedStation(station)}
           />
         ))}
         {amCustom.length > 0 && <SubHeader label="YOUR STATIONS" />}
-        {amCustom.map(({ station, dial }) => (
+        {amCustom.map(({ station, dial }, i) => (
           <StationRow
             key={station.id}
             station={station}
             dial={dial}
             tuned={station.id === tunedId}
             lcd={lcd}
+            last={i === amCustom.length - 1}
             onPress={() => setSelectedStation(station)}
           />
         ))}
 
         <BandHeader band="FM" caption="PREMIUM" lcd={lcd} />
-        {fmBand.map(({ station, dial }) => (
+        {fmBand.map(({ station, dial }, i) => (
           <StationRow
             key={station.id}
             station={station}
@@ -369,6 +368,7 @@ export default function StationsScreen() {
             tuned={station.id === tunedId}
             locked={!isPro}
             lcd={lcd}
+            last={i === fmBand.length - 1}
             onPress={isPro ? () => setSelectedStation(station) : undefined}
           />
         ))}
@@ -421,7 +421,7 @@ export default function StationsScreen() {
           fetchCustom();
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -432,45 +432,72 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
   },
-  headerBlock: {
-    paddingTop: 20,
-    paddingBottom: 10,
-    gap: 14,
-  },
+  scroll: { flex: 1 },
+  // No horizontal padding here: the hero runs edge to edge, so the inset is
+  // applied by the rows and headers instead.
+  content: { paddingBottom: 32 },
+
+  // ── Hero ──────────────────────────────────────────────────────────────────
   title: {
     color: Cruise.textPrimary,
-    fontSize: 30,
+    // 34, not 30. Big type in a lot of space is most of what "expensive"
+    // means — this is the loudest thing on the page and it should be.
+    fontSize: 34,
     fontWeight: '800',
-    letterSpacing: -0.5,
+    letterSpacing: -1.1,
     flex: 1,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowRadius: 12,
   },
-
-  // ── On Air banner ──
-  onAirShadow: {
-    borderRadius: 22,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 8,
+  heroTitleRow: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  onAirCard: {
-    height: 112,
-    borderRadius: 22,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    justifyContent: 'flex-end',
-  },
-  onAirContent: {
-    paddingHorizontal: 18,
-    paddingBottom: 12,
+  heroFoot: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 24,
     gap: 2,
+  },
+  heroName: {
+    color: '#fff',
+    fontSize: 38,
+    fontWeight: '800',
+    letterSpacing: -1.3,
+    lineHeight: 41,
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowRadius: 14,
+  },
+  heroLine: {
+    color: 'rgba(255,255,255,0.66)',
+    fontSize: 14.5,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  heroBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 18,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    paddingHorizontal: 26,
+    paddingVertical: 12,
+  },
+  heroBtnText: {
+    color: '#08080c',
+    fontSize: 15.5,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   onAirRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    marginBottom: 3,
+    marginBottom: 7,
   },
   onAirDot: {
     width: 8,
@@ -488,60 +515,42 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 2.5,
   },
-  onAirName: {
-    color: '#fff',
-    fontSize: 21,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowRadius: 8,
-  },
-  onAirLine: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12.5,
-    fontWeight: '500',
-  },
 
   // ── Station rows ──────────────────────────────────────────────────────────
-  rowShadow: {
-    borderRadius: 18,
-    marginBottom: 12,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 5,
-    shadowColor: '#000',
-  },
-  // Sized to sit alongside the Modes page's cards (both card families share an
-  // exact 84pt minimum height and 18pt radius — keep them in step) — at the old 18px padding these read as
-  // condensed strips next to them (owner, 28.07).
-  rowCard: {
+  // A list, not a card stack: the only furniture is a hairline, and it stops
+  // at the last row of each group so the group reads as one block.
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    borderRadius: 18,
-    overflow: 'hidden',
-    borderWidth: 1,
-    minHeight: 84,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
+    gap: 16,
+    paddingVertical: 19,
+    paddingHorizontal: 20,
   },
-  // Dimmer, not grey: the photo and colour stay visible behind the padlock
-  // so the premium band still sells itself.
+  rowRule: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.10)',
+  },
+  // Dimmer, not grey — the premium band still has to sell itself.
   rowLocked: {
-    opacity: 0.72,
+    opacity: 0.6,
+  },
+  // Press feedback: the row takes a beat of light rather than shrinking.
+  // Scaling a full-width list row looks like the page flexing; scaling a
+  // card looks like the card being pushed. Different shapes, different rule.
+  rowPressed: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
   },
   tunedLine: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
-    width: 4,
+    width: 3,
     backgroundColor: '#FF3B30',
     shadowColor: '#FF3B30',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
-    shadowRadius: 10,
+    shadowRadius: 8,
     elevation: 6,
   },
   numCol: {
@@ -549,38 +558,32 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
-  numGhost: {
-    position: 'absolute',
-    right: 0,
-    fontSize: 17,
-    color: 'rgba(255,255,255,0.15)',
-  },
   numLit: {
-    fontSize: 17,
-    color: '#EDF0F5',
-    textShadowColor: 'rgba(255,255,255,0.3)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 5,
+    fontSize: 16,
+    // Unplayed stations sit well back so the tuned one reads instantly —
+    // this contrast replaced the old ghost-segment trick.
+    color: 'rgba(255,255,255,0.42)',
   },
   numLitTuned: {
     color: '#FFFFFF',
-    textShadowColor: 'rgba(255,255,255,0.9)',
-    textShadowRadius: 12,
+    textShadowColor: 'rgba(255,255,255,0.75)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
-  // The modes page's original title spec, verbatim (owner's pick, 28.07) —
-  // keep in step with compactTitle in modes.tsx. The shadow stays because
-  // these names sit over photographs.
   rowName: {
     flexShrink: 1,
+    color: 'rgba(255,255,255,0.94)',
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  rowNameTuned: {
     color: '#fff',
-    fontSize: 15.5,
-    fontWeight: '800',
-    textShadowColor: 'rgba(0,0,0,0.55)',
-    textShadowRadius: 8,
+    fontWeight: '700',
   },
   mineChip: {
     borderWidth: 1,
-    borderColor: 'rgba(180,195,255,0.55)',
+    borderColor: 'rgba(180,195,255,0.45)',
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -601,11 +604,6 @@ const styles = StyleSheet.create({
     width: ICON_SLOT_W,
     alignItems: 'center',
   },
-  // Keeps white icons legible when a bright photo sits behind them.
-  iconShadow: {
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowRadius: 4,
-  },
   ctrlSlot: {
     width: CTRL_SLOT_W,
     alignItems: 'center',
@@ -615,20 +613,23 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 13,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
     backgroundColor: 'rgba(0,0,0,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   emojiText: { fontSize: 13 },
 
-  // ── Band headers ──
+  // ── Band headers ──────────────────────────────────────────────────────────
+  // The printed tick ruler went with the cards. It was the head unit's fascia,
+  // and a fascia needs something bolted to it; over a plain list it was one
+  // more grey texture competing with the names.
   bandRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 16,
-    marginBottom: 12,
+    alignItems: 'baseline',
+    gap: 11,
+    paddingHorizontal: 20,
+    marginTop: 30,
+    marginBottom: 10,
   },
   bandLetters: {
     color: Cruise.amber,
@@ -641,24 +642,18 @@ const styles = StyleSheet.create({
     fontSize: 19,
     color: 'rgba(245,158,11,0.16)',
   },
-  bandTicks: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 10,
-  },
   bandCaption: {
-    color: Cruise.amber,
-    fontSize: 10,
+    color: 'rgba(245,158,11,0.7)',
+    fontSize: 9.5,
     fontWeight: '800',
-    letterSpacing: 2,
+    letterSpacing: 2.2,
   },
   subheadRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
-    marginBottom: 12,
+    paddingHorizontal: 20,
+    marginTop: 22,
+    marginBottom: 8,
   },
   subheadText: {
     color: 'rgba(255,255,255,0.45)',
@@ -673,21 +668,8 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     marginRight: 2,
   },
-  dialTick: {
-    width: 1,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-  },
-  dialTickTall: {
-    height: 9,
-    backgroundColor: 'rgba(255,255,255,0.30)',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  // Small clear glass pill — quiet until you need it.
+
+  // ── Create pill ───────────────────────────────────────────────────────────
   createBtn: {
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -695,9 +677,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(255,255,255,0.24)',
   },
   createBtnText: {
     color: '#fff',
@@ -705,10 +687,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
   },
-  scroll: { flex: 1 },
-  content: {
-    paddingHorizontal: 16,
-    paddingBottom: 32,
-  },
   pressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
+  pressedHero: { opacity: 0.94 },
 });

@@ -113,7 +113,9 @@ export default function CruiseScreen() {
         />
         <ConnectSpotifyCard />
         <SpotifyNudgeCard />
-        <Text style={styles.greeting}>Welcome back, {driverName}</Text>
+        {/* "Welcome back" is a lie on a fresh install — a first-time driver
+            (no saved cruise yet) gets welcomed in, not back. */}
+        <Text style={styles.greeting}>{lastCruise ? 'Welcome back' : 'Welcome'}, {driverName}</Text>
         <HeroCard
           onStartDrive={handleStartDrive}
           cueLabel={heroCue}

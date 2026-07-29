@@ -53,6 +53,10 @@ export function ConnectSpotifyCard() {
       <View style={{ flex: 1 }}>
         <Text style={cs.title}>Connect Spotify</Text>
         <Text style={cs.sub}>See what’s playing and control it right from your drive.</Text>
+        {/* Honest about the developer-mode ceiling (stranger walkthrough,
+            28.07): a failed sign-in should read as a known limit, not a
+            broken app. */}
+        <Text style={cs.beta}>Connections are in limited beta — if sign-in doesn’t complete, you still get the full visual experience.</Text>
       </View>
       {loading
         ? <ActivityIndicator color={SPOTIFY_GREEN} />
@@ -90,4 +94,5 @@ const cs = StyleSheet.create({
     paddingHorizontal: 18, paddingVertical: 9,
   },
   btnText: { color: '#04220f', fontSize: 14, fontWeight: '800' },
+  beta: { color: 'rgba(255,255,255,0.42)', fontSize: 11, lineHeight: 15, marginTop: 3 },
 });

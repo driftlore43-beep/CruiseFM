@@ -1112,7 +1112,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         <ModeCloseButton onPress={handleClose} />
 
         <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={station.eqColors?.[1] ?? V.gold} />
-        <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
+        <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />
 

@@ -15,7 +15,7 @@ const SPOTIFY_GREEN = '#1DB954';
  * Waits a couple of seconds before appearing so the normal case (music starts
  * quickly) never flashes it.
  */
-export function WakeSpotifyHint({ show }: { show: boolean }) {
+export function WakeSpotifyHint({ show, connected = true }: { show: boolean; connected?: boolean }) {
   const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
@@ -29,17 +29,32 @@ export function WakeSpotifyHint({ show }: { show: boolean }) {
       setVisible(true);
       Animated.timing(fade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
     }, 2200);
-    return () => clearTimeout(t);
-  }, [show]);
+    // The visuals-only note (stranger walkthrough, 28.07: a silent first
+    // drive never says what it is) informs and then leaves — unlike the wake
+    // nudge there is nothing to resolve, so it must not sit there all drive.
+    let out: ReturnType<typeof setTimeout> | null = null;
+    if (!connected) {
+      out = setTimeout(() => {
+        Animated.timing(fade, { toValue: 0, duration: 600, useNativeDriver: true }).start(() => setVisible(false));
+      }, 9500);
+    }
+    return () => { clearTimeout(t); if (out) clearTimeout(out); };
+  }, [show, connected]);
 
   if (!visible) return null;
 
   return (
     <Animated.View style={[ws.wrap, { top: insets.top + 64, opacity: fade }]} pointerEvents="none">
-      <View style={ws.pill}>
-        <MaterialCommunityIcons name="spotify" size={16} color={SPOTIFY_GREEN} />
+      <View style={[ws.pill, !connected && ws.pillNeutral]}>
+        <MaterialCommunityIcons
+          name={connected ? 'spotify' : 'music'}
+          size={16}
+          color={connected ? SPOTIFY_GREEN : 'rgba(255,255,255,0.8)'}
+        />
         <Text style={ws.text}>
-          Spotify asleep? Open it, play any song for a second, then press play here.
+          {connected
+            ? 'Spotify asleep? Open it, play any song for a second, then press play here.'
+            : 'Visuals only for now — play music in any app and cruise on. Connect Spotify from the home page for full control.'}
         </Text>
       </View>
     </Animated.View>
@@ -54,6 +69,9 @@ const ws = StyleSheet.create({
     backgroundColor: 'rgba(8,10,18,0.92)',
     borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14,
     borderWidth: 1, borderColor: 'rgba(29,185,84,0.45)',
+  },
+  pillNeutral: {
+    borderColor: 'rgba(255,255,255,0.22)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8,
   },
   text: { flex: 1, color: 'rgba(255,255,255,0.85)', fontSize: 12.5, lineHeight: 17, fontWeight: '600' },

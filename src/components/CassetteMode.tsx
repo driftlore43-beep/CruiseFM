@@ -1077,7 +1077,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
         <ModeCloseButton onPress={handleClose} />
 
         <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
-        <WakeSpotifyHint show={playing && spotify.connected && !spotify.track && !handoff} />
+        <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />
 

@@ -16,7 +16,7 @@ import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
-import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
@@ -460,7 +460,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const eq = (nearest.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
   const accent = eq[1];
 
-  const spotify = useSpotifyPlayback(visible);
+  const spotify = useMusicPlayback(visible);
 
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState(false);

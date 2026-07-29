@@ -29,7 +29,7 @@ import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { ModeSheet } from '@/components/ModeSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
-import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { AmbientGlow } from '@/components/AmbientGlow';
@@ -434,7 +434,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
-  const spotify = useSpotifyPlayback(visible);
+  const spotify = useMusicPlayback(visible);
 
   // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
   useEffect(() => {

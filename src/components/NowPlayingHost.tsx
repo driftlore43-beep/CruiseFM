@@ -25,7 +25,7 @@ import { resolveAnyStation } from '@/utils/customStations';
 import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { isSpotifyConnected, pause as pauseSpotify } from '@/utils/spotify';
-import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 
 // `icon` is a MaterialCommunityIcons glyph; `glyph: true` means the mode has
 // a drawn icon instead (no icon font has a mirror ball).
@@ -46,7 +46,7 @@ function MiniPlayer() {
   const insets = useSafeAreaInsets();
   const visible = !!np.session && !np.expanded;
   // Minimized = less detail on screen → poll Spotify at a relaxed pace.
-  const spotify = useSpotifyPlayback(visible, { pollMs: 12000 });
+  const spotify = useMusicPlayback(visible, { pollMs: 12000 });
 
   if (!visible || !np.session) return null;
 

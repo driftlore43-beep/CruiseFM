@@ -18,7 +18,7 @@ import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
-import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
@@ -301,7 +301,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   const caseSize = Math.min(winW * 0.93, winH * 0.44, 410);
   const discSize = caseSize * 0.85;
   const station = resolveAnyStation(activeId);
-  const spotify = useSpotifyPlayback(visible);
+  const spotify = useMusicPlayback(visible);
   const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
 
   const [shuffle, setShuffle] = useState(false);

@@ -17,7 +17,7 @@ import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
-import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
@@ -1470,7 +1470,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const ballSizeRef = useRef(ballSize);
   ballSizeRef.current = ballSize;
   const station = resolveAnyStation(activeId);
-  const spotify = useSpotifyPlayback(visible);
+  const spotify = useMusicPlayback(visible);
   const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
 
   const [shuffle, setShuffle] = useState(false);

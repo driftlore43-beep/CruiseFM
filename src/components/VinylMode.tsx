@@ -17,7 +17,7 @@ import { FloatingNotes } from '@/components/FloatingNotes';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { seekTo } from '@/utils/spotify';
-import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PreviewGate } from '@/components/PreviewGate';
@@ -527,7 +527,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const { width: winW, height: winH } = useWindowDimensions();
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
-  const spotify = useSpotifyPlayback(visible);
+  const spotify = useMusicPlayback(visible);
 
   // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
   useEffect(() => {

@@ -22,7 +22,7 @@ import { ModeSheet } from '@/components/ModeSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { seekTo } from '@/utils/spotify';
-import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PreviewGate } from '@/components/PreviewGate';
@@ -584,7 +584,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const isLandscape = winW > winH;
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
-  const spotify = useSpotifyPlayback(visible);
+  const spotify = useMusicPlayback(visible);
 
   // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
   useEffect(() => {

@@ -22,7 +22,7 @@ import {
   type LastCruise,
 } from '@/utils/lastCruise';
 import { recordDriveStart } from '@/utils/driveStats';
-import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { loadCustomStations, resolveAnyStation } from '@/utils/customStations';
 import { DEFAULT_DRIVER_NAME, getDriverName } from '@/utils/driverName';
 
@@ -72,7 +72,7 @@ export default function CruiseScreen() {
   // Light Spotify pulse-check (slow poll, only while this tab is focused) so
   // the header equalizer wakes up when music is playing — even before any
   // Cruise drive has started.
-  const spotify = useSpotifyPlayback(focused, { pollMs: 15000 });
+  const spotify = useMusicPlayback(focused, { pollMs: 15000 });
 
   async function launchCruise(cruise: LastCruise) {
     // A free user resuming a saved premium-mode drive only gets a taste — it

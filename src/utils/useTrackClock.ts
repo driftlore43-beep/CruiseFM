@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 
 import { seekTo } from './spotify';
-import type { NowPlaying } from './useSpotifyPlayback';
+import type { NowPlaying } from './useMusicPlayback';
 
 /** Drag-to-seek hooks a progress bar can call: freeze on grab, follow the
  * finger, then seek the real song (and restart the clock) on release. */

@@ -16,7 +16,7 @@ import {
   CARD_H, CARD_RATIO, CARD_W, ModeHero, glowCol, mixHex, type Eq,
 } from '@/components/ShareModeArt';
 import { getProfileName } from '@/utils/spotify';
-import type { NowPlaying } from '@/utils/useSpotifyPlayback';
+import type { NowPlaying } from '@/utils/useMusicPlayback';
 
 /** Where a recipient without the app is sent. */
 const INSTALL_URL = 'https://cruisefm.app';

@@ -6,7 +6,7 @@ import { ShareCardSheet } from '@/components/ShareCard';
 import { MODE_CATALOG } from '@/constants/modeCatalog';
 import type { Station } from '@/constants/stations';
 import { useNowPlaying } from '@/context/NowPlayingContext';
-import type { NowPlaying } from '@/utils/useSpotifyPlayback';
+import type { NowPlaying } from '@/utils/useMusicPlayback';
 
 /**
  * The row of pills under every mode's transport controls:

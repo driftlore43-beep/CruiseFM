@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -299,8 +300,6 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   // the controls below.
   const caseSize = Math.min(winW * 0.93, winH * 0.44, 410);
   const discSize = caseSize * 0.85;
-  const discSizeRef = useRef(discSize);
-  discSizeRef.current = discSize;
   const station = resolveAnyStation(activeId);
   const spotify = useSpotifyPlayback(visible);
   const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
@@ -341,42 +340,99 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
     ? wrap01(phaseRef.current + (Date.now() - runStartRef.current) / CD_SPIN_MS)
     : wrap01(phaseRef.current));
 
-  // ── Swipe the disc to scrub ─────────────────────────────────────────────
+  // ── Turn the disc to scrub — the record's own gesture (owner, 28.07:
+  // "the CD should respond to the full turn like how the vinyl performs").
+  // Drag the disc around its centre and the song winds with it, one full
+  // turn = five seconds, exactly the vinyl convention; a still, quick touch
+  // is play/pause, matching a tap on the record. The disc claims its touches
+  // outright — on the platter, the disc IS the control.
   const [scrubbing, setScrubbing] = useState(false);
-  const spinBaseRef = useRef(0);
   const progressBaseRef = useRef(0);
   const scrubPctRef = useRef(0);
+  const centerRef = useRef({ x: 0, y: 0 });
+  const lastAngleRef = useRef<number | null>(null);
+  const tapStartRef = useRef(0);
+  const hapticAccumRef = useRef(0);
+  const durMsRef = useRef(1);
+  durMsRef.current = Math.max(1, durationMs);
+  // togglePlay is defined further down; the responder is built once, so it
+  // reaches it through a ref.
+  const togglePlayRef = useRef<() => void>(() => {});
+
+  const angleAt = (x: number, y: number) =>
+    Math.atan2(y - centerRef.current.y, x - centerRef.current.x) * (180 / Math.PI);
+  // Shortest way round the circle, so crossing the ±180° seam doesn't read
+  // as a whole spin in the other direction.
+  const angleDiff = (cur: number, last: number) => {
+    let d = cur - last;
+    if (d > 180) d -= 360;
+    if (d < -180) d += 360;
+    return d;
+  };
 
   const discPan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => {
+      onPanResponderGrant: (evt) => {
+        (evt.target as any).measure?.((_x: number, _y: number, w: number, h: number, pX: number, pY: number) => {
+          centerRef.current = { x: pX + w / 2, y: pY + h / 2 };
+        });
+        tapStartRef.current = Date.now();
+        hapticAccumRef.current = 0;
         progressBaseRef.current = readAnim(progress);
         scrubPctRef.current = progressBaseRef.current;
         scrub.begin();
         setScrubbing(true);
         const at = readPhase();
-        spinBaseRef.current = at;
         phaseRef.current = at;
         turningRef.current = false;
         spin.stopAnimation();
         spin.setValue(at);
+        lastAngleRef.current = angleAt(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
       },
-      onPanResponderMove: (_, g) => {
-        const size = discSizeRef.current;
-        if (size <= 0) return;
-        // A disc-width of drag turns it once and covers a fifth of the song.
-        const at = wrap01(spinBaseRef.current + g.dx / size);
+      onPanResponderMove: (evt) => {
+        if (lastAngleRef.current === null) return;
+        const a = angleAt(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
+        const diff = angleDiff(a, lastAngleRef.current);
+        lastAngleRef.current = a;
+        // The disc follows the finger exactly...
+        const at = wrap01(phaseRef.current + diff / 360);
         spin.setValue(at);
         phaseRef.current = at;
-        const pct = Math.max(0, Math.min(1, progressBaseRef.current + g.dx / (size * 5)));
+        // ...and the song winds with it: 360° = 5 seconds, like the record.
+        const pct = Math.max(0, Math.min(1, scrubPctRef.current + ((diff / 360) * 5000) / durMsRef.current));
         scrubPctRef.current = pct;
         scrub.move(pct);
+        // A soft tick every five wound seconds — the record's habit.
+        hapticAccumRef.current += Math.abs((diff / 360) * 5000);
+        if (hapticAccumRef.current >= 5000) {
+          hapticAccumRef.current = 0;
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        }
       },
-      onPanResponderRelease: () => { scrub.end(scrubPctRef.current); setScrubbing(false); },
-      onPanResponderTerminate: () => { scrub.end(scrubPctRef.current); setScrubbing(false); },
+      onPanResponderRelease: (_evt, g) => {
+        lastAngleRef.current = null;
+        setScrubbing(false);
+        // Judged by finger travel in PIXELS, not degrees — near the centre a
+        // tiny wobble reads as many degrees (the vinyl lesson).
+        if (Math.hypot(g.dx, g.dy) < 12 && Date.now() - tapStartRef.current < 450) {
+          // A tap must NOT go through scrub.end — that always seeks, and
+          // seeking to a stale position on every play/pause stutters the
+          // song. togglePlay flips `playing`, and the clock effect re-syncs.
+          togglePlayRef.current();
+          return;
+        }
+        scrub.end(scrubPctRef.current);
+      },
+      onPanResponderTerminate: () => {
+        lastAngleRef.current = null;
+        setScrubbing(false);
+        scrub.end(scrubPctRef.current);
+      },
     }),
   ).current;
 
@@ -455,6 +511,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
 
   const resetTrack = () => progress.setValue(0);
   const togglePlay = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
+  togglePlayRef.current = togglePlay;
 
   const hasTrack = !!spotify.track;
   const title = spotify.track?.title ?? station.tagline;

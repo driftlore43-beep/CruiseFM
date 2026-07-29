@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useFocusEffect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 
+import { getSavedPlatform } from '@/utils/musicPlatform';
 import { connectSpotify, isSpotifyConnected } from '@/utils/spotify';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -26,7 +27,14 @@ export function ConnectSpotifyCard() {
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      isSpotifyConnected().then((c) => { if (active) setConnected(c); });
+      (async () => {
+        // Apple Music listeners get their own card — two connect prompts on
+        // one screen is noise, and only one of them is theirs.
+        const platform = await getSavedPlatform();
+        if (platform === 'appleMusic') { if (active) setConnected(true); return; }
+        const c = await isSpotifyConnected();
+        if (active) setConnected(c);
+      })();
       return () => { active = false; };
     }, []),
   );

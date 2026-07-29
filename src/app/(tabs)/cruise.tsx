@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 
+import { ConnectMusicCard } from '@/components/ConnectMusicCard';
 import { ConnectSpotifyCard } from '@/components/ConnectSpotifyCard';
 import { SpotifyNudgeCard } from '@/components/SpotifyNudgeCard';
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
@@ -112,6 +113,7 @@ export default function CruiseScreen() {
           accent={nowStation.eqColors?.[1]}
         />
         <ConnectSpotifyCard />
+        <ConnectMusicCard />
         <SpotifyNudgeCard />
         {/* "Welcome back" is a lie on a fresh install — a first-time driver
             (no saved cruise yet) gets welcomed in, not back. */}

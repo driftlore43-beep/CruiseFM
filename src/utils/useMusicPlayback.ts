@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { getSavedPlatform, type PlatformId } from './musicPlatform';
+import { appleMusicAvailable } from './appleMusic';
 import { useAppleMusicPlayback } from './useAppleMusicPlayback';
 import { useSpotifyPlayback } from './useSpotifyPlayback';
 
@@ -33,7 +34,7 @@ export function useMusicPlayback(visible: boolean, opts?: { pollMs?: number }) {
     return () => { live = false; };
   }, [visible]);
 
-  if (platform === 'appleMusic' && apple.available) {
+  if (platform === 'appleMusic' && appleMusicAvailable()) {
     return { ...apple, platform };
   }
   return { ...spotify, platform };

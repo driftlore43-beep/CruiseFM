@@ -6,6 +6,14 @@ import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { recordDriveEnd } from '@/utils/driveStats';
 import { getSavedPlatform } from '@/utils/musicPlatform';
+import {
+  appleMusicAvailable,
+  applePause,
+  applePlay,
+  isAppleMusicConnected,
+  isApplePlaylist,
+  startApplePlaylist,
+} from '@/utils/appleMusic';
 import { getPlaybackState, isRestrictedAccount, isSpotifyConnected, pause as pauseSpotify, startPlayback, type StartResult } from '@/utils/spotify';
 import { openInSpotify } from '@/utils/spotifyHandoff';
 import { getStationPlaylist } from '@/utils/stationPlaylists';
@@ -23,6 +31,23 @@ import { getStationPlaylist } from '@/utils/stationPlaylists';
 async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean }): Promise<StartResult | null> {
   try {
     const linked = await getStationPlaylist(stationId);
+
+    // Apple Music first: on a build carrying MusicKit, a listener who chose
+    // Apple Music plays through it entirely — their own phone, their own
+    // subscription, none of Spotify's device-waking or allowlist machinery.
+    if (appleMusicAvailable() && (await getSavedPlatform()) === 'appleMusic') {
+      if (!(await isAppleMusicConnected())) return 'no-playlist';
+      if (!linked) {
+        if (opts?.resumeAny) { await applePlay(); return 'playing'; }
+        await applePause();
+        return 'no-playlist';
+      }
+      // A Spotify link saved earlier can't play here — say so rather than
+      // failing quietly, since the fix is to relink the station.
+      if (!isApplePlaylist(linked.uri)) return 'no-playlist';
+      return await startApplePlaylist(linked.uri);
+    }
+
     const connected = await isSpotifyConnected();
 
     // Each station owns its own sound. A station with no playlist never

@@ -3,6 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  appleMusicAvailable,
+  getAppleUserPlaylists,
+  isAppleMusicConnected,
+} from '@/utils/appleMusic';
+import { getSavedPlatform } from '@/utils/musicPlatform';
 import { getUserPlaylists, isSpotifyConnected } from '@/utils/spotify';
 import { parseSpotifyPlaylistLink } from '@/utils/spotifyHandoff';
 import { type LinkedPlaylist } from '@/utils/stationPlaylists';
@@ -84,9 +90,21 @@ export function PlaylistSheet({
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [playlists, setPlaylists] = useState<LinkedPlaylist[]>([]);
+  // Apple Music people get their own library and no paste box — Apple has no
+  // shareable playlist link to paste, so offering one would be a dead end.
+  const [apple, setApple] = useState(false);
 
   useEffect(() => {
     (async () => {
+      const platform = await getSavedPlatform();
+      if (platform === 'appleMusic' && appleMusicAvailable()) {
+        setApple(true);
+        const isConn = await isAppleMusicConnected();
+        setConnected(isConn);
+        if (isConn) setPlaylists(await getAppleUserPlaylists());
+        setLoading(false);
+        return;
+      }
       const isConn = await isSpotifyConnected();
       setConnected(isConn);
       if (isConn) {
@@ -127,17 +145,34 @@ export function PlaylistSheet({
                 })}
               </ScrollView>
             )}
-            {connected && playlists.length === 0 && (
-              <Text style={ps.empty}>
-                Your Spotify library isn't reachable from here — but any playlist can still be linked with its share link:
-              </Text>
+            {apple ? (
+              <>
+                {connected && playlists.length === 0 && (
+                  <Text style={ps.empty}>
+                    No playlists found in your Apple Music library yet. Make one in the Music app and it'll show up here.
+                  </Text>
+                )}
+                {!connected && (
+                  <Text style={ps.empty}>
+                    Connect Apple Music from the home screen to pick one of your playlists for this station.
+                  </Text>
+                )}
+              </>
+            ) : (
+              <>
+                {connected && playlists.length === 0 && (
+                  <Text style={ps.empty}>
+                    Your Spotify library isn't reachable from here — but any playlist can still be linked with its share link:
+                  </Text>
+                )}
+                {!connected && (
+                  <Text style={ps.empty}>
+                    No Spotify login needed — link any playlist with its share link:
+                  </Text>
+                )}
+                <PasteLinkRow onPick={onPick} />
+              </>
             )}
-            {!connected && (
-              <Text style={ps.empty}>
-                No Spotify login needed — link any playlist with its share link:
-              </Text>
-            )}
-            <PasteLinkRow onPick={onPick} />
           </>
         )}
       </View>

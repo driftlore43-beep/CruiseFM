@@ -27,6 +27,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useMotion } from '@/context/MotionContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
+import { appleMusicAvailable } from '@/utils/appleMusic';
 import { getSavedPlatform } from '@/utils/musicPlatform';
 import {
   getStationPlaylist,
@@ -74,6 +75,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [linkToast, setLinkToast] = useState<string | null>(null);
   const [spotifyPlatform, setSpotifyPlatform] = useState(true);
+  const [applePlatform, setApplePlatform] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -84,7 +86,10 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
       setShowMenu(false);
       setConfirmDelete(false);
       if (station) getStationPlaylist(station.id).then(setLinked);
-      getSavedPlatform().then((p) => setSpotifyPlatform(p === 'spotify' || p == null));
+      getSavedPlatform().then((p) => {
+        setSpotifyPlatform(p === 'spotify' || p == null);
+        setApplePlatform(p === 'appleMusic');
+      });
       slideY.setValue(0);
       slideX.setValue(SCREEN_W);
       // Timing rather than a spring: a page push wants to arrive and stop, not
@@ -184,7 +189,11 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   // that the obvious first step. Spotify people only: YouTube Music / Apple
   // Music / other listeners run music in their own app, so Cruise FM is the
   // visual companion and Start Drive always proceeds.
-  const needsPlaylist = !linked && spotifyPlatform;
+  // Apple Music listeners get the same strict rule, but ONLY on builds that
+  // can actually play in-app — without MusicKit they're a visual-companion
+  // listener like any other, and gating them would block a drive we could
+  // have shown them.
+  const needsPlaylist = !linked && (spotifyPlatform || (applePlatform && appleMusicAvailable()));
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={() => handleClose()}>
@@ -303,7 +312,9 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
                   ? 'Tap to change'
                   : needsPlaylist
                     ? 'Give your station its sound'
-                    : 'Drop in your own Spotify playlist'}
+                    : applePlatform
+                      ? 'Drop in your own Apple Music playlist'
+                      : 'Drop in your own Spotify playlist'}
               </Text>
             </View>
             <MaterialCommunityIcons name={linked ? 'pencil' : 'plus'} size={18} color={SPOTIFY_GREEN} />

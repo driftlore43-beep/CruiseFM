@@ -1,40 +1,116 @@
-import { useState } from 'react';
-import { NativeModules } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
+import { useActivityPing, useAdoptPlayState } from '@/context/NowPlayingContext';
+
+import {
+  appleMusicAvailable,
+  appleNext,
+  applePause,
+  applePlay,
+  applePrev,
+  appleSetRepeat,
+  appleSetShuffle,
+  getAppleNowPlaying,
+  isAppleMusicConnected,
+} from './appleMusic';
 import type { NowPlaying, RepeatMode } from './useSpotifyPlayback';
 
 /**
- * Apple Music playback — the second seat at the table useMusicPlayback
- * switches between.
+ * Live Apple Music playback bridge — the peer of useSpotifyPlayback, and the
+ * second seat behind the useMusicPlayback switchboard.
  *
- * CURRENT STATE: a structured stub. The real thing needs a native MusicKit
- * module, which can only ship in a fresh build (never OTA) — so the JS side
- * is built first against this exact surface, and the native module drops in
- * underneath without touching any caller. Until the module exists in the
- * installed binary, `available` is false and the switchboard never selects
- * this implementation, so shipping this file over the air changes nothing.
+ * Deliberately the same shape as the Spotify hook so the switchboard can
+ * return either one and no caller can tell the difference.
  *
- * The native bridge, when it lands, registers as NativeModules.CruiseMusicKit
- * with: requestAuthorization(), currentEntry(), play(), pause(), next(),
- * previous(), seekTo(ms), setShuffle(bool), setRepeat(mode),
- * playPlaylist(id), userPlaylists().
+ * Simpler than Spotify's in two ways, both because MusicKit plays on THIS
+ * phone rather than commanding a remote device: there is no waking a dozing
+ * speaker (so no wake nudge, no start-result reporting), and no playlist
+ * "context" to chase — the queue is ours.
  */
+export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number }) {
+  const [connected, setConnected] = useState(false);
+  const [track, setTrack] = useState<NowPlaying | null>(null);
+  const [shuffleOn, setShuffleOn] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
+  const [contextName, setContextName] = useState<string | null>(null);
 
-const Bridge: unknown = (NativeModules as Record<string, unknown>)?.CruiseMusicKit ?? null;
+  const cancelledRef = useRef(false);
+  const refreshRef = useRef<() => void>(() => {});
+  const lastControlRef = useRef(0);
+  const adoptPlay = useAdoptPlayState();
+  const adoptRef = useRef(adoptPlay);
+  adoptRef.current = adoptPlay;
 
-/** True only in builds that carry the native MusicKit module. */
-export function appleMusicAvailable(): boolean {
-  return Bridge != null;
-}
+  /**
+   * The poll is owned by a ref so the AppState listener can stop and restart
+   * it. This is a CRASH FIX, not a battery tweak: iOS SIGKILLs a backgrounded
+   * app that keeps a timer running (bug_type 309, invisible to Sentry), which
+   * is exactly what the Spotify poll did before it was gated. Any repeating
+   * timer added here must obey the same rule.
+   */
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopPoll = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  };
+  const startPoll = () => {
+    stopPoll();
+    pollRef.current = setInterval(() => refreshRef.current(), opts?.pollMs ?? 5000);
+  };
 
-export function useAppleMusicPlayback(_visible: boolean, _opts?: { pollMs?: number }) {
-  // State hooks exist so the real implementation slots in without changing
-  // the hook's call order — rules of hooks make retrofitting state painful.
-  const [connected] = useState(false);
-  const [track] = useState<NowPlaying | null>(null);
-  const [shuffleOn] = useState(false);
-  const [repeatMode] = useState<RepeatMode>('off');
-  const [contextName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!visible || !appleMusicAvailable()) return;
+    cancelledRef.current = false;
+
+    (async () => {
+      const conn = await isAppleMusicConnected();
+      if (cancelledRef.current) return;
+      setConnected(conn);
+      if (!conn) return;
+
+      const refresh = async () => {
+        const entry = await getAppleNowPlaying();
+        if (cancelledRef.current) return;
+        if (!entry) { setTrack(null); return; }
+        // Mirror reality: if music stops elsewhere (car Bluetooth drops, the
+        // Music app pauses) the drive follows. Recent taps win for 8s.
+        if (Date.now() - lastControlRef.current > 8000) adoptRef.current(entry.isPlaying);
+        setTrack({
+          title: entry.title,
+          artist: entry.artist,
+          albumArt: entry.artworkUrl,
+          durationMs: entry.durationMs,
+          progressMs: entry.positionMs,
+          syncedAt: Date.now(),
+          isPlaying: entry.isPlaying,
+        });
+        if (entry.contextName !== undefined) setContextName(entry.contextName ?? null);
+      };
+      refreshRef.current = refresh;
+      refresh();
+      if (AppState.currentState === 'active') startPoll();
+    })();
+
+    return () => {
+      cancelledRef.current = true;
+      stopPoll();
+    };
+  }, [visible]);
+
+  // Poll only while the app is in front of the user — see the note above.
+  // Returning to the app also re-reads immediately so the title and progress
+  // snap into step rather than waiting out the interval.
+  useEffect(() => {
+    if (!visible || !appleMusicAvailable()) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') { refreshRef.current(); startPoll(); }
+      else stopPoll();
+    });
+    return () => sub.remove();
+  }, [visible]);
+
+  const ping = useActivityPing();
+  const after = () => setTimeout(() => refreshRef.current(), 500);
 
   return {
     available: appleMusicAvailable(),
@@ -43,11 +119,14 @@ export function useAppleMusicPlayback(_visible: boolean, _opts?: { pollMs?: numb
     contextName,
     shuffleOn,
     repeatMode,
-    play: () => {},
-    pause: () => {},
-    next: () => {},
-    prev: () => {},
-    shuffle: (_state: boolean) => {},
-    repeat: (_mode: RepeatMode) => {},
+    // Controls are optimistic: fire, then re-read so the display catches up.
+    // Playback is local, so these land far faster than Spotify's remote calls
+    // and need none of its waking machinery.
+    play: () => { ping(); lastControlRef.current = Date.now(); applePlay(); after(); },
+    pause: () => { ping(); lastControlRef.current = Date.now(); applePause(); after(); },
+    next: () => { ping(); lastControlRef.current = Date.now(); appleNext(); after(); },
+    prev: () => { ping(); lastControlRef.current = Date.now(); applePrev(); after(); },
+    shuffle: (state: boolean) => { ping(); setShuffleOn(state); appleSetShuffle(state); after(); },
+    repeat: (mode: RepeatMode) => { ping(); setRepeatMode(mode); appleSetRepeat(mode); after(); },
   };
 }

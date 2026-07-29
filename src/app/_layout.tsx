@@ -1,11 +1,17 @@
 import { DarkTheme, Slot, ThemeProvider } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { BrandIntro, holdSplashScreen } from '@/components/BrandIntro';
 import { Cruise } from '@/constants/theme';
 import { initCrashReports } from '@/utils/crashReports';
 
 // First thing on launch, so even startup crashes get reported.
 initCrashReports();
+// Keep the native splash up until BrandIntro is on screen to take over from
+// it — without this the mark is gone the moment the first screen mounts,
+// which is the "it happens in a flash" the owner reported.
+holdSplashScreen();
 import { ThemeProvider as CruiseThemeProvider, useTheme } from '@/context/ThemeContext';
 import { MotionProvider } from '@/context/MotionContext';
 import { NowPlayingProvider } from '@/context/NowPlayingContext';
@@ -20,6 +26,10 @@ claimFounderIfEligible();
 function AppShell() {
   const platformSelector = usePlatformSelector();
   const { theme } = useTheme();
+  // The platform sheet is a Modal, and a Modal renders above the app root —
+  // on a first launch it was covering the opening logo about a third of the
+  // way through it. The brand goes first, then the question.
+  const [introDone, setIntroDone] = useState(false);
 
   const handleDismiss = async (skipped?: boolean) => {
     if (skipped) await setPlatformSkipped();
@@ -35,9 +45,11 @@ function AppShell() {
       <View style={[styles.ambientGlow, { backgroundColor: glowColor }]} />
       <Slot />
       <PlatformSelector
-        visible={platformSelector.visible}
+        visible={introDone && platformSelector.visible}
         onDismiss={handleDismiss}
       />
+      {/* Last child, so it covers everything including the platform sheet. */}
+      <BrandIntro onDone={() => setIntroDone(true)} />
     </View>
   );
 }

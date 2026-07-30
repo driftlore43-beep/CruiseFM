@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
@@ -24,29 +25,45 @@ const BAR_CONFIGS = [
   { maxH: 11, duration: 460, delay: 55,  color: '#6575F5' },
 ] as const;
 
+/** Height the bars settle at when nothing is playing — a row of dots. */
+const REST_H = 3;
+
 function EqBar({
   maxH,
   duration,
   delay,
   color,
+  live,
 }: {
   maxH: number;
   duration: number;
   delay: number;
   color: string;
+  /** Bars only move while audio is genuinely playing. */
+  live: boolean;
 }) {
-  const h = useSharedValue(3);
+  const h = useSharedValue(REST_H);
 
+  // The loop used to start on mount and never stop, so the meter bounced
+  // merrily along over paused music — which is the one thing an equalizer
+  // must not do. It now starts and stops with the audio.
   useEffect(() => {
-    h.value = withDelay(
-      delay,
-      withRepeat(
-        withTiming(maxH, { duration, easing: Easing.inOut(Easing.ease) }),
-        -1,
-        true,
-      ),
-    );
-  }, []);
+    if (live) {
+      h.value = withDelay(
+        delay,
+        withRepeat(
+          withTiming(maxH, { duration, easing: Easing.inOut(Easing.ease) }),
+          -1,
+          true,
+        ),
+      );
+    } else {
+      // cancelAnimation first: withTiming alone would be overridden by the
+      // repeat that is still running.
+      cancelAnimation(h);
+      h.value = withTiming(REST_H, { duration: 320, easing: Easing.out(Easing.quad) });
+    }
+  }, [live]);
 
   const style = useAnimatedStyle(() => ({ height: h.value }));
 
@@ -60,26 +77,26 @@ export function EqualizerHeader({
 }: {
   /** Station to show — the active drive's, or tonight's pick when idle. */
   stationName: string;
-  /** True when a drive session is actually playing. */
+  /** True when audio is genuinely playing — drives whether the bars move. */
   live?: boolean;
   /** Mood colour to tint the bars, so the header matches the station. */
   accent?: string;
 }) {
-  // Idle, this used to read "TONIGHT'S PICK / <station>" — which the hero
-  // directly below now says twice over, in bigger type. A header that only
-  // repeats the thing under it is clutter, so it stands down unless there is
-  // real playback for it to report.
-  if (!live) return null;
-
+  // WHETHER this renders is the caller's decision (there is nothing to report
+  // with no drive and no playback, and idle it used to read "TONIGHT'S PICK /
+  // <station>" — which the hero directly below says twice over in bigger
+  // type). What it reports is decided here: the label and the motion both
+  // follow the audio, so an open-but-paused drive reads as paused instead of
+  // dancing over silence.
   return (
     <View style={styles.container}>
       <View style={styles.labelGroup}>
-        <Text style={styles.label}>NOW PLAYING</Text>
+        <Text style={styles.label}>{live ? 'NOW PLAYING' : 'PAUSED'}</Text>
         <Text style={styles.sublabel}>{stationName}</Text>
       </View>
       <View style={styles.equalizerRow}>
         {BAR_CONFIGS.map((cfg, i) => (
-          <EqBar key={i} {...cfg} color={accent ?? cfg.color} />
+          <EqBar key={i} {...cfg} color={accent ?? cfg.color} live={live} />
         ))}
       </View>
     </View>

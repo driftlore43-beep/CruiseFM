@@ -127,11 +127,17 @@ export default function CruiseScreen() {
           { paddingTop: insets.top + 18, paddingBottom: TAB_SAFE_INSET + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}>
-        <EqualizerHeader
-          stationName={nowStation.name}
-          live={!!np.session || !!spotify.track?.isPlaying}
-          accent={nowStation.eqColors?.[1]}
-        />
+        {/* Shown whenever there is a drive open or music genuinely playing —
+            and its bars move only while the audio does. Opening a station or
+            mode card creates the session, so the meter is up and running for
+            the whole drive and rests the moment it's paused. */}
+        {(!!np.session || !!spotify.track?.isPlaying) && (
+          <EqualizerHeader
+            stationName={nowStation.name}
+            live={!!spotify.track?.isPlaying || (!!np.session && np.playing)}
+            accent={nowStation.eqColors?.[1]}
+          />
+        )}
 
         {/* The title, then the one big thing. The connect cards used to sit
             above this and pushed the greeting clean off the screen, so the

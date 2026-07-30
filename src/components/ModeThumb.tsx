@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, {
-  Circle, Defs, G, Line, LinearGradient as SvgLinearGradient, Path,
+  Circle, ClipPath, Defs, G, Line, LinearGradient as SvgLinearGradient, Path,
   RadialGradient, Rect, Stop,
 } from 'react-native-svg';
 
@@ -176,10 +176,16 @@ export const ModeThumb = memo(function ModeThumb({ mode, size, colors, uid }: Pr
         );
       }
 
-      // ── Sliced retrowave sun over a receding grid ───────────────────────
+      // ── Retrowave sun over a receding grid ──────────────────────────────
       case 'horizon': {
-        const c = S / 2, R = S * 0.26, sunY = S * 0.40;
-        const slices = 7;
+        const c = S / 2, R = S * 0.26, sunY = S * 0.38;
+        // The sun is drawn WHOLE, then a few thin dark cuts are laid over its
+        // lower half — clipped to the disc's chord width at each height. The
+        // first version built the disc OUT of separate bands with wide gaps,
+        // and at row size the circle came out shredded (owner, 30.07): the
+        // silhouette must be one unbroken shape, the slats just a texture on
+        // it.
+        const cuts = [0.18, 0.42, 0.64, 0.84];
         return (
           <>
             <Defs>
@@ -188,24 +194,24 @@ export const ModeThumb = memo(function ModeThumb({ mode, size, colors, uid }: Pr
                 <Stop offset="1" stopColor={colors[2]} />
               </SvgLinearGradient>
             </Defs>
-            {/* Drawn as bands clipped to the circle's width at each height —
-                cheaper than a real mask and reads identically at this size. */}
-            {Array.from({ length: slices }).map((_, i) => {
-              const t0 = i / slices, t1 = (i + 0.72) / slices;
-              const y0 = sunY - R + 2 * R * t0;
-              const yh = 2 * R * (t1 - t0);
-              const half = Math.sqrt(Math.max(0, 1 - Math.pow((y0 + yh / 2 - sunY) / R, 2))) * R;
-              return <Rect key={i} x={c - half} y={y0} width={half * 2} height={yh} fill={`url(#${id('sun')})`} />;
+            <Circle cx={c} cy={sunY} r={R} fill={`url(#${id('sun')})`} />
+            {cuts.map((f, i) => {
+              const y = sunY + R * f;                       // lower half only
+              const h = Math.max(0.8, S * (0.010 + i * 0.004)); // thicker downward
+              const half = Math.sqrt(Math.max(0, 1 - Math.pow((y - sunY) / R, 2))) * R;
+              return <Rect key={i} x={c - half - 0.5} y={y - h / 2} width={half * 2 + 1} height={h} fill="#07070c" />;
             })}
             {Array.from({ length: 6 }).map((_, i) => {
-              const y = S * 0.66 + Math.pow(i / 5, 1.7) * S * 0.32;
+              const y = S * 0.68 + Math.pow(i / 5, 1.7) * S * 0.30;
               return <Rect key={`h${i}`} x={0} y={y} width={S} height={Math.max(0.5, S * 0.006)}
                 fill="rgba(255,255,255,0.26)" />;
             })}
+            {/* Verticals converge AT the horizon line, like real perspective —
+                not at a point floating below the sun. */}
             {Array.from({ length: 7 }).map((_, i) => {
               const spread = (i - 3) / 3;
-              return <Line key={`v${i}`} x1={c + spread * S * 0.12} y1={S * 0.66}
-                x2={c + spread * S * 0.95} y2={S} stroke="rgba(255,255,255,0.20)"
+              return <Line key={`v${i}`} x1={c + spread * S * 0.06} y1={S * 0.68}
+                x2={c + spread * S * 0.85} y2={S} stroke="rgba(255,255,255,0.18)"
                 strokeWidth={Math.max(0.5, S * 0.006)} />;
             })}
           </>
@@ -236,59 +242,68 @@ export const ModeThumb = memo(function ModeThumb({ mode, size, colors, uid }: Pr
         );
       }
 
-      // ── The ball: the mode's own sphere projection, held still ──────────
+      // ── The ball, drawn the way the paywall showcase draws it ───────────
+      // A UNIFORM grid of square mirrors clipped to a circle, alternate rows
+      // offset by half a tile (how a real ball is built), a soft light band,
+      // a top-left catch and a thick dark inner rim for roundness. The owner
+      // compared this against the previous sphere-projection thumbnail and
+      // preferred the paywall's version outright (30.07) — the projection's
+      // pinched pole tiles read as noise at row size, where flat squares
+      // read as mirrors.
       case 'disco': {
         const c = S / 2, R = S * 0.42;
-        // Facet count follows the size. At row size a dozen rows is plenty and
-        // more would just be mush; at hero size the same dozen reads as a
-        // stack of chunky bands rather than a mirror ball, which is exactly
-        // how the first hero render came out.
-        const ROWS = Math.max(9, Math.min(23, Math.round(S / 11)));
-        const COLS = Math.round(ROWS * 1.75);
+        const pitch = Math.max(4.5, S * 0.098);          // ≈ the paywall's 13px at 130
+        const tile = pitch - Math.max(0.8, pitch * 0.14);
+        const n = Math.ceil((R * 2) / pitch) + 1;
         const tiles: React.ReactNode[] = [];
-        for (let r = 0; r < ROWS; r++) {
-          const b0 = -Math.PI / 2 + (Math.PI * r) / ROWS;
-          const b1 = -Math.PI / 2 + (Math.PI * (r + 1)) / ROWS;
-          const yTop = c - R * Math.sin(b1);
-          const yBot = c - R * Math.sin(b0);
-          const bm = (b0 + b1) / 2;
-          const rr = R * Math.cos(bm);
-          for (let k = 0; k < COLS; k++) {
-            // Brick bond on alternate rows — how a real ball is built, and
-            // what stops the columns stacking into hard vertical lines.
-            const lam = ((k + (r % 2) * 0.5) / COLS) * Math.PI * 2 - Math.PI;
-            const face = Math.cos(lam);
-            if (face <= 0.05) continue;              // back-face cull
-            const x = c + rr * Math.sin(lam);
-            const w = Math.max(0.5, (rr * 2 * Math.PI / COLS) * face);
-            const nx = Math.cos(bm) * Math.sin(lam);
-            const ny = Math.sin(bm);
-            const nz = Math.cos(bm) * face;
-            const lambert = Math.max(0, -nx * 0.45 + ny * 0.5 + nz * 0.74);
-            // Hard per-tile scatter is what makes it read as mirrors rather
-            // than as a shaded ball — see the Mirror Ball notes in AGENTS.md.
-            const jit = hash01(r * 7.3 + k * 3.1);
-            const l = Math.min(1, 0.10 + lambert * 0.52 + jit * lambert * 0.58 + jit * 0.08);
-            const g = Math.round(232 * l);
+        for (let r = 0; r < n; r++) {
+          const y = c - R + r * pitch;
+          const off = (r % 2) * (pitch / 2);
+          for (let k = -1; k < n; k++) {
+            const x = c - R + k * pitch + off;
+            // Skip tiles fully outside the disc; part-tiles are clipped.
+            const dx = x + tile / 2 - c, dy = y + tile / 2 - c;
+            if (Math.sqrt(dx * dx + dy * dy) > R + pitch) continue;
+            const j = hash01(r * 12.9898 + k * 78.233);
             tiles.push(
-              <Rect key={`${r}-${k}`} x={x - w / 2} y={yTop} width={w}
-                height={Math.max(0.6, (yBot - yTop) * 0.86)}
-                fill={`rgb(${Math.round(222 * l)},${g},${Math.round(244 * l)})`} />,
+              <Rect key={`${r}-${k}`} x={x} y={y} width={tile} height={tile}
+                rx={Math.max(0.4, tile * 0.10)}
+                fill={`rgba(226,236,255,${(0.16 + j * 0.46).toFixed(3)})`} />,
             );
           }
         }
         return (
           <>
             <Defs>
-              <RadialGradient id={id('ball')} cx="34%" cy="28%" r="76%">
-                <Stop offset="0" stopColor="#ffffff" stopOpacity="0.16" />
-                <Stop offset="0.55" stopColor="#000000" stopOpacity="0" />
-                <Stop offset="1" stopColor="#000000" stopOpacity="0.62" />
+              <ClipPath id={id('clip')}>
+                <Circle cx={c} cy={c} r={R} />
+              </ClipPath>
+              {/* The travelling light of the real mode, frozen mid-sweep. */}
+              <SvgLinearGradient id={id('beam')} x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0" stopColor="#ffffff" stopOpacity="0" />
+                <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.16" />
+                <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+              </SvgLinearGradient>
+              <RadialGradient id={id('rim')} cx="50%" cy="50%" r="50%">
+                <Stop offset="0" stopColor="#000000" stopOpacity="0" />
+                <Stop offset="0.72" stopColor="#000000" stopOpacity="0" />
+                <Stop offset="1" stopColor="#04060e" stopOpacity="0.55" />
+              </RadialGradient>
+              <RadialGradient id={id('catch')} cx="50%" cy="50%" r="50%">
+                <Stop offset="0" stopColor="#ffffff" stopOpacity="0.14" />
+                <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
               </RadialGradient>
             </Defs>
-            <Circle cx={c} cy={c} r={R} fill="#0b0b0c" />
-            {tiles}
-            <Circle cx={c} cy={c} r={R} fill={`url(#${id('ball')})`} />
+            <G clipPath={`url(#${id('clip')})`}>
+              <Circle cx={c} cy={c} r={R} fill="#141828" />
+              {tiles}
+              <Rect x={c - R * 0.55} y={c - R} width={R * 0.9} height={R * 2} fill={`url(#${id('beam')})`} />
+              <Circle cx={c - R * 0.35} cy={c - R * 0.45} r={R * 0.45} fill={`url(#${id('catch')})`} />
+              <Circle cx={c} cy={c} r={R} fill={`url(#${id('rim')})`} />
+            </G>
+            {/* Hanging stem, like the showcase miniature. */}
+            <Rect x={c - Math.max(0.8, S * 0.010)} y={c - R - S * 0.10}
+              width={Math.max(1.6, S * 0.020)} height={S * 0.10} fill="rgba(190,200,222,0.55)" />
           </>
         );
       }

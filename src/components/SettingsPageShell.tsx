@@ -1,10 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRef } from 'react';
 import { Animated, Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { Cruise } from '@/constants/theme';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -58,12 +55,10 @@ export function SettingsPageShell({
   ).current;
 
   return (
+    // Flat black, the same #0a0a10 the Profile page sits on — the old
+    // navy-violet gradient made every settings page the last purple corner
+    // of an app that had gone black everywhere else (owner, 30.07).
     <Animated.View style={[styles.root, { transform: [{ translateX: slideX }] }]} {...backPan.panHandlers}>
-      <LinearGradient
-        colors={[Cruise.deepNavy, Cruise.charcoal, '#08080f']}
-        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <View style={styles.header}>
           <Pressable style={styles.backBtn} onPress={onBack} hitSlop={12}>
@@ -107,7 +102,7 @@ export function SettingsInfoRow({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Cruise.charcoal },
+  root: { flex: 1, backgroundColor: '#0a0a10' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 12, paddingTop: 4, paddingBottom: 10,
@@ -125,10 +120,12 @@ const sectionStyles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700',
     letterSpacing: 2, marginBottom: 10, marginLeft: 4,
   },
+  // Dark glass on black, matching the Profile page's settings card exactly —
+  // one card style across every settings surface.
   card: {
     borderRadius: 16, overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.12)',
   },
   row: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

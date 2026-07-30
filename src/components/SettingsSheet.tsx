@@ -1,12 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Image, Modal, Platform, Pressable, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { SettingsInfoRow, SettingsPageShell, SettingsSection } from '@/components/SettingsPageShell';
-import { GlossSheen } from '@/components/GlossSheen';
 import { OWNER_MODE } from '@/constants/config';
 import { Cruise } from '@/constants/theme';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE, type LegalDoc } from '@/constants/legal';
@@ -99,7 +97,7 @@ function AccountBody() {
             style={styles.nameInput}
             maxLength={24}
             returnKeyType="done"
-            selectionColor={Cruise.violetLight}
+            selectionColor="#ffffff"
           />
           <MaterialCommunityIcons name="pencil-outline" size={15} color="rgba(255,255,255,0.4)" />
         </View>
@@ -344,30 +342,22 @@ function ReferBody() {
     }
   }
 
+  // Black glass with a white primary button — the same language as the rest
+  // of the app (white play disc, white Tune-in pill). The old card was a
+  // violet gradient slab with a glowing violet button, the last of the purple.
   return (
     <View style={styles.referCard}>
-      <LinearGradient
-        colors={['rgba(155,95,255,0.30)', 'rgba(74,31,138,0.20)', 'rgba(14,21,64,0.30)']}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      <GlossSheen radius={20} />
-      <MaterialCommunityIcons name="star-four-points" size={30} color={Cruise.violetLight} style={{ marginBottom: 4 }} />
+      <MaterialCommunityIcons name="star-four-points" size={28} color="rgba(255,255,255,0.85)" style={{ marginBottom: 4 }} />
 
       <Text style={styles.referTitle}>Share the drive.</Text>
       <Text style={styles.referSub}>
         Know someone who'd love turning their playlists into a mood station? Send them Cruise FM.
       </Text>
-      <Pressable style={({ pressed }) => [styles.shareBtn, pressed && { opacity: 0.88 }]} onPress={handleShare}>
-        <LinearGradient
-          colors={['rgba(155,95,255,0.30)', 'rgba(123,56,224,0.16)']}
-          start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+      <Pressable style={({ pressed }) => [styles.shareBtn, pressed && { opacity: 0.85 }]} onPress={handleShare}>
         <MaterialCommunityIcons
           name={copied ? 'check' : 'share-variant'}
           size={16}
-          color="#fff"
+          color="#0a0a10"
         />
         <Text style={styles.shareBtnText}>{copied ? 'Link copied' : 'Share Cruise FM'}</Text>
       </Pressable>
@@ -395,18 +385,18 @@ const styles = StyleSheet.create({
   aboutTagline: { color: 'rgba(255,255,255,0.55)', fontSize: 13.5, textAlign: 'center', lineHeight: 19, paddingHorizontal: 24 },
   referCard: {
     borderRadius: 20, padding: 26, gap: 12, overflow: 'hidden', alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(155,95,255,0.45)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.12)',
   },
-  referTitle: { color: '#fff', fontSize: 21, fontWeight: '800', textAlign: 'center' },
+  referTitle: { color: '#fff', fontSize: 21, fontWeight: '800', textAlign: 'center', letterSpacing: -0.4 },
   referSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13.5, lineHeight: 19, textAlign: 'center', marginBottom: 6 },
   shareBtn: {
-    // Premium glass: transparent violet with a bright rim, not a solid fill.
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderRadius: 14, paddingVertical: 15, paddingHorizontal: 28, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(155,95,255,0.65)',
-    shadowColor: Cruise.violet, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 14, elevation: 8,
+    borderRadius: 26, paddingVertical: 14, paddingHorizontal: 28,
+    backgroundColor: '#fff',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
   },
-  shareBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  shareBtnText: { color: '#0a0a10', fontSize: 15, fontWeight: '700' },
   nameRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 16, paddingVertical: 8,
@@ -414,7 +404,7 @@ const styles = StyleSheet.create({
   nameRowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   nameRowLabel: { color: '#fff', fontSize: 14.5, fontWeight: '600', flex: 1 },
   nameInput: {
-    color: Cruise.violetLight, fontSize: 14, fontWeight: '600',
+    color: '#ffffff', fontSize: 14, fontWeight: '600',
     textAlign: 'right', minWidth: 120, paddingVertical: 8,
   },
   legalRow: {

@@ -391,6 +391,20 @@ function buildSphereTiles(size: number, eq: [string, string, string]): { tiles: 
       tiles.push({ d: face, fill: tint(faceStep - 0.55, cast), op: 0.55 + 0.35 * depth });
       tiles.push({ d: face, fill: `url(#dbFacet${facetDir(j, k)})`, op: 0.42 + 0.30 * depth });
 
+      // MICRO-BEVEL (owner's premium-detail round, 30.07): a hairline lit lip
+      // along each mirror's TOP edge and a shadow lip along its BOTTOM — one
+      // shared vertical gradient (`dbLip`, objectBoundingBox) serving every
+      // tile, so it costs one def and one path per tile, not per-tile defs.
+      // Horizontal edges ONLY: vertical edges are static meridian seams and
+      // drawing them is the round-12 mistake (bright regular verticals pin
+      // the whole surface). Opacity is jittered per tile — uniform lips read
+      // as stamped; scattered ones read as hand-set mirrors. Skipped at the
+      // silhouette where tiles are slivers and the lip would just be noise.
+      if (depth > 0.35) {
+        const lipRoll = hash01(j * 6.29 + k * 13.7);
+        tiles.push({ d: face, fill: 'url(#dbLip)', op: (0.16 + lipRoll * 0.26) * depth });
+      }
+
       // ...and a BRIGHT copy of the same face, filed into a phase bucket by
       // where it sits across the ball. MirrorFlash fades these in as a band
       // sweeping left to right, so what travels is individual mirrors catching
@@ -527,6 +541,15 @@ function SphereGrid({ size, tiles }: { size: number; tiles: Tile[] }) {
               (the SVG default) means each definition stretches to fit every
               facet that references it — real gradients on ~380 tiles for the
               price of six nodes. */}
+          {/* The micro-bevel's shared lip gradient — lit top edge, shadow
+              bottom edge, nothing in between. objectBoundingBox units, so it
+              rescales to whichever tile references it. */}
+          <SvgLinearGradient id="dbLip" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.8" />
+            <Stop offset="0.10" stopColor="#ffffff" stopOpacity="0" />
+            <Stop offset="0.88" stopColor="#000000" stopOpacity="0" />
+            <Stop offset="1" stopColor="#000000" stopOpacity="0.65" />
+          </SvgLinearGradient>
           {FACET_DIRS.map((g, i) => (
             <SvgLinearGradient key={i} id={`dbFacet${i}`} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2}>
               {/* Six stops, not three. The old ramp fell from white 0.66 to
@@ -759,7 +782,11 @@ function LightFace({ size, eq, blobs, sfx }: {
  * stays put on the near face while the mirrors travel through it.
  */
 function ColourReflections({ size, eq, lit }: { size: number; eq: [string, string, string]; lit: Animated.Value }) {
-  const patches = useMemo(() => Array.from({ length: 5 }, (_, i) => ({
+  // Patch 5 is deliberately NEUTRAL — a cool-white ambient reflection of the
+  // room itself, so the mood colours always sit alongside plain light and the
+  // ball never reads as fully tinted (the owner's brief, 30.07: white light
+  // stays dominant, theme colour tints only).
+  const patches = useMemo(() => Array.from({ length: 6 }, (_, i) => ({
     cx: 18 + hash01(i * 4.13 + 0.7) * 64,
     cy: 16 + hash01(i * 7.91 + 1.3) * 66,
     // Small enough that several can be alight without covering the ball. At
@@ -769,8 +796,8 @@ function ColourReflections({ size, eq, lit }: { size: number; eq: [string, strin
     // First and last stops weighted over the middle one — the outer stops
     // are where a station's character lives (Sunset: amber and magenta; its
     // middle coral mostly just averages them).
-    color: eq[[0, 2, 1, 0, 2][i % 5]],
-    peak: 0.20 + hash01(i * 9.7) * 0.16,
+    color: i === 5 ? '#e9edf5' : eq[[0, 2, 1, 0, 2][i % 5]],
+    peak: i === 5 ? 0.10 + hash01(i * 9.7) * 0.08 : 0.20 + hash01(i * 9.7) * 0.16,
     dur: 3800 + Math.floor(hash01(i * 5.5) * 4200),
     delay: Math.floor(hash01(i * 2.3) * 3600),
   })), [eq]);
@@ -1134,6 +1161,73 @@ function BallSheen({ size, pulse }: { size: number; pulse: Animated.Value }) {
   );
 }
 
+// The single soft specular where the key light hits strongest (owner's
+// premium round, 30.07: "one or two bright specular highlights"). NOT a hard
+// hotspot — round 4 proved a hard ellipse reads as a painted blob sitting on
+// the ball. This is all falloff: a small radial gradient at the key light's
+// upper-left, breathing slowly on its own period, and it goes out with the
+// music like every other piece of light.
+function KeySpecular({ size, lit }: { size: number; lit: Animated.Value }) {
+  const breathe = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(breathe, { toValue: 1, duration: 3600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(breathe, { toValue: 0, duration: 4400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, {
+        opacity: Animated.multiply(breathe.interpolate({ inputRange: [0, 1], outputRange: [0.10, 0.22] }), lit),
+      }]}
+    >
+      <Svg width={size} height={size} viewBox="0 0 100 100">
+        <Defs>
+          <RadialGradient id="dbKeySpec" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
+            <Stop offset="45%" stopColor="#ffffff" stopOpacity="0.30" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={33} cy={28} r={24} fill="url(#dbKeySpec)" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+// The soft glow BENEATH the ball (owner's premium round, 30.07) — the pool
+// of light a hanging mirror ball throws at whatever is under it. Mood-tinted
+// because it is LIGHT leaving the ball, not material (the chrome rule); goes
+// out with the music like everything else. Sits behind the ball, wider than
+// it, fading on its own gradient — no hard edges anywhere near it.
+function UnderGlow({ size, color, lit }: { size: number; color: string; lit: Animated.Value }) {
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: -size * 0.3, top: size * 0.72,
+        width: size * 1.6, height: size * 0.8,
+        opacity: lit.interpolate({ inputRange: [0, 1], outputRange: [0, 0.42] }),
+      }}
+    >
+      <Svg width="100%" height="100%" viewBox="0 0 160 80" preserveAspectRatio="none">
+        <Defs>
+          <RadialGradient id="dbUnder" cx="50%" cy="38%" rx="50%" ry="55%">
+            <Stop offset="0%" stopColor={color} stopOpacity="0.6" />
+            <Stop offset="55%" stopColor={color} stopOpacity="0.22" />
+            <Stop offset="100%" stopColor={color} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Ellipse cx={80} cy={30} rx={78} ry={28} fill="url(#dbUnder)" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
 function MirrorBall({ size, eq, spin, pulse, lit }: { size: number; eq: [string, string, string]; spin: Animated.Value; pulse: Animated.Value; lit: Animated.Value }) {
   const { tiles, flashes } = useMemo(() => buildSphereTiles(size, eq), [size, eq]);
   return (
@@ -1231,6 +1325,7 @@ function MirrorBall({ size, eq, spin, pulse, lit }: { size: number; eq: [string,
           they belong to the music like the flashes do. Paused, the ball is a
           dull unlit object and nothing may still be sliding across it. */}
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: lit }]} pointerEvents="none">
+        <KeySpecular size={size} lit={lit} />
         <BallSheen size={size} pulse={pulse} />
         <LensFlare size={size} pulse={pulse} />
       </Animated.View>
@@ -1853,6 +1948,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
                   themselves relative to it, not the taller pole+ball stack.
                   Also the scrub target: swipe left/right anywhere on the ball. */}
               <View style={{ width: ballSize, height: ballSize }} {...ballPan.panHandlers}>
+                <UnderGlow size={ballSize} color={bloomColor} lit={live} />
                 {/* Bloom and beams are light LEAVING the ball, so they fade
                     out with the music exactly as the flashes do. */}
                 <Animated.View style={[StyleSheet.absoluteFill, { opacity: live }]} pointerEvents="none">

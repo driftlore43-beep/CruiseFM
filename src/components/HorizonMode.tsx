@@ -109,6 +109,10 @@ function formatMs(ms: number): string {
 
 // ── The outrun scene ────────────────────────────────────────────────────────────
 function HorizonScene({ phase, amp, eq, geom = GEOM_PORTRAIT }: { phase: number; amp: number; eq: [string, string, string]; geom?: HzGeom }) {
+  // The canvas is sized in real pixels rather than "100%": a percentage
+  // canvas does not reliably re-resolve when the window changes shape, and
+  // with `slice` cropping that would crop the scene for the OLD screen.
+  const { width: winW, height: winH } = useWindowDimensions();
   const g = geom;
   // Rolling grid: each line loops from the horizon toward the viewer,
   // accelerating as it approaches (q^2.2 ≈ perspective).
@@ -132,7 +136,7 @@ function HorizonScene({ phase, amp, eq, geom = GEOM_PORTRAIT }: { phase: number;
   });
 
   return (
-    <Svg width="100%" height="100%" viewBox={`0 0 ${g.W} ${g.H}`} preserveAspectRatio="xMidYMid slice">
+    <Svg width={winW} height={winH} viewBox={`0 0 ${g.W} ${g.H}`} preserveAspectRatio="xMidYMid slice">
       <Defs>
         <SvgGradient id="hzSun" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor={eq[0]} />
@@ -226,7 +230,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   // Slide only — shrinking a full-bleed scene would reveal its edges. The
   // sun (drawn at centre) lands at the left pane's centre while the panel
   // is docked, and glides back to true centre at rest.
-  const deckScene = useDeckScene(chrome, winW, 1);
+  const deckScene = useDeckScene(chrome, winW, 1, isLandscape);
 
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
   const { progress, elapsedMs, durationMs, scrub } = useTrackClock({

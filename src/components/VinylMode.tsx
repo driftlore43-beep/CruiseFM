@@ -559,7 +559,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
     active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
   });
-  const deckScene = useDeckScene(chrome, winW);
+  const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
 
   // ── Real-track layer ────────────────────────────────────────────────────────
   // With Spotify connected the deck runs on the REAL song: true duration,
@@ -632,9 +632,18 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       onMoveShouldSetPanResponderCapture:  () => true,
       onPanResponderTerminationRequest:    () => false,
       onPanResponderGrant: (evt) => {
-        (evt.target as any).measure((_x: number, _y: number, w: number, h: number, pX: number, pY: number) => {
+        const { pageX, pageY } = evt.nativeEvent;
+        // `measure?.` — optional because a detached node has none, and a
+        // throw in here kills the whole gesture.
+        (evt.target as any).measure?.((_x: number, _y: number, w: number, h: number, pX: number, pY: number) => {
           recordCenterX.current = pX + w / 2;
           recordCenterY.current = pY + h / 2;
+          // measure answers a frame late, so the angle this gesture started
+          // from has to be recomputed against the FRESH centre. Without
+          // this, the first move is measured from the old one and the record
+          // jumps — which happens any time the centre has moved since the
+          // last touch: after turning the phone, or mid deck-glide.
+          if (lastAngle.current !== null) lastAngle.current = _getAngleFromCenter(pageX, pageY);
         });
         tapStartRef.current = Date.now();
         movedDegRef.current = 0;
@@ -1048,7 +1057,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           </View>
           )}
 
-          <Animated.View style={[fs.turntableWrap, isLandscape && { flex: 1, justifyContent: 'center' }, isLandscape ? deckScene : null]}>
+          <Animated.View style={[fs.turntableWrap, isLandscape && { flex: 1, justifyContent: 'center' }, deckScene]}>
             <TurntableHero
               platSize={platSize} spin={spin} tonearmAnim={tonearmVal} glowOpacity={glowOpacity}
               ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={spin} playing={playing}

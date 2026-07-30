@@ -84,6 +84,10 @@ function fmtTapeMs(ms: number): string {
 // ── Grain overlay ─────────────────────────────────────────────────────────────
 // Simulated film grain: a grid of tiny dots at random-but-stable positions
 function GrainOverlay() {
+  // Live screen size, not the module-load one: seeded against a portrait
+  // height the grain landed almost entirely below a sideways screen, and
+  // what did show was crammed into the left half.
+  const { width: w, height: h } = useWindowDimensions();
   const dots = useMemo(() => {
     const result: { key: number; left: number; top: number; opacity: number; size: number }[] = [];
     // 400 stable pseudo-random dots seeded by index
@@ -95,14 +99,14 @@ function GrainOverlay() {
       const h4 = Math.sin(i * 19.3)  * 43758.5453;
       result.push({
         key: i,
-        left:    (h1 - Math.floor(h1)) * SCREEN_W,
-        top:     (h2 - Math.floor(h2)) * SCREEN_H,
+        left:    (h1 - Math.floor(h1)) * w,
+        top:     (h2 - Math.floor(h2)) * h,
         opacity: (h3 - Math.floor(h3)) * 0.04 + 0.01,
         size:    (h4 - Math.floor(h4)) * 1.5 + 0.5,
       });
     }
     return result;
-  }, []);
+  }, [w, h]);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -844,7 +848,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
     active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
   });
-  const deckScene = useDeckScene(chrome, winW);
+  const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
 
   // Glow: 0.3 → 0.6 range, gentle amber pulse
 

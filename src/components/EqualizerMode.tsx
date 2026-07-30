@@ -364,7 +364,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   });
   // 0.62: the meter is full-width, so the generic 0.86 would poke under the
   // docked panel.
-  const deckScene = useDeckScene(chrome, winW, 0.62);
+  const deckScene = useDeckScene(chrome, winW, 0.62, isLandscape);
 
   useEffect(() => {
     if (visible) getStationPlaylist(activeStation).then(setLinked);

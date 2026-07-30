@@ -645,7 +645,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     setBand(b);
     bandRef.current = b;
     setFreq(dialValue(id));
-    slideY.setValue(SCREEN_H);
+    slideY.setValue(winH);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
     return () => cancelSnap();
   }, [visible]);
@@ -668,7 +668,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
   const handleClose = () => {
     cancelSnap();
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
+    Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
   // The dial pan was created before handleClose exists — it reaches it here.
   closeRef.current = handleClose;
@@ -698,7 +698,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   // centre of the left pane while the deck is docked, and at true centre at
   // rest; the dial simply continues behind the panel, which is what a real
   // head unit's scale does anyway.
-  const deckScene = useDeckScene(chrome, winW, 1);
+  const deckScene = useDeckScene(chrome, winW, 1, isLandscape);
 
   // Real song when connected, else the mood's own line — never a fake track.
   const hasTrack = !!spotify.track;

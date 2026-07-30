@@ -337,7 +337,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
     active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
   });
-  const deckScene = useDeckScene(chrome, winW);
+  const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
 
   const wrap01 = (v: number) => ((v % 1) + 1) % 1;
   const readAnim = (a: Animated.Value) => (a as unknown as { __getValue?: () => number }).__getValue?.() ?? 0;
@@ -391,8 +391,12 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
       onMoveShouldSetPanResponderCapture: () => true,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (evt) => {
+        const { pageX, pageY } = evt.nativeEvent;
         (evt.target as any).measure?.((_x: number, _y: number, w: number, h: number, pX: number, pY: number) => {
           centerRef.current = { x: pX + w / 2, y: pY + h / 2 };
+          // Same as the record: measure answers a frame late, so re-anchor
+          // the starting angle to the fresh centre or the first move jumps.
+          if (lastAngleRef.current !== null) lastAngleRef.current = angleAt(pageX, pageY);
         });
         tapStartRef.current = Date.now();
         hapticAccumRef.current = 0;
@@ -565,7 +569,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
           )}
 
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <Animated.View style={isLandscape ? deckScene : null}>
+            <Animated.View style={deckScene}>
             <View style={fs.caseShadow} {...discPan.panHandlers}>
               <JewelCase size={caseSize}>
                 <CDDisc size={discSize} spin={spin} albumArt={spotify.track?.albumArt ?? null} />

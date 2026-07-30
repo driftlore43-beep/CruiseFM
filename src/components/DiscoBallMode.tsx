@@ -22,7 +22,7 @@ import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
-import { LandscapeChrome, useDeckScene } from '@/components/LandscapeChrome';
+import { LandscapeChrome, useDeckScene, useIsoLayoutEffect } from '@/components/LandscapeChrome';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
@@ -1214,7 +1214,9 @@ function UnderGlow({ size, color, lit }: { size: number; color: string; lit: Ani
         opacity: lit.interpolate({ inputRange: [0, 1], outputRange: [0, 0.42] }),
       }}
     >
-      <Svg width="100%" height="100%" viewBox="0 0 160 80" preserveAspectRatio="none">
+      {/* Explicit size, never "100%" — a percentage canvas is what left the
+          ambient hazes drawn at their old proportions after a turn. */}
+      <Svg width={size * 1.6} height={size * 0.8} viewBox="0 0 160 80" preserveAspectRatio="none">
         <Defs>
           <RadialGradient id="dbUnder" cx="50%" cy="38%" rx="50%" ry="55%">
             <Stop offset="0%" stopColor={color} stopOpacity="0.6" />
@@ -1860,13 +1862,16 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   // keeps its own fade machinery (one value serves the portrait fade and the
   // landscape dock), so it needs the orientation re-wake spelled out; the
   // shared useChromeFade does the same thing via its own active flag.
-  useEffect(() => {
+  // Layout effect for the same reason the shared hook uses one: the turn
+  // renders the scene as landscape while chrome is still at 1, so a plain
+  // effect leaves one frame with the deck glide already applied.
+  useIsoLayoutEffect(() => {
     if (!visible) return;
     chrome.setValue(0);
     wakeChrome(true);
   }, [isLandscape]);
 
-  const deckScene = useDeckScene(chrome, winW);
+  const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
 
   const hasTrack = !!spotify.track;
   const title = spotify.track?.title ?? station.tagline;
@@ -1967,7 +1972,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
           {/* paddingBottom lifts the ball off dead centre — it hangs from
               above, so sitting high is what reads right (owner, 30.07). */}
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? ballSize * 0.16 : ballSize * 0.30 }}>
-            <Animated.View style={[{ alignItems: 'center' }, isLandscape ? deckScene : null]}>
+            <Animated.View style={[{ alignItems: 'center' }, deckScene]}>
               <View style={{ width: 2, height: ballSize * 0.22, backgroundColor: 'rgba(255,255,255,0.25)' }} />
               <View style={{ width: 14, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: -3 }} />
               {/* A ball-sized anchor box — the bloom/ray layers below position

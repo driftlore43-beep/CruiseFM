@@ -1,7 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { DECK_FRAC } from '@/components/LandscapeChrome';
 
 const SPOTIFY_GREEN = '#1DB954';
 
@@ -17,6 +19,8 @@ const SPOTIFY_GREEN = '#1DB954';
  */
 export function WakeSpotifyHint({ show, connected = true }: { show: boolean; connected?: boolean }) {
   const insets = useSafeAreaInsets();
+  const { width: winW, height: winH } = useWindowDimensions();
+  const isLandscape = winW > winH;
   const [visible, setVisible] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
 
@@ -44,7 +48,20 @@ export function WakeSpotifyHint({ show, connected = true }: { show: boolean; con
   if (!visible) return null;
 
   return (
-    <Animated.View style={[ws.wrap, { top: insets.top + 64, opacity: fade }]} pointerEvents="none">
+    <Animated.View
+      style={[
+        ws.wrap,
+        // Sideways there is no room to hang below the header: the scene owns
+        // the middle and the deck panel owns the right. So the hint tucks
+        // into the top strip of the LEFT pane — past the close chevron,
+        // stopping short of where the panel docks — instead of lying across
+        // the object.
+        isLandscape
+          ? { top: insets.top + 8, left: Math.max(insets.left, 22) + 46, right: winW * DECK_FRAC + 14 }
+          : { top: insets.top + 64 },
+        { opacity: fade },
+      ]}
+      pointerEvents="none">
       <View style={[ws.pill, !connected && ws.pillNeutral]}>
         <MaterialCommunityIcons
           name={connected ? 'spotify' : 'music'}

@@ -9,18 +9,35 @@ const BEAT_ATTACK_MS = 150;
 const BEAT_RELEASE_MS = 450;
 
 /** A soft round haze — dense in the middle, dissolving to nothing at the
- * edges, like a smoke machine's plume under a coloured light. */
-function Haze({ id, color }: { id: string; color: string }) {
+ * edges, like a smoke machine's plume under a coloured light.
+ *
+ * SIZED IN REAL PIXELS, AND DRAWN THROUGH A viewBox. Both matter, and this
+ * was a real bug (owner, 30.07: a hard horizontal line across the left of
+ * the Mirror Ball and Circular EQ after turning the phone). It used to be
+ * `<Svg width="100%" height="100%">` with `50%` geometry inside — the only
+ * percentage-sized SVG in the app. On iOS a percentage-sized canvas is
+ * resolved natively and does NOT re-resolve when the window changes shape,
+ * so after a rotation the ellipse was still drawn at its PORTRAIT
+ * proportions while the view had already re-laid-out to the landscape box —
+ * and the view clips, so the bottom half of the haze was sliced off in a
+ * straight line. (Measured on the owner's screenshots: the cut sat exactly
+ * where the portrait-shaped ellipse ran out of landscape box.)
+ *
+ * Concrete numbers give the native side a new canvas on every dimension
+ * change, and the `0 0 100 100` viewBox with `preserveAspectRatio="none"`
+ * means the drawing itself no longer depends on how any percentage resolves.
+ */
+function Haze({ id, color, w, h }: { id: string; color: string; w: number; h: number }) {
   return (
-    <Svg width="100%" height="100%" pointerEvents="none">
+    <Svg width={w} height={h} viewBox="0 0 100 100" preserveAspectRatio="none" pointerEvents="none">
       <Defs>
-        <RadialGradient id={id} cx="50%" cy="50%" rx="50%" ry="50%">
+        <RadialGradient id={id} cx="50" cy="50" rx="50" ry="50" gradientUnits="userSpaceOnUse">
           <Stop offset="0%" stopColor={color} stopOpacity="0.72" />
           <Stop offset="55%" stopColor={color} stopOpacity="0.34" />
           <Stop offset="100%" stopColor={color} stopOpacity="0" />
         </RadialGradient>
       </Defs>
-      <Ellipse cx="50%" cy="50%" rx="50%" ry="50%" fill={`url(#${id})`} />
+      <Ellipse cx="50" cy="50" rx="50" ry="50" fill={`url(#${id})`} />
     </Svg>
   );
 }
@@ -109,63 +126,76 @@ export function AmbientGlow({ active, beat, color, hero = true, trackKey }: {
   // the weight changes.
   const strength = softAtmosphere ? 0.5 : 1;
 
+  // Every box in real pixels. These are exactly the proportions the layer has
+  // always had (the lower two-thirds of the screen, plumes bleeding past both
+  // edges) — only written as left+width/top+height rather than left+right and
+  // percentages, so each haze can be handed its own concrete size. See the
+  // note on Haze for why that is load-bearing rather than tidying.
+  const wrapTop = SCREEN_H * 0.34;
+  const wrapH   = SCREEN_H * 0.66;
+  const boxes = {
+    hero:  { left: -SCREEN_W * 0.18, width: SCREEN_W * 1.36, top: SCREEN_H * 0.08,    height: SCREEN_H * 0.5 },
+    main:  { left: -SCREEN_W * 0.35, width: SCREEN_W * 1.70, top: wrapH * 0.18, height: wrapH * 0.82 },
+    left:  { left: -SCREEN_W * 0.45, width: SCREEN_W * 0.95, top: wrapH * 0.05, height: wrapH * 0.75 },
+    right: { left:  SCREEN_W * 0.50, width: SCREEN_W * 0.95, top: wrapH * 0.25, height: wrapH * 0.75 },
+    beat:  { left: -SCREEN_W * 0.15, width: SCREEN_W * 1.30, top: wrapH * 0.10, height: wrapH * 0.90 },
+  };
+
   return (
-    <View style={[StyleSheet.absoluteFill, { opacity: strength }]} pointerEvents="none">
+    // Keyed on the orientation: a turn rebuilds the hazes outright rather
+    // than resizing native SVG canvases in place. Cheap (it happens only when
+    // the phone actually turns) and it cannot leave a stale canvas behind.
+    // The breathing values live on this component, so nothing restarts.
+    <View
+      key={SCREEN_W > SCREEN_H ? 'ls' : 'pt'}
+      style={[StyleSheet.absoluteFill, { opacity: strength }]}
+      pointerEvents="none">
     {/* Hero halo — the cassette-style orb behind the mode's centrepiece.
         Turned off (hero={false}) in modes whose scene already owns that
         space (Cassette's own orb, Horizon's sun). */}
     {hero && (
-      <View
-        style={[ag.heroWrap, {
-          left: -SCREEN_W * 0.18, right: -SCREEN_W * 0.18,
-          top: SCREEN_H * 0.08, height: SCREEN_H * 0.5,
-        }]}
-        pointerEvents="none">
+      <View style={[ag.heroWrap, boxes.hero]} pointerEvents="none">
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
             { opacity: heroO,
               transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.1] }) }] },
           ]}>
-          <Haze id="agHero" color={color} />
+          <Haze id="agHero" color={color} w={boxes.hero.width} h={boxes.hero.height} />
         </Animated.View>
       </View>
     )}
-    <View style={[ag.wrap, { top: SCREEN_H * 0.34 }]} pointerEvents="none">
+    <View style={[ag.wrap, { top: wrapTop }]} pointerEvents="none">
       {/* Wide base cloud */}
       <Animated.View
-        style={[ag.haze, {
-          left: -SCREEN_W * 0.35, right: -SCREEN_W * 0.35, top: '18%', height: '82%',
+        style={[ag.haze, boxes.main, {
           opacity: mainO,
           transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.18] }) }],
         }]}>
-        <Haze id="agMain" color={color} />
+        <Haze id="agMain" color={color} w={boxes.main.width} h={boxes.main.height} />
       </Animated.View>
       {/* Side plumes, breathing against each other */}
       <Animated.View
-        style={[ag.haze, {
-          left: -SCREEN_W * 0.45, width: SCREEN_W * 0.95, top: '5%', height: '75%',
+        style={[ag.haze, boxes.left, {
           opacity: leftO,
           transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [1.1, 0.92] }) }],
         }]}>
-        <Haze id="agLeft" color={color} />
+        <Haze id="agLeft" color={color} w={boxes.left.width} h={boxes.left.height} />
       </Animated.View>
       <Animated.View
-        style={[ag.haze, {
-          right: -SCREEN_W * 0.45, width: SCREEN_W * 0.95, top: '25%', height: '75%',
+        style={[ag.haze, boxes.right, {
           opacity: rightO,
           transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.12] }) }],
         }]}>
-        <Haze id="agRight" color={color} />
+        <Haze id="agRight" color={color} w={boxes.right.width} h={boxes.right.height} />
       </Animated.View>
       {/* Beat plume — centre burst on every kick, only while audio plays */}
       <Animated.View
-        style={[ag.haze, {
-          left: -SCREEN_W * 0.15, right: -SCREEN_W * 0.15, top: '10%', height: '90%',
+        style={[ag.haze, boxes.beat, {
           opacity: beatPulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.7] }),
           transform: [{ scale: beatPulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.18] }) }],
         }]}>
-        <Haze id="agBeat" color={color} />
+        <Haze id="agBeat" color={color} w={boxes.beat.width} h={boxes.beat.height} />
       </Animated.View>
     </View>
     </View>

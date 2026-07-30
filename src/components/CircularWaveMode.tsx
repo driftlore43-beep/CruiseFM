@@ -111,7 +111,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
     active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
   });
-  const deckScene = useDeckScene(chrome, winW);
+  const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
 
   // Orb animation loop — throttled to ~15fps — each tick re-renders the whole SVG scene on the CPU, and 25fps measured 53-59% sustained CPU (iOS resource reports, 24.07); 15fps looks identical for these slow drifts and halves the burn.
   useEffect(() => {
@@ -253,7 +253,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
 
           {/* Orb */}
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <Animated.View style={[{ width: orbSize, height: orbSize }, isLandscape ? deckScene : null]}>
+            <Animated.View style={[{ width: orbSize, height: orbSize }, deckScene]}>
             <Svg width={orbSize} height={orbSize} viewBox={`0 0 ${VB} ${VB}`}>
               <Defs>
                 <RadialGradient id="cwStroke" cx="0.5" cy="0.5" r="0.5">

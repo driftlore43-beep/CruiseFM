@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -30,6 +30,12 @@ import type { ScrubApi } from '@/utils/useTrackClock';
  * value that used to drive opacity now ALSO drives the panel's slide and
  * the scene's glide (`useDeckScene`), so awake/rest stays one timeline.
  */
+
+/** `useLayoutEffect` on device, plain `useEffect` under the web build's
+ *  server render (where there is no layout phase and React warns). Anything
+ *  that resets the deck on a turn must use this — see the note on the effect
+ *  inside useChromeFade. */
+export const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /** Fraction of the screen the docked panel occupies. */
 export const DECK_FRAC = 0.40;
@@ -96,7 +102,15 @@ export function useChromeFade({ active, playing, sheetOpen }: {
   // should replay the dock's arrival.
   const wasActive = useRef(false);
 
-  useEffect(() => {
+  // LAYOUT effect, not a plain one. The turn re-renders the scene as
+  // landscape while `chrome` is still parked at 1 from portrait, so for one
+  // frame the deck glide would already be applied — the scene flashing
+  // small-and-shifted before this hook resets it to 0 and slides it in. A
+  // layout effect lands the reset in the same frame, so the arrival starts
+  // from a clean full-size scene every time. (`window` is defined in React
+  // Native; the fallback is only for the web build's server render, which
+  // has no layout phase to be early for.)
+  useIsoLayoutEffect(() => {
     if (!active) {
       if (timer.current) { clearTimeout(timer.current); timer.current = null; }
       setRested(false);
@@ -126,14 +140,23 @@ export function useChromeFade({ active, playing, sheetOpen }: {
  * default; the Equalizer's full-width meter needs ~0.62 to fit the pane;
  * Horizon's full-bleed scene passes 1 and only slides (shrinking a
  * full-bleed scene would reveal its edges).
+ *
+ * `active` (portrait = false) FLATTENS the glide to an identity transform
+ * instead of the caller dropping the style. That difference is the whole
+ * reason the flag exists, and it was a real bug (owner, 30.07: the record
+ * left half off the screen in portrait after a turn). A native-driven
+ * transform lives on the native view; removing it from the style prop sends
+ * no transform at all, so the view simply KEEPS the last one it was given —
+ * the scene stayed shrunk and pushed left forever. Always render the style;
+ * never write `isLandscape ? deckScene : null` again.
  */
-export function useDeckScene(chrome: Animated.Value, winW: number, scale = 0.86) {
+export function useDeckScene(chrome: Animated.Value, winW: number, scale = 0.86, active = true) {
   return useMemo(() => ({
     transform: [
-      { translateX: chrome.interpolate({ inputRange: [0, 1], outputRange: [0, -winW * DECK_FRAC * 0.5] }) },
-      { scale: chrome.interpolate({ inputRange: [0, 1], outputRange: [1, scale] }) },
+      { translateX: chrome.interpolate({ inputRange: [0, 1], outputRange: [0, active ? -winW * DECK_FRAC * 0.5 : 0] }) },
+      { scale: chrome.interpolate({ inputRange: [0, 1], outputRange: [1, active ? scale : 1] }) },
     ],
-  }), [chrome, winW, scale]);
+  }), [chrome, winW, scale, active]);
 }
 
 export function LandscapeChrome({

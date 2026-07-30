@@ -87,7 +87,23 @@ jobs:
       - name: Check the Spotify keys are present AND readable
         run: |
           set -euo pipefail
-          vars=$(eas env:list --environment ${{ inputs.channel }} --include-sensitive --format short --non-interactive || true)
+          # DO NOT add --non-interactive here. It is not one of env:list's
+          # flags — checked against eas-cli 21.4.0's own source, where the
+          # command declares exactly: include-sensitive, include-file-content,
+          # environment, format, scope. oclif rejects unknown flags outright,
+          # so passing it made this step die with "env:list command failed"
+          # and then report both keys as missing, which sent us hunting in
+          # expo.dev for variables that were there all along.
+          #
+          # The output is captured WITH stderr and printed on failure for the
+          # same reason: the original version swallowed it with `|| true`, so
+          # the one line that said what actually went wrong never appeared.
+          if ! vars=$(eas env:list --environment ${{ inputs.channel }} --include-sensitive --format short 2>&1); then
+            echo "::error::Could not read environment variables from EAS for '${{ inputs.channel }}'."
+            echo "::error::eas said:"
+            echo "$vars"
+            exit 1
+          fi
           for key in EXPO_PUBLIC_SPOTIFY_CLIENT_ID EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET; do
             # Anchored to "KEY=" so a similarly-named variable can't satisfy it.
             line=$(echo "$vars" | grep -E "^${key}=" || true)

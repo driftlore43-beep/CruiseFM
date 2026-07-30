@@ -1760,7 +1760,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const bloomColor = mixHex(eq[1], eq[0], 0.35);
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View
         style={[{ flex: 1, backgroundColor: '#04040c' }, { transform: [{ translateY: slideY }] }]}
         {...dismissPan.panHandlers}

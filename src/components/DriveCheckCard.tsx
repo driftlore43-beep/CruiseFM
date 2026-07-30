@@ -94,7 +94,7 @@ export function DriveCheckCard() {
   };
 
   return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={stillCruising}>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible transparent animationType="fade" statusBarTranslucent onRequestClose={stillCruising}>
       <View style={dc.scrim}>
         <View style={dc.card}>
           <LinearGradient

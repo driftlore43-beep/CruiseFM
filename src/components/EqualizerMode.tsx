@@ -413,7 +413,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   // ─────────────────────────────────────────────────────────────────────────
   if (isLandscape) {
     return (
-      <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+      <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
         <Animated.View
           style={[fs.container, { minHeight: winH, transform: [{ translateY: slideY }] }]}
           {...dismissPan.panHandlers}
@@ -481,7 +481,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   // PORTRAIT LAYOUT (unchanged)
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={() => {}} statusBarTranslucent>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" onRequestClose={() => {}} statusBarTranslucent>
       <Animated.View style={[fs.container, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
 
         {background}

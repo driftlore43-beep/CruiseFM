@@ -247,7 +247,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const fill = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[{ flex: 1, backgroundColor: '#05060f' }, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
 
         {/* Blurred station background — darkened hard so the scene reads like dusk */}

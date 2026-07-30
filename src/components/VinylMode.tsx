@@ -983,7 +983,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const labelRotate = labelSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent>
       <Animated.View style={[fs.container, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
         <StationBackdrop station={station} blurRadius={2.5} />
         <LinearGradient

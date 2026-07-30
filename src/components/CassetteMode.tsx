@@ -891,7 +891,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     const safeR = insets.right || 0;
 
     return (
-      <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
+      <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent>
         <View style={[fs.container, { backgroundColor: C.bg }]} {...dismissPan.panHandlers}>
           {background}
           <GrainOverlay />
@@ -970,7 +970,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
   // ── Portrait ───────────────────────────────────────────────────────────────
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent>
       <Animated.View style={[fs.container, { backgroundColor: C.bg, transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
         {background}
         <GrainOverlay />

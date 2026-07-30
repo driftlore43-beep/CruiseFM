@@ -519,7 +519,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   const artist = spotify.track?.artist ?? '';
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[{ flex: 1, backgroundColor: '#04040c' }, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
 
         <StationBackdrop station={station} blurRadius={3} />

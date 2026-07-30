@@ -194,7 +194,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   const orbSize = Math.min(winW * 1.02, winH * 0.54, 460);
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[{ flex: 1, backgroundColor: '#04060f' }, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
 
         {/* Blurred station background */}

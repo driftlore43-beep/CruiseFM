@@ -189,7 +189,7 @@ function AutoDim() {
   if (!dimmed) return null;
   // Invisible catch layer: the wake tap lands here, not on the controls.
   return (
-    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={restore}>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible transparent animationType="none" statusBarTranslucent onRequestClose={restore}>
       <Pressable style={{ flex: 1 }} onPress={restore} />
     </Modal>
   );
@@ -234,7 +234,7 @@ function PlaybackNotice() {
   if (!notice) return null;
 
   return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={np.clearPlaybackNotice}>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible transparent animationType="fade" statusBarTranslucent onRequestClose={np.clearPlaybackNotice}>
       <Pressable style={pn.scrim} onPress={np.clearPlaybackNotice}>
         <View style={pn.card}>
           <View style={pn.iconRing}>

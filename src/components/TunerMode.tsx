@@ -689,7 +689,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const offAir = 1 - lock;
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
       <Animated.View style={[{ flex: 1, backgroundColor: '#05060f' }, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
 
         {/* Locked station scene, darkened; mood tint follows the needle */}

@@ -299,7 +299,7 @@ export function ShareCardSheet({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={sc.backdrop} onPress={onClose}>
         {/* Stop taps on the card itself from dismissing */}
         <Pressable style={sc.body} onPress={() => {}}>

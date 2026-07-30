@@ -13,6 +13,7 @@ import { Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { LandscapeChrome, LS_CHROME_CLEAR, useChromeFade } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
@@ -526,6 +527,7 @@ function TrackList({ activeIdx, onSelect }: { activeIdx: number; onSelect: (i: n
 export function VinylFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
+  const isLandscape = winW > winH;
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const spotify = useMusicPlayback(visible);
@@ -552,6 +554,11 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   useEffect(() => {
     if (visible) getStationPlaylist(activeId).then(setLinked);
   }, [visible, activeId]);
+
+  // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
+  const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
+    active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
+  });
 
   // ── Real-track layer ────────────────────────────────────────────────────────
   // With Spotify connected the deck runs on the REAL song: true duration,
@@ -908,7 +915,9 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
   const station      = resolveAnyStation(activeId);
   const currentTrack = VINYL_TRACKS[activeTrack];
-  const platSize     = Math.min(winW * 0.9, winH * 0.46);
+  // Landscape sizes off HEIGHT alone — the portrait formula shrinks a
+  // sideways platter to a saucer (the "squish", owner 30.07).
+  const platSize     = isLandscape ? Math.min(winH * 0.64, 280) : Math.min(winW * 0.9, winH * 0.46);
 
   // Swipe-down to dismiss
   const dismissPan = useRef(PanResponder.create({
@@ -984,7 +993,10 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent>
-      <Animated.View style={[fs.container, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
+      <Animated.View
+        style={[fs.container, { transform: [{ translateY: slideY }] }]}
+        {...dismissPan.panHandlers}
+        onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
         <StationBackdrop station={station} blurRadius={2.5} />
         <LinearGradient
           colors={[
@@ -1021,18 +1033,21 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         </Animated.View>
 
         {/* Floating header */}
+        {!isLandscape && (
         <View style={[fs.floatingTop, { top: topPad + 4, zIndex: 10 }]}>
           <View style={fs.dragPill} />
         </View>
+        )}
 
-        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: bottomPad, alignItems: 'center' }}>
+        <View style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : bottomPad, alignItems: 'center' }}>
 
-          {/* ── Header — small top-center, Spotify style ── */}
+          {!isLandscape && (
           <View style={fs.header}>
             <StationIdentity station={station} />
           </View>
+          )}
 
-          <View style={fs.turntableWrap}>
+          <View style={[fs.turntableWrap, isLandscape && { flex: 1, justifyContent: 'center', paddingBottom: LS_CHROME_CLEAR * 0.40 }]}>
             <TurntableHero
               platSize={platSize} spin={spin} tonearmAnim={tonearmVal} glowOpacity={glowOpacity}
               ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={spin} playing={playing}
@@ -1044,6 +1059,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             />
           </View>
 
+          {!isLandscape && (
+          <>
           {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
             {spotify.track
@@ -1107,11 +1124,38 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             station={station}
           />
 
+          </>
+          )}
         </View>
 
-        <ModeCloseButton onPress={handleClose} />
+        {isLandscape && (
+          <LandscapeChrome
+            chrome={chrome}
+            rested={chromeRested}
+            station={station}
+            track={spotify.track}
+            playing={playing}
+            tagline={station.tagline}
+            seekBar={spotify.track ? (
+              <ScrubProgressBar
+                progress={progress} isScrubbing={isScrubbing}
+                onLayout={(e) => { progressBarWidthRef.current = e.nativeEvent.layout.width; }}
+                panHandlers={progressPanRef.panHandlers}
+              />
+            ) : null}
+            onPlayPause={() => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); }}
+            onPrev={() => { setActiveTrack((t) => Math.max(0, t - 1)); spotify.prev(); }}
+            onNext={() => { setActiveTrack((t) => Math.min(VINYL_TRACKS.length - 1, t + 1)); spotify.next(); }}
+            onClose={handleClose}
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+          />
+        )}
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={station.eqColors?.[1] ?? V.gold} />
+        {!isLandscape && <ModeCloseButton onPress={handleClose} />}
+
+        <AmbientGlow active={visible && playing && !isLandscape} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={station.eqColors?.[1] ?? V.gold} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

@@ -24,7 +24,7 @@ import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useNowPlaying } from '@/context/NowPlayingContext';
-import { allowRotation, lockPortrait } from '@/utils/orientation';
+import { allowRotation, LANDSCAPE_READY, lockPortrait } from '@/utils/orientation';
 import { isSpotifyConnected, pause as pauseSpotify } from '@/utils/spotify';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 
@@ -203,7 +203,10 @@ function AutoDim() {
  */
 function OrientationGate() {
   const np = useNowPlaying();
-  const modeOpen = !!np.session && np.expanded;
+  // Only modes with a real landscape composition may turn — see the
+  // LANDSCAPE_READY note. Switching to a not-ready mode mid-drive (the
+  // ModeSheet) re-runs this and snaps the phone upright, which is right.
+  const modeOpen = !!np.session && np.expanded && LANDSCAPE_READY.has(np.session.mode);
 
   useEffect(() => {
     if (modeOpen) allowRotation(); else lockPortrait();

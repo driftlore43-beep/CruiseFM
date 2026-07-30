@@ -8,6 +8,7 @@ import {
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
+import { LandscapeChrome, LS_CHROME_CLEAR, useChromeFade } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { STATIONS } from '@/constants/stations';
@@ -74,6 +75,7 @@ function ringBars(phase: number, amp: number): string {
 export function CircularWaveFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
+  const isLandscape = winW > winH;
   const topPad = Math.max(insets.top, 20);
 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
@@ -104,6 +106,11 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
 
   useEffect(() => { playingRef.current = playing; }, [playing]);
   useEffect(() => { if (visible) getStationPlaylist(station.id).then(setLinked); }, [visible, station.id]);
+
+  // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
+  const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
+    active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
+  });
 
   // Orb animation loop — throttled to ~15fps — each tick re-renders the whole SVG scene on the CPU, and 25fps measured 53-59% sustained CPU (iOS resource reports, 24.07); 15fps looks identical for these slow drifts and halves the burn.
   useEffect(() => {
@@ -191,11 +198,18 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   const accent = Math.floor(tSec / BEAT_S) % 4 === 0 ? 1 : 0.6;
   const kick = playing && !musicSwitching && !kickHold ? Math.pow(1 - beatPos, 2.5) * accent : 0;
   const amp = ampRef.current * (0.68 + 0.6 * kick);
-  const orbSize = Math.min(winW * 1.02, winH * 0.54, 460);
+  // Landscape sizes off HEIGHT alone — the portrait formula shrinks a
+  // sideways orb to a bangle (the "squish", owner 30.07).
+  const orbSize = isLandscape
+    ? Math.min(winH * 0.66, 300)
+    : Math.min(winW * 1.02, winH * 0.54, 460);
 
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
-      <Animated.View style={[{ flex: 1, backgroundColor: '#04060f' }, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
+      <Animated.View
+        style={[{ flex: 1, backgroundColor: '#04060f' }, { transform: [{ translateY: slideY }] }]}
+        {...dismissPan.panHandlers}
+        onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
 
         {/* Blurred station background */}
         <StationBackdrop station={station} blurRadius={2.5} />
@@ -216,24 +230,28 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
           pointerEvents="none"
         />
 
-        {/* Drag pill */}
+        {!isLandscape && (
         <View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
         </View>
+        )}
 
-        {/* Top bar */}
+        {!isLandscape && (
         <View style={[fs.topBar, { top: topPad + 14 }]}>
           <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>CIRCULAR EQ</Text>
         </View>
+        )}
 
         {/* Content */}
-        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>
+        <View style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : Math.max(insets.bottom, 24) + 16 }}>
+          {!isLandscape && (
           <View style={{ paddingHorizontal: 32, paddingBottom: 10, alignItems: 'center' }}>
             <StationIdentity station={station} />
           </View>
+          )}
 
           {/* Orb */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? LS_CHROME_CLEAR * 0.45 : 0 }}>
             <View style={{ width: orbSize, height: orbSize }}>
             <Svg width={orbSize} height={orbSize} viewBox={`0 0 ${VB} ${VB}`}>
               <Defs>
@@ -259,6 +277,8 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
             </View>
           </View>
 
+          {!isLandscape && (
+          <>
           {/* Song title / mood line */}
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
             {hasTrack
@@ -312,11 +332,33 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
             track={spotify.track}
             station={station}
           />
+          </>
+          )}
         </View>
 
-        <ModeCloseButton onPress={handleClose} />
+        {isLandscape && (
+          <LandscapeChrome
+            chrome={chrome}
+            rested={chromeRested}
+            station={station}
+            track={spotify.track}
+            playing={playing}
+            tagline={station.tagline}
+            progress={progress}
+            scrub={scrub}
+            onPlayPause={togglePlay}
+            onPrev={() => { resetTrack(); spotify.prev(); }}
+            onNext={() => { resetTrack(); spotify.next(); }}
+            onClose={handleClose}
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+          />
+        )}
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
+        {!isLandscape && <ModeCloseButton onPress={handleClose} />}
+
+        <AmbientGlow active={visible && playing && !isLandscape} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

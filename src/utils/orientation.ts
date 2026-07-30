@@ -16,6 +16,16 @@ import { Platform } from 'react-native';
  * over something as cosmetic as rotation.
  */
 
+/**
+ * Which modes have a real landscape composition. A mode NOT in this set
+ * stays portrait even while open — its portrait column squeezed into a wide
+ * window is worse than no landscape at all (owner, 30.07: "a lot of them do
+ * squish"). Add a mode here ONLY once its file has an isLandscape branch
+ * wearing LandscapeChrome. Tuner is the one holdout: the dial deserves its
+ * own sideways design round, not a transplant.
+ */
+export const LANDSCAPE_READY = new Set(['disco', 'equalizer', 'cassette', 'vinyl', 'cd', 'orb', 'horizon']);
+
 function loadModule(): typeof import('expo-screen-orientation') | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

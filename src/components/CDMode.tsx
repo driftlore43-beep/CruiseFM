@@ -13,6 +13,7 @@ import Svg, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaylistSheet } from '@/components/PlaylistSheet';
+import { LandscapeChrome, LS_CHROME_CLEAR, useChromeFade } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { resolveAnyStation } from '@/utils/customStations';
@@ -299,7 +300,12 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   // The height term is deliberately left where it was: on a small phone
   // (SE-sized) height binds instead, and raising it would push the case into
   // the controls below.
-  const caseSize = Math.min(winW * 0.93, winH * 0.44, 410);
+  const isLandscape = winW > winH;
+  // Landscape sizes off HEIGHT alone — the portrait formula's winH*0.44 term
+  // shrinks a sideways case to a coaster (the "squish", owner 30.07).
+  const caseSize = isLandscape
+    ? Math.min(winH * 0.66, 280)
+    : Math.min(winW * 0.93, winH * 0.44, 410);
   const discSize = caseSize * 0.85;
   const station = resolveAnyStation(activeId);
   const spotify = useMusicPlayback(visible);
@@ -326,6 +332,11 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   });
 
   useEffect(() => { if (visible) getStationPlaylist(station.id).then(setLinked); }, [visible, station.id]);
+
+  // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
+  const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
+    active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
+  });
 
   const wrap01 = (v: number) => ((v % 1) + 1) % 1;
   const readAnim = (a: Animated.Value) => (a as unknown as { __getValue?: () => number }).__getValue?.() ?? 0;
@@ -520,7 +531,10 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
 
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
-      <Animated.View style={[{ flex: 1, backgroundColor: '#04040c' }, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
+      <Animated.View
+        style={[{ flex: 1, backgroundColor: '#04040c' }, { transform: [{ translateY: slideY }] }]}
+        {...dismissPan.panHandlers}
+        onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
 
         <StationBackdrop station={station} blurRadius={3} />
         <LinearGradient
@@ -530,20 +544,26 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
           style={StyleSheet.absoluteFill}
         />
 
+        {!isLandscape && (
         <View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
         </View>
+        )}
 
+        {!isLandscape && (
         <View style={[fs.topBar, { top: topPad + 14 }]}>
           <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>CD</Text>
         </View>
+        )}
 
-        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>
+        <View style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : Math.max(insets.bottom, 24) + 16 }}>
+          {!isLandscape && (
           <View style={{ paddingHorizontal: 32, paddingBottom: 10, alignItems: 'center' }}>
             <StationIdentity station={station} />
           </View>
+          )}
 
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? LS_CHROME_CLEAR * 0.45 : 0 }}>
             <View style={fs.caseShadow} {...discPan.panHandlers}>
               <JewelCase size={caseSize}>
                 <CDDisc size={discSize} spin={spin} albumArt={spotify.track?.albumArt ?? null} />
@@ -551,6 +571,8 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
             </View>
           </View>
 
+          {!isLandscape && (
+          <>
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
             {hasTrack
               ? <MarqueeText text={title} style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }} />
@@ -600,11 +622,33 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
             track={spotify.track}
             station={station}
           />
+          </>
+          )}
         </View>
 
-        <ModeCloseButton onPress={handleClose} />
+        {isLandscape && (
+          <LandscapeChrome
+            chrome={chrome}
+            rested={chromeRested}
+            station={station}
+            track={spotify.track}
+            playing={playing}
+            tagline={station.tagline}
+            progress={progress}
+            scrub={scrub}
+            onPlayPause={togglePlay}
+            onPrev={() => { resetTrack(); spotify.prev(); }}
+            onNext={() => { resetTrack(); spotify.next(); }}
+            onClose={handleClose}
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+          />
+        )}
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
+        {!isLandscape && <ModeCloseButton onPress={handleClose} />}
+
+        <AmbientGlow active={visible && playing && !isLandscape} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

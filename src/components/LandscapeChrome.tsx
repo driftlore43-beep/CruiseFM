@@ -90,7 +90,7 @@ export function useChromeFade({ active, playing, sheetOpen }: {
 
 export function LandscapeChrome({
   chrome, rested, station, track, playing, tagline,
-  progress, scrub,
+  progress, scrub, seekBar,
   onPlayPause, onPrev, onNext, onClose,
   onChangeMood, onPickPlaylist, playlistLabel,
 }: {
@@ -101,8 +101,11 @@ export function LandscapeChrome({
   playing: boolean;
   /** Shown as the title when there is no live track — never a fake song. */
   tagline: string;
-  progress: Animated.Value;
-  scrub: ScrubApi;
+  progress?: Animated.Value;
+  scrub?: ScrubApi;
+  /** Vinyl predates the shared clock and carries its own scrub-capable bar —
+   *  passing it here replaces the standard SeekBar outright. */
+  seekBar?: React.ReactNode;
   onPlayPause: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -162,11 +165,13 @@ export function LandscapeChrome({
             />
           </View>
 
-          {!!track && (
-            <View style={{ marginTop: 4 }}>
-              <SeekBar progress={progress} scrub={scrub} />
-            </View>
-          )}
+          {seekBar !== undefined
+            ? <View style={{ marginTop: 4 }}>{seekBar}</View>
+            : !!track && progress && scrub && (
+              <View style={{ marginTop: 4 }}>
+                <SeekBar progress={progress} scrub={scrub} />
+              </View>
+            )}
 
           <View style={st.transport}>
             <TouchableOpacity onPress={onPrev} activeOpacity={0.75} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

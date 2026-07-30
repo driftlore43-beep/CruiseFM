@@ -32,6 +32,7 @@ import { AmbientGlow } from '@/components/AmbientGlow';
 import { ModeActionRow } from '@/components/ModeActionRow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
+import { LandscapeChrome, LS_CHROME_CLEAR, useChromeFade } from '@/components/LandscapeChrome';
 import { SeekBar } from '@/components/SeekBar';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -839,11 +840,18 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     },
   };
 
+  // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
+  const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
+    active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
+  });
+
   // Glow: 0.3 → 0.6 range, gentle amber pulse
 
   const topPad    = Math.max(insets.top, 20);
   const bottomPad = Math.max(insets.bottom, 24) + 24;
-  const cassetteW = isLandscape ? winH * 0.72 : winW * 0.92;
+  // Landscape: the shell is the whole show — winH*0.72 was the OLD branch's
+  // side-column size and reads small alone on a full screen.
+  const cassetteW = isLandscape ? Math.min(winH * 1.06, winW * 0.52) : winW * 0.92;
   const cassetteH = cassetteW * 0.62;
 
 
@@ -884,86 +892,64 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     </>
   );
 
-  // ── Landscape ──────────────────────────────────────────────────────────────
+  // ── Landscape — the owner's L1+L3 grammar (30.07) ──────────────────────────
+  // The cassette alone on the full-bleed scene, the shared chrome along the
+  // bottom, everything fading out mid-drive. This REPLACES the original
+  // early-development landscape (two columns, a FAKE track list, a
+  // Play-on-Spotify button) which predated every shared piece and every
+  // honesty rule — it shipped by accident the day rotation unlocked.
   if (isLandscape) {
-    const leftW = winW * 0.44;
-    const safeL = insets.left  || 0;
-    const safeR = insets.right || 0;
-
     return (
       <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent>
-        <View style={[fs.container, { backgroundColor: C.bg }]} {...dismissPan.panHandlers}>
+        <Animated.View
+          style={[fs.container, { backgroundColor: C.bg, transform: [{ translateY: slideY }] }]}
+          {...dismissPan.panHandlers}
+          onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
           {background}
           <GrainOverlay />
 
-
-          <View style={{ flex: 1, flexDirection: 'row' }}>
-            {/* Left column */}
-            <ScrollView
-              style={{ flex: 0, width: leftW }}
-              contentContainerStyle={[ls.leftCol, { paddingLeft: safeL + 22, paddingBottom: 16 }]}
-              showsVerticalScrollIndicator={false}>
-              <Text style={[ls.nowPlaying, { fontFamily: Fonts.mono }]}>NOW PLAYING</Text>
-              <Text style={ls.lsStation} numberOfLines={1}>{station.name}</Text>
-              <Text style={ls.lsTrack} numberOfLines={1}>
-                {spotify.track ? `${spotify.track.title} — ${spotify.track.artist}` : station.tagline}
-              </Text>
-
-              <View style={{ height: 14 }} />
-
-              {/* Controls */}
-              <View style={ls.ctrlRow}>
-                <TouchableOpacity onPress={() => setActiveTrack((t) => Math.max(0, t - 1))} style={ls.lsSkipBtn} activeOpacity={0.75}>
-                  <Ionicons name="play-skip-back" size={20} color="#fff" />
-                </TouchableOpacity>
-                <Animated.View style={{ transform: [{ scale: playBtnScale }] }}>
-                  <TouchableOpacity
-                    onPress={togglePlay}
-                    onPressIn={() => Animated.spring(playBtnScale, { toValue: 1.05, useNativeDriver: true, speed: 40, bounciness: 4 }).start()}
-                    onPressOut={() => Animated.spring(playBtnScale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 4 }).start()}
-                    style={ls.lsPlayBtn} activeOpacity={0.9}>
-                    <Ionicons name={playing ? 'pause' : 'play'} size={26} color="#0a0a12" style={playing ? undefined : { marginLeft: 3 }} />
-                  </TouchableOpacity>
-                </Animated.View>
-                <TouchableOpacity onPress={() => setActiveTrack((t) => Math.min(SIDE_A_TRACKS.length - 1, t + 1))} style={ls.lsSkipBtn} activeOpacity={0.75}>
-                  <Ionicons name="play-skip-forward" size={20} color="#fff" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={[ls.progressRow, { marginBottom: 14 }]}>
-                <AmberProgressBar progress={progress} />
-              </View>
-
-              {/* Compact track list */}
-              <View style={{ marginBottom: 12 }}>
-                <SectionLabel label="SIDE A" />
-                {SIDE_A_TRACKS.map((track, i) => (
-                  <TouchableOpacity
-                    key={track.id}
-                    onPress={() => setActiveTrack(i)}
-                    style={[ls.miniTrack, i === activeTrack && ls.miniTrackActive]}>
-                    <Text style={[ls.miniNum, { fontFamily: Fonts.mono }, i === activeTrack && { color: C.amber }]}>
-                      {track.id}
-                    </Text>
-                    <Text style={[ls.miniTitle, i === activeTrack && { color: C.amber }]} numberOfLines={1}>
-                      {track.title}
-                    </Text>
-                    <Text style={[ls.miniDur, { fontFamily: Fonts.mono }]}>{track.duration}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {platform && (
-                <PlatformButton platform={platform} onPress={() => openMusicPlatform(station.name)} />
-              )}
-            </ScrollView>
-
-            {/* Right column — cassette */}
-            <View style={[ls.rightCol, { paddingRight: safeR }]}>
-              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
-            </View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: LS_CHROME_CLEAR * 0.42 }}>
+            <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
           </View>
-        </View>
+
+          <LandscapeChrome
+            chrome={chrome}
+            rested={chromeRested}
+            station={station}
+            track={spotify.track}
+            playing={playing}
+            tagline={station.tagline}
+            progress={progress}
+            scrub={cassetteScrub}
+            onPlayPause={togglePlay}
+            onPrev={() => setActiveTrack((t) => Math.max(0, t - 1))}
+            onNext={() => setActiveTrack((t) => Math.min(SIDE_A_TRACKS.length - 1, t + 1))}
+            onClose={handleClose}
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+          />
+
+          <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
+          {handoff && !spotify.track && <HandoffOverlay />}
+          <PreviewGate onSilence={spotify.pause} />
+
+          <ModeSheet visible={showMood} onClose={() => setShowMood(false)} />
+
+          {showPicker && (
+            <PlaylistSheet
+              stationName={station.name}
+              current={linked}
+              onClose={() => setShowPicker(false)}
+              onPick={async (pl) => {
+                await setStationPlaylist(station.id, pl);
+                setLinked(pl);
+                setShowPicker(false);
+                relinkStationPlaylist(station.id);
+              }}
+            />
+          )}
+        </Animated.View>
       </Modal>
     );
   }

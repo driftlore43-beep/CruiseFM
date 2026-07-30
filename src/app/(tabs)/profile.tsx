@@ -14,6 +14,7 @@ import { OWNER_MODE } from '@/constants/config';
 import { PLATFORMS, PlatformId, getSavedPlatform } from '@/utils/musicPlatform';
 import { PlatformSelector } from '@/components/PlatformSelector';
 import { SpotifyConnectRow } from '@/components/SpotifyConnectRow';
+import { UpdateCheckRow } from '@/components/UpdateCheckRow';
 import { SettingsSheet, type SettingsPage } from '@/components/SettingsSheet';
 import { GlossSheen } from '@/components/GlossSheen';
 import { getDriveLog, getDriveStats } from '@/utils/driveStats';
@@ -341,6 +342,10 @@ export default function ProfileScreen() {
 
           {/* Spotify Connect row */}
           <SpotifyConnectRow />
+
+          {/* Over-the-air updates arrive silently, which made them look like
+              they never arrived at all. This gives them a button. */}
+          <UpdateCheckRow />
 
           {/* Dev-only: see every lock, shimmer and preview as a free user would */}
           {OWNER_MODE && (

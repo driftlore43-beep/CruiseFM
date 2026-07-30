@@ -64,7 +64,8 @@ wait a few seconds, fully swipe it closed, reopen — and they're on the newest
 version. The Profile version line ("updated …") is the proof it landed.
 
 ### When a rebuild *is* needed
-Only when we add a new **native** feature (a new device capability). The
-fingerprint system auto-blocks the OTA in that case — that's the signal to run
-the `eas build` + `eas submit` steps again. Everyday visual/behaviour tweaks
-ship over the air, no rebuild.
+Only when we add a new **native** feature (a new device capability). Claude
+raises `runtimeVersion` in `app.json` as part of that change, which is the
+signal to run the `eas build` + `eas submit` steps again. Everyday
+visual/behaviour tweaks ship over the air, no rebuild — see
+[ota-updates.md](./ota-updates.md) for what that number does.

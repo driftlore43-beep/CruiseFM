@@ -16,8 +16,8 @@
 # early with "The bearer token is invalid" — which is exactly how the first
 # attempt at this failed.
 #
-# Note this file is NOT a fingerprint source (unlike app.json, eas.json and
-# package.json), so adding it does not disturb OTA for installed builds.
+# Note this file is NOT a runtime-version source (unlike app.json, eas.json
+# and package.json), so editing it never disturbs OTA for installed builds.
 
 name: Ship OTA update
 
@@ -42,6 +42,11 @@ on:
         options:
           - publish
           - diagnose
+
+# Everything below runs on Expo's servers via eas-cli. The one thing this
+# workflow CANNOT do is make a new build — that needs `eas build`, which is
+# fine to trigger from here in principle but takes 20+ minutes and costs a
+# build slot, so it stays a deliberate action on a computer.
 
 jobs:
   update:
@@ -109,9 +114,9 @@ jobs:
           echo "════════ the iOS builds people actually have ════════"
           eas build:list --platform ios --limit 2 --non-interactive 2>&1 \
             | grep -E "Build number|Runtime Version|Channel|Profile|Commit" || true
-          echo "════════ runtime this LINUX runner computes ════════"
-          npx expo-updates fingerprint:generate --platform ios 2>&1 \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])" || true
+          echo "════════ runtime version this code publishes as ════════"
+          npx expo config --type public --json 2>/dev/null \
+            | python3 -c "import sys,json; print(json.load(sys.stdin).get('runtimeVersion'))" || true
 
       - name: Check the Spotify keys are present AND readable
         if: inputs.mode == 'publish'
@@ -153,6 +158,58 @@ jobs:
             echo "$key: present and readable"
           done
 
+      # THE GUARD THIS WORKFLOW WAS MISSING, and the reason a whole day went
+      # into "the update published fine but never arrived" (30.07).
+      #
+      # An update only ever reaches a build whose runtime version matches it
+      # EXACTLY. Nothing in eas-cli warns when nothing matches: the publish
+      # succeeds, the dashboard looks healthy, and the phone silently ignores
+      # it forever. So ask, before publishing, whether any real iOS build on
+      # this channel is actually listening on the number we're about to stamp.
+      - name: Check a real build is listening on this runtime version
+        if: inputs.mode == 'publish'
+        run: |
+          set -euo pipefail
+          mine=$(npx expo config --type public --json \
+            | python3 -c "import sys,json; print(json.load(sys.stdin).get('runtimeVersion') or '')")
+          if [ -z "$mine" ]; then
+            echo "::error::app.json has no runtimeVersion. It must be a literal string, e.g. \"1.0.0\"."
+            exit 1
+          fi
+          echo "this update would publish as runtime: $mine"
+
+          builds=$(eas build:list --platform ios --limit 12 --json --non-interactive 2>/dev/null || echo '[]')
+          # The build list goes in through the ENVIRONMENT, not a pipe: the
+          # heredoc below is already using stdin to carry the script, so a
+          # piped `echo "$builds"` would have python reading its own source.
+          CFM_BUILDS="$builds" CFM_MINE="$mine" CFM_CHANNEL="${{ inputs.channel }}" python3 <<'PY'
+          import json, os, sys
+          mine, channel = os.environ["CFM_MINE"], os.environ["CFM_CHANNEL"]
+          try:
+              builds = json.loads(os.environ.get("CFM_BUILDS") or "[]")
+          except Exception:
+              print("::warning::Could not read the build list; publishing anyway.")
+              sys.exit(0)
+          on_channel = [b for b in builds
+                        if b.get("channel") == channel and b.get("status") == "FINISHED"]
+          seen = {b.get("runtimeVersion") for b in on_channel}
+          for b in on_channel[:6]:
+              label = b.get("appBuildVersion") or b.get("appVersion") or b.get("id", "?")[:8]
+              print(f"  build {label}  runtime {b.get('runtimeVersion')}")
+          if not on_channel:
+              print(f"::warning::No finished iOS builds found on the '{channel}' channel to check against.")
+              sys.exit(0)
+          if mine in seen:
+              print(f"OK — a build on '{channel}' is listening on {mine}.")
+              sys.exit(0)
+          print(f"::error::Nothing on the '{channel}' channel is listening on runtime {mine}.")
+          print(f"::error::Builds there are on: {', '.join(sorted(x or '?' for x in seen))}")
+          print("::error::This update would publish successfully and never reach a single phone.")
+          print("::error::Either a new build is still finishing, or app.json's runtimeVersion")
+          print("::error::was changed without cutting a build to match it.")
+          sys.exit(1)
+          PY
+
       # --environment is LOAD-BEARING and nothing here will catch its absence.
       # eas-cli's own "you forgot --environment" guard for SDK 55+ skips
       # itself whenever CI or EAS_BUILD is set, and GitHub Actions always sets
@@ -167,26 +224,8 @@ jobs:
           --message "${{ inputs.message }}"
           --non-interactive
 
-  # WHY A SECOND JOB ON macOS: build 10 (made by EAS on a macOS builder from
-  # commit 247faef) reports runtime 1a4deffd…, while this repo's own code
-  # fingerprints as eb670d78… on a Linux runner. Same commit, two answers —
-  # so an update published from Linux is invisible to every iOS build EAS
-  # made. This job asks a macOS runner for the same number, which either
-  # confirms the OS is the variable or rules it out.
-  #
-  # Free on a public repo, and diagnose-only.
-  runtime-macos:
-    if: inputs.mode == 'diagnose'
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - name: Runtime this macOS runner computes
-        run: |
-          npx expo-updates fingerprint:generate --platform ios 2>&1 \
-            | python3 -c "import sys,json; print('macOS hash:', json.load(sys.stdin)['hash'])"
-          echo "build 10 (EAS, macOS) reports: 1a4deffd3fee3f9ad1ccc3d53843eefcf3e4705d"
+  # (A second job on a macOS runner used to live here, to prove whether the
+  # operating system was why EAS's builds and our updates disagreed on the
+  # runtime version. It wasn't — macOS computed the same number Linux did.
+  # The runtime version is now a literal string in app.json, so there is no
+  # number to compute and nothing left for that job to answer.)

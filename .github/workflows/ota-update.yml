@@ -102,19 +102,16 @@ jobs:
       - name: Ask Expo what state things are in
         if: inputs.mode == 'diagnose'
         run: |
-          echo "════════ channels, and which branch each points at ════════"
-          echo "An update publishes to a BRANCH. A build listens to a CHANNEL."
-          echo "If the two aren't linked, every publish succeeds and reaches nobody."
-          eas channel:list --non-interactive 2>&1 || true
-          echo "──────── channel:view preview ────────"
-          eas channel:view preview --non-interactive 2>&1 || true
-          echo "════════ updates on the preview branch ════════"
-          eas update:list --branch preview --non-interactive 2>&1 || true
-          echo "════════ installed builds and their runtime versions ════════"
-          echo "These must match an update's runtime version exactly."
-          eas build:list --platform ios --limit 4 --non-interactive 2>&1 || true
-          echo "════════ what this commit would publish as ════════"
-          npx expo-updates fingerprint:generate --platform ios 2>&1 | tail -c 300 || true
+          echo "════════ preview channel → branch ════════"
+          eas channel:view preview --non-interactive 2>&1 | head -30 || true
+          echo "════════ newest updates on the preview branch ════════"
+          eas update:list --branch preview --limit 4 --non-interactive 2>&1 | head -60 || true
+          echo "════════ the iOS builds people actually have ════════"
+          eas build:list --platform ios --limit 2 --non-interactive 2>&1 \
+            | grep -E "Build number|Runtime Version|Channel|Profile|Commit" || true
+          echo "════════ runtime this LINUX runner computes ════════"
+          npx expo-updates fingerprint:generate --platform ios 2>&1 \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])" || true
 
       - name: Check the Spotify keys are present AND readable
         if: inputs.mode == 'publish'
@@ -169,3 +166,27 @@ jobs:
           --environment ${{ inputs.channel }}
           --message "${{ inputs.message }}"
           --non-interactive
+
+  # WHY A SECOND JOB ON macOS: build 10 (made by EAS on a macOS builder from
+  # commit 247faef) reports runtime 1a4deffd…, while this repo's own code
+  # fingerprints as eb670d78… on a Linux runner. Same commit, two answers —
+  # so an update published from Linux is invisible to every iOS build EAS
+  # made. This job asks a macOS runner for the same number, which either
+  # confirms the OS is the variable or rules it out.
+  #
+  # Free on a public repo, and diagnose-only.
+  runtime-macos:
+    if: inputs.mode == 'diagnose'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Runtime this macOS runner computes
+        run: |
+          npx expo-updates fingerprint:generate --platform ios 2>&1 \
+            | python3 -c "import sys,json; print('macOS hash:', json.load(sys.stdin)['hash'])"
+          echo "build 10 (EAS, macOS) reports: 1a4deffd3fee3f9ad1ccc3d53843eefcf3e4705d"

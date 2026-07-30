@@ -83,26 +83,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    paddingVertical: 15,
+    // 22 to match the Profile page's other settings rows, and the status dot
+    // sits in a 24pt column so this label starts at the same x as theirs.
+    paddingHorizontal: 22,
   },
   border: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.09)',
   },
   left: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
+    marginHorizontal: 8,
   },
   label: {
     color: Cruise.textPrimary,
-    fontSize: 15,
+    fontSize: 16.5,
     fontWeight: '500',
   },
   sub: {

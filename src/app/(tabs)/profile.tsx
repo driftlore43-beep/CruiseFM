@@ -32,13 +32,6 @@ function formatHours(totalMinutes: number): string {
   return hours >= 10 ? String(Math.round(hours)) : hours.toFixed(1);
 }
 
-const PREMIUM_ITEMS: { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; sub: string }[] = [
-  { icon: 'album',            label: 'Premium Music Modes', sub: 'Vinyl, Tuner, Horizon & Orb' },
-  { icon: 'palette',          label: 'Visual Mood Themes',  sub: 'All premium palettes & imagery' },
-  { icon: 'playlist-music',   label: 'Unlimited Playlists', sub: 'Build as many stations as you like' },
-  { icon: 'star-four-points', label: 'Future Additions',    sub: 'New modes & moods, always included' },
-];
-
 const SETTINGS_ITEMS: { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; page: SettingsPage }[] = [
   { icon: 'account-outline',     label: 'Account Settings', page: 'account' },
   { icon: 'bell-outline',        label: 'Notifications',    page: 'notifications' },
@@ -47,37 +40,38 @@ const SETTINGS_ITEMS: { icon: keyof typeof MaterialCommunityIcons.glyphMap; labe
   { icon: 'gift-outline',        label: 'Refer a Friend',    page: 'refer' },
 ];
 
-// Card gradients — same treatment as the Modes screen: bold, fairly opaque
-// per-card hues (not a washed-out transparent tint) so each card reads as
-// its own mood, with "Cruise FM Premium" the one fixed-violet exception.
-const STATS_GRADIENT    = ['#1a4f74', '#123049', '#0a1a2a'] as const;
-// Badges live between the blue stats and the amber upgrade card — deep teal.
-const BADGES_GRADIENT   = ['#14554a', '#0d3a34', '#071d1c'] as const;
-// Premium card matches the amber /premium screen it links to; Settings gets the violet.
-const UPGRADE_GRADIENT  = ['#a84f1c', '#7a3712', '#3a1808'] as const;
-const SETTINGS_GRADIENT = ['#2c1848', '#1c1038', '#0d0718'] as const;
-const GRADIENT_LOCATIONS = [0, 0.55, 1] as const;
+/**
+ * ONE COLOURED CARD ON THE WHOLE PAGE (owner's pick, 29.07 — "P3").
+ *
+ * This page used to stack four full-size coloured panels — blue stats, teal
+ * badges, amber upgrade, violet settings — and the badges panel was a card
+ * containing twelve more cards, each with its own rim. Cards inside cards is
+ * what made it read as busy rather than rich.
+ *
+ * The four hues were a deliberate one-colour-per-section idea, and it worked
+ * when every other screen was coloured slabs too. Now that Stations, Modes and
+ * Home are quiet, the only thing left that should ask for attention is the
+ * upgrade card, so it is the only thing that gets to be a colour.
+ */
+const UPGRADE_GRADIENT  = ['#3a1f0c', '#241206', '#140a04'] as const;
+const GRADIENT_LOCATIONS = [0, 0.6, 1] as const;
 
 // Diagonal glass-reflection streak laid over every card's top-left corner.
 const SHEEN_GRADIENT = ['rgba(255,255,255,0.20)', 'rgba(255,255,255,0.03)', 'transparent'] as const;
 
-function CardSheen() {
-  return (
-    <LinearGradient
-      colors={SHEEN_GRADIENT}
-      start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.9 }}
-      style={styles.cardSheen}
-      pointerEvents="none"
-    />
-  );
-}
 
 // Neutral translucent-white chip + bold white icon — matches the Modes
 // screen's mode-card icon treatment. The card itself carries the hue.
+/**
+ * A settings-row icon. Used to be a filled, rimmed circle ("chip") — the same
+ * treatment the badge grid used, which meant a settings row and an achievement
+ * looked equally important. It's a bare glyph in a fixed column now, exactly
+ * like the Stations and Modes rows.
+ */
 function IconChip({ icon, size = 38 }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; size?: number }) {
   return (
-    <View style={[styles.iconChip, { width: size, height: size, borderRadius: size / 2 }]}>
-      <MaterialCommunityIcons name={icon} size={size * 0.5} color="#fff" />
+    <View style={{ width: 24, alignItems: 'center' }}>
+      <MaterialCommunityIcons name={icon} size={Math.round(size * 0.55)} color="rgba(255,255,255,0.6)" />
     </View>
   );
 }
@@ -107,7 +101,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere } = useMotion();
-  const { devFreePreview, setDevFreePreview } = useEntitlements();
+  const { devFreePreview, setDevFreePreview, isPro } = useEntitlements();
   const { name: platformName, color: platformColor, refresh: refreshPlatform } = useMusicPlatformInfo();
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage | null>(null);
@@ -133,11 +127,16 @@ export default function ProfileScreen() {
   // count never reads "12 of 11".
   const judgeable = badges.filter((b) => !b.reserved || b.earned).length;
 
-  const STATS: { label: string; value: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
-    { label: 'Total Drives',     value: String(stats?.totalDrives ?? 0),        icon: 'steering' },
-    { label: 'Hours Driven',     value: formatHours(stats?.totalMinutes ?? 0),  icon: 'clock-outline' },
-    { label: 'Favorite Station', value: stationName(stats?.favoriteStationId ?? null), icon: 'radio-tower' },
-  ];
+  // One line, not three rows. Favourite station is dropped when there isn't
+  // one yet rather than printing a dash — a new driver reads two facts, not
+  // two facts and an apology.
+  const drives = stats?.totalDrives ?? 0;
+  const fave = stats?.favoriteStationId ? stationName(stats.favoriteStationId) : null;
+  const STAT_LINE = [
+    `${drives} ${drives === 1 ? 'drive' : 'drives'}`,
+    `${formatHours(stats?.totalMinutes ?? 0)}h cruised`,
+    fave,
+  ].filter(Boolean).join(' · ');
 
   const handlePlatformRowPress = () => setSelectorVisible(true);
   const handlePlatformDismiss = () => {
@@ -152,7 +151,11 @@ export default function ProfileScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: TAB_SAFE_INSET + insets.bottom }]}
         showsVerticalScrollIndicator={false}>
 
-        <View style={styles.avatarSection}>
+        {/* Name as the page title, avatar shrunk to a chip beside it — the same
+            left-aligned heading the other three pages use. It was centred at
+            28pt under an 84pt avatar, which read as a settings screen from a
+            different app. */}
+        <View style={styles.identity}>
           <View style={styles.avatarRing}>
             <LinearGradient
               colors={[theme.accentColor, Cruise.violetDim]}
@@ -162,113 +165,74 @@ export default function ProfileScreen() {
               <Text style={styles.avatarInitials}>{initialsFor(driverName)}</Text>
             </LinearGradient>
           </View>
-          <Text style={styles.name}>{driverName}</Text>
-          <View style={styles.planBadge}>
-            <LinearGradient
-              colors={[theme.accentColor + '2e', theme.accentColor + '0a']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <MaterialCommunityIcons name="star-four-points" size={11} color={theme.accentColor} />
-            <Text style={[styles.planText, { color: theme.accentColor }]}>FREE PLAN</Text>
-          </View>
-        </View>
-
-        <View style={styles.statsCard}>
-          <LinearGradient colors={STATS_GRADIENT} locations={GRADIENT_LOCATIONS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-          <CardSheen />
-          <GlossSheen radius={20} />
-          {STATS.map((stat, i) => (
-            <View key={stat.label} style={[styles.statRow, i < STATS.length - 1 && styles.statBorder]}>
-              <View style={styles.statRowLeft}>
-                <IconChip icon={stat.icon} size={34} />
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-              <Text style={styles.statValue}>{stat.value}</Text>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.name} numberOfLines={1}>{driverName}</Text>
+            <View style={styles.planBadge}>
+              <MaterialCommunityIcons name="star-four-points" size={10} color={theme.accentColor} />
+              <Text style={[styles.planText, { color: theme.accentColor }]}>
+                {isPro ? 'PREMIUM' : 'FREE PLAN'}
+              </Text>
             </View>
-          ))}
+          </View>
         </View>
 
-        <View style={styles.badgesCard}>
-          <LinearGradient colors={BADGES_GRADIENT} locations={GRADIENT_LOCATIONS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-          <CardSheen />
-          <GlossSheen radius={20} />
-          <View style={styles.badgesHeader}>
-            <Text style={styles.badgesEyebrow}>BADGES</Text>
-            <Text style={styles.badgesCount}>{earnedCount} of {judgeable} earned</Text>
-          </View>
-          <View style={styles.badgeGrid}>
-            {badges.map((b) => {
-              const founder = !!b.reserved;
-              return (
-                <View
-                  key={b.id}
-                  style={[
-                    styles.badgeCell,
-                    b.earned && styles.badgeCellEarned,
-                    founder && styles.badgeCellFounder,
-                  ]}>
-                  <View style={[
-                    styles.badgeIconRing,
-                    b.earned && styles.badgeIconRingEarned,
-                    founder && styles.badgeIconRingFounder,
-                  ]}>
-                    <MaterialCommunityIcons
-                      name={b.icon as keyof typeof MaterialCommunityIcons.glyphMap}
-                      size={22}
-                      color={founder ? '#F7B733' : b.earned ? '#fff' : 'rgba(255,255,255,0.30)'}
-                    />
-                  </View>
-                  <Text style={[styles.badgeName, (b.earned || founder) && styles.badgeNameLit]} numberOfLines={1}>
+        {/* Three numbers on one line. They were three rows of a blue glass card
+            with an icon chip each; a statistic is the least interesting thing
+            on a page about badges, so it gets a line, not a panel. */}
+        <Text style={styles.statLine}>{STAT_LINE}</Text>
+
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>Badges</Text>
+          <Text style={styles.sectionMeta}>{earnedCount} of {judgeable} earned</Text>
+        </View>
+        {/* The collection, all of it visible at once. Locked tiles stay in place
+            and stay legible — you can't want to finish a set you can't see. */}
+        <View style={styles.badgeGrid}>
+          {badges.map((b) => {
+            const founder = !!b.reserved;
+            return (
+              <View key={b.id} style={styles.badgeCellWrap}>
+                <View style={[
+                  styles.badgeTile,
+                  b.earned && styles.badgeTileEarned,
+                  founder && styles.badgeTileFounder,
+                ]}>
+                  <MaterialCommunityIcons
+                    name={b.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                    size={30}
+                    color={founder ? '#F7B733' : b.earned ? '#fff' : 'rgba(255,255,255,0.22)'}
+                  />
+                  <Text
+                    style={[styles.badgeName, (b.earned || founder) && styles.badgeNameLit]}
+                    numberOfLines={2}>
                     {b.name}
                   </Text>
-                  <Text style={styles.badgeDesc} numberOfLines={2}>{b.desc}</Text>
-                  {founder && (
-                    <View style={styles.founderTag}>
-                      <Text style={styles.founderTagText}>FIRST 500</Text>
-                    </View>
-                  )}
                 </View>
-              );
-            })}
-          </View>
+              </View>
+            );
+          })}
         </View>
 
         <View style={styles.upgradeCard}>
-          <LinearGradient colors={UPGRADE_GRADIENT} locations={GRADIENT_LOCATIONS} start={{ x: 0, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={UPGRADE_GRADIENT} locations={GRADIENT_LOCATIONS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           <View style={styles.upgradeGlow} pointerEvents="none" />
-          <CardSheen />
-          <GlossSheen radius={20} />
           <Text style={styles.upgradeEyebrow}>CRUISE FM PREMIUM</Text>
           <Text style={styles.upgradeTitle}>Unlock the full driving atmosphere.</Text>
-          <Text style={styles.upgradeSub}>Premium modes, mood themes, and unlimited playlists.</Text>
-          <View style={styles.featureList}>
-            {PREMIUM_ITEMS.map((item) => (
-              <View key={item.label} style={styles.featureRow}>
-                <IconChip icon={item.icon} />
-                <View style={styles.featureText}>
-                  <Text style={styles.featureLabel}>{item.label}</Text>
-                  <Text style={styles.featureSub}>{item.sub}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
+          {/* The four-item feature list lived here; /premium exists to make the
+              pitch properly, and repeating it on the way there made this card
+              taller than the badge collection it sat under. */}
+          <Text style={styles.upgradeSub}>Premium modes, mood themes and unlimited stations.</Text>
           <Pressable
             style={({ pressed }) => [styles.upgradeBtn, pressed && { opacity: 0.85 }]}
             onPress={() => router.push('/premium')}>
-            <LinearGradient
-              colors={['#F7B733', '#F59E0B']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFill}
-            />
             <Text style={styles.upgradeBtnText}>Upgrade to Premium</Text>
           </Pressable>
         </View>
 
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>Settings</Text>
+        </View>
         <View style={styles.settingsCard}>
-          <LinearGradient colors={SETTINGS_GRADIENT} locations={GRADIENT_LOCATIONS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-          <CardSheen />
-          <GlossSheen radius={20} />
           {/* Custom Theme was removed until it applies app-wide (only accent +
               glow worked). Station moods now colour the app automatically. */}
 
@@ -435,131 +399,167 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  // ── Identity ──────────────────────────────────────────────────────────────
+  identity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  name: {
+    color: '#fff',
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -1.1,
+  },
+  planBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(123,56,224,0.45)',
+  },
+  planText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 1.6,
+  },
+  statLine: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 13.5,
+    fontWeight: '500',
+    marginTop: 14,
+  },
+
+  // ── Section headings, shared by Badges and Settings ────────────────────────
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: 34,
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    color: '#fff',
+    fontSize: 21,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+  },
+  sectionMeta: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 13,
+  },
+
+  // ── The badge collection ──────────────────────────────────────────────────
+  // Three across, square, all twelve on screen at once. Padding on the cell
+  // rather than a gap on the grid: a wrapping flex row with gaps leaves a
+  // ragged last line, and these must sit on a strict 3-column grid.
+  badgeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -5,
+    marginTop: 2,
+  },
+  badgeCellWrap: {
+    width: '33.333%',
+    padding: 5,
+  },
+  badgeTile: {
+    aspectRatio: 1,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 8,
+    backgroundColor: '#0a0a10',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+  },
+  // Earned tiles lift off the page; locked ones stay flat and dark but never
+  // vanish, so the set still reads as something to finish.
+  badgeTileEarned: {
+    backgroundColor: '#1b1b24',
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
+  badgeTileFounder: {
+    backgroundColor: '#2e2007',
+    borderColor: 'rgba(247,183,51,0.45)',
+  },
+  badgeName: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: -0.1,
+  },
+  badgeNameLit: { color: '#fff' },
+
+  // ── The one coloured card ─────────────────────────────────────────────────
+  upgradeCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    padding: 20,
+    marginTop: 34,
+    borderWidth: 1,
+    borderColor: 'rgba(247,183,51,0.28)',
+  },
+  upgradeBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 18,
+    borderRadius: 22,
+    overflow: 'hidden',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#F7B733',
+  },
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+  // No panel: the rows are the list. Negative margin puts the hairlines out to
+  // the screen edges while the content keeps the page's 22pt inset.
+  settingsCard: {
+    marginHorizontal: -22,
+  },
+
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 16, paddingBottom: 48, gap: 16 },
-  avatarSection: { alignItems: 'center', paddingTop: 24, paddingBottom: 8, gap: 12 },
+  content: { paddingHorizontal: 22, paddingBottom: 48 },
+  // A hairline ring, not the old violet drop-shadow halo: the avatar is 60pt
+  // beside the name now rather than 80pt centred above it, and a glow at that
+  // size just muddies the initials.
   avatarRing: {
-    width: 90, height: 90, borderRadius: 45,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 32,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   avatar: {
-    width: 80, height: 80, borderRadius: 40, overflow: 'hidden',
+    width: 56, height: 56, borderRadius: 28, overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: Cruise.violet, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.55, shadowRadius: 16, elevation: 8,
   },
   avatarHighlight: {
     position: 'absolute', top: -20, left: -20, right: -20, height: 60,
     backgroundColor: 'rgba(255,255,255,0.20)', transform: [{ rotate: '-20deg' }],
   },
-  avatarInitials: { color: '#fff', fontSize: 26, fontWeight: '700' },
-  name: { color: Cruise.textPrimary, fontSize: 22, fontWeight: '700' },
-  planBadge: {
-    borderRadius: 20, overflow: 'hidden',
-    paddingHorizontal: 14, paddingVertical: 5,
-    borderWidth: 1, borderColor: 'rgba(155,95,255,0.4)',
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-  },
-  planText: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
-  statsCard: {
-    borderRadius: 20, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(94,199,255,0.35)',
-    shadowColor: '#5EC7FF', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
-  },
-  cardSheen: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: '55%',
-  },
-  iconChip: {
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
-  },
-  statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  statRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  statBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.10)' },
-  statLabel: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
-  statValue: { color: Cruise.textPrimary, fontSize: 14, fontWeight: '600' },
-  badgesCard: {
-    borderRadius: 20, overflow: 'hidden', padding: 16, gap: 12,
-    borderWidth: 1, borderColor: 'rgba(75,220,190,0.35)',
-    shadowColor: '#4BDCBE', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
-  },
-  badgesHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  badgesEyebrow: { color: '#4BDCBE', fontSize: 10, fontWeight: '700', letterSpacing: 2.5 },
-  badgesCount: { color: Cruise.textSecondary, fontSize: 12, fontWeight: '600' },
-  badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  badgeCell: {
-    width: '31%', flexGrow: 1, borderRadius: 14,
-    paddingVertical: 12, paddingHorizontal: 8, gap: 5,
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-  },
-  badgeCellEarned: {
-    backgroundColor: 'rgba(155,95,255,0.16)',
-    borderColor: 'rgba(155,95,255,0.55)',
-    shadowColor: Cruise.violet, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 4,
-  },
-  badgeCellFounder: {
-    backgroundColor: 'rgba(247,183,51,0.08)',
-    borderColor: 'rgba(247,183,51,0.45)',
-  },
-  badgeIconRing: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
-  },
-  badgeIconRingEarned: {
-    backgroundColor: 'rgba(155,95,255,0.30)',
-    borderColor: 'rgba(200,160,255,0.7)',
-  },
-  badgeIconRingFounder: {
-    backgroundColor: 'rgba(247,183,51,0.12)',
-    borderColor: 'rgba(247,183,51,0.5)',
-  },
-  badgeName: { color: 'rgba(255,255,255,0.45)', fontSize: 11.5, fontWeight: '800', textAlign: 'center' },
-  badgeNameLit: { color: '#fff' },
-  badgeDesc: { color: 'rgba(255,255,255,0.35)', fontSize: 9.5, lineHeight: 12.5, textAlign: 'center' },
-  founderTag: {
-    borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1.5,
-    backgroundColor: 'rgba(247,183,51,0.14)',
-    borderWidth: 1, borderColor: 'rgba(247,183,51,0.4)',
-  },
-  founderTagText: { color: '#F7B733', fontSize: 7.5, fontWeight: '800', letterSpacing: 0.8 },
-  upgradeCard: {
-    borderRadius: 20, padding: 22, gap: 10, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(255,150,90,0.5)',
-    shadowColor: '#FF8A3C', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4, shadowRadius: 22, elevation: 10,
-  },
+  avatarInitials: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 0.5 },
+
   upgradeGlow: {
-    position: 'absolute', top: -60, right: -60,
-    width: 180, height: 180, borderRadius: 90,
-    backgroundColor: '#F7B733', opacity: 0.20,
+    position: 'absolute', top: -50, left: -40,
+    width: 190, height: 150, borderRadius: 95,
+    backgroundColor: '#F7B733', opacity: 0.13,
   },
-  upgradeEyebrow: { color: '#F7B733', fontSize: 10, fontWeight: '700', letterSpacing: 2.5 },
-  upgradeTitle: { color: Cruise.textPrimary, fontSize: 22, fontWeight: '700' },
-  upgradeSub: { color: Cruise.textSecondary, fontSize: 13, lineHeight: 19 },
-  featureList: { gap: 14, marginTop: 4 },
-  featureRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
-  featureText: { flex: 1, gap: 2 },
-  featureLabel: { color: Cruise.textPrimary, fontSize: 14, fontWeight: '600' },
-  featureSub: { color: Cruise.textSecondary, fontSize: 12, lineHeight: 16 },
-  upgradeBtn: {
-    marginTop: 6, borderRadius: 12, paddingVertical: 13, alignItems: 'center', overflow: 'hidden',
-    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.6, shadowRadius: 14, elevation: 8,
-  },
-  upgradeBtnText: { color: '#2a1a00', fontSize: 15, fontWeight: '700' },
-  settingsCard: {
-    borderRadius: 20, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(155,95,255,0.35)',
-    shadowColor: Cruise.violet, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
-  },
-  settingsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 14 },
-  settingsBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.10)' },
-  settingsLabel: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
+  upgradeEyebrow: { color: '#F7B733', fontSize: 9.5, fontWeight: '800', letterSpacing: 2.4 },
+  upgradeTitle: { color: Cruise.textPrimary, fontSize: 22, fontWeight: '800', letterSpacing: -0.6, marginTop: 8, lineHeight: 26 },
+  upgradeSub: { color: 'rgba(255,255,255,0.55)', fontSize: 13.5, lineHeight: 19, marginTop: 6 },
+  upgradeBtnText: { color: '#1a0e02', fontSize: 15, fontWeight: '800' },
+  settingsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingVertical: 15, gap: 16 },
+  settingsBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.09)' },
+  settingsLabel: { color: '#fff', fontSize: 16.5, fontWeight: '500' },
   settingsArrow: { color: 'rgba(255,255,255,0.5)', fontSize: 20 },
   platformRowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
   platformRowMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },

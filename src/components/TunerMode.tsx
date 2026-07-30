@@ -9,6 +9,7 @@ import {
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Line, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModeSheet } from '@/components/ModeSheet';
+import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { STATIONS, stationDial, type Band } from '@/constants/stations';
@@ -372,9 +373,14 @@ function BandSwitch({ band, accent, onPick }: { band: Band; accent: string; onPi
   );
 }
 
-function TunerReadout({ width, accent, band, freq, lock, playing, title, artist, hasTrack, onBand }: {
+function TunerReadout({ width, accent, band, freq, lock, playing, title, artist, hasTrack, onBand, compact = false }: {
   width: number; accent: string; band: Band; freq: number; lock: number; playing: boolean;
   title: string; artist: string; hasTrack: boolean; onBand: (b: Band) => void;
+  /** Landscape: the panel's HEIGHT is fixed by its dot sizes, not its width,
+   *  so making it narrower saves nothing. This trims the paddings and row
+   *  gaps instead — about 40pt, which is what the readout + dial + hint stack
+   *  needs to fit a 393pt-tall screen. */
+  compact?: boolean;
 }) {
   const onAir = playing && lock > 0.9;
 
@@ -392,6 +398,8 @@ function TunerReadout({ width, accent, band, freq, lock, playing, title, artist,
 
   const PAD = 22;
   const inner = width - PAD * 2;
+  const padV = compact ? 14 : 26;
+  const rowGap = compact ? 14 : 24;
 
   const LAMP = { dot: 1.7, gap: 0.62 };
   // The song gets the panel's whole width on its own line rather than sharing
@@ -406,7 +414,7 @@ function TunerReadout({ width, accent, band, freq, lock, playing, title, artist,
   const lampOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
 
   return (
-    <View style={[fs.lcd, { width, borderColor: accent + '2E' }]}>
+    <View style={[fs.lcd, { width, borderColor: accent + '2E', paddingVertical: padV }]}>
       {/* Row 1 — the ON AIR lamp, on its own line above the song */}
       <Animated.View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', opacity: onAir ? lampOpacity : 0.34 }}>
         <View style={[fs.lamp, {
@@ -417,7 +425,7 @@ function TunerReadout({ width, accent, band, freq, lock, playing, title, artist,
       </Animated.View>
 
       {/* Row 2 — what's playing, across the full panel */}
-      <View style={{ marginTop: 18, gap: 11 }}>
+      <View style={{ marginTop: compact ? 10 : 18, gap: compact ? 7 : 11 }}>
         <DmLine text={hasTrack ? title : 'CRUISE FM'} width={inner} dot={TITLE.dot} gap={TITLE.gap} color={accent} align="left" />
         {hasTrack && !!artist && (
           <DmLine text={artist} width={inner} dot={ART.dot} gap={ART.gap} color={accent} dim={false} align="left" />
@@ -425,14 +433,14 @@ function TunerReadout({ width, accent, band, freq, lock, playing, title, artist,
       </View>
 
       {/* Row 2 — band button and the status lamps of a real receiver */}
-      <View style={fs.lcdRow}>
+      <View style={[fs.lcdRow, { marginTop: rowGap }]}>
         <BandSwitch band={band} accent={accent} onPick={onBand} />
         <DotMatrixText text="STEREO" dot={SMALL.dot} gap={SMALL.gap} color="#FFA24B" dim opacity={onAir ? 1 : 0.32} />
         <DotMatrixText text="TUNED" dot={SMALL.dot} gap={SMALL.gap} color={accent} dim opacity={0.3 + lock * 0.7} />
       </View>
 
       {/* Row 3 — band and frequency, the biggest thing on the panel */}
-      <View style={[fs.lcdRow, { alignItems: 'flex-end', marginTop: 16 }]}>
+      <View style={[fs.lcdRow, { alignItems: 'flex-end', marginTop: compact ? 10 : 16 }]}>
         <DotMatrixText text={band} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
         <DotMatrixText text={BAND_CFG[band].label(freq)} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
       </View>
@@ -443,6 +451,7 @@ function TunerReadout({ width, accent, band, freq, lock, playing, title, artist,
 export function TunerFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
+  const isLandscape = winW > winH;
   const topPad = Math.max(insets.top, 20);
 
   // How far the dial sits below the head unit. The owner wanted it lower, but
@@ -680,6 +689,17 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const resetTrack = () => progress.setValue(0);
   const togglePlay = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
 
+  // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
+  const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
+    active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
+  });
+  // Slide only, no scale: the dial is a full-width INSTRUMENT and shrinking
+  // it just makes the frequencies unreadable. Sliding puts the needle at the
+  // centre of the left pane while the deck is docked, and at true centre at
+  // rest; the dial simply continues behind the panel, which is what a real
+  // head unit's scale does anyway.
+  const deckScene = useDeckScene(chrome, winW, 1);
+
   // Real song when connected, else the mood's own line — never a fake track.
   const hasTrack = !!spotify.track;
   const title = spotify.track?.title ?? lockedStation.tagline;
@@ -687,6 +707,111 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const fill = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   const offAir = 1 - lock;
+
+  // ── LANDSCAPE — the dial gets the whole width ─────────────────────────────
+  // This was the one mode held back from landscape: turning it sideways with
+  // the portrait column would have squashed the head-unit display, and the
+  // dial deserved a composition of its own (owner, 30.07). Sideways is
+  // actually the dial's natural shape — a receiver's scale is a wide strip —
+  // so the readout sits above it and the scale runs edge to edge.
+  if (isLandscape) {
+    return (
+      <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+        <Animated.View
+          style={[{ flex: 1, backgroundColor: '#05060f' }, { transform: [{ translateY: slideY }] }]}
+          {...dismissPan.panHandlers}
+          onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
+
+          <StationBackdrop station={lockedStation} blurRadius={2.5} />
+          <LinearGradient
+            colors={[
+              'rgba(3,4,16,0.62)', 'rgba(3,4,16,0.55)', 'rgba(3,4,16,0.62)',
+              'rgba(3,4,16,0.75)', 'rgba(3,4,16,0.85)',
+            ]}
+            locations={[0, 0.4, 0.65, 0.85, 1]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            colors={['transparent', accent + '22', 'transparent']}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={{ position: 'absolute', left: 0, right: 0, top: '20%', bottom: '25%' }}
+            pointerEvents="none"
+          />
+
+          {/* Drag anywhere across this whole area to tune. */}
+          <Animated.View
+            style={[StyleSheet.absoluteFill, { justifyContent: 'center' }, deckScene]}
+            {...pan.panHandlers}>
+            {/* The readout is sized DOWN for landscape, not up: its height
+                scales with its width, and at 460 wide the readout + dial +
+                hint stack was taller than a 393pt screen, clipping the hint
+                off the bottom and pushing ON AIR under the back chevron. */}
+            <View style={{ alignItems: 'center' }}>
+              <TunerReadout
+                width={Math.min(winW * 0.44, 400)}
+                compact
+                accent={accent}
+                band={band}
+                onBand={pickBand}
+                freq={freq}
+                lock={lock}
+                playing={playing}
+                title={title}
+                artist={artist}
+                hasTrack={hasTrack}
+              />
+            </View>
+            <View style={{ marginTop: 14 }}>
+              <DialRuler band={band} freq={freq} width={winW} color={accent} lock={lock} />
+              <StaticNoise width={winW} height={116} phase={phase} opacity={offAir * 0.55} />
+            </View>
+            <Text style={[fs.dragHint, { fontFamily: Fonts.mono }]}>tap am / fm  ·  drag to tune</Text>
+          </Animated.View>
+
+          <LandscapeChrome
+            chrome={chrome}
+            rested={chromeRested}
+            station={lockedStation}
+            track={spotify.track}
+            playing={playing}
+            tagline={lockedStation.tagline}
+            progress={progress}
+            scrub={scrub}
+            onPlayPause={togglePlay}
+            onPrev={() => { resetTrack(); spotify.prev(); }}
+            onNext={() => { resetTrack(); spotify.next(); }}
+            onClose={handleClose}
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+          />
+
+          <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
+          <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
+          {handoff && !spotify.track && <HandoffOverlay />}
+          <PreviewGate onSilence={spotify.pause} />
+
+          <ModeSheet visible={showMood} onClose={() => setShowMood(false)} />
+
+          {showPicker && (
+            <PlaylistSheet
+              stationName={lockedStation.name}
+              current={linked}
+              onClose={() => setShowPicker(false)}
+              onPick={async (pl) => {
+                await setStationPlaylist(lockedStation.id, pl);
+                setLinked(pl);
+                setShowPicker(false);
+                relinkStationPlaylist(lockedStation.id);
+              }}
+            />
+          )}
+        </Animated.View>
+      </Modal>
+    );
+  }
 
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>

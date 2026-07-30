@@ -21,10 +21,9 @@ import { Platform } from 'react-native';
  * stays portrait even while open — its portrait column squeezed into a wide
  * window is worse than no landscape at all (owner, 30.07: "a lot of them do
  * squish"). Add a mode here ONLY once its file has an isLandscape branch
- * wearing LandscapeChrome. Tuner is the one holdout: the dial deserves its
- * own sideways design round, not a transplant.
+ * wearing LandscapeChrome — all eight now do.
  */
-export const LANDSCAPE_READY = new Set(['disco', 'equalizer', 'cassette', 'vinyl', 'cd', 'orb', 'horizon']);
+export const LANDSCAPE_READY = new Set(['disco', 'equalizer', 'cassette', 'vinyl', 'cd', 'orb', 'horizon', 'radio']);
 
 function loadModule(): typeof import('expo-screen-orientation') | null {
   try {

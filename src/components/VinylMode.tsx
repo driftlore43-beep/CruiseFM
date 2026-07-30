@@ -918,7 +918,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const currentTrack = VINYL_TRACKS[activeTrack];
   // Landscape sizes off HEIGHT alone — the portrait formula shrinks a
   // sideways platter to a saucer (the "squish", owner 30.07).
-  const platSize     = isLandscape ? Math.min(winH * 0.64, 280) : Math.min(winW * 0.9, winH * 0.46);
+  const platSize     = isLandscape ? Math.min(winH * 0.86, 350) : Math.min(winW * 0.9, winH * 0.46);
 
   // Swipe-down to dismiss
   const dismissPan = useRef(PanResponder.create({
@@ -1156,7 +1156,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
         {!isLandscape && <ModeCloseButton onPress={handleClose} />}
 
-        <AmbientGlow active={visible && playing && !isLandscape} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={station.eqColors?.[1] ?? V.gold} />
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={station.eqColors?.[1] ?? V.gold} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

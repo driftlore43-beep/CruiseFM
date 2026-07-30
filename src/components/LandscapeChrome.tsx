@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ModeActionRow } from '@/components/ModeActionRow';
 import { SeekBar } from '@/components/SeekBar';
+import { StationBackdrop } from '@/components/StationBackdrop';
 import { StationIdentity, stationDisplayName } from '@/components/StationIdentity';
 import type { Station } from '@/constants/stations';
 import type { NowPlaying } from '@/utils/useMusicPlayback';
@@ -197,9 +198,18 @@ export function LandscapeChrome({
       <Animated.View
         pointerEvents={rested ? 'none' : 'auto'}
         style={[st.panel, { width: panelW, transform: [{ translateX: slideX }] }]}>
+        {/* The panel wears the STATION, not a fixed navy slab (owner, 30.07)
+            — the same blurred photograph as the scene, so the deck belongs to
+            the mood it's controlling. Custom stations have no photo and fall
+            through to their own palette gradient inside StationBackdrop.
+            A scrim over it keeps the type legible: deepest on the left where
+            the panel meets the scene, so the join reads as a soft edge rather
+            than a cut. */}
+        <StationBackdrop station={station} blurRadius={3} />
         <LinearGradient
-          colors={['rgba(23,24,38,0.96)', 'rgba(11,11,19,0.98)']}
-          start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }}
+          colors={['rgba(6,7,14,0.94)', 'rgba(8,9,16,0.80)', 'rgba(6,7,14,0.90)']}
+          locations={[0, 0.45, 1]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
         <View style={[st.panelInner, { paddingRight: sideR, paddingTop: top + 8, paddingBottom: bottom + 6 }]}>
@@ -266,6 +276,8 @@ const st = StyleSheet.create({
 
   panel: {
     position: 'absolute', right: 0, top: 0, bottom: 0,
+    // Clips the station photo to the panel.
+    overflow: 'hidden',
     borderLeftWidth: StyleSheet.hairlineWidth,
     borderLeftColor: 'rgba(255,255,255,0.12)',
     shadowColor: '#000', shadowOffset: { width: -10, height: 0 }, shadowOpacity: 0.4, shadowRadius: 22, elevation: 16,

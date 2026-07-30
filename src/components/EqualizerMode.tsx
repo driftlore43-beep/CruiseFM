@@ -268,7 +268,9 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const lsSide     = 28;
   const lsAvailW   = winW - lsSide * 2;
   const lsBarW     = Math.max(3, Math.floor((lsAvailW - (BAR_COUNT - 1) * 2) / BAR_COUNT));
-  const lsMaxSegs  = Math.max(10, Math.floor((winH * 0.38) / UNIT));
+  // 0.38 -> 0.60 of the height: the meter has a lot more room sideways and
+  // was barely using it — the bars now swing properly (owner, 30.07).
+  const lsMaxSegs  = Math.max(10, Math.floor((winH * 0.60) / UNIT));
   const lsMaxH     = lsMaxSegs * UNIT;
   const lsBellMaxH = useCallback((i: number) => {
     const t = (i - (BAR_COUNT - 1) / 2) / (BAR_COUNT / 4.2);
@@ -430,7 +432,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               meter rises from a baseline. Glides with the deck: shrunk into
               the left pane while the panel is out, full width at rest. */}
           <Animated.View
-            style={[{ position: 'absolute', left: lsSide, right: lsSide, bottom: 44, alignItems: 'center' }, deckScene]}
+            style={[{ position: 'absolute', left: lsSide, right: lsSide, bottom: 74, alignItems: 'center' }, deckScene]}
             pointerEvents="none">
             <Bars
               values={fsValues}
@@ -458,6 +460,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
           />
 
+          <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
           <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
           {handoff && !spotify.track && <HandoffOverlay />}
           <PreviewGate onSilence={spotify.pause} />

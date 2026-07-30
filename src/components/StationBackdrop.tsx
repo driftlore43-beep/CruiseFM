@@ -1,6 +1,6 @@
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ImageBackground, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import type { Station } from '@/constants/stations';
 
@@ -46,23 +46,23 @@ export function StationBackdrop({
   // image on the main thread every re-display (mode open, app re-entry) —
   // Sentry caught iOS killing the app for exactly that. Displaying an
   // already-blurred JPEG costs the same as any photo.
-  if (station.imageBlur) {
-    return (
-      <ImageBackground
-        source={station.imageBlur}
-        style={StyleSheet.absoluteFill}
-        imageStyle={{ width: '100%', height: '100%' }}
-        resizeMode="cover"
-      />
-    );
-  }
+  //
+  // expo-image with contentFit="cover", NOT ImageBackground. The old version
+  // forced `imageStyle={{width:'100%',height:'100%'}}` to work around web
+  // rendering the photo at its intrinsic size — but explicit dimensions fight
+  // resizeMode, and in LANDSCAPE that showed as the photo failing to reach
+  // the left and bottom edges, leaving a hard black margin in the corner
+  // (owner, 30.07). The station assets are portrait (1080 wide), so a wide
+  // window is exactly the case that exposed it. contentFit covers correctly
+  // on every platform and orientation with no override needed, and
+  // expo-image is already in the build for the motion clips.
   return (
-    <ImageBackground
-      source={station.image}
+    <ExpoImage
+      source={station.imageBlur ?? station.image}
+      contentFit="cover"
+      blurRadius={station.imageBlur ? 0 : blurRadius}
+      cachePolicy="memory-disk"
       style={StyleSheet.absoluteFill}
-      imageStyle={{ width: '100%', height: '100%' }}
-      blurRadius={blurRadius}
-      resizeMode="cover"
     />
   );
 }

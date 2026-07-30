@@ -304,7 +304,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   // Landscape sizes off HEIGHT alone — the portrait formula's winH*0.44 term
   // shrinks a sideways case to a coaster (the "squish", owner 30.07).
   const caseSize = isLandscape
-    ? Math.min(winH * 0.66, 280)
+    ? Math.min(winH * 0.86, 350)
     : Math.min(winW * 0.93, winH * 0.44, 410);
   const discSize = caseSize * 0.85;
   const station = resolveAnyStation(activeId);
@@ -651,7 +651,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
 
         {!isLandscape && <ModeCloseButton onPress={handleClose} />}
 
-        <AmbientGlow active={visible && playing && !isLandscape} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

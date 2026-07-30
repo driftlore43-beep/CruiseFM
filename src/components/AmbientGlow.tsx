@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 
 import { useMotion } from '@/context/MotionContext';
-
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // One beat ≈ 100 BPM: quick swell, longer relax.
 const BEAT_ATTACK_MS = 150;
@@ -47,6 +45,13 @@ export function AmbientGlow({ active, beat, color, hero = true, trackKey }: {
   const breath = useRef(new Animated.Value(0)).current;
   const beatPulse = useRef(new Animated.Value(0)).current;
   const { atmosphere, softAtmosphere } = useMotion();
+  // LIVE dimensions, not module-load ones. These were captured once at
+  // startup (so always portrait), which meant that sideways the whole layer
+  // was positioned for a screen twice as tall as the real one: the smoke
+  // band collapsed into a sliver at the bottom and the side plumes became a
+  // patch in the lower-left corner. That is why atmosphere had to be gated
+  // out of landscape at all — with live values it simply works in both.
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
 
   // Song-transition hold: a new title means the old song just ended — the
   // 5s poll can't see the ~1s silent gap itself, so the moment the title
@@ -110,7 +115,12 @@ export function AmbientGlow({ active, beat, color, hero = true, trackKey }: {
         Turned off (hero={false}) in modes whose scene already owns that
         space (Cassette's own orb, Horizon's sun). */}
     {hero && (
-      <View style={ag.heroWrap} pointerEvents="none">
+      <View
+        style={[ag.heroWrap, {
+          left: -SCREEN_W * 0.18, right: -SCREEN_W * 0.18,
+          top: SCREEN_H * 0.08, height: SCREEN_H * 0.5,
+        }]}
+        pointerEvents="none">
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
@@ -121,7 +131,7 @@ export function AmbientGlow({ active, beat, color, hero = true, trackKey }: {
         </Animated.View>
       </View>
     )}
-    <View style={ag.wrap} pointerEvents="none">
+    <View style={[ag.wrap, { top: SCREEN_H * 0.34 }]} pointerEvents="none">
       {/* Wide base cloud */}
       <Animated.View
         style={[ag.haze, {
@@ -172,19 +182,18 @@ const ag = StyleSheet.create({
   // showed as a visible seam near the home indicator on every mode screen.
   // Unclipped, the hazes simply fade out on their own gradient; the screen
   // edge does the only clipping that's actually wanted.
+  // `top` is supplied per render from the LIVE screen height — see the note
+  // in the component. Everything else is orientation-independent.
   wrap: {
     position: 'absolute',
     left: 0, right: 0,
-    top: SCREEN_H * 0.34,
     bottom: 0,
     zIndex: 0,
   },
   // Upper-middle halo zone, bleeding past the sides so it stays round.
+  // Position/size also supplied per render.
   heroWrap: {
     position: 'absolute',
-    left: -SCREEN_W * 0.18, right: -SCREEN_W * 0.18,
-    top: SCREEN_H * 0.08,
-    height: SCREEN_H * 0.5,
     zIndex: 0,
   },
   haze: { position: 'absolute' },

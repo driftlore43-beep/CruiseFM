@@ -852,7 +852,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const bottomPad = Math.max(insets.bottom, 24) + 24;
   // Landscape: the shell is the whole show — winH*0.72 was the OLD branch's
   // side-column size and reads small alone on a full screen.
-  const cassetteW = isLandscape ? Math.min(winH * 1.06, winW * 0.52) : winW * 0.92;
+  const cassetteW = isLandscape ? Math.min(winH * 1.30, winW * 0.60) : winW * 0.92;
   const cassetteH = cassetteW * 0.62;
 
 
@@ -933,6 +933,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
           />
 
+          <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
           <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
           {handoff && !spotify.track && <HandoffOverlay />}
           <PreviewGate onSilence={spotify.pause} />

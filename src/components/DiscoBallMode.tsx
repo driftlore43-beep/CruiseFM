@@ -1574,7 +1574,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   // grapefruit. 0.62 of a 393pt-high screen ≈ 244 — big enough to be the
   // whole show, small enough that the chrome never touches it.
   const ballSize = isLandscape
-    ? Math.min(winH * 0.56, 280)
+    ? Math.min(winH * 0.74, 330)
     : Math.min(winW * 0.71, winH * 0.39, 340);
   const ballSizeRef = useRef(ballSize);
   ballSizeRef.current = ballSize;
@@ -1964,7 +1964,9 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
               Landscape lifts by a chrome-derived amount instead: verified at
               852x393, anything less sinks the ball's bottom edge into the
               seek bar and play disc. */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? 0 : ballSize * 0.30 }}>
+          {/* paddingBottom lifts the ball off dead centre — it hangs from
+              above, so sitting high is what reads right (owner, 30.07). */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? ballSize * 0.16 : ballSize * 0.30 }}>
             <Animated.View style={[{ alignItems: 'center' }, isLandscape ? deckScene : null]}>
               <View style={{ width: 2, height: ballSize * 0.22, backgroundColor: 'rgba(255,255,255,0.25)' }} />
               <View style={{ width: 14, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: -3 }} />
@@ -2075,12 +2077,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         </Animated.View>
         )}
 
-        {/* AmbientGlow sits out of landscape: its smoke geometry is derived
-            from the PORTRAIT screen height at module load, which in a
-            393pt-high window would start the haze below the bottom edge —
-            animation loops running for pixels nobody can see. The mirror
-            ball's room is dark anyway; nothing is missed. */}
-        <AmbientGlow active={visible && playing && !isLandscape} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
+        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

@@ -1788,12 +1788,12 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   useEffect(() => {
     if (!visible) return;
     if (stationId) setActiveId(stationId);
-    slideY.setValue(SCREEN_H);
+    slideY.setValue(winH);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
   }, [visible]);
 
   const handleClose = () => {
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
+    Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
   const dismissPan = useRef(PanResponder.create({
@@ -1822,10 +1822,20 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const restTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sheetOpen = showMood || showPicker;
 
-  const wakeChrome = () => {
+  // `arriving` — the phone has just been turned. In landscape this value also
+  // slides the docking deck, so the wake is given the shared component's
+  // arrival timing: a beat for the rotation to settle, then the panel travels
+  // in. A plain tap-to-wake stays quick.
+  const wakeChrome = (arriving = false) => {
     if (restTimer.current) { clearTimeout(restTimer.current); restTimer.current = null; }
     setChromeRested(false);
-    Animated.timing(chrome, { toValue: 1, duration: 170, useNativeDriver: true }).start();
+    Animated.timing(chrome, {
+      toValue: 1,
+      duration: arriving ? 340 : 170,
+      delay: arriving ? 160 : 0,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
     // Only ever rests during playback: a paused drive is one you are looking
     // at, and hiding the play button from someone who just paused is rude.
     if (playing && !sheetOpen) {
@@ -1843,6 +1853,18 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
     wakeChrome();
     return () => { if (restTimer.current) { clearTimeout(restTimer.current); restTimer.current = null; } };
   }, [visible, playing, sheetOpen]);
+
+  // TURNING THE PHONE RE-DOCKS THE DECK. Without this, rotating into landscape
+  // after the PORTRAIT chrome had already rested arrives at chrome = 0 — the
+  // panel parked off-screen and no controls anywhere until you tap. This mode
+  // keeps its own fade machinery (one value serves the portrait fade and the
+  // landscape dock), so it needs the orientation re-wake spelled out; the
+  // shared useChromeFade does the same thing via its own active flag.
+  useEffect(() => {
+    if (!visible) return;
+    chrome.setValue(0);
+    wakeChrome(true);
+  }, [isLandscape]);
 
   const deckScene = useDeckScene(chrome, winW);
 

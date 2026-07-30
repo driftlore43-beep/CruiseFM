@@ -279,7 +279,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   useEffect(() => {
     if (!visible) return;
     if (stationId) setActiveStation(stationId);
-    slideY.setValue(SCREEN_H);
+    slideY.setValue(winH);
     // Respect the session's play state — a browse from the Modes tab opens
     // paused, so the bars hold still until the user presses play.
     if (playing) startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
@@ -320,7 +320,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
   const handleClose = () => {
     stopBarAnims(fsValues, timers);
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
+    Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
   const spotify = useMusicPlayback(visible);

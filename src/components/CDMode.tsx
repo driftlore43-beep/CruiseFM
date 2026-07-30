@@ -504,12 +504,12 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   useEffect(() => {
     if (!visible) return;
     if (stationId) setActiveId(stationId);
-    slideY.setValue(SCREEN_H);
+    slideY.setValue(winH);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
   }, [visible]);
 
   const handleClose = () => {
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
+    Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
   const dismissPan = useRef(PanResponder.create({

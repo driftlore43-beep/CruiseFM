@@ -58,12 +58,25 @@ export function useChromeFade({ active, playing, sheetOpen }: {
   const gate = useRef({ active, playing, sheetOpen });
   gate.current = { active, playing, sheetOpen };
 
-  const wake = useCallback(() => {
+  /** `arriving` = the phone has just been turned into landscape (or a mode
+   *  opened already sideways), as opposed to a tap waking a rested deck. The
+   *  dock then slides in from off-screen just AFTER the rotation settles, so
+   *  the deck reads as arriving with the turn instead of appearing fully
+   *  formed the instant the screen flips. */
+  const wake = useCallback((arriving = false) => {
     if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     setRested(false);
     // A shade slower than the old 170ms opacity pop: the panel now TRAVELS
     // in, and arriving instantly reads as teleporting.
-    Animated.timing(chrome, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.timing(chrome, {
+      toValue: 1,
+      duration: arriving ? 340 : 260,
+      // iOS takes about 400ms to turn the screen. Waiting a beat means the
+      // slide plays on a settled screen rather than racing the rotation.
+      delay: arriving ? 160 : 0,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
     const g = gate.current;
     // Only rests during playback — hiding the play button from someone who
     // just paused is rude (the Mirror Ball lesson, verbatim).
@@ -77,14 +90,25 @@ export function useChromeFade({ active, playing, sheetOpen }: {
     }
   }, []);
 
+  // Distinguishes "just turned sideways" from "playback state changed while
+  // already sideways" — this effect re-runs for both, and only the first
+  // should replay the dock's arrival.
+  const wasActive = useRef(false);
+
   useEffect(() => {
     if (!active) {
       if (timer.current) { clearTimeout(timer.current); timer.current = null; }
       setRested(false);
+      // Portrait parks it at 1 so nothing downstream sees a half-docked value.
       chrome.setValue(1);
+      wasActive.current = false;
       return;
     }
-    wake();
+    const arriving = !wasActive.current;
+    wasActive.current = true;
+    // Start the dock off-screen so it slides in rather than blinking on.
+    if (arriving) chrome.setValue(0);
+    wake(arriving);
     return () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
   }, [active, playing, sheetOpen, wake]);
 

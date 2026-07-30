@@ -901,7 +901,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       if (id && id !== 'none') { const p = PLATFORMS[id as Exclude<PlatformId, 'none'>]; if (p) setPlatform({ id: id as PlatformId, name: p.name, color: p.color }); } else setPlatform(null);
     });
     // Play state belongs to the session — a Modes-tab browse opens paused.
-    slideY.setValue(SCREEN_H); setActiveTrack(0);
+    slideY.setValue(winH); setActiveTrack(0);
     progress.setValue(0); progressValue.current = 0; setCurrentTimeMs(0);
     setShowTracks(false); showTracksAnim.setValue(0);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
@@ -911,7 +911,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   }, [visible]);
 
   const handleClose = () => {
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
+    Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
   const station      = resolveAnyStation(activeId);
@@ -1015,7 +1015,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           colors={['transparent', (station.eqColors?.[1] ?? V.gold) + '26', 'transparent']}
           locations={[0, 0.5, 1]}
           start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={{ position: 'absolute', left: 0, right: 0, top: SCREEN_H * 0.40, bottom: 0 }}
+          style={{ position: 'absolute', left: 0, right: 0, top: winH * 0.40, bottom: 0 }}
           pointerEvents="none"
         />
 

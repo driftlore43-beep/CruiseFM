@@ -143,13 +143,13 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   useEffect(() => {
     if (!visible) return;
     if (stationId) setActiveId(stationId);
-    slideY.setValue(SCREEN_H);
+    slideY.setValue(winH);
     ampRef.current = playingRef.current ? 1 : 0.55;
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
   }, [visible]);
 
   const handleClose = () => {
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
+    Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
   // Swipe down anywhere to drop back to the mini-player — the one exit

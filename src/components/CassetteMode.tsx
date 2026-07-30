@@ -779,7 +779,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
         if (p) setPlatform({ id: id as PlatformId, name: p.name, color: p.color });
       } else { setPlatform(null); }
     });
-    slideY.setValue(SCREEN_H);
+    slideY.setValue(winH);
     // Play state belongs to the session — a Modes-tab browse opens paused.
     progress.setValue(0);
     progressValue.current = 0;
@@ -795,7 +795,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   }, [visible]);
 
   const handleClose = () => {
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
+    Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
   // Swipe down anywhere to drop back to the mini-player — the one exit
@@ -887,7 +887,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
         colors={['transparent', (currentEq?.[1] ?? '#C8860A') + '26', 'transparent']}
         locations={[0, 0.5, 1]}
         start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-        style={{ position: 'absolute', left: 0, right: 0, top: SCREEN_H * 0.40, bottom: 0 }}
+        style={{ position: 'absolute', left: 0, right: 0, top: winH * 0.40, bottom: 0 }}
         pointerEvents="none"
       />
     </>

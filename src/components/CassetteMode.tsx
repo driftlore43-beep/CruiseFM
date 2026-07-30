@@ -15,6 +15,7 @@ import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
@@ -851,8 +852,12 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   // Plain JSX, not an inline component — an inline component remounts the
   // blurred image on every render (background twitching).
   const currentEq = resolveAnyStation(activeId).eqColors;
-  // Neon glow tracks the station's mood: brightest eq stop = body, first stop = accent.
-  const neonColor  = currentEq?.[2] ?? '#FF3DF0';
+  // The shell wears the station's ACCENT stop (eq[1]) — the same slot the
+  // mini-player edge and glow bands use — not the last stop. The last stop
+  // put Sunset's cassette in hot pink when everything else about that
+  // station is orange (owner, 30.07); the middle stop is where each
+  // station's app-wide accent lives.
+  const neonColor  = currentEq?.[1] ?? '#FF3DF0';
   const neonAccent = currentEq?.[0] ?? '#33E1FF';
   const background = (
     <>
@@ -986,8 +991,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
           {/* Header — small top-center, Spotify style */}
           <View style={fs.header}>
-            <Text style={fs.headerEyebrow}>YOU’RE LISTENING TO</Text>
-            <Text style={fs.headerStation}>{station.name}</Text>
+            <StationIdentity station={station} />
           </View>
 
           {/* Cassette hero — flex:1 so it grows to fill available space */}

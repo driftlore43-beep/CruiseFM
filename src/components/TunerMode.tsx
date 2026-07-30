@@ -9,6 +9,7 @@ import {
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Line, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModeSheet } from '@/components/ModeSheet';
+import { StationIdentity } from '@/components/StationIdentity';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { STATIONS, stationDial, type Band } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
@@ -43,8 +44,13 @@ const BAND_CFG: Record<Band, {
   min: number; max: number; px: number; tick: number; lock: number;
   label: (v: number) => string;
 }> = {
-  FM: { min: 87.5, max: 108.5, px: 110, tick: 0.1, lock: 0.45, label: (v) => v.toFixed(2) },
-  AM: { min: 530, max: 1600, px: 2.2, tick: 10, lock: 25, label: (v) => String(Math.round(v)) },
+  // px loosened 110→72 / 2.2→1.45 and the lock window widened 0.45→0.65 /
+  // 25→38 (owner, 30.07: "difficult to tune different stations... a little
+  // loose") — a third less thumb travel between stations, and the needle
+  // snaps onto a station from further away. The two bands move together so
+  // end-to-end travel stays matched (~1500px each).
+  FM: { min: 87.5, max: 108.5, px: 72, tick: 0.1, lock: 0.65, label: (v) => v.toFixed(2) },
+  AM: { min: 530, max: 1600, px: 1.45, tick: 10, lock: 38, label: (v) => String(Math.round(v)) },
 };
 
 /** Every tenth tick is a labelled major in both bands — 1 MHz, 100 kHz. */
@@ -717,9 +723,8 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
         {/* Content */}
         <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>
-          <View style={{ alignItems: 'center', gap: 3, paddingHorizontal: 32, paddingBottom: 10 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 }}>YOU’RE LISTENING TO</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>{lockedStation.name}</Text>
+          <View style={{ paddingHorizontal: 32, paddingBottom: 10, alignItems: 'center' }}>
+            <StationIdentity station={lockedStation} />
           </View>
 
           {/* ── The dial — drag anywhere in this zone to tune ── */}

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ModeActionRow } from '@/components/ModeActionRow';
 import { SeekBar } from '@/components/SeekBar';
+import { StationIdentity, stationDisplayName } from '@/components/StationIdentity';
 import type { Station } from '@/constants/stations';
 import type { NowPlaying } from '@/utils/useMusicPlayback';
 import type { ScrubApi } from '@/utils/useTrackClock';
@@ -124,7 +125,7 @@ export function LandscapeChrome({
       <Animated.View
         pointerEvents="none"
         style={[st.whisperWrap, { bottom: bottom + 2, opacity: chrome.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
-        <Text style={st.whisper}>{station.name.toUpperCase()}</Text>
+        <Text style={st.whisper}>{stationDisplayName(station).toUpperCase()}</Text>
       </Animated.View>
 
       {/* Everything below rests together. pointerEvents goes off once it's
@@ -140,10 +141,7 @@ export function LandscapeChrome({
           <Pressable onPress={onClose} hitSlop={14} style={st.backBtn}>
             <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.9)" />
           </Pressable>
-          <View>
-            <Text style={st.eyebrow}>YOU’RE LISTENING TO</Text>
-            <Text style={st.station} numberOfLines={1}>{station.name}</Text>
-          </View>
+          <StationIdentity station={station} align="left" compact />
         </View>
 
         {/* Bottom block: title + pills on one line, seek across, transport

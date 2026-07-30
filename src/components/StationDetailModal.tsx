@@ -18,7 +18,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import { type Station } from '@/constants/stations';
+import { stationDial, type Station } from '@/constants/stations';
+import { useDsegFont } from '@/components/StationIdentity';
 import { type CustomStation } from '@/utils/customStations';
 import { Cruise } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
@@ -62,6 +63,9 @@ type Props = {
 };
 
 export function StationDetailModal({ station, visible, onClose, onStartDrive, isPro, onEdit, onDelete }: Props) {
+  const dseg = useDsegFont();
+  // The modal renders with station null while closed.
+  const dial = station ? stationDial(station.id, !!station.premium) : { band: 'AM' as const, label: '', value: 0 };
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { dataSaver } = useMotion();
@@ -295,6 +299,12 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
           {/* Push the title block just below the hero image */}
           <View style={{ flex: 1, minHeight: SCREEN_H * 0.50 }} />
 
+          {/* The dial position in the seven-segment face, above the title —
+              the receiver identity, same as the Stations page. */}
+          <Text style={[styles.dialLine, { fontFamily: dseg }]}>
+            {dial.label}
+            <Text style={styles.dialBand}>  {dial.band}</Text>
+          </Text>
           <Text style={styles.stationName}>{station.name}</Text>
           <Text style={styles.stationTagline}>{station.tagline}</Text>
 
@@ -472,6 +482,8 @@ const styles = StyleSheet.create({
   },
   linkToastText: { color: '#fff', fontSize: 13.5, fontWeight: '600', flexShrink: 1 },
 
+  dialLine: { color: 'rgba(255,255,255,0.6)', fontSize: 15, marginBottom: 10 },
+  dialBand: { color: 'rgba(255,255,255,0.4)', fontSize: 12 },
   stationName: {
     color: '#fff', fontSize: 40, fontWeight: '800',
     letterSpacing: -0.5, marginBottom: 8,

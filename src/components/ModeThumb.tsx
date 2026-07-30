@@ -252,23 +252,37 @@ export const ModeThumb = memo(function ModeThumb({ mode, size, colors, uid }: Pr
       // read as mirrors.
       case 'disco': {
         const c = S / 2, R = S * 0.42;
-        const pitch = Math.max(4.5, S * 0.098);          // ≈ the paywall's 13px at 130
-        const tile = pitch - Math.max(0.8, pitch * 0.14);
-        const n = Math.ceil((R * 2) / pitch) + 1;
+        // The grid is WARPED through a sphere: a tile's edges live at
+        // u ∈ [-1,1] in grid space and land on screen at c + R·sin(u·π/2),
+        // so squares compress into slivers toward the silhouette in BOTH
+        // axes. A uniform grid clipped to a circle read as a flat disc
+        // (owner, 30.07: "doesn't look curved but flat") — foreshortening
+        // at the edges is what makes a ball a ball. Same idea as the full
+        // mode's projection, but on a square lattice, so the poles never
+        // pinch into the noise that sank the first sphere-projection thumb.
+        const N = 10;                                    // tiles across the diameter
+        const gapF = 0.14;                               // seam fraction of a cell
+        const proj = (u: number) => c + Math.sin(Math.max(-1, Math.min(1, u)) * Math.PI / 2) * R;
         const tiles: React.ReactNode[] = [];
-        for (let r = 0; r < n; r++) {
-          const y = c - R + r * pitch;
-          const off = (r % 2) * (pitch / 2);
-          for (let k = -1; k < n; k++) {
-            const x = c - R + k * pitch + off;
-            // Skip tiles fully outside the disc; part-tiles are clipped.
-            const dx = x + tile / 2 - c, dy = y + tile / 2 - c;
-            if (Math.sqrt(dx * dx + dy * dy) > R + pitch) continue;
+        for (let r = 0; r < N; r++) {
+          const v0 = -1 + (2 * r) / N;
+          const v1 = v0 + (2 / N) * (1 - gapF);
+          const y0 = proj(v0), y1 = proj(v1);
+          const off = (r % 2) * (1 / N);                 // brick bond, in grid space
+          for (let k = -1; k <= N; k++) {
+            const u0 = -1 + (2 * k) / N + off * 2;
+            const u1 = u0 + (2 / N) * (1 - gapF);
+            const x0 = proj(u0), x1 = proj(u1);
+            if (x1 - x0 < 0.4 || y1 - y0 < 0.4) continue; // sliver at the limb
+            const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
+            if (cu * cu + cv * cv > 1.35) continue;       // fully off the ball
             const j = hash01(r * 12.9898 + k * 78.233);
+            // Dims toward the silhouette — the curvature's other half.
+            const shade = 1 - 0.38 * Math.min(1, (cu * cu + cv * cv) * 0.85);
             tiles.push(
-              <Rect key={`${r}-${k}`} x={x} y={y} width={tile} height={tile}
-                rx={Math.max(0.4, tile * 0.10)}
-                fill={`rgba(226,236,255,${(0.16 + j * 0.46).toFixed(3)})`} />,
+              <Rect key={`${r}-${k}`} x={x0} y={y0} width={x1 - x0} height={y1 - y0}
+                rx={Math.max(0.3, (x1 - x0) * 0.10)}
+                fill={`rgba(226,236,255,${((0.16 + j * 0.46) * shade).toFixed(3)})`} />,
             );
           }
         }

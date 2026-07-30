@@ -1,12 +1,10 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef } from 'react';
 import {
   Animated, Dimensions, Easing, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { smoke } from '@/components/GlassPane';
 import { MirrorBallGlyph } from '@/components/MirrorBallGlyph';
 import { MODE_CATALOG } from '@/constants/modeCatalog';
 import { Fonts } from '@/constants/theme';
@@ -25,15 +23,19 @@ const SCREEN_H = Dimensions.get('window').height;
  * modes.tsx — keep the two in step when a mode is added.
  */
 
-const MODE_LOOK: Record<string, { icon: string | null; g: [string, string] }> = {
-  cassette:  { icon: 'cassette',          g: ['#7a4fd0', '#4a2a90'] },
-  equalizer: { icon: 'equalizer',         g: ['#164a6a', '#0a1a2a'] },
-  orb:       { icon: 'circle-slice-8',    g: ['#b23ae6', '#2a1550'] },
-  vinyl:     { icon: 'record-player',     g: ['#c05a20', '#3a180a'] },
-  radio:     { icon: 'radio-tower',       g: ['#6a3ae0', '#1a8a9a'] },
-  horizon:   { icon: 'weather-sunset-up', g: ['#b02a8a', '#200a45'] },
-  cd:        { icon: 'disc',              g: ['#5a6f9a', '#141a2e'] },
-  disco:     { icon: null,                g: ['#c8d2e2', '#5a6274'] }, // MirrorBallGlyph
+// Icons only since 30.07 — the chips wore coloured smoked-glass gradients
+// from the pre-redesign Modes tab long after that tab went black rows with
+// white glyphs (owner: "the pills have not updated since the redesign").
+// One chip style now, matching the app: dark glass, white icon, white text.
+const MODE_LOOK: Record<string, { icon: string | null }> = {
+  cassette:  { icon: 'cassette' },
+  equalizer: { icon: 'equalizer' },
+  orb:       { icon: 'circle-slice-8' },
+  vinyl:     { icon: 'record-player' },
+  radio:     { icon: 'radio-tower' },
+  horizon:   { icon: 'weather-sunset-up' },
+  cd:        { icon: 'disc' },
+  disco:     { icon: null }, // MirrorBallGlyph
 };
 
 // Free modes first, the same shelf order as the Modes tab.
@@ -96,29 +98,12 @@ export function ModeSheet({ visible, onClose }: { visible: boolean; onClose: () 
                 activeOpacity={0.85}
                 onPress={() => { np.setMode(m.id); onClose(); }}
                 style={[s.chip, active && s.chipActive]}>
-                <LinearGradient
-                  colors={[smoke(look.g[0]), smoke(look.g[1])]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                {/* the glass: sheen + hairline top edge */}
-                <LinearGradient
-                  colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.03)', 'transparent', 'rgba(0,0,0,0.14)']}
-                  locations={[0, 0.4, 0.65, 1]}
-                  start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <LinearGradient
-                  colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0.1)']}
-                  start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-                  style={s.chipTopline}
-                />
                 {look.icon
-                  ? <MaterialCommunityIcons name={look.icon as any} size={17} color="#fff" />
-                  : <MirrorBallGlyph size={17} />}
-                <Text style={s.chipLabel}>{m.label}</Text>
-                {active && <Ionicons name="checkmark" size={13} color="#fff" />}
-                {locked && !active && <MaterialCommunityIcons name="lock" size={12} color="rgba(255,255,255,0.75)" />}
+                  ? <MaterialCommunityIcons name={look.icon as any} size={17} color={active ? '#0a0a10' : '#fff'} />
+                  : <MirrorBallGlyph size={17} color={active ? '#0a0a10' : '#ffffff'} />}
+                <Text style={[s.chipLabel, active && s.chipLabelActive]}>{m.label}</Text>
+                {active && <Ionicons name="checkmark" size={13} color="#0a0a10" />}
+                {locked && !active && <MaterialCommunityIcons name="lock" size={12} color="rgba(255,255,255,0.55)" />}
               </TouchableOpacity>
             );
           })}
@@ -151,19 +136,20 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   row: { paddingHorizontal: 18, gap: 10, paddingVertical: 4 },
+  // Dark glass, hairline rim; the ACTIVE mode is a solid white pill with
+  // dark type — the same primary-button language as the play disc and the
+  // Tune-in pill.
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 15, paddingVertical: 12,
-    borderRadius: 15, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)',
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderRadius: 22, overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
   chipActive: {
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.95)',
-    shadowColor: '#fff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.28, shadowRadius: 12,
-  },
-  chipTopline: {
-    position: 'absolute', top: 0, left: '10%', right: '10%', height: 1.2, borderRadius: 1,
+    backgroundColor: '#ffffff',
+    borderColor: '#ffffff',
   },
   chipLabel: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
+  chipLabelActive: { color: '#0a0a10' },
 });

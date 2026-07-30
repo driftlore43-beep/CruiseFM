@@ -13,6 +13,7 @@ import { Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
@@ -1028,8 +1029,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
           {/* ── Header — small top-center, Spotify style ── */}
           <View style={fs.header}>
-            <Text style={fs.headerEyebrow}>YOU’RE LISTENING TO</Text>
-            <Text style={fs.headerStation}>{station.name}</Text>
+            <StationIdentity station={station} />
           </View>
 
           <View style={fs.turntableWrap}>

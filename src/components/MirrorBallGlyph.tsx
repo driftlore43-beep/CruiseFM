@@ -76,7 +76,14 @@ function buildFacets(size: number, r: number, cx: number, cy: number): Facet[] {
   return out;
 }
 
-export function MirrorBallGlyph({ size = 22, hanger = true }: { size?: number; hanger?: boolean }) {
+export function MirrorBallGlyph({ size = 22, hanger = true, color = '#ffffff' }: {
+  size?: number;
+  hanger?: boolean;
+  /** Still monochrome — this only exists so the glyph can go DARK on a
+   *  white surface (the active Change-Mode chip); it stays white everywhere
+   *  else, per the plain-white rule above. */
+  color?: string;
+}) {
   // Leave headroom for the little hanging stem so the ball itself stays round
   // inside a square icon slot.
   const r = size * (hanger ? 0.42 : 0.48);
@@ -90,9 +97,9 @@ export function MirrorBallGlyph({ size = 22, hanger = true }: { size?: number; h
         <>
           <Path
             d={`M ${cx} ${cy - r} L ${cx} ${size * 0.09}`}
-            stroke="#ffffff" strokeOpacity={0.55} strokeWidth={Math.max(0.7, size * 0.045)}
+            stroke={color} strokeOpacity={0.55} strokeWidth={Math.max(0.7, size * 0.045)}
           />
-          <Circle cx={cx} cy={size * 0.075} r={Math.max(0.9, size * 0.055)} fill="#ffffff" fillOpacity={0.6} />
+          <Circle cx={cx} cy={size * 0.075} r={Math.max(0.9, size * 0.055)} fill={color} fillOpacity={0.6} />
         </>
       )}
 
@@ -100,9 +107,9 @@ export function MirrorBallGlyph({ size = 22, hanger = true }: { size?: number; h
           Anything darker underneath turned this into a picture of a ball
           rather than an icon of one. */}
       {facets.map((f, i) => (
-        <Path key={i} d={f.d} fill={f.fill} fillOpacity={f.op} />
+        <Path key={i} d={f.d} fill={color} fillOpacity={f.op} />
       ))}
-      <Circle cx={cx} cy={cy} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.5} strokeWidth={Math.max(0.5, size * 0.035)} />
+      <Circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeOpacity={0.5} strokeWidth={Math.max(0.5, size * 0.035)} />
     </Svg>
   );
 }

@@ -21,6 +21,7 @@ import { Cruise, Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { ModeSheet } from '@/components/ModeSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
@@ -549,8 +550,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
           {/* Station — small top-center label, Spotify "Playing From Playlist" style */}
           <View style={fs.identity}>
-            <Text style={fs.identityEyebrow}>YOU’RE LISTENING TO</Text>
-            <Text style={fs.identityStation}>{currentStation.name}</Text>
+            <StationIdentity station={currentStation} />
           </View>
 
           {/* Flexible spacer — pushes the whole player cluster to the bottom,

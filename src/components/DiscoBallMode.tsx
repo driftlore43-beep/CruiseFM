@@ -12,6 +12,7 @@ import Svg, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaylistSheet } from '@/components/PlaylistSheet';
+import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
@@ -1833,9 +1834,8 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
 
         <View style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : Math.max(insets.bottom, 24) + 16 }}>
           {!isLandscape && (
-          <Animated.View style={{ alignItems: 'center', gap: 3, paddingHorizontal: 32, paddingBottom: 10, opacity: chrome }} pointerEvents="none">
-            <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 }}>YOU’RE LISTENING TO</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>{station.name}</Text>
+          <Animated.View style={{ alignItems: 'center', paddingHorizontal: 32, paddingBottom: 10, opacity: chrome }} pointerEvents="none">
+            <StationIdentity station={station} />
           </Animated.View>
           )}
 

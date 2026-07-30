@@ -3,7 +3,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRef } from 'react';
 import { Animated, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { Station } from '@/constants/stations';
+import { stationDial, type Station } from '@/constants/stations';
+import { useDsegFont } from '@/components/StationIdentity';
 
 export const SHELF_CARD_W = 150;
 
@@ -22,6 +23,8 @@ export const SHELF_CARD_W = 150;
  */
 export function ShelfCard({ station, onPress }: { station: Station; onPress?: () => void }) {
   const scale = useRef(new Animated.Value(1)).current;
+  const dseg = useDsegFont();
+  const dial = stationDial(station.id, !!station.premium);
   const press = (to: number) =>
     Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 42, bounciness: 5 }).start();
 
@@ -58,7 +61,13 @@ export function ShelfCard({ station, onPress }: { station: Station; onPress?: ()
             style={st.icon}
           />
         </View>
-        <Text style={st.name} numberOfLines={1}>{station.name}</Text>
+        {/* "(dial no.) (name)" — the receiver identity follows the station
+            onto every card (owner, 30.07). Nested Text carries the
+            seven-segment face for the number only. */}
+        <Text style={st.name} numberOfLines={1}>
+          <Text style={[st.dial, { fontFamily: dseg }]}>{dial.label}</Text>
+          {'  '}{station.name}
+        </Text>
         {!!station.tags[0] && <Text style={st.tag} numberOfLines={1}>{station.tags[0]}</Text>}
       </Pressable>
     </Animated.View>
@@ -87,6 +96,7 @@ const st = StyleSheet.create({
     letterSpacing: -0.2,
     marginTop: 8,
   },
+  dial: { color: 'rgba(255,255,255,0.55)', fontSize: 10.5 },
   tag: {
     color: 'rgba(255,255,255,0.45)',
     fontSize: 12.5,

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 
 import { ConnectMusicCard } from '@/components/ConnectMusicCard';
@@ -9,7 +9,7 @@ import { SpotifyNudgeCard } from '@/components/SpotifyNudgeCard';
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
 import { HeroCard } from '@/components/HeroCard';
-import { StationCard } from '@/components/StationCard';
+import { ShelfCard, SHELF_CARD_W } from '@/components/ShelfCard';
 import { StationDetailModal } from '@/components/StationDetailModal';
 import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
@@ -42,6 +42,19 @@ const MODE_LABELS: Record<string, string> = {
 function stationById(id: string): Station {
   // Includes the user's own creations (cache primed on focus below).
   return resolveAnyStation(id);
+}
+
+/**
+ * The page title. Time-aware, because "Welcome back" said the same thing at
+ * 7am and midnight — and on a first launch it was simply untrue, which is why
+ * a driver with no saved cruise gets welcomed in rather than back.
+ */
+function greetingFor(hour: number, returning: boolean): string {
+  if (!returning) return 'Welcome';
+  if (hour < 5) return 'Still up';
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
 }
 
 export default function CruiseScreen() {
@@ -91,9 +104,13 @@ export default function CruiseScreen() {
 
   const heroCruise: LastCruise = lastCruise ?? { stationId: tonightPick.id, mode: 'equalizer' };
   const heroStation = stationById(heroCruise.stationId);
+  // The hero's eyebrow already says TONIGHT'S PICK / PICK UP WHERE YOU LEFT
+  // OFF, so the line underneath just names the station and mode. It used to
+  // read "Tonight's pick: <station>", which said the same words twice inside
+  // one card.
   const heroCue = lastCruise
     ? `${heroStation.name} · ${MODE_LABELS[heroCruise.mode] ?? 'Equalizer'} mode`
-    : `Tonight's pick: ${heroStation.name}`;
+    : heroStation.name;
 
   const handleStartDrive = () => launchCruise(heroCruise);
 
@@ -102,22 +119,28 @@ export default function CruiseScreen() {
   const nowStation = np.session ? stationById(np.session.stationId) : heroStation;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <View style={styles.safe}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: TAB_SAFE_INSET + insets.bottom }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + 18, paddingBottom: TAB_SAFE_INSET + insets.bottom },
+        ]}
         showsVerticalScrollIndicator={false}>
         <EqualizerHeader
           stationName={nowStation.name}
           live={!!np.session || !!spotify.track?.isPlaying}
           accent={nowStation.eqColors?.[1]}
         />
-        <ConnectSpotifyCard />
-        <ConnectMusicCard />
-        <SpotifyNudgeCard />
-        {/* "Welcome back" is a lie on a fresh install — a first-time driver
-            (no saved cruise yet) gets welcomed in, not back. */}
-        <Text style={styles.greeting}>{lastCruise ? 'Welcome back' : 'Welcome'}, {driverName}</Text>
+
+        {/* The title, then the one big thing. The connect cards used to sit
+            above this and pushed the greeting clean off the screen, so the
+            first thing a returning driver saw was a beta warning about
+            somebody else's service. They come after the hero now. */}
+        <Text style={styles.greeting}>
+          {greetingFor(new Date().getHours(), !!lastCruise)},{'\n'}{driverName}
+        </Text>
+
         <HeroCard
           onStartDrive={handleStartDrive}
           cueLabel={heroCue}
@@ -125,21 +148,27 @@ export default function CruiseScreen() {
           buttonLabel={lastCruise ? 'Continue Drive' : 'Start Drive'}
         />
 
-        <DriveStatsStrip refreshKey={statsKey} />
+        <View style={styles.connects}>
+          <ConnectSpotifyCard />
+          <ConnectMusicCard />
+          <SpotifyNudgeCard />
+        </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>RECOMMENDED</Text>
+          <Text style={styles.sectionHeading}>Recommended</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            snapToInterval={264}
+            snapToInterval={SHELF_CARD_W + 14}
             decelerationRate="fast"
-            contentContainerStyle={styles.horizontal}>
+            contentContainerStyle={styles.shelf}>
             {recommended.map((station) => (
-              <StationCard key={station.id} station={station} compact onPress={() => setSelectedStation(station)} />
+              <ShelfCard key={station.id} station={station} onPress={() => setSelectedStation(station)} />
             ))}
           </ScrollView>
         </View>
+
+        <DriveStatsStrip refreshKey={statsKey} />
       </ScrollView>
 
       <StationDetailModal
@@ -161,31 +190,38 @@ export default function CruiseScreen() {
         }}
         isPro={isPro}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
-  content: { paddingTop: 4 },
+  content: {},
+  // The page title, at the same weight and size as "Now tuning" and "Modes".
+  // It was 15pt — smaller than the station names underneath it.
   greeting: {
     color: Cruise.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    fontSize: 36,
+    fontWeight: '800',
+    letterSpacing: -1.3,
+    lineHeight: 39,
     marginHorizontal: 22,
-    marginBottom: 10,
+    marginBottom: 22,
   },
-  section: { marginBottom: 30, gap: 14 },
-  sectionLabel: {
-    color: Cruise.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 2.5,
+  connects: { marginTop: 18 },
+  section: { marginTop: 30, marginBottom: 30, gap: 14 },
+  // Sentence case at 21pt, not letterspaced small caps: the eyebrow style is
+  // reserved for labels inside artwork now, so section headings can be read
+  // rather than deciphered.
+  sectionHeading: {
+    color: '#fff',
+    fontSize: 21,
+    fontWeight: '800',
+    letterSpacing: -0.6,
     marginHorizontal: 22,
   },
-  horizontal: { paddingHorizontal: 22, paddingBottom: 6 },
+  shelf: { paddingHorizontal: 22, gap: 14, paddingBottom: 2 },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,12 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Cruise } from '@/constants/theme';
-import { GlossSheen } from '@/components/GlossSheen';
 import { StationBackdrop } from '@/components/StationBackdrop';
-import { WelcomeCueLine } from '@/components/WelcomeMessage';
 import { useMotion } from '@/context/MotionContext';
 import type { Station } from '@/constants/stations';
 
@@ -18,7 +16,7 @@ function triggerHaptic() {
 
 type HeroCardProps = {
   onStartDrive: () => void;
-  /** e.g. "Tonight's pick: Sunset AM" or "Night Run FM · Vinyl mode" */
+  /** e.g. "Tonight's pick: Sunset AM" or "Night Run AM · Vinyl mode" */
   cueLabel: string;
   /** The station the button will launch — its photo becomes the hero scene. */
   station: Station;
@@ -26,142 +24,133 @@ type HeroCardProps = {
   buttonLabel?: string;
 };
 
+/**
+ * The one big thing on the home page (owner's pick, 29.07 — "H2", the shape
+ * Apple Music's Listen Now uses).
+ *
+ * WHAT CHANGED AND WHY: the old hero was 280pt tall with the title at the top,
+ * a full-width glass button in the middle, and then two hundred pixels of
+ * photograph doing nothing underneath — a gap, not space. The copy now sits at
+ * the bottom where the scrim is deepest, and the button is a single white disc
+ * beside it. Everything above that line is just the picture.
+ *
+ * The white disc also stops the page having two competing calls to action: the
+ * old wide glass button was the loudest object on the screen, competing with
+ * the mini player for attention. A disc reads as "play" without shouting.
+ */
 export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start Drive' }: HeroCardProps) {
   const { dataSaver } = useMotion();
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const press = (to: number) =>
+    Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 42, bounciness: 5 }).start();
+
   const handleStart = () => {
     triggerHaptic();
     onStartDrive();
   };
 
-  const glowTint = (station.eqColors?.[1] ?? Cruise.violet) + '22';
+  // "Continue Drive" → "Continue" — the word Drive is already in the cue line
+  // underneath it, and this label now sits in a 52pt circle's shadow rather
+  // than across the whole card.
+  const eyebrow = buttonLabel.toLowerCase().startsWith('continue')
+    ? 'PICK UP WHERE YOU LEFT OFF'
+    : 'TONIGHT’S PICK';
 
   return (
-    <View style={styles.cardShadow}>
-      <View style={styles.card}>
-        {/* Tonight's pick, full bleed — the hero always animates (a taste of
-            motion for everyone), unless Data Saver forces stills */}
-        <StationBackdrop station={station} blurRadius={1.2} motionAllowed={!dataSaver} />
-        {/* Dark fade so the copy stays readable over any photo */}
-        <LinearGradient
-          colors={[
-            'rgba(2,2,12,0.30)',
-            'rgba(2,2,12,0.18)',
-            'rgba(2,2,12,0.38)',
-            'rgba(2,2,12,0.62)',
-          ]}
-          locations={[0, 0.35, 0.68, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        {/* Soft mood tint pulled from the station's own palette */}
-        <LinearGradient
-          colors={['transparent', glowTint]}
-          start={{ x: 0.5, y: 0.3 }} end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
-        />
+    <Animated.View style={[styles.wrap, { transform: [{ scale }] }]}>
+      <Pressable
+        onPress={handleStart}
+        onPressIn={() => press(0.985)}
+        onPressOut={() => press(1)}
+        accessibilityLabel={buttonLabel}>
+        <View style={styles.card}>
+          <StationBackdrop station={station} blurRadius={1.2} motionAllowed={!dataSaver} />
+          {/* Deep at the bottom where the type lives, barely there at the top
+              so the photograph is actually visible. */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.15)', 'rgba(0,0,0,0.18)', 'rgba(0,0,0,0.62)', 'rgba(0,0,0,0.92)']}
+            locations={[0, 0.42, 0.76, 1]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
 
-        {/* ── Main copy ── */}
-        <View style={styles.copyBlock}>
-          <Text style={styles.title}>Let’s cruise.</Text>
-          {/* Greeting fades in first, then cross-fades into the cue label */}
-          <WelcomeCueLine cueLabel={cueLabel} />
+          <View style={styles.foot}>
+            <View style={styles.copy}>
+              <Text style={styles.eyebrow}>{eyebrow}</Text>
+              <Text style={styles.title}>Let’s cruise.</Text>
+              <Text style={styles.cue} numberOfLines={1}>{cueLabel}</Text>
+            </View>
+            <View style={styles.play}>
+              <Ionicons name="play" size={21} color="#08080c" style={{ marginLeft: 2 }} />
+            </View>
+          </View>
         </View>
-
-        {/* ── One big Start Drive button ── */}
-        <View style={styles.buttonsRow}>
-          <Pressable
-            style={({ pressed }) => [styles.startBtn, pressed && styles.startBtnPressed]}
-            onPress={handleStart}
-            hitSlop={8}>
-            {/* White glass — translucent, the scene glows through */}
-            <LinearGradient
-              colors={['rgba(255,255,255,0.30)', 'rgba(255,255,255,0.14)', 'rgba(255,255,255,0.08)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <GlossSheen radius={18} />
-            <Ionicons name="play" size={17} color="#fff" style={styles.startBtnIcon} />
-            <Text style={styles.startBtnText}>{buttonLabel}</Text>
-          </Pressable>
-        </View>
-      </View>
-    </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
+const HERO_H = 250;
+
 const styles = StyleSheet.create({
-  // Outer shadow halo — separate from overflow:hidden inner
-  cardShadow: {
-    marginHorizontal: 16,
-    marginBottom: 28,
-    borderRadius: 26,
-    shadowColor: Cruise.violet,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 30,
-    elevation: 12,
+  // The shadow lives out here: the card clips its own children for the rounded
+  // photo, and on iOS that clips the shadow with them.
+  wrap: {
+    marginHorizontal: 22,
+    marginBottom: 4,
+    borderRadius: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.5,
+    shadowRadius: 26,
+    elevation: 10,
   },
   card: {
-    borderRadius: 26,
+    height: HERO_H,
+    borderRadius: 22,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    minHeight: 280,
-    backgroundColor: '#0A0A22',
+    backgroundColor: '#0A0A12',
+    justifyContent: 'flex-end',
   },
-  // ── Copy ──
-  copyBlock: {
-    paddingHorizontal: 22,
-    paddingTop: 28,
-    paddingBottom: 10,
-    gap: 8,
+  foot: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 18,
+  },
+  copy: { flex: 1, minWidth: 0 },
+  eyebrow: {
+    color: 'rgba(255,255,255,0.62)',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 2.4,
+    marginBottom: 6,
   },
   title: {
     color: '#fff',
-    fontSize: 40,
+    fontSize: 27,
     fontWeight: '800',
-    lineHeight: 44,
-    letterSpacing: -1,
-    textShadowColor: 'rgba(0,0,0,0.55)',
-    textShadowRadius: 12,
-    textShadowOffset: { width: 0, height: 2 },
+    letterSpacing: -0.8,
   },
-  // ── Buttons ──
-  buttonsRow: {
-    paddingHorizontal: 22,
-    paddingTop: 8,
-    paddingBottom: 24,
+  cue: {
+    color: 'rgba(255,255,255,0.62)',
+    fontSize: 13.5,
+    fontWeight: '500',
+    marginTop: 3,
   },
-  startBtn: {
-    flexDirection: 'row',
+  play: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    borderRadius: 18,
-    overflow: 'hidden',
-    paddingVertical: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
-    shadowColor: '#ffffff',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 14,
-    elevation: 10,
-  },
-  startBtnPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
-  },
-  startBtnIcon: {
-    fontSize: 18,
-    color: '#fff',
-  },
-  startBtnText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
 });

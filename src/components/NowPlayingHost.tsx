@@ -3,7 +3,7 @@ import * as Brightness from 'expo-brightness';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, ImageBackground, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useMotion } from '@/context/MotionContext';
@@ -67,31 +67,48 @@ function MiniPlayer() {
   return (
     <View style={[mp.wrap, { bottom }]} pointerEvents="box-none">
       <TouchableOpacity activeOpacity={0.92} onPress={np.expand} style={mp.bar}>
-        <LinearGradient
-          colors={station.cardGradient}
-          start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={mp.iconChip}>
-          {meta.glyph
-            ? <MirrorBallGlyph size={19} />
-            : <MaterialCommunityIcons name={meta.icon as any} size={17} color="#fff" />}
+        {/* Dark glass, not a coloured slab (owner, 29.07). The bar used to be
+            the station's cardGradient at full strength, which made it the
+            brightest object anywhere in the app — a saturated violet that
+            appears nowhere else since the pages were quietened. The station is
+            still identifiable, just by its own artwork and a hairline of its
+            colour rather than by drowning the bar in it. */}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(18,18,24,0.96)' }]} />
+        <View style={[mp.accent, { backgroundColor: station.eqColors?.[1] ?? station.glowColor }]} />
+        <View style={mp.artwork}>
+          {station.image ? (
+            <ImageBackground
+              source={station.image}
+              style={StyleSheet.absoluteFill}
+              imageStyle={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          ) : (
+            <LinearGradient
+              colors={station.cardGradient}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
         </View>
         <View style={{ flex: 1, gap: 1 }}>
           <Text style={mp.title} numberOfLines={1}>{spotify.track?.title ?? station.name}</Text>
-          <Text style={mp.sub} numberOfLines={1}>{station.name} · {meta.label}</Text>
+          <Text style={mp.sub} numberOfLines={1}>
+            {spotify.track ? `${station.name} · ${meta.label}` : meta.label}
+          </Text>
         </View>
+        {/* Bare glyphs, no filled disc and no dark circle: two buttons inside a
+            56pt bar don't need containers to be found. */}
         <TouchableOpacity
           onPress={togglePlay}
-          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-          style={mp.playBtn}>
-          <Ionicons name={np.playing ? 'pause' : 'play'} size={19} color="#0a0a12" style={np.playing ? undefined : { marginLeft: 2 }} />
+          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}>
+          <Ionicons name={np.playing ? 'pause' : 'play'} size={22} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={np.stop}
-          hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
-          style={mp.stopBtn}>
-          <Ionicons name="close" size={15} color="rgba(255,255,255,0.75)" />
+          hitSlop={{ top: 12, bottom: 12, left: 10, right: 12 }}
+          style={{ marginLeft: 6 }}>
+          <Ionicons name="close" size={17} color="rgba(255,255,255,0.4)" />
         </TouchableOpacity>
       </TouchableOpacity>
     </View>
@@ -283,35 +300,31 @@ const mp = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     width: '100%',
     height: 56,
     borderRadius: 16,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: 'rgba(255,255,255,0.10)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.5,
     shadowRadius: 18,
     elevation: 16,
   },
-  iconChip: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    alignItems: 'center', justifyContent: 'center',
+  // The station's colour, as an edge rather than a wash.
+  accent: {
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
+    width: 3,
   },
-  title: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
-  sub:   { color: 'rgba(255,255,255,0.65)', fontSize: 11, fontWeight: '600' },
-  playBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#fff',
-    alignItems: 'center', justifyContent: 'center',
+  artwork: {
+    width: 38, height: 38, borderRadius: 9,
+    overflow: 'hidden',
+    backgroundColor: '#0d0d14',
   },
-  stopBtn: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.30)',
-    alignItems: 'center', justifyContent: 'center',
-  },
+  title: { color: '#fff', fontSize: 14.5, fontWeight: '600', letterSpacing: -0.2 },
+  sub:   { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '500' },
 });

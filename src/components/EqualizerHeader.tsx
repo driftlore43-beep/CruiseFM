@@ -65,10 +65,16 @@ export function EqualizerHeader({
   /** Mood colour to tint the bars, so the header matches the station. */
   accent?: string;
 }) {
+  // Idle, this used to read "TONIGHT'S PICK / <station>" — which the hero
+  // directly below now says twice over, in bigger type. A header that only
+  // repeats the thing under it is clutter, so it stands down unless there is
+  // real playback for it to report.
+  if (!live) return null;
+
   return (
     <View style={styles.container}>
       <View style={styles.labelGroup}>
-        <Text style={styles.label}>{live ? 'NOW PLAYING' : "TONIGHT'S PICK"}</Text>
+        <Text style={styles.label}>NOW PLAYING</Text>
         <Text style={styles.sublabel}>{stationName}</Text>
       </View>
       <View style={styles.equalizerRow}>

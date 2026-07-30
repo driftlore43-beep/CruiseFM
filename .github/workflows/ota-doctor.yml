@@ -1,0 +1,60 @@
+# TEMPORARY DIAGNOSTIC — safe to delete once the update mystery is settled.
+#
+# Read-only. It publishes nothing and changes nothing; it just asks Expo what
+# it thinks the state of things is, because "the update didn't arrive" has now
+# cost several rounds of guessing and the answer lives on Expo's servers:
+#
+#   - which BRANCH the `preview` CHANNEL actually points at (an update goes to
+#     a branch; a build listens to a channel; if the two aren't linked the
+#     update is published perfectly and reaches nobody)
+#   - what updates exist on that branch, and their runtime versions
+#   - the runtime version of the installed builds, which has to match exactly
+#
+# Every command prints its own output including errors and then continues, so
+# one unsupported flag can't hide the rest — the mistake that sent us hunting
+# in the wrong place last time.
+
+name: OTA doctor
+
+on:
+  workflow_dispatch:
+
+jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+
+      - name: Who am I
+        run: eas whoami 2>&1 || true
+
+      - name: Channels and where they point
+        run: |
+          echo "──────── channel:list ────────"
+          eas channel:list --non-interactive 2>&1 || true
+          echo "──────── channel:view preview ────────"
+          eas channel:view preview --non-interactive 2>&1 || true
+
+      - name: Updates on the preview branch
+        run: |
+          echo "──────── update:list --branch preview ────────"
+          eas update:list --branch preview --non-interactive 2>&1 || true
+
+      - name: Installed builds and their runtime versions
+        run: |
+          echo "──────── build:list ios ────────"
+          eas build:list --platform ios --limit 4 --non-interactive 2>&1 || true
+
+      - name: What this checkout would publish as
+        run: |
+          echo "──────── fingerprint of this commit ────────"
+          npx expo-updates fingerprint:generate --platform ios 2>&1 | tail -c 400 || true

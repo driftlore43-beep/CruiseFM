@@ -24,6 +24,7 @@ import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { allowRotation, lockPortrait } from '@/utils/orientation';
 import { isSpotifyConnected, pause as pauseSpotify } from '@/utils/spotify';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 
@@ -195,6 +196,26 @@ function AutoDim() {
 }
 
 /**
+ * Rotation is a fullscreen-mode privilege (owner, 30.07): the scenes want
+ * widescreen in a car mount, the list pages never do. While a mode is up the
+ * phone may turn; the moment it minimizes or closes, the app snaps upright
+ * again — including physically, if it was closed lying sideways.
+ */
+function OrientationGate() {
+  const np = useNowPlaying();
+  const modeOpen = !!np.session && np.expanded;
+
+  useEffect(() => {
+    if (modeOpen) allowRotation(); else lockPortrait();
+  }, [modeOpen]);
+
+  // Never leave the app rotatable after this unmounts, whatever state it was in.
+  useEffect(() => () => { lockPortrait(); }, []);
+
+  return null;
+}
+
+/**
  * "Why is my drive silent?" — when a start attempt fails, Spotify's verdict
  * surfaces here in plain words instead of dying in a log. Its own Modal so it
  * stacks above whichever mode is presenting; a tap anywhere dismisses it, and
@@ -285,6 +306,7 @@ export function NowPlayingHost() {
       <DriveCheckCard />
       <PlaybackNotice />
       <AutoDim />
+      <OrientationGate />
     </>
   );
 }

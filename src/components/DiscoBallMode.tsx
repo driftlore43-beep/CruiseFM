@@ -21,6 +21,7 @@ import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { LandscapeChrome, LS_CHROME_CLEAR } from '@/components/LandscapeChrome';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
@@ -1468,9 +1469,17 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const topPad = Math.max(insets.top, 20);
 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
+  const isLandscape = winW > winH;
   // Declared up here because the scrub gesture needs the ball's size, and
   // the PanResponder is built before the render body reaches the ball.
-  const ballSize = Math.min(winW * 0.71, winH * 0.39, 340);
+  //
+  // Landscape sizes off the HEIGHT alone: the portrait formula's winH*0.39
+  // term was written for a tall window and turns a sideways ball into a
+  // grapefruit. 0.62 of a 393pt-high screen ≈ 244 — big enough to be the
+  // whole show, small enough that the chrome never touches it.
+  const ballSize = isLandscape
+    ? Math.min(winH * 0.56, 280)
+    : Math.min(winW * 0.71, winH * 0.39, 340);
   const ballSizeRef = useRef(ballSize);
   ballSizeRef.current = ballSize;
   const station = resolveAnyStation(activeId);
@@ -1808,25 +1817,35 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         {/* Floating bokeh — soft out-of-focus particles drifting in the room */}
         <BokehField count={9} eq={eq} live={live} winW={winW} winH={winH} />
 
-        {/* Drag pill */}
+        {/* Drag pill + mode label + centred header are portrait furniture —
+            in landscape LandscapeChrome carries the identity at top-left. */}
+        {!isLandscape && (
         <Animated.View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10, opacity: chrome }} pointerEvents="none">
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
         </Animated.View>
+        )}
 
+        {!isLandscape && (
         <Animated.View style={[fs.topBar, { top: topPad + 14, opacity: chrome }]} pointerEvents="none">
           <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>MIRROR BALL</Text>
         </Animated.View>
+        )}
 
-        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>
+        <View style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : Math.max(insets.bottom, 24) + 16 }}>
+          {!isLandscape && (
           <Animated.View style={{ alignItems: 'center', gap: 3, paddingHorizontal: 32, paddingBottom: 10, opacity: chrome }} pointerEvents="none">
             <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 }}>YOU’RE LISTENING TO</Text>
             <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 }}>{station.name}</Text>
           </Animated.View>
+          )}
 
           {/* The ball, hanging from a mount, genuinely turning on its axis */}
           {/* paddingBottom lifts the ball off the dead centre of its box —
-              it hangs from above, so sitting slightly high reads better. */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: ballSize * 0.30 }}>
+              it hangs from above, so sitting slightly high reads better.
+              Landscape lifts by a chrome-derived amount instead: verified at
+              852x393, anything less sinks the ball's bottom edge into the
+              seek bar and play disc. */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? LS_CHROME_CLEAR * 0.54 : ballSize * 0.30 }}>
             <View style={{ alignItems: 'center' }}>
               <View style={{ width: 2, height: ballSize * 0.22, backgroundColor: 'rgba(255,255,255,0.25)' }} />
               <View style={{ width: 14, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: -3 }} />
@@ -1848,6 +1867,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
           {/* Everything below the ball rests together. pointerEvents goes off
               once it's invisible so the first tap only wakes it — you can't
               hit a skip button you can't see. */}
+          {!isLandscape && (
           <Animated.View style={{ opacity: chrome }} pointerEvents={chromeRested ? 'none' : 'auto'}>
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
             {hasTrack
@@ -1899,19 +1919,48 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             station={station}
           />
           </Animated.View>
+          )}
         </View>
 
+        {/* Landscape: the shared L1+L3 overlay, riding this mode's own
+            chrome-fade machinery — same value, same timer, one behaviour. */}
+        {isLandscape && (
+          <LandscapeChrome
+            chrome={chrome}
+            rested={chromeRested}
+            station={station}
+            track={spotify.track}
+            playing={playing}
+            tagline={station.tagline}
+            progress={progress}
+            scrub={scrub}
+            onPlayPause={togglePlay}
+            onPrev={() => { resetTrack(); spotify.prev(); }}
+            onNext={() => { resetTrack(); spotify.next(); }}
+            onClose={handleClose}
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+          />
+        )}
 
         {/* absoluteFill, not an auto-sized wrapper: the close button positions
             itself absolutely against its parent, so anything smaller than the
             screen would move it. */}
+        {!isLandscape && (
         <Animated.View
           style={[StyleSheet.absoluteFill, { opacity: chrome, zIndex: 60 }]}
           pointerEvents={chromeRested ? 'none' : 'box-none'}>
           <ModeCloseButton onPress={handleClose} />
         </Animated.View>
+        )}
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
+        {/* AmbientGlow sits out of landscape: its smoke geometry is derived
+            from the PORTRAIT screen height at module load, which in a
+            393pt-high window would start the haze below the bottom edge —
+            animation loops running for pixels nobody can see. The mirror
+            ball's room is dark anyway; nothing is missed. */}
+        <AmbientGlow active={visible && playing && !isLandscape} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

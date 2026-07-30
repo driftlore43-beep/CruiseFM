@@ -1,6 +1,4 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Brightness from 'expo-brightness';
-import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -24,8 +22,6 @@ import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
-import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
-import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { ModeSheet } from '@/components/ModeSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
@@ -34,6 +30,7 @@ import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { AmbientGlow } from '@/components/AmbientGlow';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { LandscapeChrome, LS_CHROME_CLEAR, useChromeFade } from '@/components/LandscapeChrome';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { MarqueeText } from '@/components/MarqueeText';
@@ -227,67 +224,6 @@ const Bars = React.memo(function Bars({ values, barW, maxH, colors, cap = true }
   (prev.colors?.join() ?? '') === (next.colors?.join() ?? ''),
 );
 
-// Slim volume slider with fade-in-on-touch
-// ── Violet progress bar ───────────────────────────────────────────────────────
-function VioletProgressBar({ progress }: { progress: Animated.Value }) {
-  const [barW, setBarW] = useState(260);
-  const fillW = progress.interpolate({ inputRange: [0, 1], outputRange: [0, barW] });
-  const DOT = 14;
-  return (
-    <View
-      style={{ width: '100%', height: 36, justifyContent: 'center' }}
-      onLayout={(e) => setBarW(e.nativeEvent.layout.width)}
-    >
-      <View style={{ position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)' }} />
-      <Animated.View style={{ position: 'absolute', left: 0, height: 6, borderRadius: 3, width: fillW, backgroundColor: '#ffffff' }}>
-        <View style={{
-          position: 'absolute', right: -DOT / 2, top: -(DOT / 2 - 3),
-          width: DOT, height: DOT, borderRadius: DOT / 2,
-          backgroundColor: '#ffffff',
-          shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 5,
-          shadowOffset: { width: 0, height: 2 }, elevation: 4,
-        }} />
-      </Animated.View>
-    </View>
-  );
-}
-
-function VolumeSlider() {
-  const [vol, setVol] = useState(0.65);
-  const widthRef  = useRef(200);
-  const opacity   = useRef(new Animated.Value(0.3)).current;
-
-  const reveal = () => Animated.timing(opacity, { toValue: 1,   duration: 140, useNativeDriver: true }).start();
-  const dim    = () => Animated.timing(opacity, { toValue: 0.3, duration: 900, useNativeDriver: true }).start();
-
-  const pan = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder:  () => true,
-    onPanResponderGrant: (e) => { reveal(); setVol(Math.max(0, Math.min(1, e.nativeEvent.locationX / widthRef.current))); },
-    onPanResponderMove:  (e) => { setVol(Math.max(0, Math.min(1, e.nativeEvent.locationX / widthRef.current))); },
-    onPanResponderRelease: () => dim(),
-  })).current;
-
-  const pct = `${(vol * 100).toFixed(1)}%` as any;
-
-  return (
-    <Animated.View style={[fs.volWrap, { opacity }]}>
-      <View
-        style={fs.volTrack}
-        onLayout={(e) => { widthRef.current = e.nativeEvent.layout.width; }}
-        {...pan.panHandlers}>
-        <View style={[StyleSheet.absoluteFill, fs.volBg]} />
-        <LinearGradient
-          colors={['#6B28D4', '#9B5CFF']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={[StyleSheet.absoluteFill, { width: pct, borderRadius: 3 }]}
-        />
-        <View style={[fs.volThumb, { left: pct }]} />
-      </View>
-    </Animated.View>
-  );
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatMs(ms: number): string {
@@ -313,8 +249,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const [activeStation, setActiveStation] = useState(stationId ?? 'night-run');
   const [shuffle,       setShuffle]       = useState(false);
   const [repeat,        setRepeat]        = useState(false);
-  const [platform,      setPlatform]      = useState<{ id: PlatformId; name: string; color: string } | null>(null);
-  const [dimmed,        setDimmed]        = useState(false);
   const [showMood,      setShowMood]      = useState(false);
   const [showPicker,    setShowPicker]    = useState(false);
   const [linked,        setLinked]        = useState<LinkedPlaylist | null>(null);
@@ -323,31 +257,27 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const slideY        = useRef(new Animated.Value(SCREEN_H)).current;
   const closePulse    = useRef(new Animated.Value(1)).current;
   const timers        = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const bannerOpacity = useRef(new Animated.Value(0)).current;
-  const origBrightness = useRef(1);
 
   const currentStation = resolveAnyStation(activeStation);
 
-  // ── Dynamic landscape bar geometry (computed every render from window dims) ──
-  const lsRightW   = winW * 0.56;
-  const lsBarW     = Math.max(3, Math.floor(lsRightW / BAR_COUNT) - 2);
-  const lsMaxSegs  = Math.max(20, Math.floor(winH / UNIT));
+  // ── Landscape bar geometry — full width along the bottom of the scene, the
+  // meter standing in front of the photograph (the approved L1 mock).
+  // Recomputed per render from the live window, since these only matter the
+  // moment the phone actually turns. ──
+  const lsSide     = 28;
+  const lsAvailW   = winW - lsSide * 2;
+  const lsBarW     = Math.max(3, Math.floor((lsAvailW - (BAR_COUNT - 1) * 2) / BAR_COUNT));
+  const lsMaxSegs  = Math.max(10, Math.floor((winH * 0.38) / UNIT));
   const lsMaxH     = lsMaxSegs * UNIT;
   const lsBellMaxH = useCallback((i: number) => {
     const t = (i - (BAR_COUNT - 1) / 2) / (BAR_COUNT / 4.2);
     return Math.round(MIN_SEGS + (lsMaxSegs - MIN_SEGS) * Math.exp(-0.5 * t * t)) * UNIT;
   }, [lsMaxSegs]);
 
-  // ── Open: read platform, start bars, slide in ─────────────────────────────
+  // ── Open: start bars, slide in ────────────────────────────────────────────
   useEffect(() => {
     if (!visible) return;
     if (stationId) setActiveStation(stationId);
-    getSavedPlatform().then((id) => {
-      if (id && id !== 'none') {
-        const p = PLATFORMS[id as Exclude<PlatformId, 'none'>];
-        if (p) setPlatform({ id: id as PlatformId, name: p.name, color: p.color });
-      } else { setPlatform(null); }
-    });
     slideY.setValue(SCREEN_H);
     // Respect the session's play state — a browse from the Modes tab opens
     // paused, so the bars hold still until the user presses play.
@@ -363,7 +293,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     }, 600);
     return () => {
       stopBarAnims(fsValues, timers);
-      if (Platform.OS !== 'web') deactivateKeepAwake();
     };
   }, [visible]);
 
@@ -388,48 +317,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     return () => loop.stop();
   }, [visible, playing]);
 
-  // ── Keep screen awake in landscape ───────────────────────────────────────
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    if (visible && isLandscape) {
-      activateKeepAwakeAsync().catch(() => {});
-    } else {
-      deactivateKeepAwake();
-    }
-  }, [visible, isLandscape]);
-
-  // ── Safety banner: fade in on landscape, then out after 3s ───────────────
-  useEffect(() => {
-    if (!isLandscape) { bannerOpacity.setValue(0); return; }
-    bannerOpacity.setValue(1);
-    const t = setTimeout(() => {
-      Animated.timing(bannerOpacity, { toValue: 0, duration: 900, useNativeDriver: true }).start();
-    }, 3000);
-    return () => clearTimeout(t);
-  }, [isLandscape]);
-
-  // ── Dim toggle ────────────────────────────────────────────────────────────
-  const toggleDim = async () => {
-    if (Platform.OS === 'web') return;
-    try {
-      if (!dimmed) {
-        origBrightness.current = await Brightness.getBrightnessAsync();
-        await Brightness.setBrightnessAsync(0.12);
-        setDimmed(true);
-      } else {
-        await Brightness.setBrightnessAsync(origBrightness.current);
-        setDimmed(false);
-      }
-    } catch { /* permissions not granted */ }
-  };
-
-  const handleClose = async () => {
-    // Restore brightness if dimmed
-    if (dimmed && Platform.OS !== 'web') {
-      try { await Brightness.setBrightnessAsync(origBrightness.current); } catch {}
-      setDimmed(false);
-    }
-    if (Platform.OS !== 'web') deactivateKeepAwake();
+  const handleClose = () => {
     stopBarAnims(fsValues, timers);
     Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
@@ -463,6 +351,14 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
   const topPad    = Math.max(insets.top, 20);
   const bottomPad = Math.max(insets.bottom, 24) + 20;
+
+  // The landscape rest-and-wake cycle (L3). Inactive in portrait, where the
+  // controls stay put — only the sideways scene earns the fade.
+  const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
+    active: visible && isLandscape,
+    playing,
+    sheetOpen: showMood || showPicker,
+  });
 
   useEffect(() => {
     if (visible) getStationPlaylist(activeStation).then(setLinked);
@@ -503,119 +399,79 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
 
   // ─────────────────────────────────────────────────────────────────────────
-  // LANDSCAPE LAYOUT
+  // LANDSCAPE — the owner's L1+L3 pick (30.07): the scene keeps the whole
+  // screen, the portrait grammar redistributes along the bottom, and after a
+  // few untouched seconds of playback the chrome fades out entirely (the
+  // shared LandscapeChrome overlay owns all of that). The meter stands
+  // full-width in front of the photograph, just above where the chrome lives.
+  //
+  // This replaces the ORIGINAL landscape layout from early development (two
+  // columns, its own volume slider, safety banner and dim button) which
+  // never shipped — the app was portrait-locked until today — and predated
+  // every shared piece: ModeActionRow, SeekBar, the track clock, AutoDim.
   // ─────────────────────────────────────────────────────────────────────────
   if (isLandscape) {
-    const leftW  = winW * 0.44;
-    const rightW = winW - leftW;
-    const safeLeft  = insets.left  || 0;
-    const safeRight = insets.right || 0;
-
     return (
-      <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
-        <View style={ls.container} {...dismissPan.panHandlers}>
+      <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+        <Animated.View
+          style={[fs.container, { minHeight: winH, transform: [{ translateY: slideY }] }]}
+          {...dismissPan.panHandlers}
+          /* Passive touch sniffer — never claims the gesture, just brings the
+             rested chrome back. Must sit on the root so it sees taps on the
+             bars, the buttons and the empty scene alike. */
+          onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
           {background}
 
-          {/* Safety banner — fades out after 3s */}
-          <Animated.View
-            style={[ls.safeBanner, { opacity: bannerOpacity, top: Math.max(insets.top, 8) }]}
+          {/* The meter, standing in front of the photo above the chrome. */}
+          <View
+            style={{ position: 'absolute', left: lsSide, right: lsSide, bottom: LS_CHROME_CLEAR, alignItems: 'center' }}
             pointerEvents="none">
-            <MaterialCommunityIcons name="steering" size={14} color="rgba(255,255,255,0.75)" />
-            <Text style={ls.safeBannerText}>Drive safe — keep eyes on the road</Text>
-          </Animated.View>
-
-          {/* Dim button — top left */}
-          <TouchableOpacity
-            style={[ls.dimBtn, { top: Math.max(insets.top, 8) + 2, left: safeLeft + 14 }]}
-            onPress={toggleDim}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons
-              name={dimmed ? 'sunny-outline' : 'moon-outline'}
-              size={17}
-              color={dimmed ? 'rgba(255,210,60,0.7)' : 'rgba(255,255,255,0.45)'}
+            <Bars
+              values={fsValues}
+              barW={lsBarW}
+              maxH={lsMaxH}
+              colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
             />
-          </TouchableOpacity>
-
-
-          {/* Two-column row */}
-          <View style={ls.columns}>
-
-            {/* ── LEFT COLUMN ── */}
-            <View style={[ls.leftCol, { width: leftW, paddingLeft: safeLeft + 20 }]}>
-
-              {/* Station identity */}
-              <View style={ls.leftIdentity}>
-                <Ionicons name="moon" size={13} color="rgba(123,56,224,0.7)" />
-                <Text style={ls.lsStation} numberOfLines={1}>{currentStation.name}</Text>
-              </View>
-              <Text style={ls.lsTrack} numberOfLines={1}>
-                {spotify.track ? `${spotify.track.title} — ${spotify.track.artist}` : currentStation.tagline}
-              </Text>
-
-              {/* Spacer */}
-              <View style={{ flex: 1 }} />
-
-              {/* ── Large controls ── */}
-              <View style={ls.controls}>
-                <TouchableOpacity style={ls.prevNextBtn} activeOpacity={0.75}>
-                  <Ionicons name="play-skip-back" size={22} color="#fff" />
-                </TouchableOpacity>
-                <Animated.View style={{ transform: [{ scale: playBtnScale }] }}>
-                  <TouchableOpacity
-                    style={ls.lsPlayBtn}
-                    onPress={togglePlay}
-                    onPressIn={() => Animated.spring(playBtnScale, { toValue: 1.05, useNativeDriver: true, speed: 40, bounciness: 4 }).start()}
-                    onPressOut={() => Animated.spring(playBtnScale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 4 }).start()}
-                    activeOpacity={0.9}>
-                    <Ionicons name={playing ? 'pause' : 'play'} size={30} color="#0a0a12" style={playing ? undefined : { marginLeft: 3 }} />
-                  </TouchableOpacity>
-                </Animated.View>
-                <TouchableOpacity style={ls.prevNextBtn} activeOpacity={0.75}>
-                  <Ionicons name="play-skip-forward" size={22} color="#fff" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Volume */}
-              <View style={ls.volWrap}>
-                <VolumeSlider />
-              </View>
-
-              {/* Spacer */}
-              <View style={{ flex: 1 }} />
-
-              {/* Tagline */}
-              <Text style={ls.lsTagline} numberOfLines={2}>{currentStation.tagline}</Text>
-
-              {/* Platform row */}
-              {platform && (
-                <TouchableOpacity
-                  style={ls.lsPlatformRow}
-                  onPress={() => openMusicPlatform(currentStation.name)}
-                  activeOpacity={0.7}>
-                  <PlatformIcon id={platform.id} size={14} color={platform.color} />
-                  <Text style={[ls.lsPlatformText, { color: platform.color }]}>
-                    {platform.name}
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-            </View>
-
-            {/* ── RIGHT COLUMN — bars ── */}
-            <View style={[ls.rightCol, { width: rightW, paddingRight: safeRight }]}>
-              {/* Violet bloom behind bars */}
-              <View style={ls.lsVizGlow} pointerEvents="none" />
-              <Bars
-                values={fsValues}
-                barW={lsBarW}
-                maxH={lsMaxH}
-                colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
-              />
-              <FloatingNotes playing={playing} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
-            </View>
-
           </View>
-        </View>
+
+          <LandscapeChrome
+            chrome={chrome}
+            rested={chromeRested}
+            station={currentStation}
+            track={spotify.track}
+            playing={playing}
+            tagline={currentStation.tagline}
+            progress={progress}
+            scrub={scrub}
+            onPlayPause={togglePlay}
+            onPrev={spotify.prev}
+            onNext={spotify.next}
+            onClose={handleClose}
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+          />
+
+          <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
+          {handoff && !spotify.track && <HandoffOverlay />}
+          <PreviewGate onSilence={spotify.pause} />
+
+          <ModeSheet visible={showMood} onClose={() => setShowMood(false)} />
+
+          {showPicker && (
+            <PlaylistSheet
+              stationName={currentStation.name}
+              current={linked}
+              onClose={() => setShowPicker(false)}
+              onPick={async (pl) => {
+                await setStationPlaylist(activeStation, pl);
+                setLinked(pl);
+                setShowPicker(false);
+                relinkStationPlaylist(activeStation);
+              }}
+            />
+          )}
+        </Animated.View>
       </Modal>
     );
   }
@@ -1053,31 +909,6 @@ const fs = StyleSheet.create({
     backgroundColor: '#0a0a12',
   },
 
-  // ── Volume ────────────────────────────────────────────────────────────────
-  volWrap: {
-    paddingHorizontal: 28,
-    marginBottom: 28,
-  },
-  volTrack: {
-    height: 4, borderRadius: 3,
-    position: 'relative', justifyContent: 'center',
-  },
-  volBg: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 3,
-  },
-  volThumb: {
-    position: 'absolute',
-    width: 13, height: 13, borderRadius: 7,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    marginLeft: -6,
-    shadowColor: '#9060FF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-
   // ── Mode chip ─────────────────────────────────────────────────────────────
   modeChip: {
     color: '#7B38E0',
@@ -1156,132 +987,3 @@ const fs = StyleSheet.create({
 });
 
 // ── Landscape styles ──────────────────────────────────────────────────────────
-const ls = StyleSheet.create({
-  container: { flex: 1 },
-
-  columns: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-
-  leftCol: {
-    flexDirection: 'column',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 0,
-  },
-
-  rightCol: {
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-
-  lsVizGlow: {
-    position: 'absolute', bottom: 0, alignSelf: 'center',
-    width: '100%', height: '50%',
-    backgroundColor: 'rgba(80, 20, 180, 0.22)',
-    borderTopLeftRadius: 200, borderTopRightRadius: 200,
-  },
-
-  leftIdentity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 3,
-  },
-
-  lsStation: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.2,
-  },
-
-  lsTrack: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    fontWeight: '400',
-    marginBottom: 12,
-  },
-
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 18,
-    marginBottom: 14,
-  },
-
-  prevNextBtn: {
-    width: 52, height: 52, borderRadius: 26,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#0d0d1a',
-    borderWidth: 1.5, borderColor: '#7B38E0',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4, shadowRadius: 6, elevation: 4,
-  },
-
-  lsPlayBtn: {
-    width: 68, height: 68, borderRadius: 34,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 12,
-  },
-
-  volWrap: { marginBottom: 12 },
-
-  lsTagline: {
-    color: 'rgba(255,255,255,0.2)',
-    fontSize: 11,
-    fontStyle: 'italic',
-    lineHeight: 16,
-    marginBottom: 6,
-  },
-
-  lsPlatformRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-
-  lsPlatformEmoji: { fontSize: 13 },
-
-  lsPlatformText: { fontSize: 12, fontWeight: '600' },
-
-  safeBanner: {
-    position: 'absolute',
-    alignSelf: 'center',
-    zIndex: 30,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-
-  safeBannerText: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-  },
-
-  dimBtn: {
-    position: 'absolute',
-    zIndex: 20,
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-  },
-});

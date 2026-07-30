@@ -35,6 +35,13 @@ on:
         description: 'Short note for the update log'
         type: string
         default: 'Update from GitHub'
+      mode:
+        description: 'publish an update, or just ask Expo what state things are in'
+        type: choice
+        default: publish
+        options:
+          - publish
+          - diagnose
 
 jobs:
   update:
@@ -84,7 +91,33 @@ jobs:
       # name-only check reported green. `--include-sensitive` returns the real
       # values for plaintext and sensitive vars; anything still masked as
       # `*****` here is a secret and must have its visibility changed.
+      # ── Diagnose ────────────────────────────────────────────────────────
+      # Read-only. Lives in this workflow rather than its own file because
+      # GitHub only registers workflow_dispatch workflows that exist on the
+      # DEFAULT branch, and main is deliberately far behind — a new file on a
+      # feature branch is invisible to the Run workflow button and the API.
+      #
+      # Every command prints its own output including stderr and then
+      # continues, so one unsupported flag can't mask the rest.
+      - name: Ask Expo what state things are in
+        if: inputs.mode == 'diagnose'
+        run: |
+          echo "════════ channels, and which branch each points at ════════"
+          echo "An update publishes to a BRANCH. A build listens to a CHANNEL."
+          echo "If the two aren't linked, every publish succeeds and reaches nobody."
+          eas channel:list --non-interactive 2>&1 || true
+          echo "──────── channel:view preview ────────"
+          eas channel:view preview --non-interactive 2>&1 || true
+          echo "════════ updates on the preview branch ════════"
+          eas update:list --branch preview --non-interactive 2>&1 || true
+          echo "════════ installed builds and their runtime versions ════════"
+          echo "These must match an update's runtime version exactly."
+          eas build:list --platform ios --limit 4 --non-interactive 2>&1 || true
+          echo "════════ what this commit would publish as ════════"
+          npx expo-updates fingerprint:generate --platform ios 2>&1 | tail -c 300 || true
+
       - name: Check the Spotify keys are present AND readable
+        if: inputs.mode == 'publish'
         run: |
           set -euo pipefail
           # DO NOT add --non-interactive here. It is not one of env:list's
@@ -129,6 +162,7 @@ jobs:
       # CI=true — so removing this flag produces no error, no prompt and no
       # warning, just an update with empty Spotify credentials. Never drop it.
       - name: Publish
+        if: inputs.mode == 'publish'
         run: >-
           eas update
           --branch ${{ inputs.channel }}

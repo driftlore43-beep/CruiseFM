@@ -31,7 +31,7 @@ import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { AmbientGlow } from '@/components/AmbientGlow';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
-import { LandscapeChrome, LS_CHROME_CLEAR, useChromeFade } from '@/components/LandscapeChrome';
+import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { MarqueeText } from '@/components/MarqueeText';
@@ -360,6 +360,9 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     playing,
     sheetOpen: showMood || showPicker,
   });
+  // 0.62: the meter is full-width, so the generic 0.86 would poke under the
+  // docked panel.
+  const deckScene = useDeckScene(chrome, winW, 0.62);
 
   useEffect(() => {
     if (visible) getStationPlaylist(activeStation).then(setLinked);
@@ -423,9 +426,11 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
           {background}
 
-          {/* The meter, standing in front of the photo above the chrome. */}
-          <View
-            style={{ position: 'absolute', left: lsSide, right: lsSide, bottom: LS_CHROME_CLEAR, alignItems: 'center' }}
+          {/* The meter — anchored LOW (owner, 30.07: "not dead centre"), a
+              meter rises from a baseline. Glides with the deck: shrunk into
+              the left pane while the panel is out, full width at rest. */}
+          <Animated.View
+            style={[{ position: 'absolute', left: lsSide, right: lsSide, bottom: 44, alignItems: 'center' }, deckScene]}
             pointerEvents="none">
             <Bars
               values={fsValues}
@@ -433,7 +438,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               maxH={lsMaxH}
               colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
             />
-          </View>
+          </Animated.View>
 
           <LandscapeChrome
             chrome={chrome}

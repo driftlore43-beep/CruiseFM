@@ -32,7 +32,7 @@ import { AmbientGlow } from '@/components/AmbientGlow';
 import { ModeActionRow } from '@/components/ModeActionRow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
-import { LandscapeChrome, LS_CHROME_CLEAR, useChromeFade } from '@/components/LandscapeChrome';
+import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
 import { SeekBar } from '@/components/SeekBar';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -844,6 +844,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
     active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
   });
+  const deckScene = useDeckScene(chrome, winW);
 
   // Glow: 0.3 → 0.6 range, gentle amber pulse
 
@@ -908,8 +909,10 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
           {background}
           <GrainOverlay />
 
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: LS_CHROME_CLEAR * 0.42 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <Animated.View style={deckScene}>
             <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
+            </Animated.View>
           </View>
 
           <LandscapeChrome

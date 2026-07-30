@@ -8,7 +8,7 @@ import {
 import Svg, { Circle, Defs, Ellipse, Line, LinearGradient as SvgGradient, Mask, Rect, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { LandscapeChrome, useChromeFade } from '@/components/LandscapeChrome';
+import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { STATIONS } from '@/constants/stations';
@@ -223,6 +223,10 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
     active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
   });
+  // Slide only — shrinking a full-bleed scene would reveal its edges. The
+  // sun (drawn at centre) lands at the left pane's centre while the panel
+  // is docked, and glides back to true centre at rest.
+  const deckScene = useDeckScene(chrome, winW, 1);
 
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
   const { progress, elapsedMs, durationMs, scrub } = useTrackClock({
@@ -318,9 +322,9 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             sideways is FOR. Its Svg crops to fill (preserveAspectRatio
             "slice"), so no redrawing needed, just a bigger window. */}
         {isLandscape && (
-          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Animated.View style={[StyleSheet.absoluteFill, deckScene]} pointerEvents="none">
             <HorizonScene phase={phase} amp={ampRef.current} eq={eq} geom={GEOM_WIDE} />
-          </View>
+          </Animated.View>
         )}
 
         {!isLandscape && (

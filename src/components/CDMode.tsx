@@ -13,7 +13,7 @@ import Svg, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { LandscapeChrome, LS_CHROME_CLEAR, useChromeFade } from '@/components/LandscapeChrome';
+import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { resolveAnyStation } from '@/utils/customStations';
@@ -337,6 +337,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
     active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
   });
+  const deckScene = useDeckScene(chrome, winW);
 
   const wrap01 = (v: number) => ((v % 1) + 1) % 1;
   const readAnim = (a: Animated.Value) => (a as unknown as { __getValue?: () => number }).__getValue?.() ?? 0;
@@ -563,12 +564,14 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
           </View>
           )}
 
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? LS_CHROME_CLEAR * 0.45 : 0 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <Animated.View style={isLandscape ? deckScene : null}>
             <View style={fs.caseShadow} {...discPan.panHandlers}>
               <JewelCase size={caseSize}>
                 <CDDisc size={discSize} spin={spin} albumArt={spotify.track?.albumArt ?? null} />
               </JewelCase>
             </View>
+            </Animated.View>
           </View>
 
           {!isLandscape && (

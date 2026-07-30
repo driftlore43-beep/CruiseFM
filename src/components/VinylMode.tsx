@@ -13,7 +13,7 @@ import { Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
-import { LandscapeChrome, LS_CHROME_CLEAR, useChromeFade } from '@/components/LandscapeChrome';
+import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
@@ -559,6 +559,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
     active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
   });
+  const deckScene = useDeckScene(chrome, winW);
 
   // ── Real-track layer ────────────────────────────────────────────────────────
   // With Spotify connected the deck runs on the REAL song: true duration,
@@ -1047,7 +1048,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           </View>
           )}
 
-          <View style={[fs.turntableWrap, isLandscape && { flex: 1, justifyContent: 'center', paddingBottom: LS_CHROME_CLEAR * 0.40 }]}>
+          <Animated.View style={[fs.turntableWrap, isLandscape && { flex: 1, justifyContent: 'center' }, isLandscape ? deckScene : null]}>
             <TurntableHero
               platSize={platSize} spin={spin} tonearmAnim={tonearmVal} glowOpacity={glowOpacity}
               ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={spin} playing={playing}
@@ -1057,7 +1058,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
               albumArt={spotify.track?.albumArt ?? null}
               progressAnim={progress}
             />
-          </View>
+          </Animated.View>
 
           {!isLandscape && (
           <>

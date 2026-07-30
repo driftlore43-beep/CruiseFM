@@ -8,7 +8,7 @@ import {
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { LandscapeChrome, LS_CHROME_CLEAR, useChromeFade } from '@/components/LandscapeChrome';
+import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { STATIONS } from '@/constants/stations';
@@ -111,6 +111,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
     active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
   });
+  const deckScene = useDeckScene(chrome, winW);
 
   // Orb animation loop — throttled to ~15fps — each tick re-renders the whole SVG scene on the CPU, and 25fps measured 53-59% sustained CPU (iOS resource reports, 24.07); 15fps looks identical for these slow drifts and halves the burn.
   useEffect(() => {
@@ -251,8 +252,8 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
           )}
 
           {/* Orb */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? LS_CHROME_CLEAR * 0.45 : 0 }}>
-            <View style={{ width: orbSize, height: orbSize }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <Animated.View style={[{ width: orbSize, height: orbSize }, isLandscape ? deckScene : null]}>
             <Svg width={orbSize} height={orbSize} viewBox={`0 0 ${VB} ${VB}`}>
               <Defs>
                 <RadialGradient id="cwStroke" cx="0.5" cy="0.5" r="0.5">
@@ -274,7 +275,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
               <Path d={ringBars(phase, amp)} stroke="url(#cwStroke)" strokeWidth={5} strokeOpacity={0.97} fill="none" strokeLinecap="round" />
             </Svg>
             <FloatingNotes playing={playing} emitter="ring" color={eq[0]} />
-            </View>
+            </Animated.View>
           </View>
 
           {!isLandscape && (

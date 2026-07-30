@@ -22,7 +22,7 @@ import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
-import { LandscapeChrome, LS_CHROME_CLEAR } from '@/components/LandscapeChrome';
+import { LandscapeChrome, useDeckScene } from '@/components/LandscapeChrome';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
@@ -1844,6 +1844,8 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
     return () => { if (restTimer.current) { clearTimeout(restTimer.current); restTimer.current = null; } };
   }, [visible, playing, sheetOpen]);
 
+  const deckScene = useDeckScene(chrome, winW);
+
   const hasTrack = !!spotify.track;
   const title = spotify.track?.title ?? station.tagline;
   const artist = spotify.track?.artist ?? '';
@@ -1940,8 +1942,8 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
               Landscape lifts by a chrome-derived amount instead: verified at
               852x393, anything less sinks the ball's bottom edge into the
               seek bar and play disc. */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? LS_CHROME_CLEAR * 0.54 : ballSize * 0.30 }}>
-            <View style={{ alignItems: 'center' }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? 0 : ballSize * 0.30 }}>
+            <Animated.View style={[{ alignItems: 'center' }, isLandscape ? deckScene : null]}>
               <View style={{ width: 2, height: ballSize * 0.22, backgroundColor: 'rgba(255,255,255,0.25)' }} />
               <View style={{ width: 14, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: -3 }} />
               {/* A ball-sized anchor box — the bloom/ray layers below position
@@ -1957,7 +1959,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
                 </Animated.View>
                 <MirrorBall size={ballSize} eq={eq} spin={spin} pulse={pulse} lit={live} />
               </View>
-            </View>
+            </Animated.View>
           </View>
 
           {/* Everything below the ball rests together. pointerEvents goes off

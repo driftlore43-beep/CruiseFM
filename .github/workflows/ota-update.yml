@@ -1,10 +1,20 @@
 # Ship an over-the-air update from anywhere — including a phone.
 #
 # This is a BUTTON, not an automation: it only runs when you press "Run
-# workflow" in GitHub (Actions tab, or the GitHub mobile app). Nothing ships
-# on a plain push, so what goes out is still your call.
+# workflow" in GitHub. Nothing ships on a plain push, so what goes out is
+# still your call.
 #
-# GitHub → Actions → "Ship OTA update" → Run workflow → pick a channel → Run.
+# github.com → Actions → "Ship OTA update" → Run workflow → set "Use workflow
+# from" to this branch → pick a channel → Run.
+#
+# USE A BROWSER, NOT THE GITHUB MOBILE APP. The app has no "Run workflow"
+# button and cannot reach repo Settings, so it can neither trigger this nor
+# set the EXPO_TOKEN secret it needs. Mobile Safari on github.com is fine.
+#
+# EXPO_TOKEN is a repo secret (Settings → Secrets and variables → Actions),
+# made at expo.dev/settings/access-tokens. Without a valid one the run dies
+# early with "The bearer token is invalid" — which is exactly how the first
+# attempt at this failed.
 #
 # Note this file is NOT a fingerprint source (unlike app.json, eas.json and
 # package.json), so adding it does not disturb OTA for installed builds.

@@ -26,6 +26,7 @@ import { LandscapeChrome, useDeckScene, useIsoLayoutEffect } from '@/components/
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
+import { buildFlipbook, FlipbookGrid } from '@/components/MirrorBallFlipbook';
 import { ModeActionRow } from '@/components/ModeActionRow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
@@ -37,6 +38,15 @@ const DEMO_DURATION_MS = 214000;
 // 3-5 RPM, and 15s per revolution is 4 — deliberately slow (owner, 28.07).
 // Anything quicker reads as a toy spinning, and it also makes the light
 // sweeping across the room look frantic rather than like stage lighting.
+/**
+ * PROTOTYPE SWITCH (31.07). True = the mirrors themselves turn, via the
+ * six-frame flipbook in MirrorBallFlipbook.tsx; false = the shipping ball,
+ * whose grid is static and whose motion is carried by light travelling over
+ * it. One line either way — see that file's header for how the flipbook
+ * works and what it trades.
+ */
+const FLIPBOOK = true;
+
 const BALL_SPIN_MS = 15000;
 // How long the controls stay up after you last touched the screen. Long
 // enough to read the song and reach the skip button; short enough that the
@@ -1232,14 +1242,19 @@ function UnderGlow({ size, color, lit }: { size: number; color: string; lit: Ani
 
 function MirrorBall({ size, eq, spin, pulse, lit }: { size: number; eq: [string, string, string]; spin: Animated.Value; pulse: Animated.Value; lit: Animated.Value }) {
   const { tiles, flashes } = useMemo(() => buildSphereTiles(size, eq), [size, eq]);
+  const flip = useMemo(() => (FLIPBOOK ? buildFlipbook(size, eq) : []), [size, eq]);
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#0b0b0c' }}>
       {/* The moving layer: light travelling across the surface as it turns */}
       <LightPatches size={size} spin={spin} eq={eq} />
 
-      {/* The sphere itself — facet colours and latitude rings, which under an
-          axial turn genuinely don't move */}
-      <SphereGrid size={size} tiles={tiles} />
+      {/* The sphere itself. FLIPBOOK swaps the static grid for six pre-built
+          copies a fraction of a tile apart, cross-fading in step with the
+          spin — so the mirrors travel instead of the light travelling over
+          them. The flash layer goes with it: its whole job was to fake this. */}
+      {FLIPBOOK
+        ? <FlipbookGrid size={size} frames={flip} spin={spin} />
+        : <SphereGrid size={size} tiles={tiles} />}
 
       {/* NO MERIDIANS. The rotating vertical seams were added back in round 12
           as the one structure that visibly turned, because the tile grid is
@@ -1310,7 +1325,10 @@ function MirrorBall({ size, eq, spin, pulse, lit }: { size: number; eq: [string,
           real ball a lit mirror is the brightest thing in the room — nothing
           may sit on top of it. Depth falloff is baked into each flash's own
           opacity instead, so it still obeys the sphere's curvature. */}
-      <MirrorFlash size={size} groups={flashes} spin={spin} lit={lit} />
+      {/* Not under the flipbook: the flares are baked into each mirror's
+          own fill there, because a mirror flaring as it swings past a lamp
+          is the thing this layer was standing in for. */}
+      {!FLIPBOOK && <MirrorFlash size={size} groups={flashes} spin={spin} lit={lit} />}
 
       {/* The hotspot's blown-out core and the lens glints go ABOVE the
           mirrors, because on a real ball both of them are the light itself

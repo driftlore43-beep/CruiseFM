@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, {
-  Circle, ClipPath, Defs, G, Line, LinearGradient as SvgLinearGradient, Path,
+  Circle, ClipPath, Defs, Ellipse, G, Line, LinearGradient as SvgLinearGradient, Path,
   RadialGradient, Rect, Stop,
 } from 'react-native-svg';
 
@@ -268,7 +268,11 @@ export const ModeThumb = memo(function ModeThumb({ mode, size, colors, uid }: Pr
         // zero because it is turning and has lighting to sell it, but a still
         // picture needs the tilt to say "ball" on sight.
         const c = S / 2, R = S * 0.42;
-        const TILT = 0.30;                       // radians we look down by
+        // NEGATIVE = looking UP at the ball, which is how you actually meet
+        // one — it hangs above you (owner, 31.07). Latitude rows then bow
+        // UPWARD across the front and the columns converge at the BOTTOM
+        // pole, since that is the end now facing us.
+        const TILT = -0.30;                      // radians; negative = looking up
         const ct = Math.cos(TILT), stt = Math.sin(TILT);
         const big = S >= 120;
         const ROWS = big ? 13 : 8;               // latitude bands
@@ -358,12 +362,18 @@ export const ModeThumb = memo(function ModeThumb({ mode, size, colors, uid }: Pr
               {/* Key highlight, sitting where the light actually is. */}
               <Circle cx={c + LX * R * 0.72} cy={c - LY * R * 0.72} r={R * 0.5} fill={`url(#${id('catch')})`} />
             </G>
-            {/* Cap and stem. The cap earns its place twice over: a real ball
-                has a fitting there, and it covers the point where the columns
-                converge, which is the one place this projection looks busy. */}
-            <Circle cx={c} cy={c - R * 0.955} r={R * 0.17} fill="#1b1e29" />
+            {/* The bottom fitting, drawn as a squashed ellipse because we are
+                looking up at it. It also covers the one place this projection
+                looks busy — the pole where the columns converge, which flipped
+                to the bottom with the tilt. Inside the clip, so the part past
+                the silhouette is trimmed. */}
+            <G clipPath={`url(#${id('clip')})`}>
+              <Ellipse cx={c} cy={c + R * 0.93} rx={R * 0.17} ry={R * 0.075} fill="#141824" />
+            </G>
+            {/* The stem runs to the ball's outline and stops: looking up, the
+                top fitting is on the FAR side, hidden behind the sphere. */}
             <Rect x={c - Math.max(0.8, S * 0.010)} y={c - R - S * 0.10}
-              width={Math.max(1.6, S * 0.020)} height={S * 0.10} fill="rgba(190,200,222,0.55)" />
+              width={Math.max(1.6, S * 0.020)} height={S * 0.105} fill="rgba(190,200,222,0.55)" />
           </>
         );
       }

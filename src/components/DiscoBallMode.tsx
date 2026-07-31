@@ -1245,8 +1245,11 @@ function MirrorBall({ size, eq, spin, pulse, lit }: { size: number; eq: [string,
   const flip = useMemo(() => (FLIPBOOK ? buildFlipbook(size, eq) : []), [size, eq]);
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#0b0b0c' }}>
-      {/* The moving layer: light travelling across the surface as it turns */}
-      <LightPatches size={size} spin={spin} eq={eq} />
+      {/* The moving layer: light travelling across the surface as it turns.
+          Held right back under the flipbook — it exists to move light over
+          a STATIC grid, and over mirrors that already carry their own it
+          is just a veil, which is what read as matte (owner, 31.07). */}
+      {!FLIPBOOK && <LightPatches size={size} spin={spin} eq={eq} />}
 
       {/* The sphere itself. FLIPBOOK swaps the static grid for six pre-built
           copies a fraction of a tile apart, cross-fading in step with the
@@ -1270,13 +1273,15 @@ function MirrorBall({ size, eq, spin, pulse, lit }: { size: number; eq: [string,
       {/* Coloured lamps reaching PARTS of the surface — never the whole of
           it, so bare chrome always shows between them. This is where the
           station's mood lives now; the mirrors themselves are silver. */}
-      <ColourReflections size={size} eq={eq} lit={lit} />
+      <Animated.View style={[StyleSheet.absoluteFill, FLIPBOOK && { opacity: 0.22 }]} pointerEvents="none">
+        <ColourReflections size={size} eq={eq} lit={lit} />
+      </Animated.View>
 
       {/* Neon reflections — four independent streaks drifting across the
           surface, above the patches so they read as light moving over
           the facets rather than another flat tint. Gated on the music like
           every other light layer: nothing may drift across a stopped ball. */}
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: lit }]} pointerEvents="none">
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: lit }, FLIPBOOK && { opacity: 0.24 }]} pointerEvents="none">
         <NeonSweep size={size} eq={eq} pulse={pulse} />
       </Animated.View>
 
@@ -1288,8 +1293,8 @@ function MirrorBall({ size, eq, spin, pulse, lit }: { size: number; eq: [string,
               chrome rebuild exists to undo. The dark outer stops stay: they
               are what make the ball read as round. */}
           <RadialGradient id="dbShade" cx="0.36" cy="0.3" r="0.9">
-            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.12" />
-            <Stop offset="0.4" stopColor="#ffffff" stopOpacity="0.04" />
+            <Stop offset="0" stopColor="#ffffff" stopOpacity={FLIPBOOK ? 0.03 : 0.12} />
+            <Stop offset="0.4" stopColor="#ffffff" stopOpacity={FLIPBOOK ? 0.01 : 0.04} />
             <Stop offset="0.78" stopColor="#040404" stopOpacity="0.34" />
             <Stop offset="1" stopColor="#020202" stopOpacity="0.78" />
           </RadialGradient>
@@ -1297,15 +1302,15 @@ function MirrorBall({ size, eq, spin, pulse, lit }: { size: number; eq: [string,
               a thin falloff at the silhouette, not a wash over the face. */}
           <RadialGradient id="dbRim" cx="50%" cy="50%" r="50%">
             <Stop offset="0.80" stopColor={eq[2]} stopOpacity="0" />
-            <Stop offset="0.955" stopColor={eq[2]} stopOpacity="0.18" />
+            <Stop offset="0.955" stopColor={eq[2]} stopOpacity={FLIPBOOK ? 0.09 : 0.18} />
             <Stop offset="1" stopColor="#ffffff" stopOpacity="0.12" />
           </RadialGradient>
           {/* The broad soft bloom around where the key light strikes. Soft
               on purpose — the mirrors must still read through it instead of
               it sitting on the ball like a painted blob (round 4). */}
           <RadialGradient id="dbHot" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.30" />
-            <Stop offset="0.45" stopColor="#ffffff" stopOpacity="0.13" />
+            <Stop offset="0" stopColor="#ffffff" stopOpacity={FLIPBOOK ? 0.12 : 0.30} />
+            <Stop offset="0.45" stopColor="#ffffff" stopOpacity={FLIPBOOK ? 0.05 : 0.13} />
             <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
           </RadialGradient>
         </Defs>

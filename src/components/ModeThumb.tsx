@@ -251,120 +251,117 @@ export const ModeThumb = memo(function ModeThumb({ mode, size, colors, uid }: Pr
       // pinched pole tiles read as noise at row size, where flat squares
       // read as mirrors.
       case 'disco': {
+        // A REAL SPHERE, not a warped square grid.
+        //
+        // The previous thumbnail was a square lattice squeezed toward the
+        // edges, and it read flat however it was shaded (owner, 31.07: "this
+        // 2D mirror ball is not cooperating") — because every row was a
+        // dead-straight horizontal line and every column a dead-straight
+        // vertical one, and no sphere has those. Curvature has to be in the
+        // GRID, not just the lighting.
+        //
+        // So each mirror is a genuine latitude/longitude quad on a unit
+        // sphere, tilted ~17° so we look slightly down at it: latitude rows
+        // then project to arcs that dip toward the viewer, columns converge
+        // toward the poles, and back-facing tiles are dropped. That is the
+        // same construction the full mode uses; the mode keeps its tilt near
+        // zero because it is turning and has lighting to sell it, but a still
+        // picture needs the tilt to say "ball" on sight.
         const c = S / 2, R = S * 0.42;
-        // Square-lattice sphere. A tile's edges live at u ∈ [-1,1] in grid
-        // space and land on screen at c + R·sin(u·π/2), so squares compress
-        // into slivers toward the silhouette in BOTH axes. (A lat/long
-        // projection is truer but its pole tiles read as noise at 62px —
-        // that version was rejected on the render; a square lattice never
-        // pinches.)
-        //
-        // FORESHORTENING ALONE STILL READ FLAT (owner, 30.07: "the mirror
-        // ball still has the 2D flat effect"). It would: the old shading was
-        // a radial dim, which is symmetric, and a symmetric dim is a vignette
-        // on a disc — it says nothing about where the light is. What makes a
-        // sphere a sphere is DIRECTIONAL shading, so each tile is now lit by
-        // its own surface normal.
-        //
-        // Under an orthographic view a sphere's normal is given by screen
-        // position alone: at (nx, ny) off centre, nz = √(1 − nx² − ny²).
-        // Lambert against a light sitting up, left and slightly in front then
-        // gives a genuine lit side, terminator and shadow side.
-        const LX = -0.42, LY = -0.52, LZ = 0.74;
+        const TILT = 0.30;                       // radians we look down by
+        const ct = Math.cos(TILT), stt = Math.sin(TILT);
+        const big = S >= 120;
+        const ROWS = big ? 13 : 8;               // latitude bands
+        const COLS = big ? 24 : 14;              // mirrors around the equator
+        const LAT_MAX = 1.38;                    // stop short of the poles
+        const INSET = 0.90;                      // quad shrink = the seam
+        // Light up, left and slightly toward us.
+        const LX = -0.44, LY = 0.50, LZ = 0.75;
         const LN = Math.hypot(LX, LY, LZ);
-        const N = S >= 120 ? 15 : 10;                    // tiles across the diameter
-        const gapF = 0.13;                               // seam fraction of a cell
-        const proj = (u: number) => c + Math.sin(Math.max(-1, Math.min(1, u)) * Math.PI / 2) * R;
-        const tiles: React.ReactNode[] = [];
-        for (let r = 0; r < N; r++) {
-          const v0 = -1 + (2 * r) / N;
-          const v1 = v0 + (2 / N) * (1 - gapF);
-          const y0 = proj(v0), y1 = proj(v1);
-          const off = (r % 2) * (1 / N);                 // brick bond, in grid space
-          for (let k = -1; k <= N; k++) {
-            const u0 = -1 + (2 * k) / N + off * 2;
-            const u1 = u0 + (2 / N) * (1 - gapF);
-            const x0 = proj(u0), x1 = proj(u1);
-            if (x1 - x0 < 0.4 || y1 - y0 < 0.4) continue; // sliver at the limb
-            const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
-            if (cu * cu + cv * cv > 1.35) continue;       // fully off the ball
-            // The tile's own normal, straight off its screen position.
-            const nx = Math.sin(Math.max(-1, Math.min(1, cu)) * Math.PI / 2);
-            const ny = Math.sin(Math.max(-1, Math.min(1, cv)) * Math.PI / 2);
-            const r2 = nx * nx + ny * ny;
-            if (r2 > 1.04) continue;                      // past the silhouette
-            const nz = Math.sqrt(Math.max(0, 1 - r2));
-            const lam = Math.max(0, (nx * LX + ny * LY + nz * LZ) / LN);
-            // Each mirror reflects a different part of the room, so the
-            // scatter is pushed toward the ENDS of its range rather than
-            // clustered — a bright tile beside a dead one is what reads as
-            // chrome (the full mode's rule, at thumbnail scale).
+
+        // Sphere point -> screen, plus the depth that decides visibility.
+        const pt = (lat: number, lon: number) => {
+          const cb = Math.cos(lat), sb = Math.sin(lat);
+          const x = cb * Math.sin(lon), y = sb, z = cb * Math.cos(lon);
+          const yr = y * ct - z * stt;
+          const zr = y * stt + z * ct;
+          return { x: c + R * x, y: c - R * yr, z: zr, nx: x, ny: yr, nz: zr };
+        };
+
+        const facets: React.ReactNode[] = [];
+        for (let r = 0; r < ROWS; r++) {
+          const b0 = -LAT_MAX + (2 * LAT_MAX * r) / ROWS;
+          const b1 = -LAT_MAX + (2 * LAT_MAX * (r + 1)) / ROWS;
+          const bm = (b0 + b1) / 2;
+          const bond = (r % 2) * 0.5;            // brick bond, as a real ball is built
+          for (let k = 0; k < COLS; k++) {
+            const l0 = ((k + bond) / COLS) * Math.PI * 2 - Math.PI;
+            const l1 = ((k + bond + 1) / COLS) * Math.PI * 2 - Math.PI;
+            const lm = (l0 + l1) / 2;
+            const mid = pt(bm, lm);
+            if (mid.z <= 0.06) continue;         // back face / silhouette sliver
+            // Shrink each quad toward its own centre so the dark body shows
+            // between mirrors — the gap IS the grid.
+            const sb0 = bm + (b0 - bm) * INSET, sb1 = bm + (b1 - bm) * INSET;
+            const sl0 = lm + (l0 - lm) * INSET, sl1 = lm + (l1 - lm) * INSET;
+            const q = [pt(sb0, sl0), pt(sb0, sl1), pt(sb1, sl1), pt(sb1, sl0)];
+            const d = `M ${q[0].x.toFixed(2)} ${q[0].y.toFixed(2)}`
+              + q.slice(1).map((v) => ` L ${v.x.toFixed(2)} ${v.y.toFixed(2)}`).join('')
+              + ' Z';
+            // Lambert off the tile's own normal — a real lit side, terminator
+            // and shadow side, instead of a symmetric vignette.
+            const lam = Math.max(0, (mid.nx * LX + mid.ny * LY + mid.nz * LZ) / LN);
+            // Mirrors reflect different parts of the room, so the scatter is
+            // pushed toward the ENDS of its range: a bright tile beside a dead
+            // one is what reads as chrome.
             const roll = hash01(r * 12.9898 + k * 78.233) * 2 - 1;
-            const scatter = Math.sign(roll) * Math.pow(Math.abs(roll), 0.62) * 0.27;
-            const a = Math.max(0.02, Math.min(0.99, 0.05 + Math.pow(lam, 0.8) * 0.90 + scatter));
-            tiles.push(
-              <Rect key={`${r}-${k}`} x={x0} y={y0} width={x1 - x0} height={y1 - y0}
-                fill={`rgba(228,238,255,${a.toFixed(3)})`} />,
+            const scatter = Math.sign(roll) * Math.pow(Math.abs(roll), 0.62) * 0.26;
+            const a = Math.max(0.03, Math.min(0.99, 0.06 + Math.pow(lam, 0.8) * 0.88 + scatter));
+            facets.push(
+              <Path key={`${r}-${k}`} d={d} fill={`rgba(228,238,255,${a.toFixed(3)})`} />,
+            );
+            facets.push(
+              <Path key={`g${r}-${k}`} d={d} fill={`url(#${id('facet')})`} opacity={0.34} />,
             );
           }
         }
+
         return (
           <>
             <Defs>
               <ClipPath id={id('clip')}>
                 <Circle cx={c} cy={c} r={R} />
               </ClipPath>
-              {/* One gradient shared by every facet (SVG gradients are in
-                  bounding-box units, so a single def rescales to each tile) —
-                  the small highlight-to-shadow falloff that stops a mirror
-                  reading as a flat chip. */}
+              {/* One gradient for every facet — SVG gradients are in bounding
+                  box units, so a single def rescales to each quad. */}
               <SvgLinearGradient id={id('facet')} x1="0" y1="0" x2="1" y2="1">
-                <Stop offset="0" stopColor="#ffffff" stopOpacity="0.55" />
-                <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.08" />
-                <Stop offset="1" stopColor="#05060d" stopOpacity="0.38" />
+                <Stop offset="0" stopColor="#ffffff" stopOpacity="0.5" />
+                <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.06" />
+                <Stop offset="1" stopColor="#05060d" stopOpacity="0.4" />
               </SvgLinearGradient>
-              {/* The travelling light of the real mode, frozen mid-sweep. */}
-              <SvgLinearGradient id={id('beam')} x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor="#ffffff" stopOpacity="0" />
-                <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.14" />
-                <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-              </SvgLinearGradient>
-              {/* Deep shadow crowding the lower-right limb — the other half
-                  of the roundness, opposite the key light. */}
-              <RadialGradient id={id('rim')} cx="34%" cy="30%" r="78%">
+              {/* Shadow crowding the lower-right limb, opposite the key light
+                  — the other half of the roundness. */}
+              <RadialGradient id={id('rim')} cx="34%" cy="28%" r="80%">
                 <Stop offset="0" stopColor="#000000" stopOpacity="0" />
-                <Stop offset="0.62" stopColor="#02030a" stopOpacity="0.20" />
-                <Stop offset="1" stopColor="#02030a" stopOpacity="0.82" />
+                <Stop offset="0.6" stopColor="#02030a" stopOpacity="0.14" />
+                <Stop offset="1" stopColor="#02030a" stopOpacity="0.66" />
               </RadialGradient>
               <RadialGradient id={id('catch')} cx="50%" cy="50%" r="50%">
-                <Stop offset="0" stopColor="#ffffff" stopOpacity="0.20" />
+                <Stop offset="0" stopColor="#ffffff" stopOpacity="0.22" />
                 <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
               </RadialGradient>
             </Defs>
             <G clipPath={`url(#${id('clip')})`}>
-              <Circle cx={c} cy={c} r={R} fill="#0a0b12" />
-              {tiles}
-              {/* Facet sheen: the same tiles again, filled with the shared
-                  gradient so each carries its own falloff. */}
-              <G opacity={0.34}>
-                {tiles.map((t) => {
-                  const el = t as React.ReactElement<Record<string, unknown>>;
-                  return (
-                    <Rect
-                      key={`g${String(el.key)}`}
-                      x={el.props.x as number} y={el.props.y as number}
-                      width={el.props.width as number} height={el.props.height as number}
-                      fill={`url(#${id('facet')})`}
-                    />
-                  );
-                })}
-              </G>
-              <Rect x={c - R * 0.62} y={c - R} width={R * 0.9} height={R * 2} fill={`url(#${id('beam')})`} />
+              <Circle cx={c} cy={c} r={R} fill="#090a11" />
+              {facets}
               <Circle cx={c} cy={c} r={R} fill={`url(#${id('rim')})`} />
               {/* Key highlight, sitting where the light actually is. */}
-              <Circle cx={c + LX * R * 0.78} cy={c + LY * R * 0.78} r={R * 0.5} fill={`url(#${id('catch')})`} />
+              <Circle cx={c + LX * R * 0.72} cy={c - LY * R * 0.72} r={R * 0.5} fill={`url(#${id('catch')})`} />
             </G>
-            {/* Hanging stem, like the showcase miniature. */}
+            {/* Cap and stem. The cap earns its place twice over: a real ball
+                has a fitting there, and it covers the point where the columns
+                converge, which is the one place this projection looks busy. */}
+            <Circle cx={c} cy={c - R * 0.955} r={R * 0.17} fill="#1b1e29" />
             <Rect x={c - Math.max(0.8, S * 0.010)} y={c - R - S * 0.10}
               width={Math.max(1.6, S * 0.020)} height={S * 0.10} fill="rgba(190,200,222,0.55)" />
           </>

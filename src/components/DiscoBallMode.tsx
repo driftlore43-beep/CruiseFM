@@ -532,8 +532,25 @@ function SpotlightPan({ size, lit, pan, eq }: { size: number; lit: Animated.Valu
             <Stop offset="0.52" stopColor={tint} stopOpacity="0.16" />
             <Stop offset="1" stopColor={tint} stopOpacity="0" />
           </RadialGradient>
+          {/* The one permitted sparkle (owner's lighting brief: "only very
+              subtle lens flares or sparkle effects on the brightest
+              reflections"). It lives INSIDE the pool, so it rides the pan and
+              only ever sits on the brightest mirrors — all gradient falloff,
+              no solid strokes, and quiet enough to miss unless you look. */}
+          <SvgLinearGradient id="dbSpotArmH" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0" />
+            <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.30" />
+            <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+          </SvgLinearGradient>
+          <SvgLinearGradient id="dbSpotArmV" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0" />
+            <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.30" />
+            <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+          </SvgLinearGradient>
         </Defs>
         <Circle cx={50} cy={50} r={50} fill="url(#dbSpot)" />
+        <Rect x={34} y={49.3} width={32} height={1.4} fill="url(#dbSpotArmH)" />
+        <Rect x={49.3} y={30} width={1.4} height={40} fill="url(#dbSpotArmV)" />
       </Svg>
     </Animated.View>
   );
@@ -722,6 +739,85 @@ function MirrorBall({ size, eq, spin, pulse, lit, spotPan }: { size: number; eq:
 // A fixed field of dots; the whole field slowly rotates (one native transform)
 // while each dot twinkles on its own native-driver opacity loop. Zero per-frame
 // CPU — the "sweep" is staggered phases + the group rotation.
+/**
+ * A dark vignette pulling the corners down (owner's lighting brief, 31.07):
+ * the room reads as a deep studio rather than a flat backdrop, and the ball
+ * — the one bright thing — gains depth for free. Static, costs nothing.
+ */
+function Vignette({ winW, winH }: { winW: number; winH: number }) {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Svg width={winW} height={winH} viewBox="0 0 100 100" preserveAspectRatio="none">
+        <Defs>
+          <RadialGradient id="dbVign" cx="50%" cy="46%" r="72%">
+            <Stop offset="0" stopColor="#000000" stopOpacity="0" />
+            <Stop offset="0.62" stopColor="#000000" stopOpacity="0" />
+            <Stop offset="1" stopColor="#020208" stopOpacity="0.52" />
+          </RadialGradient>
+        </Defs>
+        <Rect x={0} y={0} width={100} height={100} fill="url(#dbVign)" />
+      </Svg>
+    </View>
+  );
+}
+
+/**
+ * Atmospheric dust (owner's lighting brief, 31.07): a handful of near-
+ * invisible motes drifting slowly upward through the light, each catching a
+ * brief highlight once per loop. They are what make the rays read as light
+ * travelling through AIR — a beam with nothing suspended in it is just a
+ * drawn shape. Deliberately few, tiny and slow: dust in a still room, not
+ * snow. All native-driver opacity/transform loops.
+ */
+function DustMote({ x, y, size, tint, dur, delay, driftX }: {
+  x: number; y: number; size: number; tint: string; dur: number; delay: number; driftX: number;
+}) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.delay(delay),
+      Animated.timing(t, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(t, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', left: x, top: y, width: size, height: size, borderRadius: size / 2,
+        backgroundColor: tint,
+        opacity: t.interpolate({ inputRange: [0, 0.35, 0.5, 0.65, 1], outputRange: [0.02, 0.08, 0.20, 0.08, 0.02] }),
+        transform: [
+          { translateY: t.interpolate({ inputRange: [0, 1], outputRange: [0, -winHDrift] }) },
+          { translateX: t.interpolate({ inputRange: [0, 1], outputRange: [0, driftX] }) },
+        ],
+      }}
+    />
+  );
+}
+const winHDrift = 64;
+
+function DustField({ count, eq, live, winW, winH }: {
+  count: number; eq: [string, string, string]; live: Animated.Value; winW: number; winH: number;
+}) {
+  const motes = useMemo(() => Array.from({ length: count }, (_, i) => ({
+    x: hash01(i * 5.17 + 0.9) * winW,
+    y: winH * 0.12 + hash01(i * 8.31 + 3.3) * winH * 0.66,
+    size: 1.5 + hash01(i * 3.9) * 2.2,
+    tint: i % 3 === 0 ? mixHex(eq[1], '#ffffff', 0.55) : '#e8eef8',
+    dur: 5200 + Math.floor(hash01(i * 6.1) * 5200),
+    delay: Math.floor(hash01(i * 2.7) * 6000),
+    driftX: (hash01(i * 9.7) - 0.5) * 30,
+  })), [count, eq, winW, winH]);
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity: live }]} pointerEvents="none">
+      {motes.map((m, i) => <DustMote key={i} {...m} />)}
+    </Animated.View>
+  );
+}
+
 function LightField({ count, eq, live, winW, winH, offsetX = 0 }: {
   count: number; eq: [string, string, string]; live: Animated.Value; winW: number; winH: number;
   offsetX?: number;
@@ -826,8 +922,8 @@ function MirrorBeams({ size, color, winW, spin, lit }: {
     const lat = (hash01(i * 3.7 + 0.4) - 0.5) * 1.7;
     const lon0 = (i / BEAM_COUNT) * Math.PI * 2 + hash01(i * 9.1) * 0.4;
     const len = reach * (0.34 + hash01(i * 5.3) * 0.52);
-    const width = size * (0.006 + Math.pow(hash01(i * 7.7), 2.2) * 0.022);
-    const peak = 0.26 + hash01(i * 2.3) * 0.40;
+    const width = size * (0.020 + Math.pow(hash01(i * 7.7), 1.6) * 0.075);
+    const peak = 0.14 + hash01(i * 2.3) * 0.22;
 
     const N = 60;
     const xs: number[] = [], tx: number[] = [], ty: number[] = [];
@@ -881,15 +977,22 @@ function MirrorBeams({ size, color, winW, spin, lit }: {
               { translateX: -b.len / 2 },
             ],
           }}>
-          <Svg width={b.len} height={b.width} viewBox="0 0 100 10" preserveAspectRatio="none">
+          {/* Feathered, not laser-cut (owner's lighting brief, 31.07): the
+              ray is three strips of one gradient — a soft full-width wash
+              with a slightly brighter middle — so its edges dissolve instead
+              of ending in two hard lines. The gradient starts at the ball
+              already soft: the white spark tip was what read as a laser. */}
+          <Svg width={b.len} height={b.width} viewBox="0 0 100 12" preserveAspectRatio="none">
             <Defs>
               <SvgLinearGradient id={`dbBeam${i}`} x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor="#ffffff" stopOpacity="0.95" />
-                <Stop offset="0.10" stopColor={color} stopOpacity="0.62" />
+                <Stop offset="0" stopColor={color} stopOpacity="0.50" />
+                <Stop offset="0.30" stopColor={color} stopOpacity="0.22" />
                 <Stop offset="1" stopColor={color} stopOpacity="0" />
               </SvgLinearGradient>
             </Defs>
-            <Rect x={0} y={0} width={100} height={10} fill={`url(#dbBeam${i})`} />
+            <Rect x={0} y={0} width={100} height={12} fill={`url(#dbBeam${i})`} opacity={0.5} />
+            <Rect x={0} y={3} width={100} height={6} fill={`url(#dbBeam${i})`} opacity={0.7} />
+            <Rect x={0} y={4.8} width={100} height={2.4} fill={`url(#dbBeam${i})`} />
           </Svg>
         </Animated.View>
       ))}
@@ -1293,6 +1396,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             reflections, so they cannot have a life of their own. Two copies a
             screen apart make the wrap seamless: as one leaves to the right the
             other is already arriving. */}
+        <DustField count={14} eq={eq} live={live} winW={winW} winH={winH} />
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate: fieldSpin }] }]} pointerEvents="none">
           <LightField count={18} eq={eq} live={live} winW={winW} winH={winH} offsetX={0} />
         </Animated.View>
@@ -1304,7 +1408,10 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             so it holds still while the ball's reflections move past it. */}
         <LightStreaks live={live} winW={winW} winH={winH} />
 
-        {/* Floating bokeh — soft out-of-focus particles drifting in the room */}
+        {/* The vignette sits over the room but under the chrome: the studio
+            darkens toward its corners, the scene keeps its depth, the type
+            stays on top of everything. */}
+        <Vignette winW={winW} winH={winH} />
 
         {/* Drag pill + mode label + centred header are portrait furniture —
             in landscape LandscapeChrome carries the identity at top-left. */}

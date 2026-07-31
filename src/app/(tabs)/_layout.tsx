@@ -5,7 +5,7 @@ import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NowPlayingHost } from '@/components/NowPlayingHost';
-import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
+import { PAGE_GUTTER, TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -128,8 +128,8 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: PAGE_GUTTER,
+    right: PAGE_GUTTER,
     zIndex: 100,
     alignItems: 'center',
   },

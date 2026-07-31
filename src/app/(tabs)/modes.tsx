@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ModeThumb, type ModeThumbId } from '@/components/ModeThumb';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useEntitlements } from '@/context/EntitlementsContext';
-import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
+import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
 
 /**
  * SHOW THE MODE, DON'T DESCRIBE IT (owner's pick, 29.07 — "direction Q",
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '800',
     letterSpacing: -1.3,
-    paddingHorizontal: 22,
+    paddingHorizontal: PAGE_GUTTER,
     marginBottom: 24,
   },
   section: {
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '800',
     letterSpacing: 3,
-    paddingHorizontal: 22,
+    paddingHorizontal: PAGE_GUTTER,
     marginTop: 30,
     marginBottom: 6,
   },
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     paddingVertical: 16,
-    paddingHorizontal: 22,
+    paddingHorizontal: PAGE_GUTTER,
   },
   rowRule: {
     borderBottomWidth: StyleSheet.hairlineWidth,

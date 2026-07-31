@@ -14,7 +14,7 @@ import { StationDetailModal } from '@/components/StationDetailModal';
 import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
-import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
+import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
 import { RECOMMENDED_IDS, STATIONS, type Station } from '@/constants/stations';
 import {
   loadLastCruise,
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -1.3,
     lineHeight: 39,
-    marginHorizontal: 22,
+    marginHorizontal: PAGE_GUTTER,
     marginBottom: 22,
   },
   connects: { marginTop: 18 },
@@ -225,9 +225,9 @@ const styles = StyleSheet.create({
     fontSize: 21,
     fontWeight: '800',
     letterSpacing: -0.6,
-    marginHorizontal: 22,
+    marginHorizontal: PAGE_GUTTER,
   },
-  shelf: { paddingHorizontal: 22, gap: 14, paddingBottom: 2 },
+  shelf: { paddingHorizontal: PAGE_GUTTER, gap: 14, paddingBottom: 2 },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',

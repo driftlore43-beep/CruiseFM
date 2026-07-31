@@ -1241,10 +1241,16 @@ function MirrorBall({ size, eq, spin, pulse, lit }: { size: number; eq: [string,
           axial turn genuinely don't move */}
       <SphereGrid size={size} tiles={tiles} />
 
-      {/* ...and the seams that DO move: the meridians sweep round with the
-          turn, so the grid itself is visibly rotating rather than only the
-          light travelling across it */}
-      <RotatingMeridians size={size} spin={spin} />
+      {/* NO MERIDIANS. The rotating vertical seams were added back in round 12
+          as the one structure that visibly turned, because the tile grid is
+          static and only the light used to travel. The flashing-mirror layer
+          below has since taken that job — each mirror snaps on and off as the
+          lit band sweeps past it — and on the device the drawn verticals read
+          as a wire cage over the chrome (owner, 31.07: "try the mirror
+          animating without the vertical lines"). `RotatingMeridians` and
+          `Meridian` are kept in the file, unused, because the two are hard to
+          judge apart from a still and this is a straight swap back if the
+          rotation stops reading. */}
 
       {/* Coloured lamps reaching PARTS of the surface — never the whole of
           it, so bare chrome always shows between them. This is where the

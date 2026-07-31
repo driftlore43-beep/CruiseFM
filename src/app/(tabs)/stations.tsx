@@ -11,7 +11,7 @@ import { useDaylight } from '@/context/MotionContext';
 import { StationDetailModal } from '@/components/StationDetailModal';
 import { GlossSheen } from '@/components/GlossSheen';
 import { useNowPlaying } from '@/context/NowPlayingContext';
-import { Cruise, Fonts, TAB_SAFE_INSET } from '@/constants/theme';
+import { Cruise, Fonts, TAB_SAFE_INSET, PAGE_GUTTER } from '@/constants/theme';
 import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { deleteCustomStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     paddingVertical: 19,
-    paddingHorizontal: 20,
+    paddingHorizontal: PAGE_GUTTER,
   },
   rowRule: {
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -637,7 +637,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 11,
-    paddingHorizontal: 20,
+    paddingHorizontal: PAGE_GUTTER,
     marginTop: 30,
     marginBottom: 10,
   },
@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
   subheadRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: PAGE_GUTTER,
     marginTop: 22,
     marginBottom: 8,
   },

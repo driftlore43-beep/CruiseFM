@@ -71,6 +71,15 @@ export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
 
 // Floating tab bar sizing — screens must add this as paddingBottom
+/**
+ * The app's single side gutter. Page titles, list rows and the floating tab
+ * bar all sit on it, so the bar's edges line up with the text column above
+ * instead of hanging a few points outside it — which read as the panel not
+ * being centred on the page (owner, 31.07). It was 22 on Cruise and Modes,
+ * 20 on Stations and 16 on the tab bar.
+ */
+export const PAGE_GUTTER     = 20;
+
 export const TAB_BAR_HEIGHT  = 84;
 export const TAB_BAR_BOTTOM  = 22;   // gap from screen edge
 export const TAB_SAFE_INSET  = TAB_BAR_HEIGHT + TAB_BAR_BOTTOM + 16;

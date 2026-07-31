@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
   Animated, Dimensions, Easing, Modal, PanResponder, ScrollView,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
@@ -198,6 +198,10 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
   const isLandscape = winW > winH;
+  // Portrait geometry derived from the REAL window, the same way the wide
+  // one is — so the drawing never has to be cropped to fit and the sun
+  // stays the size it was designed to be at any screen shape.
+  const geomPortrait = useMemo(() => makeGeom(winW, winH), [winW, winH]);
   const topPad = Math.max(insets.top, 20);
 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
@@ -331,6 +335,23 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
           </Animated.View>
         )}
 
+        {/* PORTRAIT: also full-bleed, and derived from the real window.
+            It used to be a fixed 360x460 drawing dropped into the middle
+            flex slot, which had two consequences: `slice` had to crop that
+            shape into a much taller screen, magnifying the sun to nearly the
+            full width; and the oversized canvas spilled out of its box, which
+            is the only reason the scene appeared behind the controls at all.
+            The owner likes it behind the controls (31.07), so that is now
+            deliberate rather than an overflow — and with the viewBox matching
+            the screen there is no crop and no magnification left, so the sun
+            comes back to a sane size and the sky above it fills with stars
+            instead of sitting empty. */}
+        {!isLandscape && (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <HorizonScene phase={phase} amp={ampRef.current} eq={eq} geom={geomPortrait} />
+          </View>
+        )}
+
         {!isLandscape && (
         <View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
@@ -350,9 +371,9 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             <StationIdentity station={station} />
           </View>
 
-          {/* Outrun scene */}
+          {/* The scene itself is the full-bleed layer above; this slot just
+              holds the column's shape and carries the floating notes. */}
           <View style={{ flex: 1 }}>
-            <HorizonScene phase={phase} amp={ampRef.current} eq={eq} />
             <FloatingNotes playing={playing} color={eq[1]} />
           </View>
 

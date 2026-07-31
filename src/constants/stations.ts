@@ -33,7 +33,7 @@ export const STATIONS: Station[] = [
   {
     id: 'night-run',
     name: 'Night Run AM',
-    tagline: 'Empty expressways. Violet dashboards.',
+    tagline: 'Empty expressways. Blue-lit dashboards.',
     tags: ['dark vibes', 'neon nights'],
     premium: false,
     // JET BLUE, station-wide (owner, 31.07). It was cyan → periwinkle →

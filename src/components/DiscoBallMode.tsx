@@ -811,13 +811,13 @@ function LightField({ count, eq, live, winW, winH, offsetX = 0 }: {
  * `spin`, so this costs no per-frame work and stays locked to the ball —
  * stopping when it stops and following a finger drag.
  */
-const BEAM_COUNT = 15;
+const BEAM_COUNT = 30;
 
 function MirrorBeams({ size, color, winW, spin, lit }: {
   size: number; color: string; winW: number; spin: Animated.Value; lit: Animated.Value;
 }) {
   const R = size / 2;
-  const reach = Math.max(winW * 1.7, size * 3.4);
+  const reach = Math.max(winW * 1.0, size * 2.2);
   const st = Math.sin(TILT), ct = Math.cos(TILT);
 
   const beams = useMemo(() => Array.from({ length: BEAM_COUNT }, (_, i) => {
@@ -825,9 +825,9 @@ function MirrorBeams({ size, color, winW, spin, lit }: {
     // the poles, where a mirror faces up and throws its light at the ceiling.
     const lat = (hash01(i * 3.7 + 0.4) - 0.5) * 1.7;
     const lon0 = (i / BEAM_COUNT) * Math.PI * 2 + hash01(i * 9.1) * 0.4;
-    const len = reach * (0.55 + hash01(i * 5.3) * 0.45);
+    const len = reach * (0.34 + hash01(i * 5.3) * 0.52);
     const width = size * (0.006 + Math.pow(hash01(i * 7.7), 2.2) * 0.022);
-    const peak = 0.30 + hash01(i * 2.3) * 0.42;
+    const peak = 0.26 + hash01(i * 2.3) * 0.40;
 
     const N = 60;
     const xs: number[] = [], tx: number[] = [], ty: number[] = [];
@@ -852,8 +852,13 @@ function MirrorBeams({ size, color, winW, spin, lit }: {
       // edges. So the beam swells as its mirror swings round to the side and
       // dies as it comes to the front, which is what makes the light travel
       // around a sphere rather than spin like a pinwheel.
-      const limb = Math.max(0, 1 - Math.max(0, nz));
-      op.push(peak * Math.pow(limb, 0.85));
+      // A real bug in the first cut: `1 - max(0, nz)` is 1 for the whole BACK
+      // of the ball, so every mirror round the back was throwing a beam at
+      // full brightness. `vis` gates that off — a mirror has to be on our
+      // side to throw anything we can see.
+      const vis = Math.max(0, Math.min(1, nz / 0.14));
+      const limb = Math.max(0, 1 - nz);
+      op.push(peak * vis * Math.pow(limb, 0.85));
     }
     return { xs, tx, ty, rot, op, len, width };
   }), [R, reach, size, st, ct]);
@@ -1229,7 +1234,19 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   // One screen-width of travel per turn of the ball, in the direction its
   // surface travels (right). Same Animated.Value, so they can never drift
   // apart or keep moving after the ball has stopped.
-  const fieldDrift = spin.interpolate({ inputRange: [0, 1], outputRange: [0, winW] });
+  // The reflections ORBIT the ball rather than sliding across the screen.
+  //
+  // Sliding was ambiguous — half of them looked like they were going the
+  // other way to the surface (owner, 31.07: "white specks that... move in the
+  // opposite direction of the ball"), and a sideways slide has to wrap, which
+  // is what made them read as floating about. An orbit cannot be read
+  // backwards and it is what actually happens: the spots a mirror ball throws
+  // sweep around the room in the same sense as the ball.
+  //
+  // TWICE the ball's rate, which is the real physics — reflecting off a
+  // turning mirror doubles the angle, so the spots travel twice as fast as
+  // the surface that made them.
+  const fieldSpin = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] });
   const bloomColor = mixHex(eq[1], eq[0], 0.35);
 
   return (
@@ -1276,9 +1293,8 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             reflections, so they cannot have a life of their own. Two copies a
             screen apart make the wrap seamless: as one leaves to the right the
             other is already arriving. */}
-        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: fieldDrift }] }]} pointerEvents="none">
-          <LightField count={16} eq={eq} live={live} winW={winW} winH={winH} offsetX={0} />
-          <LightField count={16} eq={eq} live={live} winW={winW} winH={winH} offsetX={-winW} />
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate: fieldSpin }] }]} pointerEvents="none">
+          <LightField count={18} eq={eq} live={live} winW={winW} winH={winH} offsetX={0} />
         </Animated.View>
 
         {/* Faint diagonal beams — light in the air, the way a shaft shows when

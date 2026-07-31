@@ -128,7 +128,7 @@ function OnAirHero({
           style={({ pressed }) => [styles.createBtn, pressed && styles.pressed]}
           onPress={onCreate}
           hitSlop={6}>
-          <GlossSheen radius={17} />
+          <MaterialCommunityIcons name="plus" size={15} color="#0a0a10" />
           <Text style={styles.createBtnText}>Create</Text>
         </Pressable>
       </View>
@@ -670,19 +670,27 @@ const styles = StyleSheet.create({
   },
 
   // ── Create pill ───────────────────────────────────────────────────────────
+  // The page's one call to action, so it wears the app's primary button:
+  // a solid white pill with dark type. As grey glass on a photograph it read
+  // as another piece of chrome rather than the thing to press.
   createBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 17,
-    overflow: 'hidden',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.24)',
+    gap: 3,
+    paddingLeft: 11,
+    paddingRight: 14,
+    paddingVertical: 8,
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
   },
   createBtnText: {
-    color: '#fff',
+    color: '#0a0a10',
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.3,

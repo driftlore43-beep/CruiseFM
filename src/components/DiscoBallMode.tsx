@@ -1840,7 +1840,13 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
     }).start();
     // Only ever rests during playback: a paused drive is one you are looking
     // at, and hiding the play button from someone who just paused is rude.
-    if (playing && !sheetOpen) {
+    //
+    // ...and only SIDEWAYS. Portrait resting was this mode's own invention
+    // and no other mode does it, so the Mirror Ball was the one screen where
+    // the controls vanished while you were holding the phone normally
+    // (owner, 30.07). The landscape deck still docks and rests — that is the
+    // agreed grammar and every mode shares it.
+    if (playing && !sheetOpen && isLandscape) {
       restTimer.current = setTimeout(() => {
         setChromeRested(true);
         Animated.timing(chrome, {

@@ -57,7 +57,11 @@ const CARD_BAR_W  = Math.floor((SCREEN_W - 48) / BAR_COUNT) - 2;
 
 // ── Fullscreen bar geometry — must match the vizSection height below,
 // otherwise the tallest bars get clipped at the top ─────────────────────────
-const VIZ_H       = Math.round(SCREEN_H * 0.26);
+// 0.285 of the screen (was 0.26): the meter had room to grow upright too,
+// not only sideways (owner, 30.07 — "we can still buff it out"). Anything
+// much taller starts crowding the song title on a short phone; checked at
+// 667pt.
+const VIZ_H       = Math.round(SCREEN_H * 0.285);
 const FS_MAX_SEGS = Math.max(14, Math.floor(VIZ_H / UNIT));
 const FS_MAX_H    = FS_MAX_SEGS * UNIT;
 const FS_MIN_H    = MIN_H;
@@ -270,7 +274,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const lsBarW     = Math.max(3, Math.floor((lsAvailW - (BAR_COUNT - 1) * 2) / BAR_COUNT));
   // 0.38 -> 0.60 of the height: the meter has a lot more room sideways and
   // was barely using it — the bars now swing properly (owner, 30.07).
-  const lsMaxSegs  = Math.max(10, Math.floor((winH * 0.60) / UNIT));
+  const lsMaxSegs  = Math.max(10, Math.floor((winH * 0.68) / UNIT));
   const lsMaxH     = lsMaxSegs * UNIT;
   const lsBellMaxH = useCallback((i: number) => {
     const t = (i - (BAR_COUNT - 1) / 2) / (BAR_COUNT / 4.2);
@@ -364,7 +368,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   });
   // 0.62: the meter is full-width, so the generic 0.86 would poke under the
   // docked panel.
-  const deckScene = useDeckScene(chrome, winW, 0.62, isLandscape);
+  const deckScene = useDeckScene(chrome, winW, 0.68, isLandscape);
 
   useEffect(() => {
     if (visible) getStationPlaylist(activeStation).then(setLinked);

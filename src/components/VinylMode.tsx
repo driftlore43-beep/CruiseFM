@@ -229,6 +229,13 @@ function Tonearm({
   const eyy   = TOP + armLen * 0.90;
   const svgH  = TOP + armLen + headH + 16;
   const armPath = `M ${scx} ${TOP + 8} L ${scx} ${TOP + armLen * 0.58} C ${scx} ${TOP + armLen * 0.76}, ${ex} ${TOP + armLen * 0.72}, ${ex} ${eyy}`;
+  // Headshell offset. The pivot sits top-RIGHT and the shaft hooks LEFT
+  // toward the spindle, so the cartridge has to lean the same way to finish
+  // the J — a positive SVG angle, since y points down. It used to be -18,
+  // which kicked the cartridge back out again and broke the curve (owner,
+  // 30.07). It is also how a real arm is built: the headshell's offset
+  // angles the stylus in toward the spindle.
+  const HEAD_TILT = 18;
   const innerW  = Math.max(1, armW * 0.55);
   const screwR  = Math.max(1, headW * 0.08);
   const bandH   = Math.max(2.5, headH * 0.2);
@@ -250,7 +257,7 @@ function Tonearm({
           {/* Drop shadow — offset dark clone of shaft and headshell */}
           <G transform="translate(3,5)" opacity={0.4}>
             <Path d={armPath} stroke="#000" strokeWidth={armW} fill="none" strokeLinecap="round" />
-            <G transform={`rotate(-18 ${ex} ${eyy})`}>
+            <G transform={`rotate(${HEAD_TILT} ${ex} ${eyy})`}>
               <SvgRect x={ex - headW / 2} y={eyy - 2} width={headW} height={headH} rx={3.5} fill="#000" />
             </G>
           </G>
@@ -265,7 +272,7 @@ function Tonearm({
           <Path d={armPath} stroke="#E8E8EE" strokeWidth={innerW} fill="none" strokeLinecap="round" />
           <Path d={armPath} stroke="rgba(255,255,255,0.85)" strokeWidth={Math.max(1, armW * 0.16)} fill="none" strokeLinecap="round" transform="translate(-1.5,0)" />
           {/* Headshell — graphite cartridge: silver mount band, screws, vents, stylus */}
-          <G transform={`rotate(-18 ${ex} ${eyy})`}>
+          <G transform={`rotate(${HEAD_TILT} ${ex} ${eyy})`}>
             <SvgRect x={ex - headW / 2} y={eyy - 2} width={headW} height={headH} rx={3.5} fill="#26262c" stroke="#0e0e12" strokeWidth={1} />
             <SvgRect x={ex - headW / 2} y={eyy - 2} width={headW} height={bandH * 1.4} rx={3} fill="#9C9CA6" />
             <SvgCircle cx={ex - headW / 2 + headW * 0.24} cy={eyy + headH * 0.34} r={screwR} fill="#8A8A94" />

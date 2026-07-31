@@ -252,16 +252,28 @@ export const ModeThumb = memo(function ModeThumb({ mode, size, colors, uid }: Pr
       // read as mirrors.
       case 'disco': {
         const c = S / 2, R = S * 0.42;
-        // The grid is WARPED through a sphere: a tile's edges live at
-        // u ∈ [-1,1] in grid space and land on screen at c + R·sin(u·π/2),
-        // so squares compress into slivers toward the silhouette in BOTH
-        // axes. A uniform grid clipped to a circle read as a flat disc
-        // (owner, 30.07: "doesn't look curved but flat") — foreshortening
-        // at the edges is what makes a ball a ball. Same idea as the full
-        // mode's projection, but on a square lattice, so the poles never
-        // pinch into the noise that sank the first sphere-projection thumb.
-        const N = 10;                                    // tiles across the diameter
-        const gapF = 0.14;                               // seam fraction of a cell
+        // Square-lattice sphere. A tile's edges live at u ∈ [-1,1] in grid
+        // space and land on screen at c + R·sin(u·π/2), so squares compress
+        // into slivers toward the silhouette in BOTH axes. (A lat/long
+        // projection is truer but its pole tiles read as noise at 62px —
+        // that version was rejected on the render; a square lattice never
+        // pinches.)
+        //
+        // FORESHORTENING ALONE STILL READ FLAT (owner, 30.07: "the mirror
+        // ball still has the 2D flat effect"). It would: the old shading was
+        // a radial dim, which is symmetric, and a symmetric dim is a vignette
+        // on a disc — it says nothing about where the light is. What makes a
+        // sphere a sphere is DIRECTIONAL shading, so each tile is now lit by
+        // its own surface normal.
+        //
+        // Under an orthographic view a sphere's normal is given by screen
+        // position alone: at (nx, ny) off centre, nz = √(1 − nx² − ny²).
+        // Lambert against a light sitting up, left and slightly in front then
+        // gives a genuine lit side, terminator and shadow side.
+        const LX = -0.42, LY = -0.52, LZ = 0.74;
+        const LN = Math.hypot(LX, LY, LZ);
+        const N = S >= 120 ? 15 : 10;                    // tiles across the diameter
+        const gapF = 0.13;                               // seam fraction of a cell
         const proj = (u: number) => c + Math.sin(Math.max(-1, Math.min(1, u)) * Math.PI / 2) * R;
         const tiles: React.ReactNode[] = [];
         for (let r = 0; r < N; r++) {
@@ -276,13 +288,23 @@ export const ModeThumb = memo(function ModeThumb({ mode, size, colors, uid }: Pr
             if (x1 - x0 < 0.4 || y1 - y0 < 0.4) continue; // sliver at the limb
             const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
             if (cu * cu + cv * cv > 1.35) continue;       // fully off the ball
-            const j = hash01(r * 12.9898 + k * 78.233);
-            // Dims toward the silhouette — the curvature's other half.
-            const shade = 1 - 0.38 * Math.min(1, (cu * cu + cv * cv) * 0.85);
+            // The tile's own normal, straight off its screen position.
+            const nx = Math.sin(Math.max(-1, Math.min(1, cu)) * Math.PI / 2);
+            const ny = Math.sin(Math.max(-1, Math.min(1, cv)) * Math.PI / 2);
+            const r2 = nx * nx + ny * ny;
+            if (r2 > 1.04) continue;                      // past the silhouette
+            const nz = Math.sqrt(Math.max(0, 1 - r2));
+            const lam = Math.max(0, (nx * LX + ny * LY + nz * LZ) / LN);
+            // Each mirror reflects a different part of the room, so the
+            // scatter is pushed toward the ENDS of its range rather than
+            // clustered — a bright tile beside a dead one is what reads as
+            // chrome (the full mode's rule, at thumbnail scale).
+            const roll = hash01(r * 12.9898 + k * 78.233) * 2 - 1;
+            const scatter = Math.sign(roll) * Math.pow(Math.abs(roll), 0.62) * 0.27;
+            const a = Math.max(0.02, Math.min(0.99, 0.05 + Math.pow(lam, 0.8) * 0.90 + scatter));
             tiles.push(
               <Rect key={`${r}-${k}`} x={x0} y={y0} width={x1 - x0} height={y1 - y0}
-                rx={Math.max(0.3, (x1 - x0) * 0.10)}
-                fill={`rgba(226,236,255,${((0.16 + j * 0.46) * shade).toFixed(3)})`} />,
+                fill={`rgba(228,238,255,${a.toFixed(3)})`} />,
             );
           }
         }
@@ -292,28 +314,55 @@ export const ModeThumb = memo(function ModeThumb({ mode, size, colors, uid }: Pr
               <ClipPath id={id('clip')}>
                 <Circle cx={c} cy={c} r={R} />
               </ClipPath>
+              {/* One gradient shared by every facet (SVG gradients are in
+                  bounding-box units, so a single def rescales to each tile) —
+                  the small highlight-to-shadow falloff that stops a mirror
+                  reading as a flat chip. */}
+              <SvgLinearGradient id={id('facet')} x1="0" y1="0" x2="1" y2="1">
+                <Stop offset="0" stopColor="#ffffff" stopOpacity="0.55" />
+                <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.08" />
+                <Stop offset="1" stopColor="#05060d" stopOpacity="0.38" />
+              </SvgLinearGradient>
               {/* The travelling light of the real mode, frozen mid-sweep. */}
               <SvgLinearGradient id={id('beam')} x1="0" y1="0" x2="1" y2="0">
                 <Stop offset="0" stopColor="#ffffff" stopOpacity="0" />
-                <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.16" />
+                <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.14" />
                 <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
               </SvgLinearGradient>
-              <RadialGradient id={id('rim')} cx="50%" cy="50%" r="50%">
+              {/* Deep shadow crowding the lower-right limb — the other half
+                  of the roundness, opposite the key light. */}
+              <RadialGradient id={id('rim')} cx="34%" cy="30%" r="78%">
                 <Stop offset="0" stopColor="#000000" stopOpacity="0" />
-                <Stop offset="0.72" stopColor="#000000" stopOpacity="0" />
-                <Stop offset="1" stopColor="#04060e" stopOpacity="0.55" />
+                <Stop offset="0.62" stopColor="#02030a" stopOpacity="0.20" />
+                <Stop offset="1" stopColor="#02030a" stopOpacity="0.82" />
               </RadialGradient>
               <RadialGradient id={id('catch')} cx="50%" cy="50%" r="50%">
-                <Stop offset="0" stopColor="#ffffff" stopOpacity="0.14" />
+                <Stop offset="0" stopColor="#ffffff" stopOpacity="0.20" />
                 <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
               </RadialGradient>
             </Defs>
             <G clipPath={`url(#${id('clip')})`}>
-              <Circle cx={c} cy={c} r={R} fill="#141828" />
+              <Circle cx={c} cy={c} r={R} fill="#0a0b12" />
               {tiles}
-              <Rect x={c - R * 0.55} y={c - R} width={R * 0.9} height={R * 2} fill={`url(#${id('beam')})`} />
-              <Circle cx={c - R * 0.35} cy={c - R * 0.45} r={R * 0.45} fill={`url(#${id('catch')})`} />
+              {/* Facet sheen: the same tiles again, filled with the shared
+                  gradient so each carries its own falloff. */}
+              <G opacity={0.34}>
+                {tiles.map((t) => {
+                  const el = t as React.ReactElement<Record<string, unknown>>;
+                  return (
+                    <Rect
+                      key={`g${String(el.key)}`}
+                      x={el.props.x as number} y={el.props.y as number}
+                      width={el.props.width as number} height={el.props.height as number}
+                      fill={`url(#${id('facet')})`}
+                    />
+                  );
+                })}
+              </G>
+              <Rect x={c - R * 0.62} y={c - R} width={R * 0.9} height={R * 2} fill={`url(#${id('beam')})`} />
               <Circle cx={c} cy={c} r={R} fill={`url(#${id('rim')})`} />
+              {/* Key highlight, sitting where the light actually is. */}
+              <Circle cx={c + LX * R * 0.78} cy={c + LY * R * 0.78} r={R * 0.5} fill={`url(#${id('catch')})`} />
             </G>
             {/* Hanging stem, like the showcase miniature. */}
             <Rect x={c - Math.max(0.8, S * 0.010)} y={c - R - S * 0.10}

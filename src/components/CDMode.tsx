@@ -304,8 +304,8 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   // Landscape sizes off HEIGHT alone — the portrait formula's winH*0.44 term
   // shrinks a sideways case to a coaster (the "squish", owner 30.07).
   const caseSize = isLandscape
-    ? Math.min(winH * 0.86, 350)
-    : Math.min(winW * 0.93, winH * 0.44, 410);
+    ? Math.min(winH * 0.94, 384)
+    : Math.min(winW * 0.97, winH * 0.47, 430);
   const discSize = caseSize * 0.85;
   const station = resolveAnyStation(activeId);
   const spotify = useMusicPlayback(visible);
@@ -360,6 +360,12 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   // is play/pause, matching a tap on the record. The disc claims its touches
   // outright — on the platter, the disc IS the control.
   const [scrubbing, setScrubbing] = useState(false);
+  // How far the wind has moved the song, in seconds — shown in the same
+  // centre pill the record uses, so a turn reads identically on both
+  // spinning objects (owner, 30.07).
+  const [scrubDeltaSec, setScrubDeltaSec] = useState(0);
+  const scrubPillAnim = useRef(new Animated.Value(0)).current;
+  const scrubPillTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressBaseRef = useRef(0);
   const scrubPctRef = useRef(0);
   const centerRef = useRef({ x: 0, y: 0 });
@@ -383,6 +389,18 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
     return d;
   };
 
+  /** The pill sits for a second after you let go, then fades — the record's
+   *  timing exactly, so the two objects behave as one family. */
+  const fadeScrubPill = () => {
+    if (scrubPillTimer.current) clearTimeout(scrubPillTimer.current);
+    scrubPillTimer.current = setTimeout(() => {
+      Animated.timing(scrubPillAnim, {
+        toValue: 0, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true,
+      }).start();
+    }, 1000);
+  };
+  useEffect(() => () => { if (scrubPillTimer.current) clearTimeout(scrubPillTimer.current); }, []);
+
   const discPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -404,6 +422,9 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
         scrubPctRef.current = progressBaseRef.current;
         scrub.begin();
         setScrubbing(true);
+        setScrubDeltaSec(0);
+        if (scrubPillTimer.current) clearTimeout(scrubPillTimer.current);
+        scrubPillAnim.setValue(1);
         const at = readPhase();
         phaseRef.current = at;
         turningRef.current = false;
@@ -424,6 +445,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
         const pct = Math.max(0, Math.min(1, scrubPctRef.current + ((diff / 360) * 5000) / durMsRef.current));
         scrubPctRef.current = pct;
         scrub.move(pct);
+        setScrubDeltaSec(Math.round(((pct - progressBaseRef.current) * durMsRef.current) / 1000));
         // A soft tick every five wound seconds — the record's habit.
         hapticAccumRef.current += Math.abs((diff / 360) * 5000);
         if (hapticAccumRef.current >= 5000) {
@@ -440,15 +462,18 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
           // A tap must NOT go through scrub.end — that always seeks, and
           // seeking to a stale position on every play/pause stutters the
           // song. togglePlay flips `playing`, and the clock effect re-syncs.
+          scrubPillAnim.setValue(0);
           togglePlayRef.current();
           return;
         }
         scrub.end(scrubPctRef.current);
+        fadeScrubPill();
       },
       onPanResponderTerminate: () => {
         lastAngleRef.current = null;
         setScrubbing(false);
         scrub.end(scrubPctRef.current);
+        fadeScrubPill();
       },
     }),
   ).current;
@@ -578,6 +603,17 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
             </Animated.View>
           </View>
 
+          {/* Wind marker — the record's pill, in the station's own colour
+              rather than the vinyl's gold, so it belongs to this deck. */}
+          <Animated.View pointerEvents="none" style={[fs.scrubPillWrap, { opacity: scrubPillAnim }]}>
+            <View style={[fs.scrubPill, { borderColor: eq[1] + '80' }]}>
+              <Ionicons name={scrubDeltaSec >= 0 ? 'play-forward' : 'play-back'} size={14} color={eq[1]} />
+              <Text style={[fs.scrubPillText, { color: eq[1] }]}>
+                {scrubDeltaSec >= 0 ? `+${scrubDeltaSec}s` : `${scrubDeltaSec}s`}
+              </Text>
+            </View>
+          </Animated.View>
+
           {!isLandscape && (
           <>
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
@@ -686,6 +722,13 @@ const fs = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   modeLabel: { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', letterSpacing: 3 },
+  scrubPillWrap: { position: 'absolute', left: 0, right: 0, top: '50%', alignItems: 'center', zIndex: 200 },
+  scrubPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    backgroundColor: 'rgba(0,0,0,0.78)', borderRadius: 20,
+    paddingHorizontal: 18, paddingVertical: 9, borderWidth: 1,
+  },
+  scrubPillText: { fontSize: 11, fontWeight: '700', letterSpacing: 2.5 },
   caseShadow: {
     shadowColor: '#000', shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.45, shadowRadius: 26, elevation: 14,

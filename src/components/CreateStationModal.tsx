@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -15,7 +15,10 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Cruise } from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { useDsegFont } from '@/components/StationIdentity';
+import { stationDial } from '@/constants/stations';
+import { Cruise, Fonts } from '@/constants/theme';
 import { saveCustomStation, updateCustomStation, type CustomStation } from '@/utils/customStations';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -119,12 +122,21 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
     setError('');
   }
 
+  // The dial number is a hash of the station's id, so the id is settled the
+  // moment the sheet opens rather than at save time — that way the number in
+  // the preview is the number the station actually gets, not a lookalike.
+  const newIdRef = useRef(`custom-${Date.now()}`);
+  useEffect(() => { if (visible && !editing) newIdRef.current = `custom-${Date.now()}`; }, [visible, editing]);
+  const previewId = editing ? editing.id : newIdRef.current;
+  const dial = stationDial(previewId, false);
+  const dsegFont = useDsegFont();
+
   async function handleSave() {
     const trimName = name.trim();
     if (!trimName) { setError('Give your station a name.'); return; }
     setSaving(true);
     const station: CustomStation = {
-      id: editing ? editing.id : `custom-${Date.now()}`,
+      id: previewId,
       name: trimName,
       tagline: tagline.trim() || 'My custom station',
       tags: [],
@@ -235,21 +247,35 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
               ))}
             </View>
 
-            <View style={[styles.preview, { borderColor: selectedPalette.color + '66', shadowColor: selectedPalette.color }]}>
-              <CardWash radius={16} />
-              <View style={[styles.previewIcon, { backgroundColor: selectedPalette.iconBg, borderColor: selectedPalette.color + '88' }]}>
-                <MaterialCommunityIcons name={selectedIcon as any} size={24} color="#fff" />
+            {/* Preview = an actual row off the Stations dial, not a card.
+                The page is a printed list now (dial number, name, MINE chip,
+                the station's colour on its icon), so a preview that isn't
+                that shape is showing something the user will never see. The
+                number is real: the id is settled when the sheet opens. */}
+            <Text style={[styles.previewLabel, { fontFamily: Fonts.mono }]}>ON THE DIAL</Text>
+            <View style={styles.previewRow}>
+              <View style={styles.previewNumCol}>
+                <Text style={[styles.previewNum, { fontFamily: dsegFont }]} numberOfLines={1}>{dial.label}</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.previewName} numberOfLines={1}>{name || 'Station name'}</Text>
-                <Text style={styles.previewTagline} numberOfLines={1}>{tagline || 'Your tagline here'}</Text>
+              <Text style={styles.previewName} numberOfLines={1}>{name.trim() || 'Station name'}</Text>
+              <View style={styles.mineChip}><Text style={styles.mineChipText}>MINE</Text></View>
+              <View style={styles.previewTrail}>
+                <View style={styles.previewIconSlot}>
+                  <MaterialCommunityIcons name={selectedIcon as any} size={20} color={selectedPalette.color} />
+                </View>
+                <View style={styles.previewCtrlSlot}>
+                  <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.28)" />
+                </View>
               </View>
             </View>
+            <Text style={styles.previewTagline} numberOfLines={1}>
+              {tagline.trim() || 'Your tagline here'}
+            </Text>
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <Pressable
-              style={[styles.saveBtn, { backgroundColor: selectedPalette.color }, (atLimit || saving) && styles.saveBtnDisabled]}
+              style={[styles.saveBtn, (atLimit || saving) && styles.saveBtnDisabled]}
               onPress={atLimit ? undefined : handleSave}
               disabled={atLimit || saving}>
               <Text style={styles.saveBtnText}>{saving ? 'Saving…' : atLimit ? 'Upgrade to Pro' : editing ? 'Save changes' : 'Create station'}</Text>
@@ -361,57 +387,66 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
     transform: [{ scale: 1.15 }],
   },
-  preview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 20,
-    borderWidth: 1,
-    overflow: 'hidden',
-    // Really deep blue card under the glass wash, glowing in the chosen colour.
-    backgroundColor: '#070c1e',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    elevation: 8,
+  // ── Preview: one row off the Stations dial ───────────────────────────────
+  // Column widths and type sizes are copied from stations.tsx on purpose —
+  // if they drift the preview stops being a preview.
+  previewLabel: {
+    color: 'rgba(255,255,255,0.32)',
+    fontSize: 9.5, fontWeight: '800', letterSpacing: 2,
+    marginTop: 24, marginBottom: 8,
   },
-  previewIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
+  previewRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    paddingVertical: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
+  previewNumCol: { width: 64, alignItems: 'flex-end', justifyContent: 'center' },
+  previewNum: { fontSize: 16, color: 'rgba(255,255,255,0.42)' },
   previewName: {
-    color: Cruise.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 2,
+    flexShrink: 1,
+    color: 'rgba(255,255,255,0.94)',
+    fontSize: 17, fontWeight: '600', letterSpacing: -0.3,
   },
+  mineChip: {
+    borderWidth: 1, borderColor: 'rgba(180,195,255,0.45)',
+    borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  mineChipText: { color: '#cdd8ff', fontSize: 8.5, fontWeight: '800', letterSpacing: 1 },
+  previewTrail: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 10 },
+  previewIconSlot: { width: 28, alignItems: 'center' },
+  previewCtrlSlot: { width: 16, alignItems: 'center' },
+  // The tagline doesn't appear on the dial (it lives on the station's own
+  // page), so it sits under the row as a caption rather than inside it.
   previewTagline: {
     color: Cruise.textSecondary,
     fontSize: 12,
+    marginTop: 8,
+    paddingLeft: 80,
   },
   errorText: {
     color: '#e05578',
     fontSize: 13,
     marginTop: 10,
   },
+  // The app's primary button is a solid white pill with dark type (same as
+  // the Refer-a-Friend card and every other confirm). The old version was a
+  // slab in whatever colour the user had just picked, which made the CTA
+  // change identity as you scrolled the swatches.
   saveBtn: {
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 24,
     marginBottom: 8,
+    backgroundColor: '#FFFFFF',
   },
   saveBtnDisabled: {
     opacity: 0.5,
   },
   saveBtnText: {
-    color: '#fff',
+    color: '#0a0a10',
     fontSize: 16,
     fontWeight: '700',
   },

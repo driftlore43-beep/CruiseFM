@@ -83,3 +83,35 @@ export async function setSoftAtmosphereStored(value: boolean): Promise<void> {
     // ignore
   }
 }
+
+const DAYLIGHT_KEY = 'cruise_daylight';
+
+/**
+ * Daylight = a high-CONTRAST pass over the app, for driving in sun.
+ *
+ * Deliberately not a white theme. The problem in sunlight is not that the
+ * app is dark — black behind white type is the highest contrast a phone can
+ * make, and on an OLED it is also the cheapest. What disappears outdoors is
+ * everything drawn at half strength: grey-on-black captions, hairline rims,
+ * dark glass panels, and white type sitting on a photograph. So this lifts
+ * the quiet things to full strength and deepens the scrims UNDER type,
+ * rather than inverting anything. It also stands the auto-dim down, since
+ * dimming is the opposite of what you want with the sun on the screen.
+ *
+ * Default OFF: at night the softer treatment is the nicer one.
+ */
+export async function getDaylight(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(DAYLIGHT_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function setDaylightStored(value: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(DAYLIGHT_KEY, value ? 'true' : 'false');
+  } catch {
+    // ignore
+  }
+}

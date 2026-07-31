@@ -1,6 +1,8 @@
 import { useFonts } from 'expo-font';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useDaylight } from '@/context/MotionContext';
+
 import type { Station } from '@/constants/stations';
 import { stationDial } from '@/constants/stations';
 import { Fonts } from '@/constants/theme';
@@ -66,6 +68,7 @@ export function StationIdentity({
   // Same asset the Stations page loads; expo-font caches globally so this is
   // free after the first mount.
   const dseg = useDsegFont();
+  const day = useDaylight();
 
   const dial = stationDial(station.id, !!station.premium);
   const name = /\s(AM|FM)$/i.test(station.name) ? station.name : `${station.name} ${dial.band}`;
@@ -73,12 +76,12 @@ export function StationIdentity({
 
   return (
     <View style={{ alignItems, gap: 3 }}>
-      {eyebrow != null && <Text style={st.eyebrow}>{eyebrow}</Text>}
+      {eyebrow != null && <Text style={[st.eyebrow, day && st.eyebrowDay]}>{eyebrow}</Text>}
       <View style={st.row}>
-        <Text style={[st.dial, compact && st.dialCompact, { fontFamily: dseg }]}>
+        <Text style={[st.dial, compact && st.dialCompact, day && st.dialDay, { fontFamily: dseg }]}>
           {dial.label}
         </Text>
-        <Text style={[st.name, compact && st.nameCompact]} numberOfLines={1}>{name}</Text>
+        <Text style={[st.name, compact && st.nameCompact, day && st.nameDay]} numberOfLines={1}>{name}</Text>
       </View>
     </View>
   );
@@ -93,4 +96,9 @@ const st = StyleSheet.create({
   dialCompact: { fontSize: 11 },
   name: { color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2, flexShrink: 1 },
   nameCompact: { fontSize: 15 },
+  // Daylight: the quiet steps go to full strength. Half-opacity white on a
+  // photograph is the first thing the sun takes.
+  eyebrowDay: { color: 'rgba(255,255,255,0.88)' },
+  dialDay: { color: '#ffffff' },
+  nameDay: { color: '#ffffff' },
 });

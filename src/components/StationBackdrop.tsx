@@ -1,8 +1,23 @@
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { useDaylight } from '@/context/MotionContext';
 import type { Station } from '@/constants/stations';
+
+/**
+ * Daylight veil. Every white label in the app that sits on a photograph gets
+ * its contrast from how dark the photograph is behind it, and in sun a
+ * mid-bright photo swallows white type whole. A flat 22% black knocks the
+ * picture back just enough for the type to hold, everywhere at once — this
+ * component is the backdrop for all eight modes, the station hero and the
+ * landscape deck, so one veil covers the lot.
+ */
+function DaylightVeil() {
+  const daylight = useDaylight();
+  if (!daylight) return null;
+  return <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(2,3,10,0.22)' }]} pointerEvents="none" />;
+}
 
 /**
  * Full-bleed station background. If the station has a looping `motion` clip
@@ -31,15 +46,18 @@ export function StationBackdrop({
   }
   if (station.motion && motionAllowed) {
     return (
-      <ExpoImage
-        source={station.motion}
-        placeholder={station.imageBlur ?? station.image}
-        placeholderContentFit="cover"
-        contentFit="cover"
-        blurRadius={blurRadius}
-        cachePolicy="memory-disk"
-        style={StyleSheet.absoluteFill}
-      />
+      <>
+        <ExpoImage
+          source={station.motion}
+          placeholder={station.imageBlur ?? station.image}
+          placeholderContentFit="cover"
+          contentFit="cover"
+          blurRadius={blurRadius}
+          cachePolicy="memory-disk"
+          style={StyleSheet.absoluteFill}
+        />
+        <DaylightVeil />
+      </>
     );
   }
   // Pre-blurred asset when we have one: a live blurRadius re-blurs the full
@@ -57,12 +75,15 @@ export function StationBackdrop({
   // on every platform and orientation with no override needed, and
   // expo-image is already in the build for the motion clips.
   return (
-    <ExpoImage
-      source={station.imageBlur ?? station.image}
-      contentFit="cover"
-      blurRadius={station.imageBlur ? 0 : blurRadius}
-      cachePolicy="memory-disk"
-      style={StyleSheet.absoluteFill}
-    />
+    <>
+      <ExpoImage
+        source={station.imageBlur ?? station.image}
+        contentFit="cover"
+        blurRadius={station.imageBlur ? 0 : blurRadius}
+        cachePolicy="memory-disk"
+        style={StyleSheet.absoluteFill}
+      />
+      <DaylightVeil />
+    </>
   );
 }

@@ -2,6 +2,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { useDaylight } from '@/context/MotionContext';
+
 import { ShareCardSheet } from '@/components/ShareCard';
 import { MODE_CATALOG } from '@/constants/modeCatalog';
 import type { Station } from '@/constants/stations';
@@ -45,6 +47,7 @@ export function ModeActionRow({
   style?: object;
 }) {
   const np = useNowPlaying();
+  const day = useDaylight();
   const [sharing, setSharing] = useState(false);
   // The mode's own name for the card. Read from the session rather than passed
   // in by each mode — one less prop for eight callers to keep in step.
@@ -53,18 +56,18 @@ export function ModeActionRow({
 
   return (
     <View style={[ar.row, style]}>
-      <TouchableOpacity onPress={onChangeMood} style={ar.pill} activeOpacity={0.85}>
+      <TouchableOpacity onPress={onChangeMood} style={[ar.pill, day && ar.pillDay]} activeOpacity={0.85}>
         <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
         <Text style={ar.pillBold}>Change Mode</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={onPickPlaylist} style={[ar.pill, ar.pillFlex]} activeOpacity={0.85}>
-        <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
-        <Text style={ar.pillText} numberOfLines={1}>{trim(playlistLabel)}</Text>
+      <TouchableOpacity onPress={onPickPlaylist} style={[ar.pill, day && ar.pillDay, ar.pillFlex]} activeOpacity={0.85}>
+        <Ionicons name="musical-notes-outline" size={14} color={day ? "#ffffff" : "rgba(255,255,255,0.7)"} />
+        <Text style={[ar.pillText, day && ar.pillTextDay]} numberOfLines={1}>{trim(playlistLabel)}</Text>
       </TouchableOpacity>
 
       {!!track && (
-        <TouchableOpacity onPress={() => setSharing(true)} style={[ar.pill, ar.pillIcon]} activeOpacity={0.85}
+        <TouchableOpacity onPress={() => setSharing(true)} style={[ar.pill, day && ar.pillDay, ar.pillIcon]} activeOpacity={0.85}
           accessibilityLabel="Share this song" accessibilityRole="button">
           {/* Ionicons' `share-outline` is the iOS box-with-an-arrow; Android's
               own share glyph is the three-node one, so each platform gets the
@@ -104,4 +107,8 @@ const ar = StyleSheet.create({
   pillIcon: { paddingHorizontal: 12, marginLeft: 'auto' },
   pillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
   pillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  // Daylight: a dark glass pill on a photograph has no edge at all in sun, so
+  // the fill goes opaque and the rim and label go to full strength.
+  pillDay: { backgroundColor: 'rgba(6,7,14,0.72)', borderColor: 'rgba(255,255,255,0.42)' },
+  pillTextDay: { color: '#ffffff' },
 });

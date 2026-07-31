@@ -54,6 +54,8 @@ const SETTINGS_ITEMS: { icon: keyof typeof MaterialCommunityIcons.glyphMap; labe
  * Home are quiet, the only thing left that should ask for attention is the
  * upgrade card, so it is the only thing that gets to be a colour.
  */
+// The premium gold, shared by the upgrade card's eyebrow and the plan chip.
+const PREMIUM_GOLD = '#F7B733';
 const UPGRADE_GRADIENT  = ['#3a1f0c', '#241206', '#140a04'] as const;
 const GRADIENT_LOCATIONS = [0, 0.6, 1] as const;
 
@@ -101,7 +103,7 @@ function useMusicPlatformInfo() {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere } = useMotion();
+  const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere, daylight, setDaylight } = useMotion();
   const { devFreePreview, setDevFreePreview, isPro } = useEntitlements();
   const { name: platformName, color: platformColor, refresh: refreshPlatform } = useMusicPlatformInfo();
   const [selectorVisible, setSelectorVisible] = useState(false);
@@ -168,9 +170,12 @@ export default function ProfileScreen() {
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.name} numberOfLines={1}>{driverName}</Text>
-            <View style={styles.planBadge}>
-              <MaterialCommunityIcons name="star-four-points" size={10} color={theme.accentColor} />
-              <Text style={[styles.planText, { color: theme.accentColor }]}>
+            {/* Premium wears the paywall's gold, not the app's violet — it
+                is the same badge as the upgrade card's eyebrow and should
+                read as the same thing. Free stays on the accent. */}
+            <View style={[styles.planBadge, isPro && { borderColor: PREMIUM_GOLD + '66' }]}>
+              <MaterialCommunityIcons name="star-four-points" size={10} color={isPro ? PREMIUM_GOLD : theme.accentColor} />
+              <Text style={[styles.planText, { color: isPro ? PREMIUM_GOLD : theme.accentColor }]}>
                 {isPro ? 'PREMIUM' : 'FREE PLAN'}
               </Text>
             </View>
@@ -256,7 +261,31 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* Auto-dim toggle — head-unit style screen dimming mid-drive */}
+          {/* Daylight — sits directly above Auto-dim, which it overrules. */}
+          <View style={[styles.settingsRow, styles.settingsBorder]}>
+            <View style={styles.platformRowLeft}>
+              <IconChip icon="white-balance-sunny" size={34} />
+              <View style={styles.settingsTextBlock}>
+                <Text style={styles.settingsLabel}>Daylight</Text>
+                <Text style={styles.dataSaverSub}>
+                  Stronger contrast for driving in sun · brighter labels, deeper scrims · turns auto-dim off
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={daylight}
+              onValueChange={setDaylight}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              thumbColor="#fff"
+              ios_backgroundColor="rgba(255,255,255,0.18)"
+              {...({ activeThumbColor: '#fff' } as object)}
+            />
+          </View>
+
+          {/* Auto-dim toggle — head-unit style screen dimming mid-drive.
+              Hidden while Daylight is on: it cannot fire then, and a toggle
+              that does nothing is worse than no toggle. */}
+          {!daylight && (
           <View style={[styles.settingsRow, styles.settingsBorder]}>
             <View style={styles.platformRowLeft}>
               <IconChip icon="brightness-6" size={34} />
@@ -274,6 +303,7 @@ export default function ProfileScreen() {
               {...({ activeThumbColor: '#fff' } as object)}
             />
           </View>
+          )}
 
           {/* Atmosphere toggle — the smoke-machine haze in every mode */}
           <View style={[styles.settingsRow, styles.settingsBorder]}>
@@ -558,7 +588,7 @@ const styles = StyleSheet.create({
     width: 190, height: 150, borderRadius: 95,
     backgroundColor: '#F7B733', opacity: 0.13,
   },
-  upgradeEyebrow: { color: '#F7B733', fontSize: 9.5, fontWeight: '800', letterSpacing: 2.4 },
+  upgradeEyebrow: { color: PREMIUM_GOLD, fontSize: 9.5, fontWeight: '800', letterSpacing: 2.4 },
   upgradeTitle: { color: Cruise.textPrimary, fontSize: 22, fontWeight: '800', letterSpacing: -0.6, marginTop: 8, lineHeight: 26 },
   upgradeSub: { color: 'rgba(255,255,255,0.55)', fontSize: 13.5, lineHeight: 19, marginTop: 6 },
   upgradeBtnText: { color: '#1a0e02', fontSize: 15, fontWeight: '800' },

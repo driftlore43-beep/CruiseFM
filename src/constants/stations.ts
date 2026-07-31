@@ -36,15 +36,21 @@ export const STATIONS: Station[] = [
     tagline: 'Empty expressways. Violet dashboards.',
     tags: ['dark vibes', 'neon nights'],
     premium: false,
-    gradientColors: ['#1a0533', '#4a1a7a', '#000000'],
-    cardGradient: ['#5626bb', '#2d2282', '#181353'],
+    // JET BLUE, station-wide (owner, 31.07). It was cyan → periwinkle →
+    // magenta, and the magenta was the loud one: eqColors[2] lands on the
+    // equalizer's bar tops and the whole outer edge of the Circular EQ ring,
+    // so a station whose own photograph is a blue night city was reading
+    // violet everywhere. Every colour on the station moves together — a blue
+    // mode over a purple card is worse than either.
+    gradientColors: ['#04102e', '#12358f', '#000000'],
+    cardGradient: ['#2465e0', '#1b3f9e', '#122456'],
     iconName: 'weather-night',
-    eqColors: ['#5EE7FF', '#5B7BFF', '#C44CFF'],
-    glowColor: '#4a1a7a',
+    eqColors: ['#C6ECFF', '#2E7DFF', '#1340E6'],
+    glowColor: '#12358f',
     image: require('../../assets/stations/night-run.jpg'),
     imageBlur: require('../../assets/stations/blur/night-run.jpg'),
     icon: 'weather-night',
-    iconBg: '#2d1060',
+    iconBg: '#0e2a70',
     bestTime: 'Late night',
     duration: '2 hr mix',
     trackCount: 24,

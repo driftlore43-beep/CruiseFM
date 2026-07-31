@@ -134,11 +134,15 @@ const DIM_LEVEL = 0.35;
  */
 function AutoDim() {
   const np = useNowPlaying();
-  const { autoDim } = useMotion();
+  const { autoDim, daylight } = useMotion();
   const [dimmed, setDimmed] = useState(false);
   const origRef = useRef<number | null>(null);
 
-  const eligible = autoDim && !!np.session && np.expanded && np.playing && Platform.OS !== 'web';
+  // Daylight turns this off outright: dimming the screen is the exact
+  // opposite of what you want with the sun on it, and a driver who then
+  // reaches for the brightness slider ends up costing MORE battery than
+  // the dim ever saved.
+  const eligible = autoDim && !daylight && !!np.session && np.expanded && np.playing && Platform.OS !== 'web';
 
   const restore = useCallback(async () => {
     setDimmed(false);

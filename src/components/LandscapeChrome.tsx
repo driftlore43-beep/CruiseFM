@@ -5,6 +5,7 @@ import { Animated, Easing, Pressable, StyleSheet, Text, TouchableOpacity, useWin
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ModeActionRow } from '@/components/ModeActionRow';
+import { useDaylight } from '@/context/MotionContext';
 import { SeekBar } from '@/components/SeekBar';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { StationIdentity, stationDisplayName } from '@/components/StationIdentity';
@@ -186,6 +187,7 @@ export function LandscapeChrome({
   playlistLabel: string;
 }) {
   const insets = useSafeAreaInsets();
+  const day = useDaylight();
   const { width: winW } = useWindowDimensions();
   // Landscape safe areas live on the SIDES (the notch), not the top.
   const sideL = Math.max(insets.left, 22);
@@ -230,7 +232,9 @@ export function LandscapeChrome({
             than a cut. */}
         <StationBackdrop station={station} blurRadius={3} />
         <LinearGradient
-          colors={['rgba(6,7,14,0.94)', 'rgba(8,9,16,0.80)', 'rgba(6,7,14,0.90)']}
+          colors={day
+            ? ['rgba(3,4,10,0.985)', 'rgba(4,5,12,0.95)', 'rgba(3,4,10,0.98)']
+            : ['rgba(6,7,14,0.94)', 'rgba(8,9,16,0.80)', 'rgba(6,7,14,0.90)']}
           locations={[0, 0.45, 1]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
@@ -242,7 +246,7 @@ export function LandscapeChrome({
 
           <View>
             <Text style={st.title} numberOfLines={1}>{track?.title ?? tagline}</Text>
-            {!!track && <Text style={st.artist} numberOfLines={1}>{track.artist}</Text>}
+            {!!track && <Text style={[st.artist, day && { color: 'rgba(255,255,255,0.92)' }]} numberOfLines={1}>{track.artist}</Text>}
           </View>
 
           {seekBar !== undefined

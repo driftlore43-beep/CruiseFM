@@ -7,6 +7,7 @@ import { useFocusEffect } from 'expo-router';
 import { useFonts } from 'expo-font';
 
 import { CreateStationModal } from '@/components/CreateStationModal';
+import { useDaylight } from '@/context/MotionContext';
 import { StationDetailModal } from '@/components/StationDetailModal';
 import { GlossSheen } from '@/components/GlossSheen';
 import { useNowPlaying } from '@/context/NowPlayingContext';
@@ -154,6 +155,7 @@ function OnAirHero({
  */
 function LcdNumber({ label, tuned, lcd }: { label: string; tuned: boolean; lcd: boolean }) {
   const family = lcd ? 'DSEG7' : Fonts.mono;
+  const day = useDaylight();
   // No ghost segments on the list rows. They earned their place on the old
   // photo cards, where a lit panel needed unlit siblings to read as hardware;
   // over plain black they are just grey noise beside every name, and the
@@ -161,7 +163,7 @@ function LcdNumber({ label, tuned, lcd }: { label: string; tuned: boolean; lcd: 
   // that job now.
   return (
     <Text
-      style={[styles.numLit, { fontFamily: family }, tuned && styles.numLitTuned]}
+      style={[styles.numLit, { fontFamily: family }, day && styles.numLitDay, tuned && styles.numLitTuned]}
       numberOfLines={1}>
       {label}
     </Text>
@@ -216,6 +218,7 @@ function StationRow({
   last?: boolean;
   onPress?: () => void;
 }) {
+  const day = useDaylight();
   const custom = (station as CustomStation).image === null ? (station as CustomStation) : null;
   const mine = !!custom;
   const accent = station.eqColors?.[1] ?? (custom?.color ?? Cruise.amber);
@@ -231,6 +234,7 @@ function StationRow({
       style={({ pressed }) => [
         styles.row,
         !last && styles.rowRule,
+        !last && day && styles.rowRuleDay,
         locked && styles.rowLocked,
         pressed && onPress ? styles.rowPressed : null,
       ]}>
@@ -240,7 +244,7 @@ function StationRow({
       <View style={styles.numCol}>
         <LcdNumber label={dial.label} tuned={tuned} lcd={lcd} />
       </View>
-      <Text style={[styles.rowName, tuned && styles.rowNameTuned]} numberOfLines={1}>{station.name}</Text>
+      <Text style={[styles.rowName, tuned && styles.rowNameTuned, day && styles.rowNameDay]} numberOfLines={1}>{station.name}</Text>
       {mine && (
         <View style={styles.mineChip}>
           <Text style={styles.mineChipText}>MINE</Text>
@@ -260,7 +264,7 @@ function StationRow({
           {locked ? (
             <MaterialCommunityIcons name="lock" size={14} color="rgba(255,255,255,0.45)" />
           ) : (
-            <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.28)" />
+            <Ionicons name="chevron-forward" size={16} color={day ? 'rgba(255,255,255,0.68)' : 'rgba(255,255,255,0.28)'} />
           )}
         </View>
       </View>
@@ -564,6 +568,12 @@ const styles = StyleSheet.create({
     // this contrast replaced the old ghost-segment trick.
     color: 'rgba(255,255,255,0.42)',
   },
+  // Daylight: the dial numbers sit at 42% so the tuned one can stand out —
+  // in sun that whole scale simply vanishes, so it comes up to near-full and
+  // the tuned one keeps its glow to stay distinguishable.
+  numLitDay: { color: 'rgba(255,255,255,0.86)' },
+  rowNameDay: { color: '#ffffff' },
+  rowRuleDay: { borderBottomColor: 'rgba(255,255,255,0.30)' },
   numLitTuned: {
     color: '#FFFFFF',
     textShadowColor: 'rgba(255,255,255,0.75)',

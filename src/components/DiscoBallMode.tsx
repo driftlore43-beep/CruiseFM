@@ -401,24 +401,6 @@ function NeonSweep({ size, eq, pulse }: { size: number; eq: [string, string, str
   );
 }
 
-// A whisper-quiet lens flare along the highlight's light axis — a thin
-// streak plus a few shrinking ghost rings, the classic subtle "premium
-// camera" touch. Static geometry; only its overall opacity breathes with
-// the music pulse.
-function LensFlare({ size, pulse }: { size: number; pulse: Animated.Value }) {
-  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.85] });
-  const axis: [number, number][] = [[0.58, 0.5], [0.78, 0.72], [0.90, 0.86]];
-  return (
-    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity }]}>
-      <Svg width={size} height={size} viewBox="0 0 100 100">
-        <Path d="M 26 24 L 46 24" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.9} strokeLinecap="round" />
-        {axis.map(([fx, fy], i) => (
-          <Circle key={i} cx={fx * 100} cy={fy * 100} r={2.4 - i * 0.5} fill="none" stroke="#ffffff" strokeOpacity={0.13 - i * 0.03} strokeWidth={0.6} />
-        ))}
-      </Svg>
-    </Animated.View>
-  );
-}
 
 // A soft radial halo bleeding OUTSIDE the ball's own circular clip — the
 // cheap, established way to fake bloom in this codebase (layered translucent
@@ -512,48 +494,11 @@ function spotPath(R: number) {
   }
 }
 
-/**
- * The beam itself, reaching the ball from off-screen. This is what tells you
- * a spotlight EXISTS — a bright patch on its own is just a patch, and that is
- * why the old sheen band read as decoration. Drawn behind the ball so the
- * ball occludes its tip, and it narrows as it arrives, like a beam does.
- */
-function SpotBeam({ size, lit, pan }: { size: number; lit: Animated.Value; pan: Animated.Value }) {
-  const R = size / 2;
-  const path = useMemo(() => spotPath(R), [R]);
-  const len = size * 2.2;
-  const wide = size * 0.62;
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: 'absolute', left: R, top: R - wide / 2, width: len, height: wide,
-        opacity: Animated.multiply(lit, pan.interpolate({ inputRange: path.xs, outputRange: path.op.map((o) => o * 0.5) })),
-        // Rotated about its own LEFT edge — that end sits at the ball's centre
-        // and stays there while the far end swings round with the light.
-        transform: [
-          { translateX: len / 2 },
-          { rotate: pan.interpolate({ inputRange: path.xs, outputRange: path.from as unknown as number[] }) as unknown as string },
-          { translateX: -len / 2 },
-        ],
-      }}>
-      <Svg width={len} height={wide} viewBox="0 0 100 40" preserveAspectRatio="none">
-        <Defs>
-          <SvgLinearGradient id="dbBeam" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.22" />
-            <Stop offset="0.45" stopColor="#ffffff" stopOpacity="0.07" />
-            <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-          </SvgLinearGradient>
-        </Defs>
-        {/* A wedge: narrow where it meets the ball, spreading back to source. */}
-        <Path d="M 0 16 L 100 0 L 100 40 L 0 24 Z" fill="url(#dbBeam)" />
-      </Svg>
-    </Animated.View>
-  );
-}
 
-function SpotlightPan({ size, lit, pan }: { size: number; lit: Animated.Value; pan: Animated.Value }) {
+function SpotlightPan({ size, lit, pan, eq }: { size: number; lit: Animated.Value; pan: Animated.Value; eq: [string, string, string] }) {
   const R = size / 2;
+  const tint = eq[1];
+  const tintHi = mixHex(eq[0], '#ffffff', 0.35);
   const path = useMemo(() => spotPath(R), [R]);
   const i = (out: number[] | string[]) =>
     pan.interpolate({ inputRange: path.xs, outputRange: out as number[] });
@@ -575,10 +520,17 @@ function SpotlightPan({ size, lit, pan }: { size: number; lit: Animated.Value; p
       }}>
       <Svg width={pool * 2} height={pool * 2} viewBox="0 0 100 100">
         <Defs>
+          {/* The spot carries the STATION's colour, so the mirrors it lands
+              on go coloured and bright rather than the colour sitting behind
+              the ball and in its shadows (owner, 31.07: "the colours are
+              looking a bit unappreciated"). White at the very core, because
+              the hottest part of any beam blows out to white whatever
+              colour it is. */}
           <RadialGradient id="dbSpot" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.46" />
-            <Stop offset="0.34" stopColor="#ffffff" stopOpacity="0.17" />
-            <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.44" />
+            <Stop offset="0.22" stopColor={tintHi} stopOpacity="0.34" />
+            <Stop offset="0.52" stopColor={tint} stopOpacity="0.16" />
+            <Stop offset="1" stopColor={tint} stopOpacity="0" />
           </RadialGradient>
         </Defs>
         <Circle cx={50} cy={50} r={50} fill="url(#dbSpot)" />
@@ -760,8 +712,7 @@ function MirrorBall({ size, eq, spin, pulse, lit, spotPan }: { size: number; eq:
           them, and it is built from the sphere's geometry instead. */}
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: lit }]} pointerEvents="none">
         <KeySpecular size={size} lit={lit} />
-        <SpotlightPan size={size} lit={lit} pan={spotPan} />
-        <LensFlare size={size} pulse={pulse} />
+        <SpotlightPan size={size} lit={lit} pan={spotPan} eq={eq} />
       </Animated.View>
     </View>
   );
@@ -783,13 +734,18 @@ function LightField({ count, eq, live, winW, winH, offsetX = 0 }: {
     // Spread across the WHOLE room, not just a halo round the ball. The ball
     // is meant to be the source, not the brightest object — what should catch
     // the eye is its light landing on everything else (owner, 28.07).
-    const x = 0.5 + Math.cos(ar) * rad * 1.35;
-    const y = 0.46 + Math.sin(ar) * rad * 1.25;
-    // Small and bright, with a wide soft shadow around them — a reflection
-    // thrown onto a wall is a sharp speck inside a soft pool. Rendered fat
-    // they read as coloured bubbles floating in front of the ball; the big
-    // soft shapes are BokehField's job, not this layer's.
-    const size = 5 + (i % 5) * 4;
+    // Kept OUT of the ball's own disc: a reflection lands on the room, and one
+    // drawn over the mirrors reads as a blemish on them.
+    const push = 0.30 + rad;
+    const x = 0.5 + Math.cos(ar) * push * 1.45;
+    const y = 0.46 + Math.sin(ar) * push * 1.30;
+    // These are MIRROR REFLECTIONS landing on the room, not floating bokeh
+    // (owner, 31.07: "instead of floating circles it should be the mirrors'
+    // tiny light reflections"). So: small and sharp. The big soft circles
+    // that used to drift about with them are deleted — over the ball they
+    // read as faint rings sitting on the mirrors, which is the "Os" she
+    // spotted and could not place.
+    const size = 4 + (i % 4) * 3;
     const color = [eq[0], eq[1], eq[2], '#EAF2FF'][i % 4];
     const delay = (i * 213) % 1800;
     const dur = 1100 + (i % 6) * 260;
@@ -833,164 +789,106 @@ function LightField({ count, eq, live, winW, winH, offsetX = 0 }: {
   );
 }
 
-// ── Floating bokeh — soft out-of-focus circles drifting in the room ─────────
-// Distinct from LightField's small hard twinkle dots: these are big, blurred
-// (a RadialGradient falloff, not a solid fill), and drift on a slow yo-yo
-// float rather than orbiting — read as an out-of-focus foreground/background
-// layer, the classic "premium visualizer" touch. One native-driver loop per
-// particle; nothing recomputed per frame.
-function BokehDot({ x, y, size, color, driftY, driftX, dur, delay }: {
-  x: number; y: number; size: number; color: string; driftY: number; driftX: number; dur: number; delay: number;
-}) {
-  const t = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([
-      Animated.delay(delay),
-      Animated.timing(t, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(t, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, []);
-  const translateY = t.interpolate({ inputRange: [0, 1], outputRange: [0, -driftY] });
-  const translateX = t.interpolate({ inputRange: [0, 1], outputRange: [0, driftX] });
-  const opacity = t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.10, 0.30, 0.10] });
-  return (
-    <Animated.View pointerEvents="none" style={{
-      position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size,
-      opacity, transform: [{ translateX }, { translateY }],
-    }}>
-      <Svg width={size} height={size}>
-        <Defs>
-          <RadialGradient id="dbBokeh" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={color} stopOpacity="0.85" />
-            <Stop offset="55%" stopColor={color} stopOpacity="0.22" />
-            <Stop offset="100%" stopColor={color} stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-        <Circle cx={size / 2} cy={size / 2} r={size / 2} fill="url(#dbBokeh)" />
-      </Svg>
-    </Animated.View>
-  );
-}
 
-function BokehField({ count, eq, live, winW, winH }: {
-  count: number; eq: [string, string, string]; live: Animated.Value; winW: number; winH: number;
-}) {
-  const dots = useMemo(() => Array.from({ length: count }, (_, i) => {
-    const x = hash01(i * 7.31 + 1.7) * winW;
-    const y = winH * 0.10 + hash01(i * 3.13 + 9.4) * winH * 0.72;
-    const size = 16 + hash01(i * 5.5 + 2.2) * 30;
-    const palette = stationPalette(eq);
-    const color = palette[i % palette.length];
-    const driftY = 20 + hash01(i * 9.9) * 26;
-    const driftX = (hash01(i * 4.4) - 0.5) * 24;
-    const dur = 3600 + Math.floor(hash01(i * 2.1) * 2400);
-    const delay = Math.floor(hash01(i * 6.6) * 2000);
-    return { x, y, size, color, driftY, driftX, dur, delay };
-  }), [count, eq, winW, winH]);
-
-  return (
-    <Animated.View style={[StyleSheet.absoluteFill, { opacity: live }]} pointerEvents="none">
-      {dots.map((d, i) => <BokehDot key={i} {...d} />)}
-    </Animated.View>
-  );
-}
 /**
- * The beams the ball throws into the room.
+ * THE BEAMS THE BALL THROWS, sourced from the ball's own surface.
  *
- * The old version was two fat opaque triangles, which read as a drawn cone
- * rather than light. On the owner's reference photograph a mirror ball throws
- * DOZENS of thin shafts at every angle, each a slightly different length and
- * brightness, all of them soft-edged and fading out as they travel — so this
- * is 22 hairline shafts radiating from the ball's centre, each breathing on
- * its own period, with the whole fan turning slowly like stage lighting.
+ * The old version was a rigid fan of 22 shafts radiating from the centre,
+ * turning as one piece — which is a flat pinwheel, not a sphere throwing
+ * light (owner, 31.07: "currently it is circulating the mirror ball like a
+ * 2D shape"). On the reference photographs the beams come from particular
+ * bright mirrors dotted around the ball, each at its own angle, appearing
+ * and dying as its mirror swings past.
  *
- * Every shaft is a full-diameter view rotated about its own centre, with the
- * gradient drawn in its top half only. RN has no transform-origin, so this is
- * the way to pivot a beam at the ball rather than at its midpoint.
+ * So each beam belongs to a MIRROR: a fixed latitude and longitude on the
+ * sphere. As the ball turns, that mirror orbits, and the beam is drawn from
+ * wherever the mirror currently sits on screen, pointing along the direction
+ * that mirror reflects — r = 2(n·v)n − v. It fades out entirely while its
+ * mirror is round the back, and it is brightest when the reflection travels
+ * ACROSS the room rather than straight at the viewer.
+ *
+ * The whole trajectory is sampled once into interpolation tables driven by
+ * `spin`, so this costs no per-frame work and stays locked to the ball —
+ * stopping when it stops and following a finger drag.
  */
-function LightShafts({ size, color, winW, spin }: { size: number; color: string; winW: number; spin: Animated.Value }) {
-  // The fan turns with the BALL, not on a clock of its own. These beams are
-  // light thrown OFF the mirrors, so they can only travel at the speed of the
-  // surface that throws them — on its own 74-second loop it drifted at a rate
-  // unrelated to anything, which is exactly what makes an effect read as
-  // decoration (owner, 31.07: "make sure the reflected light move at the same
-  // pace as the ball"). Riding `spin` also means they stop when it stops and
-  // follow a finger drag.
-  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] });
+const BEAM_COUNT = 15;
 
-  // Long enough to reach the far corners of the screen, so no shaft ever ends
-  // in mid-air — they leave the frame instead.
-  const reach = Math.max(winW * 1.5, size * 3.4);
-  const shafts = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
-    deg: (360 / 22) * i + (hash01(i * 3.7) - 0.5) * 7,
-    // HAIRLINES. Rendered at the first cut these were up to 24px wide and
-    // read as flat wedges radiating out — a drawn starburst, not light. A
-    // beam from a mirror tile is a couple of pixels across with a soft bloom
-    // either side; the widest here is about 6px and most are nearer 1.
-    width: size * (0.004 + Math.pow(hash01(i * 5.3), 2.6) * 0.020),
-    len: reach * (0.55 + hash01(i * 8.1) * 0.45),
-    peak: 0.10 + hash01(i * 2.9) * 0.26,
-    dur: 3200 + Math.floor(hash01(i * 6.7) * 5200),
-    delay: Math.floor(hash01(i * 4.1) * 4600),
-  })), [size, reach]);
+function MirrorBeams({ size, color, winW, spin, lit }: {
+  size: number; color: string; winW: number; spin: Animated.Value; lit: Animated.Value;
+}) {
+  const R = size / 2;
+  const reach = Math.max(winW * 1.7, size * 3.4);
+  const st = Math.sin(TILT), ct = Math.cos(TILT);
 
-  const breath = useRef(shafts.map(() => new Animated.Value(0))).current;
-  useEffect(() => {
-    const loops = shafts.map((sh, i) => {
-      const loop = Animated.loop(Animated.sequence([
-        Animated.delay(sh.delay),
-        Animated.timing(breath[i], { toValue: 1, duration: sh.dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(breath[i], { toValue: 0, duration: sh.dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]));
-      loop.start();
-      return loop;
-    });
-    return () => loops.forEach((l) => l.stop());
-  }, [shafts]);
+  const beams = useMemo(() => Array.from({ length: BEAM_COUNT }, (_, i) => {
+    // Where this mirror lives on the ball. Latitudes are spread but kept off
+    // the poles, where a mirror faces up and throws its light at the ceiling.
+    const lat = (hash01(i * 3.7 + 0.4) - 0.5) * 1.7;
+    const lon0 = (i / BEAM_COUNT) * Math.PI * 2 + hash01(i * 9.1) * 0.4;
+    const len = reach * (0.55 + hash01(i * 5.3) * 0.45);
+    const width = size * (0.006 + Math.pow(hash01(i * 7.7), 2.2) * 0.022);
+    const peak = 0.30 + hash01(i * 2.3) * 0.42;
 
-  const box = reach * 2;
+    const N = 60;
+    const xs: number[] = [], tx: number[] = [], ty: number[] = [];
+    const rot: string[] = [], op: number[] = [];
+    for (let k = 0; k <= N; k++) {
+      const u = k / N;
+      const lam = lon0 + u * Math.PI * 2;
+      const cb = Math.cos(lat);
+      const x0 = cb * Math.sin(lam), y0 = Math.sin(lat), z0 = cb * Math.cos(lam);
+      const ny = y0 * ct - z0 * st;
+      const nz = y0 * st + z0 * ct;
+      const nx = x0;
+      xs.push(u);
+      tx.push(R * nx);
+      ty.push(-R * ny);
+      // The beam leaves along the outward normal, which on screen is the
+      // direction from the ball's centre through the mirror.
+      rot.push(`${((Math.atan2(-ny, nx) * 180) / Math.PI).toFixed(2)}deg`);
+      // Brightest at the LIMB, nothing at the centre. A mirror square on to
+      // us throws its beam straight down the lens, where the ball itself is
+      // in the way — the shafts you actually see in a photograph come off the
+      // edges. So the beam swells as its mirror swings round to the side and
+      // dies as it comes to the front, which is what makes the light travel
+      // around a sphere rather than spin like a pinwheel.
+      const limb = Math.max(0, 1 - Math.max(0, nz));
+      op.push(peak * Math.pow(limb, 0.85));
+    }
+    return { xs, tx, ty, rot, op, len, width };
+  }), [R, reach, size, st, ct]);
+
   return (
-    <Animated.View pointerEvents="none" style={{
-      position: 'absolute', width: box, height: box,
-      left: (size - box) / 2, top: (size - box) / 2,
-      transform: [{ rotate }],
-    }}>
-      {shafts.map((sh, i) => (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {beams.map((b, i) => (
         <Animated.View
           key={i}
+          pointerEvents="none"
           style={{
-            position: 'absolute', left: box / 2 - sh.width * 3, top: 0,
-            width: sh.width * 6, height: box,
-            opacity: breath[i].interpolate({ inputRange: [0, 1], outputRange: [0.03, sh.peak] }),
-            transform: [{ rotate: `${sh.deg}deg` }],
-          }}
-        >
-          {/* Two gradients, not one. There is no blur filter available, so the
-              soft edge is faked: a WIDE, very faint copy standing in for the
-              bloom, and the thin bright core inside it. A single hard-edged
-              bar reads as a drawn line however thin you make it. Both run
-              from the ball outward and are gone by the end of their throw. */}
-          <View style={{ position: 'absolute', left: 0, top: box / 2 - sh.len, width: sh.width * 6, height: sh.len }}>
-            <LinearGradient
-              colors={['rgba(255,255,255,0)', color, color]}
-              locations={[0, 0.72, 1]}
-              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-              style={[StyleSheet.absoluteFill, { opacity: 0.22 }]}
-            />
-          </View>
-          <View style={{ position: 'absolute', left: sh.width * 2.5, top: box / 2 - sh.len, width: sh.width, height: sh.len }}>
-            <LinearGradient
-              colors={['rgba(255,255,255,0)', color, 'rgba(255,255,255,0.9)']}
-              locations={[0, 0.66, 1]}
-              start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </View>
+            position: 'absolute', left: R, top: R - b.width / 2,
+            width: b.len, height: b.width,
+            opacity: Animated.multiply(lit, spin.interpolate({ inputRange: b.xs, outputRange: b.op })),
+            transform: [
+              { translateX: spin.interpolate({ inputRange: b.xs, outputRange: b.tx }) },
+              { translateY: spin.interpolate({ inputRange: b.xs, outputRange: b.ty }) },
+              { translateX: b.len / 2 },
+              { rotate: spin.interpolate({ inputRange: b.xs, outputRange: b.rot as unknown as number[] }) as unknown as string },
+              { translateX: -b.len / 2 },
+            ],
+          }}>
+          <Svg width={b.len} height={b.width} viewBox="0 0 100 10" preserveAspectRatio="none">
+            <Defs>
+              <SvgLinearGradient id={`dbBeam${i}`} x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0" stopColor="#ffffff" stopOpacity="0.95" />
+                <Stop offset="0.10" stopColor={color} stopOpacity="0.62" />
+                <Stop offset="1" stopColor={color} stopOpacity="0" />
+              </SvgLinearGradient>
+            </Defs>
+            <Rect x={0} y={0} width={100} height={10} fill={`url(#dbBeam${i})`} />
+          </Svg>
         </Animated.View>
       ))}
-    </Animated.View>
+    </View>
   );
 }
 
@@ -1391,7 +1289,6 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         <LightStreaks live={live} winW={winW} winH={winH} />
 
         {/* Floating bokeh — soft out-of-focus particles drifting in the room */}
-        <BokehField count={9} eq={eq} live={live} winW={winW} winH={winH} />
 
         {/* Drag pill + mode label + centred header are portrait furniture —
             in landscape LandscapeChrome carries the identity at top-left. */}
@@ -1431,12 +1328,10 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
                   Also the scrub target: swipe left/right anywhere on the ball. */}
               <View style={{ width: ballSize, height: ballSize }} {...ballPan.panHandlers}>
                 <UnderGlow size={ballSize} color={bloomColor} lit={live} />
-                {/* Behind the ball, so the ball stands in its way. */}
-                <SpotBeam size={ballSize} lit={live} pan={spotPan} />
                 {/* Bloom and beams are light LEAVING the ball, so they fade
                     out with the music exactly as the flashes do. */}
                 <Animated.View style={[StyleSheet.absoluteFill, { opacity: live }]} pointerEvents="none">
-                  <LightShafts size={ballSize} color={bloomColor} winW={winW} spin={spin} />
+                  <MirrorBeams size={ballSize} color={bloomColor} winW={winW} spin={spin} lit={live} />
                   <BallBloom size={ballSize} color={bloomColor} pulse={pulse} />
                 </Animated.View>
                 <MirrorBall size={ballSize} eq={eq} spin={spin} pulse={pulse} lit={live} spotPan={spotPan} />

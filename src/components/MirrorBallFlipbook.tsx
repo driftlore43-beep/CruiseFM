@@ -194,7 +194,7 @@ export function buildFlipbook(size: number, eq: [string, string, string]): FlipT
           if (dot <= 0) continue;
           const wide = Math.pow(dot, 15) * L.power;
           if (wide > flare) flare = wide;
-          const narrow = Math.pow(dot, 40) * L.power;
+          const narrow = Math.pow(dot, 28) * L.power;
           if (narrow > cLobe) { cLobe = narrow; flareHue = i; flareSat = L.sat; }
         }
         // Broad shading so the sphere still reads as a lit ball underneath.
@@ -220,9 +220,19 @@ export function buildFlipbook(size: number, eq: [string, string, string]): FlipT
 
         // Colour arrives as LIGHT: only a mirror actually catching a coloured
         // lamp carries a cast, so bare silver always shows between them.
+        //
+        // The cast goes onto a BRIGHT mirror and toward a LIGHTENED station
+        // colour, never a deepened one. Mixing a mid-grey tile toward a deep
+        // palette entry is what left the colour sitting in the ball's shadows
+        // instead of on it (owner, 31.07: "the colours are looking a bit
+        // unappreciated... the colour currently sits in the background and in
+        // deep shades"). A mirror catching a coloured beam is one of the
+        // brightest things on the ball, so it is lifted before it is tinted.
         const hue = palette[(flareHue * 3 + Math.floor(env * palette.length)) % palette.length];
-        const cast = cLobe > 0.10 ? Math.min(0.42, cLobe * flareSat * 1.5) : 0;
-        const fill = cast > 0 ? mixHex(shadeAt(t), hue, cast) : shadeAt(t);
+        const lifted = mixHex(hue, '#ffffff', 0.30);
+        const cast = cLobe > 0.06 ? Math.min(0.72, cLobe * flareSat * 2.4) : 0;
+        const base = cast > 0 ? Math.min(1, t + cast * 0.42) : t;
+        const fill = cast > 0 ? mixHex(shadeAt(base), lifted, cast) : shadeAt(t);
 
         const P = (u: number, v: number) => {
           const a = (1 - u) * (1 - v), b = u * (1 - v), cc = u * v, dd = (1 - u) * v;

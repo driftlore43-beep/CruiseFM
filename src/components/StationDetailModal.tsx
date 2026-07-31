@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { stationDial, type Station } from '@/constants/stations';
-import { useDsegFont } from '@/components/StationIdentity';
+import { useDsegFonts } from '@/components/StationIdentity';
 import { type CustomStation } from '@/utils/customStations';
 import { Cruise } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
@@ -63,7 +63,7 @@ type Props = {
 };
 
 export function StationDetailModal({ station, visible, onClose, onStartDrive, isPro, onEdit, onDelete }: Props) {
-  const dseg = useDsegFont();
+  const { seg7: dseg, seg14 } = useDsegFonts();
   // The modal renders with station null while closed.
   const dial = station ? stationDial(station.id, !!station.premium) : { band: 'AM' as const, label: '', value: 0 };
   const insets = useSafeAreaInsets();
@@ -303,7 +303,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
               the receiver identity, same as the Stations page. */}
           <Text style={[styles.dialLine, { fontFamily: dseg }]}>
             {dial.label}
-            <Text style={styles.dialBand}>  {dial.band}</Text>
+            <Text style={[styles.dialBand, { fontFamily: seg14 }]}>  {dial.band}</Text>
           </Text>
           <Text style={styles.stationName}>{station.name}</Text>
           <Text style={styles.stationTagline}>{station.tagline}</Text>

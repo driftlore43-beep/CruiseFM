@@ -21,12 +21,30 @@ import { Fonts } from '@/constants/theme';
  * means nothing without knowing which dial it's on.
  */
 
-/** The seven-segment face, or the mono stand-in until the ttf resolves. */
-export function useDsegFont(): string {
+/**
+ * The two segment faces, or the mono stand-in until the ttfs resolve.
+ *
+ * SEVEN segments for the numbers, FOURTEEN for the band letters, and that
+ * split is not decoration: a seven-segment cell has no diagonals, so it
+ * genuinely cannot draw an M — set in DSEG7 the band came out as "AN" / "FN"
+ * (owner, 31.07). Fourteen segments add the diagonals and the vertical
+ * centre bar, which is what real receivers use for their lettering. The
+ * Stations page has always set its band headers this way; everywhere else
+ * that prints a band must too.
+ */
+export function useDsegFonts(): { seg7: string; seg14: string } {
   const [loaded] = useFonts({
     'DSEG7Classic-Bold': require('../../assets/fonts/DSEG7Classic-Bold.ttf'),
+    'DSEG14Classic-Bold': require('../../assets/fonts/DSEG14Classic-Bold.ttf'),
   });
-  return loaded ? 'DSEG7Classic-Bold' : Fonts.mono;
+  return loaded
+    ? { seg7: 'DSEG7Classic-Bold', seg14: 'DSEG14Classic-Bold' }
+    : { seg7: Fonts.mono, seg14: Fonts.mono };
+}
+
+/** Just the seven-segment face — for callers that only print digits. */
+export function useDsegFont(): string {
+  return useDsegFonts().seg7;
 }
 
 export function stationDisplayName(station: Station): string {

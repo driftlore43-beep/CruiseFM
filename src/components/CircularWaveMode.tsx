@@ -31,6 +31,24 @@ import { SeekBar } from '@/components/SeekBar';
 
 const SCREEN_H = Dimensions.get('window').height;
 
+/**
+ * Per-station palettes for the orb ONLY.
+ *
+ * The ring reads the station's eqColors like every other mode, but those are
+ * a three-stop ramp tuned for bars and mirrors, and on the orb the outer stop
+ * lands on the ring's whole outside edge — so Night Run's magenta was
+ * dominating a station whose own picture is blue (owner, 31.07: "change the
+ * circular equalizer to jet blue for Night Run"). This overrides the ramp
+ * here and nowhere else: the station keeps its identity in every other mode.
+ *
+ * Order is centre → out, matching the cwStroke gradient's 0.5 / 0.75 / 1
+ * stops, so the last colour is the one you see most of.
+ */
+const ORB_PALETTE: Record<string, [string, string, string]> = {
+  'night-run': ['#C6ECFF', '#2E7DFF', '#1340E6'],
+};
+
+
 // Ring geometry (SVG viewBox units)
 const VB = 300;
 const CX = VB / 2;
@@ -89,7 +107,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
     setShuffle(spotify.shuffleOn);
     setRepeat(spotify.repeatMode !== 'off');
   }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
-  const eq = station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF'];
+  const eq = ORB_PALETTE[station.id] ?? station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF'];
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const [phase, setPhase] = useState(0);

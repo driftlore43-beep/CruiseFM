@@ -1,14 +1,5 @@
-import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  cancelAnimation,
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
 import { Cruise } from '@/constants/theme';
 
@@ -28,6 +19,22 @@ const BAR_CONFIGS = [
 /** Height the bars settle at when nothing is playing — a row of dots. */
 const REST_H = 3;
 
+/**
+ * One bar.
+ *
+ * WHY React Native's own Animated and not Reanimated (fixed 02.08): this was
+ * the only component in the app still on Reanimated, and the only one
+ * animating HEIGHT — a layout property — instead of a transform. Every other
+ * animation in Cruise FM is an Animated transform on the native driver, and
+ * every one of those runs on device; this one didn't, while measuring exactly
+ * the same component in the browser showed the loop working perfectly. A
+ * single component on a different engine, animating the one property that
+ * can't take the native driver, is not a coincidence worth defending.
+ *
+ * The bar is drawn at its FULL height and scaled down instead. Scaling happens
+ * about the centre, so it is paired with a translate that puts the bottom edge
+ * back on the baseline — React Native has no transform-origin.
+ */
 function EqBar({
   maxH,
   duration,
@@ -42,32 +49,44 @@ function EqBar({
   /** Bars only move while audio is genuinely playing. */
   live: boolean;
 }) {
-  const h = useSharedValue(REST_H);
+  // 0 = resting dot, 1 = full height.
+  const v = useRef(new Animated.Value(0)).current;
 
   // The loop used to start on mount and never stop, so the meter bounced
   // merrily along over paused music — which is the one thing an equalizer
-  // must not do. It now starts and stops with the audio.
+  // must not do. It starts and stops with the audio.
   useEffect(() => {
-    if (live) {
-      h.value = withDelay(
-        delay,
-        withRepeat(
-          withTiming(maxH, { duration, easing: Easing.inOut(Easing.ease) }),
-          -1,
-          true,
-        ),
-      );
-    } else {
-      // cancelAnimation first: withTiming alone would be overridden by the
-      // repeat that is still running.
-      cancelAnimation(h);
-      h.value = withTiming(REST_H, { duration: 320, easing: Easing.out(Easing.quad) });
+    if (!live) {
+      v.stopAnimation();
+      Animated.timing(v, {
+        toValue: 0, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true,
+      }).start();
+      return;
     }
-  }, [live]);
+    // The delay runs ONCE, before the loop — inside it, every bar would pause
+    // at the bottom of every cycle and the row would breathe in unison.
+    const anim = Animated.sequence([
+      Animated.delay(delay),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(v, { toValue: 1, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(v, { toValue: 0, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]),
+      ),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [live, delay, duration, v]);
 
-  const style = useAnimatedStyle(() => ({ height: h.value }));
+  const minScale = REST_H / maxH;
+  const scaleY = v.interpolate({ inputRange: [0, 1], outputRange: [minScale, 1] });
+  const translateY = v.interpolate({ inputRange: [0, 1], outputRange: [(maxH - REST_H) / 2, 0] });
 
-  return <Animated.View style={[styles.bar, { backgroundColor: color }, style]} />;
+  return (
+    <Animated.View
+      style={[styles.bar, { height: maxH, backgroundColor: color, transform: [{ translateY }, { scaleY }] }]}
+    />
+  );
 }
 
 export function EqualizerHeader({

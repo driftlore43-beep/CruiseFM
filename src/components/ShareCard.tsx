@@ -10,7 +10,7 @@ import Svg from 'react-native-svg';
 import type { Station } from '@/constants/stations';
 import { CARD_H, CARD_RATIO, CARD_W } from '@/components/ShareModeArt';
 import {
-  FORMAT_H, SHARE_STYLES, ShareCardBody,
+  DEFAULT_SHARE_STYLE, FORMAT_H, SHARE_STYLES, ShareCardBody,
   type ShareFormat, type ShareStyleId,
 } from '@/components/ShareCardStyles';
 import { getProfileName } from '@/utils/spotify';
@@ -20,7 +20,7 @@ import type { NowPlaying } from '@/utils/useMusicPlayback';
 const INSTALL_URL = 'https://cruisefm.app';
 
 /**
- * The shareable card — a now-playing pin, in whichever of the five design
+ * The shareable card — a now-playing pin, in whichever of the three design
  * styles the user picks (see ShareCardStyles).
  *
  * Drawn entirely in react-native-svg on purpose. Turning a normal View into an
@@ -81,7 +81,7 @@ export function ShareCardSheet({
   const { width: winW, height: winH } = useWindowDimensions();
   const [userName, setUserName] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [styleId, setStyleId] = useState<ShareStyleId>('now');
+  const [styleId, setStyleId] = useState<ShareStyleId>(DEFAULT_SHARE_STYLE);
   const [format, setFormat] = useState<ShareFormat>('card');
   const capRef = useRef<Svg>(null);
 
@@ -143,10 +143,10 @@ export function ShareCardSheet({
           <ShareCard width={previewW} station={station} track={track} modeLabel={modeLabel}
             modeId={modeId} userName={userName} styleId={styleId} format={format} />
 
-          {/* Design styles */}
-          {/* The row must be given a real width. Inside a centred column with
-              no width of its own it sizes to its CONTENT, so five chips run
-              off both edges of the screen instead of scrolling. */}
+          {/* Design styles. The row must be given a real width — inside a
+              centred column with no width of its own it sizes to its CONTENT,
+              which pushed the chips off both edges of the screen. It still
+              scrolls if a longer set is ever added. */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             contentContainerStyle={sc.chips} style={[sc.chipRow, { width: winW - 32 }]}>
             {SHARE_STYLES.map((s) => {
@@ -223,7 +223,7 @@ const sc = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(4,4,10,0.86)', alignItems: 'center', justifyContent: 'center' },
   body: { alignItems: 'center', gap: 14, paddingHorizontal: 16 },
   chipRow: { flexGrow: 0 },
-  chips: { flexDirection: 'row', gap: 8, paddingHorizontal: 4, alignItems: 'center' },
+  chips: { flexDirection: 'row', gap: 8, paddingHorizontal: 4, alignItems: 'center', flexGrow: 1, justifyContent: 'center' },
   chip: {
     paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.07)',

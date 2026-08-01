@@ -6,7 +6,7 @@ import {
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import Svg, {
-  Circle, Defs, Ellipse, LinearGradient as SvgLinearGradient, Path,
+  Circle, Defs, Ellipse, G, LinearGradient as SvgLinearGradient, Path,
   RadialGradient, Rect, Stop,
 } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -769,6 +769,89 @@ function Vignette({ winW, winH }: { winW: number; winH: number }) {
  * drawn shape. Deliberately few, tiny and slow: dust in a still room, not
  * snow. All native-driver opacity/transform loops.
  */
+/**
+ * THE BALL'S REFLECTIONS ON THE ROOM (owner, 01.08: "the background is empty
+ * — the reflections aren't hitting the background, it doesn't circulate
+ * around the sphere").
+ *
+ * This is the one thing everyone knows a mirror ball does: it covers the
+ * walls in little squares of light, and the whole constellation sweeps round
+ * as the ball turns. Each patch here is a soft-edged quad cast outward from
+ * the ball — sized UP with distance (a projected square spreads as it
+ * travels) and stretched along its own radial direction (it lands on the
+ * wall at an angle, which smears it), which is what makes the pattern read
+ * as light thrown INTO a room rather than confetti pasted on a flat image.
+ *
+ * The layer is centred on the BALL, not the screen — its container rotates
+ * about the ball's own centre, so the patches genuinely circulate the
+ * sphere. The old speck layer rotated about the screen's centre, which sat
+ * well below the ball, and that offset is why nothing ever read as orbiting.
+ * Rate is twice the ball's turn: reflecting off a turning mirror doubles the
+ * angle. One Svg root, static shapes, one shared rotation — the entire
+ * effect costs a single animated view.
+ */
+const CAST_COUNT = 34;
+
+function CastReflections({ size, eq, spin, lit, winW, winH }: {
+  size: number; eq: [string, string, string]; spin: Animated.Value; lit: Animated.Value;
+  winW: number; winH: number;
+}) {
+  const R = size / 2;
+  // Far enough that patches reach the screen corners from the ball's centre
+  // at any rotation angle.
+  const reach = Math.max(winW, winH) * 0.78;
+  const box = reach * 2;
+
+  const patches = useMemo(() => Array.from({ length: CAST_COUNT }, (_, i) => {
+    const a = (i / CAST_COUNT) * Math.PI * 2 + (hash01(i * 7.3) - 0.5) * 0.5;
+    // Clear of the ball itself, thinning with distance like a real throw.
+    const r = R * 1.25 + Math.pow(hash01(i * 3.1 + 0.7), 1.4) * (reach - R * 1.25);
+    const t = r / reach;
+    // A projected square spreads with distance and smears radially.
+    const w = size * (0.022 + t * 0.050) * (0.6 + hash01(i * 5.9) * 0.8);
+    const h = w * (1.2 + t * 1.6);
+    const lightPal = [mixHex(eq[0], '#ffffff', 0.45), mixHex(eq[1], '#ffffff', 0.5), '#e9eef8'];
+    return {
+      x: reach + Math.cos(a) * r,
+      y: reach + Math.sin(a) * r,
+      w, h,
+      deg: (a * 180) / Math.PI + 90,      // long axis along the radial line
+      color: lightPal[i % 3],
+      // Mid-distance patches are the brightest: near ones sit in the ball's
+      // own shadowed column, far ones have spread themselves thin.
+      op: (0.05 + 0.11 * Math.sin(Math.min(1, t) * Math.PI)) * (0.6 + hash01(i * 8.7) * 0.6),
+    };
+  }), [R, reach, size, eq]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', left: R - reach, top: R - reach, width: box, height: box,
+        opacity: lit,
+        transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] }) }],
+      }}>
+      <Svg width={box} height={box}>
+        <Defs>
+          <RadialGradient id="dbCast" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="1" />
+            <Stop offset="0.55" stopColor="#ffffff" stopOpacity="0.55" />
+            <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        {patches.map((pt, i) => (
+          <G key={i} transform={`translate(${pt.x} ${pt.y}) rotate(${pt.deg})`} opacity={pt.op}>
+            {/* Soft pool under a brighter core: the wall glows around the
+                patch, which is what a light landing on a surface does. */}
+            <Ellipse cx={0} cy={0} rx={pt.w * 2.4} ry={pt.h * 1.8} fill={pt.color} fillOpacity={0.10} />
+            <Rect x={-pt.w / 2} y={-pt.h / 2} width={pt.w} height={pt.h} rx={pt.w * 0.35} fill={pt.color} fillOpacity={0.75} />
+          </G>
+        ))}
+      </Svg>
+    </Animated.View>
+  );
+}
+
 function DustMote({ x, y, size, tint, dur, delay, driftX }: {
   x: number; y: number; size: number; tint: string; dur: number; delay: number; driftX: number;
 }) {
@@ -818,72 +901,6 @@ function DustField({ count, eq, live, winW, winH }: {
   );
 }
 
-function LightField({ count, eq, live, winW, winH, offsetX = 0 }: {
-  count: number; eq: [string, string, string]; live: Animated.Value; winW: number; winH: number;
-  offsetX?: number;
-}) {
-  const dots = useMemo(() => Array.from({ length: count }, (_, i) => {
-    // Deterministic pseudo-scatter (no Math.random — banned & keeps it stable).
-    const a = (i * 137.508) % 360;               // golden-angle spread
-    const rad = 0.16 + ((i * 53) % 100) / 100 * 0.42;
-    const ar = (a * Math.PI) / 180;
-    // Spread across the WHOLE room, not just a halo round the ball. The ball
-    // is meant to be the source, not the brightest object — what should catch
-    // the eye is its light landing on everything else (owner, 28.07).
-    // Kept OUT of the ball's own disc: a reflection lands on the room, and one
-    // drawn over the mirrors reads as a blemish on them.
-    const push = 0.30 + rad;
-    const x = 0.5 + Math.cos(ar) * push * 1.45;
-    const y = 0.46 + Math.sin(ar) * push * 1.30;
-    // These are MIRROR REFLECTIONS landing on the room, not floating bokeh
-    // (owner, 31.07: "instead of floating circles it should be the mirrors'
-    // tiny light reflections"). So: small and sharp. The big soft circles
-    // that used to drift about with them are deleted — over the ball they
-    // read as faint rings sitting on the mirrors, which is the "Os" she
-    // spotted and could not place.
-    const size = 4 + (i % 4) * 3;
-    const color = [eq[0], eq[1], eq[2], '#EAF2FF'][i % 4];
-    const delay = (i * 213) % 1800;
-    const dur = 1100 + (i % 6) * 260;
-    return { x, y, size, color, delay, dur };
-  }), [count, eq]);
-
-  const twinkles = useRef(dots.map(() => new Animated.Value(0.15))).current;
-
-  useEffect(() => {
-    const loops = dots.map((d, i) => {
-      const loop = Animated.loop(Animated.sequence([
-        Animated.delay(d.delay),
-        Animated.timing(twinkles[i], { toValue: 1, duration: d.dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(twinkles[i], { toValue: 0.12, duration: d.dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]));
-      loop.start();
-      return loop;
-    });
-    return () => loops.forEach((l) => l.stop());
-  }, []);
-
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {dots.map((d, i) => (
-        <Animated.View
-          key={i}
-          style={{
-            position: 'absolute',
-            left: d.x * winW - d.size / 2 + offsetX,
-            top: d.y * winH - d.size / 2,
-            width: d.size, height: d.size, borderRadius: d.size / 2,
-            backgroundColor: d.color,
-            opacity: Animated.multiply(twinkles[i], live),
-            // A generous shadow radius is what turns a hard dot into a patch
-            // of light lying on the room. Without it these read as confetti.
-            shadowColor: d.color, shadowOpacity: 1, shadowRadius: d.size * 1.6, shadowOffset: { width: 0, height: 0 },
-          }}
-        />
-      ))}
-    </View>
-  );
-}
 
 
 /**
@@ -1349,7 +1366,6 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   // TWICE the ball's rate, which is the real physics — reflecting off a
   // turning mirror doubles the angle, so the spots travel twice as fast as
   // the surface that made them.
-  const fieldSpin = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] });
   const bloomColor = mixHex(eq[1], eq[0], 0.35);
 
   return (
@@ -1397,9 +1413,6 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             screen apart make the wrap seamless: as one leaves to the right the
             other is already arriving. */}
         <DustField count={14} eq={eq} live={live} winW={winW} winH={winH} />
-        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate: fieldSpin }] }]} pointerEvents="none">
-          <LightField count={18} eq={eq} live={live} winW={winW} winH={winH} offsetX={0} />
-        </Animated.View>
 
         {/* Faint diagonal beams — light in the air, the way a shaft shows when
             it crosses a dark room. These replaced the little twinkling stars,
@@ -1450,6 +1463,9 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
                   themselves relative to it, not the taller pole+ball stack.
                   Also the scrub target: swipe left/right anywhere on the ball. */}
               <View style={{ width: ballSize, height: ballSize }} {...ballPan.panHandlers}>
+                {/* The room's cast light first, so the ball, its glow and
+                    its beams all draw over it. */}
+                <CastReflections size={ballSize} eq={eq} spin={spin} lit={live} winW={winW} winH={winH} />
                 <UnderGlow size={ballSize} color={bloomColor} lit={live} />
                 {/* Bloom and beams are light LEAVING the ball, so they fade
                     out with the music exactly as the flashes do. */}

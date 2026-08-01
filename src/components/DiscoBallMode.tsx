@@ -467,25 +467,13 @@ function SpotlightPan({ size, lit, pan, eq }: { size: number; lit: Animated.Valu
             <Stop offset="0.52" stopColor={tint} stopOpacity="0.16" />
             <Stop offset="1" stopColor={tint} stopOpacity="0" />
           </RadialGradient>
-          {/* The one permitted sparkle (owner's lighting brief: "only very
-              subtle lens flares or sparkle effects on the brightest
-              reflections"). It lives INSIDE the pool, so it rides the pan and
-              only ever sits on the brightest mirrors — all gradient falloff,
-              no solid strokes, and quiet enough to miss unless you look. */}
-          <SvgLinearGradient id="dbSpotArmH" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#ffffff" stopOpacity="0" />
-            <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.30" />
-            <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-          </SvgLinearGradient>
-          <SvgLinearGradient id="dbSpotArmV" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#ffffff" stopOpacity="0" />
-            <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.30" />
-            <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-          </SvgLinearGradient>
         </Defs>
+        {/* The pool, and nothing else. A four-point star used to ride along
+            inside it; on device that reads as a sticker sliding over the
+            mirrors rather than light (owner, 02.08: "a light star moves across
+            the ball making it look cheap"). The mirrors' own catch is the
+            sparkle this mode needs. */}
         <Circle cx={50} cy={50} r={50} fill="url(#dbSpot)" />
-        <Rect x={34} y={49.3} width={32} height={1.4} fill="url(#dbSpotArmH)" />
-        <Rect x={49.3} y={30} width={1.4} height={40} fill="url(#dbSpotArmV)" />
       </Svg>
     </Animated.View>
   );
@@ -705,85 +693,118 @@ function Vignette({ winW, winH }: { winW: number; winH: number }) {
  * snow. All native-driver opacity/transform loops.
  */
 /**
- * THE BALL'S REFLECTIONS ON THE ROOM (owner, 01.08: "the background is empty
- * — the reflections aren't hitting the background, it doesn't circulate
- * around the sphere").
+ * THE ROOM CATCHES THE LIGHT.
  *
- * This is the one thing everyone knows a mirror ball does: it covers the
- * walls in little squares of light, and the whole constellation sweeps round
- * as the ball turns. Each patch here is a soft-edged quad cast outward from
- * the ball — sized UP with distance (a projected square spreads as it
- * travels) and stretched along its own radial direction (it lands on the
- * wall at an angle, which smears it), which is what makes the pattern read
- * as light thrown INTO a room rather than confetti pasted on a flat image.
+ * A mirror ball throws its mirrors onto the walls and ceiling as a grid of
+ * bright patches, and that grid is arranged in RINGS around the ball. As the
+ * ball turns, each patch travels along its own ring — the pattern does not
+ * spin like a pinwheel, which is what the first version did and what the owner
+ * spotted straight away (02.08: "light pieces circulate the ball like a
+ * circle... not rotate in a clockwise direction").
  *
- * The layer is centred on the BALL, not the screen — its container rotates
- * about the ball's own centre, so the patches genuinely circulate the
- * sphere. The old speck layer rotated about the screen's centre, which sat
- * well below the ball, and that offset is why nothing ever read as orbiting.
- * Rate is twice the ball's turn: reflecting off a turning mirror doubles the
- * angle. One Svg root, static shapes, one shared rotation — the entire
- * effect costs a single animated view.
+ * THE TRICK, and it is the whole component: an ellipse is a rotated circle
+ * that has been squashed. So the patches are laid on plain CIRCLES inside a
+ * view that rotates, and that view sits inside another one that scales it down
+ * vertically. Points therefore travel along ELLIPSES — wide sweeps left and
+ * right, tight compressed arcs at the top and bottom, exactly like the rows in
+ * the owner's reference photographs of a real ceiling. Native-driver transform
+ * throughout; the entire room is two nested views and one animated rotation.
+ *
+ * DIRECTION: anticlockwise, so along the top rows the light travels RIGHT TO
+ * LEFT as asked. It rides `spin`, so it can never disagree with the ball —
+ * it stops when the ball stops and follows a finger drag. Twice the ball's
+ * rate, because reflecting off a turning mirror doubles the angle.
  */
-const CAST_COUNT = 34;
+const CAST_RINGS = 5;
+/** How hard the rings are squashed. Lower = flatter arcs and more compression
+ *  toward the top; at 1 they would be circles and we would be back to a
+ *  pinwheel. */
+const CAST_FLATTEN = 0.52;
 
 function CastReflections({ size, eq, spin, lit, winW, winH }: {
   size: number; eq: [string, string, string]; spin: Animated.Value; lit: Animated.Value;
   winW: number; winH: number;
 }) {
   const R = size / 2;
-  // Far enough that patches reach the screen corners from the ball's centre
-  // at any rotation angle.
-  const reach = Math.max(winW, winH) * 0.78;
+  // Far enough that the outer ring still reaches past the screen corners once
+  // it has been squashed.
+  const reach = Math.max(winW, winH) * 0.64;
   const box = reach * 2;
+  // The pattern hangs from above the ball, so more of it lands on the
+  // "ceiling" — the top of the picture — than on the floor.
+  const lift = R * 0.30;
 
-  const patches = useMemo(() => Array.from({ length: CAST_COUNT }, (_, i) => {
-    const a = (i / CAST_COUNT) * Math.PI * 2 + (hash01(i * 7.3) - 0.5) * 0.5;
-    // Clear of the ball itself, thinning with distance like a real throw.
-    const r = R * 1.25 + Math.pow(hash01(i * 3.1 + 0.7), 1.4) * (reach - R * 1.25);
-    const t = r / reach;
-    // A projected square spreads with distance and smears radially.
-    const w = size * (0.022 + t * 0.050) * (0.6 + hash01(i * 5.9) * 0.8);
-    const h = w * (1.2 + t * 1.6);
+  const patches = useMemo(() => {
     const lightPal = [mixHex(eq[0], '#ffffff', 0.45), mixHex(eq[1], '#ffffff', 0.5), '#e9eef8'];
-    return {
-      x: reach + Math.cos(a) * r,
-      y: reach + Math.sin(a) * r,
-      w, h,
-      deg: (a * 180) / Math.PI + 90,      // long axis along the radial line
-      color: lightPal[i % 3],
-      // Mid-distance patches are the brightest: near ones sit in the ball's
-      // own shadowed column, far ones have spread themselves thin.
-      op: (0.05 + 0.11 * Math.sin(Math.min(1, t) * Math.PI)) * (0.6 + hash01(i * 8.7) * 0.6),
-    };
-  }), [R, reach, size, eq]);
+    const base = R * 1.18;
+    const out: {
+      x: number; y: number; w: number; h: number; deg: number; color: string; op: number;
+    }[] = [];
+    let n = 0;
+    for (let ring = 0; ring < CAST_RINGS; ring++) {
+      const t = Math.pow((ring + 0.35) / CAST_RINGS, 0.72);
+      const r = base + (reach - base) * t;
+      const count = 12 + ring * 6;
+      for (let i = 0; i < count; i++) {
+        n++;
+        // A little jitter per spot so the rows read as light rather than as a
+        // machined grid — but only a fraction of the spacing, or the rows stop
+        // being rows.
+        const step = (Math.PI * 2) / count;
+        const a = i * step + (hash01(n * 7.3) - 0.5) * step * 0.55;
+        const rr = r * (1 + (hash01(n * 3.1) - 0.5) * 0.10);
+        // A projected mirror spreads with distance and smears radially.
+        const w = size * (0.020 + t * 0.040) * (0.62 + hash01(n * 5.9) * 0.76);
+        // Drawn TALL so the wrapper's vertical squash leaves it near-round:
+        // without this every patch comes out as a flat dash.
+        const h = (w * 1.18 / CAST_FLATTEN) * 0.82;
+        out.push({
+          x: reach + Math.cos(a) * rr,
+          y: reach + Math.sin(a) * rr,
+          w, h,
+          deg: (a * 180) / Math.PI + 90,      // long axis along the radial line
+          color: lightPal[n % 3],
+          // Mid-distance patches are brightest: near ones sit in the ball's
+          // own shadowed column, far ones have spread themselves thin.
+          op: (0.09 + 0.17 * Math.sin(Math.min(1, t) * Math.PI)) * (0.62 + hash01(n * 8.7) * 0.6),
+        });
+      }
+    }
+    return out;
+  }, [R, reach, size, eq]);
 
   return (
-    <Animated.View
+    <View
       pointerEvents="none"
       style={{
-        position: 'absolute', left: R - reach, top: R - reach, width: box, height: box,
-        opacity: lit,
-        transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] }) }],
+        position: 'absolute', left: R - reach, top: R - reach - lift, width: box, height: box,
+        transform: [{ scaleY: CAST_FLATTEN }],
       }}>
-      <Svg width={box} height={box}>
-        <Defs>
-          <RadialGradient id="dbCast" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor="#ffffff" stopOpacity="1" />
-            <Stop offset="0.55" stopColor="#ffffff" stopOpacity="0.55" />
-            <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-        {patches.map((pt, i) => (
-          <G key={i} transform={`translate(${pt.x} ${pt.y}) rotate(${pt.deg})`} opacity={pt.op}>
-            {/* Soft pool under a brighter core: the wall glows around the
-                patch, which is what a light landing on a surface does. */}
-            <Ellipse cx={0} cy={0} rx={pt.w * 2.4} ry={pt.h * 1.8} fill={pt.color} fillOpacity={0.10} />
-            <Rect x={-pt.w / 2} y={-pt.h / 2} width={pt.w} height={pt.h} rx={pt.w * 0.35} fill={pt.color} fillOpacity={0.75} />
-          </G>
-        ))}
-      </Svg>
-    </Animated.View>
+      <Animated.View
+        style={{
+          width: box, height: box,
+          opacity: lit,
+          transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-720deg'] }) }],
+        }}>
+        <Svg width={box} height={box}>
+          <Defs>
+            <RadialGradient id="dbCast" cx="50%" cy="50%" r="50%">
+              <Stop offset="0" stopColor="#ffffff" stopOpacity="1" />
+              <Stop offset="0.55" stopColor="#ffffff" stopOpacity="0.55" />
+              <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          {patches.map((pt, i) => (
+            <G key={i} transform={`translate(${pt.x} ${pt.y}) rotate(${pt.deg})`} opacity={pt.op}>
+              {/* Soft pool under a brighter core: the wall glows around the
+                  patch, which is what a light landing on a surface does. */}
+              <Ellipse cx={0} cy={0} rx={pt.w * 2.2} ry={pt.h * 1.6} fill={pt.color} fillOpacity={0.15} />
+              <Rect x={-pt.w / 2} y={-pt.h / 2} width={pt.w} height={pt.h} rx={pt.w * 0.35} fill={pt.color} fillOpacity={0.75} />
+            </G>
+          ))}
+        </Svg>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -838,122 +859,6 @@ function DustField({ count, eq, live, winW, winH }: {
 
 
 
-/**
- * THE BEAMS THE BALL THROWS, sourced from the ball's own surface.
- *
- * The old version was a rigid fan of 22 shafts radiating from the centre,
- * turning as one piece — which is a flat pinwheel, not a sphere throwing
- * light (owner, 31.07: "currently it is circulating the mirror ball like a
- * 2D shape"). On the reference photographs the beams come from particular
- * bright mirrors dotted around the ball, each at its own angle, appearing
- * and dying as its mirror swings past.
- *
- * So each beam belongs to a MIRROR: a fixed latitude and longitude on the
- * sphere. As the ball turns, that mirror orbits, and the beam is drawn from
- * wherever the mirror currently sits on screen, pointing along the direction
- * that mirror reflects — r = 2(n·v)n − v. It fades out entirely while its
- * mirror is round the back, and it is brightest when the reflection travels
- * ACROSS the room rather than straight at the viewer.
- *
- * The whole trajectory is sampled once into interpolation tables driven by
- * `spin`, so this costs no per-frame work and stays locked to the ball —
- * stopping when it stops and following a finger drag.
- */
-const BEAM_COUNT = 30;
-
-function MirrorBeams({ size, color, winW, spin, lit }: {
-  size: number; color: string; winW: number; spin: Animated.Value; lit: Animated.Value;
-}) {
-  const R = size / 2;
-  const reach = Math.max(winW * 1.0, size * 2.2);
-  const st = Math.sin(TILT), ct = Math.cos(TILT);
-
-  const beams = useMemo(() => Array.from({ length: BEAM_COUNT }, (_, i) => {
-    // Where this mirror lives on the ball. Latitudes are spread but kept off
-    // the poles, where a mirror faces up and throws its light at the ceiling.
-    const lat = (hash01(i * 3.7 + 0.4) - 0.5) * 1.7;
-    const lon0 = (i / BEAM_COUNT) * Math.PI * 2 + hash01(i * 9.1) * 0.4;
-    const len = reach * (0.34 + hash01(i * 5.3) * 0.52);
-    const width = size * (0.020 + Math.pow(hash01(i * 7.7), 1.6) * 0.075);
-    const peak = 0.14 + hash01(i * 2.3) * 0.22;
-
-    const N = 60;
-    const xs: number[] = [], tx: number[] = [], ty: number[] = [];
-    const rot: string[] = [], op: number[] = [];
-    for (let k = 0; k <= N; k++) {
-      const u = k / N;
-      const lam = lon0 + u * Math.PI * 2;
-      const cb = Math.cos(lat);
-      const x0 = cb * Math.sin(lam), y0 = Math.sin(lat), z0 = cb * Math.cos(lam);
-      const ny = y0 * ct - z0 * st;
-      const nz = y0 * st + z0 * ct;
-      const nx = x0;
-      xs.push(u);
-      tx.push(R * nx);
-      ty.push(-R * ny);
-      // The beam leaves along the outward normal, which on screen is the
-      // direction from the ball's centre through the mirror.
-      rot.push(`${((Math.atan2(-ny, nx) * 180) / Math.PI).toFixed(2)}deg`);
-      // Brightest at the LIMB, nothing at the centre. A mirror square on to
-      // us throws its beam straight down the lens, where the ball itself is
-      // in the way — the shafts you actually see in a photograph come off the
-      // edges. So the beam swells as its mirror swings round to the side and
-      // dies as it comes to the front, which is what makes the light travel
-      // around a sphere rather than spin like a pinwheel.
-      // A real bug in the first cut: `1 - max(0, nz)` is 1 for the whole BACK
-      // of the ball, so every mirror round the back was throwing a beam at
-      // full brightness. `vis` gates that off — a mirror has to be on our
-      // side to throw anything we can see.
-      const vis = Math.max(0, Math.min(1, nz / 0.14));
-      const limb = Math.max(0, 1 - nz);
-      op.push(peak * vis * Math.pow(limb, 0.85));
-    }
-    return { xs, tx, ty, rot, op, len, width };
-  }), [R, reach, size, st, ct]);
-
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {beams.map((b, i) => (
-        <Animated.View
-          key={i}
-          pointerEvents="none"
-          style={{
-            position: 'absolute', left: R, top: R - b.width / 2,
-            width: b.len, height: b.width,
-            opacity: Animated.multiply(lit, spin.interpolate({ inputRange: b.xs, outputRange: b.op })),
-            transform: [
-              { translateX: spin.interpolate({ inputRange: b.xs, outputRange: b.tx }) },
-              { translateY: spin.interpolate({ inputRange: b.xs, outputRange: b.ty }) },
-              { translateX: b.len / 2 },
-              { rotate: spin.interpolate({ inputRange: b.xs, outputRange: b.rot as unknown as number[] }) as unknown as string },
-              { translateX: -b.len / 2 },
-            ],
-          }}>
-          {/* ONE stretched radial glow per beam, centred on its root at the
-              ball. Soft in EVERY direction — along its length, across its
-              width, and at its far end. The previous build was three stacked
-              strips of a lengthwise gradient, and each strip's sides were
-              hard lines, which on device read as a drawn band hanging in the
-              room with a squared-off end (owner, 01.08: "awkward light
-              streak"). A radial falloff has no edges to see. */}
-          <Svg width={b.len} height={b.width} viewBox="0 0 100 12" preserveAspectRatio="none">
-            <Defs>
-              <RadialGradient id={`dbBeam${i}`} cx="50%" cy="50%" r="50%">
-                <Stop offset="0" stopColor={color} stopOpacity="0.55" />
-                <Stop offset="0.5" stopColor={color} stopOpacity="0.20" />
-                <Stop offset="1" stopColor={color} stopOpacity="0" />
-              </RadialGradient>
-            </Defs>
-            {/* Centred at the beam's ROOT: only the outward half is inside
-                the canvas, so it is brightest at the ball and dissolves in
-                every direction from there. */}
-            <Ellipse cx={0} cy={6} rx={100} ry={6} fill={`url(#dbBeam${i})`} />
-          </Svg>
-        </Animated.View>
-      ))}
-    </View>
-  );
-}
 
 export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
@@ -1404,10 +1309,15 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
                     its beams all draw over it. */}
                 <CastReflections size={ballSize} eq={eq} spin={spin} lit={live} winW={winW} winH={winH} />
                 <UnderGlow size={ballSize} color={bloomColor} lit={live} />
-                {/* Bloom and beams are light LEAVING the ball, so they fade
-                    out with the music exactly as the flashes do. */}
+                {/* Bloom is light LEAVING the ball, so it fades out with the
+                    music exactly as the flashes do. `MirrorBeams` used to draw
+                    here too and is GONE (owner, 02.08: "the light rays that
+                    live on the right is stubborn and won't be removed") —
+                    three rounds of tuning never stopped a beam parked near the
+                    limb reading as a streak laid over the picture. The room's
+                    light is the cast reflections now, which is what a mirror
+                    ball actually throws. */}
                 <Animated.View style={[StyleSheet.absoluteFill, { opacity: live }]} pointerEvents="none">
-                  <MirrorBeams size={ballSize} color={bloomColor} winW={winW} spin={spin} lit={live} />
                   <BallBloom size={ballSize} color={bloomColor} pulse={pulse} />
                 </Animated.View>
                 <MirrorBall size={ballSize} eq={eq} spin={spin} pulse={pulse} lit={live} spotPan={spotPan} />

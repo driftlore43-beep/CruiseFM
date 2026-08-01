@@ -41,10 +41,15 @@ export const CARD_H_PIN = 1620;
 export type ShareFormat = 'card' | 'pin';
 export const FORMAT_H: Record<ShareFormat, number> = { card: CARD_H_CARD, pin: CARD_H_PIN };
 
+// Ordered so the OBJECT family (a thing you could hold) sits together in the
+// middle — that's the direction the owner picked out of round 1.
 export const SHARE_STYLES = [
   { id: 'now', label: 'Now Playing' },
   { id: 'poster', label: 'Poster' },
   { id: 'ticket', label: 'Ticket' },
+  { id: 'sleeve', label: 'Sleeve' },
+  { id: 'polaroid', label: 'Instant' },
+  { id: 'postcard', label: 'Postcard' },
   { id: 'receiver', label: 'Receiver' },
   { id: 'minimal', label: 'Minimal' },
 ] as const;
@@ -99,6 +104,17 @@ function heroTransform(scale: number, dy: number): string {
   const tx = CX * (1 - scale);
   const ty = CY * (1 - scale) + dy;
   return `translate(${tx.toFixed(2)} ${ty.toFixed(2)}) scale(${scale})`;
+}
+
+/** Fit the whole hero stage inside an arbitrary box, centred — "contain", not
+ *  "cover". Cropping is not an option here: the modes are drawn to the stage's
+ *  full width (the cassette shell alone is 896 of 1080), so trimming the sides
+ *  to fill a square window slices the object rather than the background. */
+function heroFit(x: number, y: number, w: number, h: number): string {
+  const s = Math.min(w / CARD_W, h / STAGE_H);
+  const tx = x + (w - CARD_W * s) / 2;
+  const ty = y + (h - STAGE_H * s) / 2 - STAGE_TOP * s;
+  return `translate(${tx.toFixed(2)} ${ty.toFixed(2)}) scale(${s.toFixed(4)})`;
 }
 
 // ── Shared data ───────────────────────────────────────────────────────────────
@@ -476,7 +492,325 @@ function TicketStyle(p: StyleProps) {
   );
 }
 
-// ── 4. Receiver ───────────────────────────────────────────────────────────────
+// ── 4. Sleeve ─────────────────────────────────────────────────────────────────
+// A record jacket, with the disc easing out of the right-hand side. Everything
+// is PRINTED on the sleeve — station, song, catalogue number — because that is
+// what makes it an object rather than a card with a picture on it.
+
+function SleeveStyle(p: StyleProps) {
+  const d = derive(p);
+  const { uid, cardH, station, modeLabel } = p;
+  // The jacket is deliberately NOT the full card width: the disc has to have
+  // somewhere to come out to. A sleeve that fills the frame is just a square.
+  const JX = 80, JW = CARD_W - JX - 150;               // square jacket
+  const JH = JW;
+  // Jacket AND catalogue line are centred as one block. Pinning the line to
+  // the card's foot instead left the pin format with the sleeve stranded in
+  // the top half and 370px of nothing under it.
+  const JY = (cardH - (JH + 100)) / 2;
+  const catY = JY + JH + 80;
+  const TYPE_BAND = 236;                               // printed matter at the foot
+  const board = mixHex(d.eq[1], '#0e1018', 0.74);
+  const print = mixHex(d.eq[0], '#ffffff', 0.10);
+
+  const nameSize = fitSize(station.name, 52, JW - 128, 28);
+  const titleLines = wrapLines(d.title, 32, JW - 128, 2);
+
+  // Disc rings, drawn behind the jacket so only the sliver past its edge shows.
+  const discCx = JX + JW * 0.70, discCy = JY + JH / 2, discR = JH * 0.47;
+  const rings = [];
+  for (let i = 0; i < 7; i++) {
+    rings.push(<Circle key={`sr${i}`} cx={discCx} cy={discCy} r={discR - 14 - i * 22} fill="none"
+      stroke="#ffffff" strokeOpacity={0.16} strokeWidth={1.8} />);
+  }
+
+  return (
+    <>
+      <BaseWash d={d} uid={uid} cardH={cardH} glow={0.26} />
+      <Backdrop d={d} uid={uid} cardH={cardH} stops={[0.78, 0.76, 0.80, 0.90]} />
+
+      <Defs>
+        <ClipPath id={`slA${uid}`}>
+          <Rect x={JX + 56} y={JY + 56} width={JW - 112} height={JH - TYPE_BAND - 56} rx={6} ry={6} />
+        </ClipPath>
+        <SvgLinearGradient id={`slB${uid}`} x1="0" y1="0" x2="0.7" y2="1">
+          <Stop offset="0" stopColor={mixHex(board, '#ffffff', 0.10)} />
+          <Stop offset="1" stopColor={mixHex(board, '#05060b', 0.30)} />
+        </SvgLinearGradient>
+        <RadialGradient id={`slD${uid}`} cx="38%" cy="30%" r="72%">
+          <Stop offset="0" stopColor="#ffffff" stopOpacity="0.20" />
+          <Stop offset="0.6" stopColor="#ffffff" stopOpacity="0.04" />
+          <Stop offset="1" stopColor="#000000" stopOpacity="0.22" />
+        </RadialGradient>
+      </Defs>
+
+      {/* Disc. Only a sliver of it clears the jacket, so it has to be LIT to
+          register at all — at the record's own near-black it simply vanished
+          into the card and the sleeve read as a plain square. */}
+      <Circle cx={discCx} cy={discCy} r={discR} fill="#16171f" />
+      <Circle cx={discCx} cy={discCy} r={discR} fill={`url(#slD${uid})`} />
+      {rings}
+      <Circle cx={discCx} cy={discCy} r={discR} fill="none" stroke="#ffffff" strokeOpacity={0.28} strokeWidth={2.5} />
+      <Circle cx={discCx} cy={discCy} r={discR * 0.34} fill={mixHex(d.eq[1], '#101322', 0.40)} />
+
+      {/* Jacket */}
+      <Rect x={JX} y={JY} width={JW} height={JH} rx={4} fill={`url(#slB${uid})`}
+        stroke="#ffffff" strokeOpacity={0.16} strokeWidth={2} />
+      {/* Spine down the opening edge — a jacket is a folded sheet, and the fold
+          is the one line that stops this reading as a plain square. */}
+      <Rect x={JX} y={JY} width={38} height={JH} fill="#000000" fillOpacity={0.28} />
+      <Rect x={JX + 38} y={JY} width={2} height={JH} fill="#ffffff" fillOpacity={0.10} />
+      {[0, 1, 2].map((k) => (
+        <Rect key={`sb${k}`} x={JX + 10} y={JY + 60 + k * 34} width={18} height={16}
+          fill={d.eq[k]} fillOpacity={0.75} />
+      ))}
+
+      {/* Printed art */}
+      <Rect x={JX + 56} y={JY + 56} width={JW - 112} height={JH - TYPE_BAND - 56} rx={6}
+        fill="#05060c" fillOpacity={0.42} />
+      <G clipPath={`url(#slA${uid})`}>
+        <G transform={heroFit(JX + 56, JY + 56, JW - 112, JH - TYPE_BAND - 56)}>{d.hero}</G>
+      </G>
+      <Rect x={JX + 56} y={JY + 56} width={JW - 112} height={JH - TYPE_BAND - 56} rx={6}
+        fill="none" stroke="#ffffff" strokeOpacity={0.14} strokeWidth={1.6} />
+
+      {/* Printed type */}
+      {/* The name, the song and the artist each get a line of their own. Set on
+          one baseline with the artist right-aligned, a long station name and a
+          long artist simply printed over each other. */}
+      <SvgText x={JX + 64} y={JY + JH - TYPE_BAND + 72} fill={print} fontSize={nameSize} fontWeight="900" letterSpacing={-1}>
+        {station.name}
+      </SvgText>
+      {titleLines.map((line, i) => (
+        <SvgText key={i} x={JX + 64} y={JY + JH - TYPE_BAND + 124 + i * 40} fill="#ffffff"
+          fillOpacity={0.62} fontSize={32} fontWeight="600">
+          {line}
+        </SvgText>
+      ))}
+      {!!d.artist && (
+        <SvgText x={JX + 64} y={JY + JH - TYPE_BAND + 206} fill="#ffffff" fillOpacity={0.42}
+          fontSize={25} fontWeight="700" letterSpacing={3}>
+          {clip(d.artist.toUpperCase(), 30)}
+        </SvgText>
+      )}
+
+      {/* Catalogue line */}
+      <SvgText x={JX} y={catY} fill="#ffffff" fillOpacity={0.5} fontSize={25} fontWeight="700" letterSpacing={4}>
+        {`CFM-${d.dialLabel.replace('.', '')} · ${modeLabel.toUpperCase()}`}
+      </SvgText>
+      <SvgText x={CARD_W - JX} y={catY} fill="#ffffff" fillOpacity={0.4} fontSize={25}
+        fontWeight="600" textAnchor="end">
+        {INSTALL_HOST}
+      </SvgText>
+    </>
+  );
+}
+
+// ── 5. Instant ────────────────────────────────────────────────────────────────
+// An instant photo: a white border with a deep chin, and the caption written in
+// DARK type on it. That inversion is the whole point — among seven dark cards,
+// this one stops a feed.
+
+function PolaroidStyle(p: StyleProps) {
+  const d = derive(p);
+  const { uid, cardH, station, modeLabel } = p;
+  const PAPER = '#f3f0e8', INK = '#16181f', INK2 = '#6a6f7d';
+  const FX = 96, FW = CARD_W - FX * 2;
+  const LIP = 46;
+  const PHOTO = FW - LIP * 2;                                    // square window
+  // The chin has to hold two caption lines, the artist AND the footer. Sized
+  // by eye at 176 it did none of that: the artist fell off the bottom of the
+  // print and the footer ran through the caption's second line.
+  const CHIN = 262 + (cardH - CARD_H_CARD) * 0.34;
+  const FH = LIP + PHOTO + CHIN;
+  const FY = Math.max(80, (cardH - FH) / 2 - 40);
+  const PX0 = FX + LIP, PY0 = FY + LIP;
+
+  // Budget leaves the right-hand dial stamp alone; the caption is a column,
+  // not a full-width line.
+  const titleLines = wrapLines(d.title, 40, FW - LIP * 2 - 280, 2);
+
+  return (
+    <>
+      <BaseWash d={d} uid={uid} cardH={cardH} glow={0.30} />
+      <Backdrop d={d} uid={uid} cardH={cardH} stops={[0.74, 0.72, 0.78, 0.90]} />
+
+      <Defs>
+        <ClipPath id={`plC${uid}`}>
+          <Rect x={PX0} y={PY0} width={PHOTO} height={PHOTO} />
+        </ClipPath>
+        <SvgLinearGradient id={`plP${uid}`} x1="0" y1="0" x2="0.4" y2="1">
+          <Stop offset="0" stopColor="#ffffff" />
+          <Stop offset="1" stopColor={PAPER} />
+        </SvgLinearGradient>
+      </Defs>
+
+      {/* Print */}
+      <Rect x={FX + 8} y={FY + 12} width={FW} height={FH} rx={6} fill="#000000" fillOpacity={0.38} />
+      <Rect x={FX} y={FY} width={FW} height={FH} rx={6} fill={`url(#plP${uid})`} />
+
+      {/* Photo */}
+      <Rect x={PX0} y={PY0} width={PHOTO} height={PHOTO} fill="#06070d" />
+      <G clipPath={`url(#plC${uid})`}>
+        <Rect x={PX0} y={PY0} width={PHOTO} height={PHOTO} fill={d.deep} />
+        {!!d.backdrop && (
+          <SvgImage x={PX0} y={PY0} width={PHOTO} height={PHOTO} href={d.backdrop as string}
+            preserveAspectRatio="xMidYMid slice" opacity={0.5} />
+        )}
+        <G transform={heroFit(PX0, PY0, PHOTO, PHOTO)}>{d.hero}</G>
+      </G>
+      <Rect x={PX0} y={PY0} width={PHOTO} height={PHOTO} fill="none" stroke="#000000" strokeOpacity={0.12} strokeWidth={2} />
+
+      {/* Caption, on the chin */}
+      {titleLines.map((line, i) => (
+        <SvgText key={i} x={PX0} y={PY0 + PHOTO + 82 + i * 48} fill={INK} fontSize={40} fontWeight="800" letterSpacing={-0.5}>
+          {line}
+        </SvgText>
+      ))}
+      <SvgText x={PX0} y={PY0 + PHOTO + 82 + titleLines.length * 48 + 6} fill={INK2} fontSize={28} fontWeight="600">
+        {d.artist ? `${clip(d.artist, 26)} · ${station.name}` : station.name}
+      </SvgText>
+      {/* Right-hand stamp: dial number and mode, set like a photo-lab print */}
+      <SvgText x={FX + FW - LIP} y={PY0 + PHOTO + 82} fill={mixHex(d.eq[2], '#1a1c24', 0.45)}
+        fontSize={34} fontWeight="900" letterSpacing={1} textAnchor="end">
+        {`${d.dialLabel} ${d.band}`}
+      </SvgText>
+      <SvgText x={FX + FW - LIP} y={PY0 + PHOTO + 124} fill={INK2} fontSize={22} fontWeight="700"
+        letterSpacing={3} textAnchor="end">
+        {modeLabel.toUpperCase()}
+      </SvgText>
+      <SvgText x={PX0} y={FY + FH - 34} fill={INK2} fontSize={22} fontWeight="700" letterSpacing={4}>
+        {`CRUISE FM · ${INSTALL_HOST}`}
+      </SvgText>
+    </>
+  );
+}
+
+// ── 6. Postcard ───────────────────────────────────────────────────────────────
+// Greetings from the station. The mood stations are places, which is the whole
+// premise of the app — so the one format built for sending a place suits it
+// better than any of the music formats do.
+
+function PostcardStyle(p: StyleProps) {
+  const d = derive(p);
+  const { uid, cardH, station, modeLabel } = p;
+  const PAPER = '#efe9dc', INK = '#1b1d24', INK2 = '#6d7180';
+  const M = 54;                                        // the card sits inset, like a real one
+  const CW = CARD_W - M * 2, CH = cardH - M * 2;
+  const PHOTO_H = CH * 0.54;
+  const paperY = M + PHOTO_H;
+
+  const nameSize = fitSize(station.name, 92, CW - 120, 44);
+  const titleLines = wrapLines(d.title, 40, CW * 0.52, 2);
+
+  // Stamp, with a punched edge. The perforation is circles of the PAPER colour
+  // laid over the stamp's rim — the cheap way to a torn edge with no mask.
+  const SX = M + CW - 250, SY = paperY + 56, SW = 176, SH = 210;
+  const perf: React.ReactElement[] = [];
+  const stepX = SW / 7, stepY = SH / 8;
+  for (let i = 0; i <= 7; i++) {
+    perf.push(<Circle key={`pt${i}`} cx={SX + i * stepX} cy={SY} r={7} fill={PAPER} />);
+    perf.push(<Circle key={`pb${i}`} cx={SX + i * stepX} cy={SY + SH} r={7} fill={PAPER} />);
+  }
+  for (let i = 0; i <= 8; i++) {
+    perf.push(<Circle key={`pl${i}`} cx={SX} cy={SY + i * stepY} r={7} fill={PAPER} />);
+    perf.push(<Circle key={`pr${i}`} cx={SX + SW} cy={SY + i * stepY} r={7} fill={PAPER} />);
+  }
+
+  return (
+    <>
+      <BaseWash d={d} uid={uid} cardH={cardH} glow={0.24} />
+
+      <Defs>
+        <ClipPath id={`pcC${uid}`}>
+          <Rect x={M} y={M} width={CW} height={PHOTO_H} />
+        </ClipPath>
+        <SvgLinearGradient id={`pcS${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#03040e" stopOpacity="0.30" />
+          <Stop offset="0.6" stopColor="#03040e" stopOpacity="0.18" />
+          <Stop offset="1" stopColor="#03040e" stopOpacity="0.62" />
+        </SvgLinearGradient>
+      </Defs>
+
+      <Rect x={M + 8} y={M + 12} width={CW} height={CH} rx={8} fill="#000000" fillOpacity={0.40} />
+      <Rect x={M} y={M} width={CW} height={CH} rx={8} fill={PAPER} />
+
+      {/* The picture side */}
+      <G clipPath={`url(#pcC${uid})`}>
+        <Rect x={M} y={M} width={CW} height={PHOTO_H} fill={d.deep} />
+        {!!d.backdrop && (
+          <SvgImage x={M} y={M} width={CW} height={PHOTO_H} href={d.backdrop as string}
+            preserveAspectRatio="xMidYMid slice" />
+        )}
+        <Rect x={M} y={M} width={CW} height={PHOTO_H} fill={`url(#pcS${uid})`} />
+        {/* Fitted from the card's own top edge, not above it — starting 30px
+            higher clipped the vinyl's tonearm off the top of the picture. */}
+        <G transform={heroFit(M, M, CW, PHOTO_H * 0.84)}>{d.hero}</G>
+      </G>
+
+      {/* Greetings lettering. Drawn twice, offset, in the station's own colour —
+          the poor man's vintage letterpress, and it needs no second font. */}
+      <SvgText x={M + 44} y={paperY - 116} fill="#ffffff" fillOpacity={0.7} fontSize={28}
+        fontWeight="800" letterSpacing={8}>
+        GREETINGS FROM
+      </SvgText>
+      <SvgText x={M + 40} y={paperY - 34} fill={mixHex(d.eq[2], '#0a0b12', 0.45)} fontSize={nameSize}
+        fontWeight="900" letterSpacing={-2}>
+        {station.name}
+      </SvgText>
+      <SvgText x={M + 34} y={paperY - 40} fill="#ffffff" fontSize={nameSize} fontWeight="900" letterSpacing={-2}>
+        {station.name}
+      </SvgText>
+
+      {/* The written side */}
+      <Rect x={M + 44} y={paperY + 44} width={2} height={CH - PHOTO_H - 132} fill={INK} fillOpacity={0.10} />
+      <SvgText x={M + 80} y={paperY + 96} fill={INK2} fontSize={22} fontWeight="700" letterSpacing={5}>
+        NOW PLAYING
+      </SvgText>
+      {titleLines.map((line, i) => (
+        <SvgText key={i} x={M + 80} y={paperY + 154 + i * 50} fill={INK} fontSize={40} fontWeight="800" letterSpacing={-0.5}>
+          {line}
+        </SvgText>
+      ))}
+      {!!d.artist && (
+        <SvgText x={M + 80} y={paperY + 154 + titleLines.length * 50 + 4} fill={INK2} fontSize={28} fontWeight="600">
+          {clip(d.artist, 28)}
+        </SvgText>
+      )}
+
+      {/* Stamp + postmark */}
+      <Rect x={SX} y={SY} width={SW} height={SH} fill={mixHex(d.eq[1], '#f2ece0', 0.30)} />
+      <Rect x={SX + 14} y={SY + 14} width={SW - 28} height={SH - 28} fill="none" stroke={INK} strokeOpacity={0.22} strokeWidth={1.6} />
+      <DotMatrixGroup text={d.dialLabel} x={SX + SW / 2} y={SY + 56} dot={4.4} gap={1.6}
+        color={mixHex(d.eq[2], '#1a1c24', 0.35)} anchor="middle" opacity={0.95} />
+      <SvgText x={SX + SW / 2} y={SY + 138} fill={INK} fillOpacity={0.6} fontSize={22} fontWeight="800"
+        letterSpacing={2} textAnchor="middle">
+        {d.band}
+      </SvgText>
+      <SvgText x={SX + SW / 2} y={SY + 178} fill={INK} fillOpacity={0.4} fontSize={17} fontWeight="700"
+        letterSpacing={2} textAnchor="middle">
+        CRUISE FM
+      </SvgText>
+      {perf}
+      {[0, 1, 2].map((k) => (
+        <Circle key={`pm${k}`} cx={SX - 42} cy={SY + 96} r={62 - k * 16} fill="none"
+          stroke={INK} strokeOpacity={0.16} strokeWidth={2} />
+      ))}
+
+      {/* Address lines */}
+      {[0, 1, 2].map((k) => (
+        <Rect key={`ad${k}`} x={SX - 96} y={SY + SH + 62 + k * 46} width={SW + 96} height={2}
+          fill={INK} fillOpacity={0.16} />
+      ))}
+
+      <SvgText x={M + 80} y={M + CH - 46} fill={INK2} fontSize={22} fontWeight="700" letterSpacing={4}>
+        {`${modeLabel.toUpperCase()} · ${INSTALL_HOST}`}
+      </SvgText>
+    </>
+  );
+}
+
+// ── 7. Receiver ───────────────────────────────────────────────────────────────
 // The card as a head unit, in the same language as the Stations page and the
 // Tuner: brushed panel, amber dot-matrix readout, recessed window, dial and
 // needle. Everything is drawn with DotMatrix rather than a font, so it ships
@@ -606,7 +940,7 @@ function ReceiverStyle(p: StyleProps) {
   );
 }
 
-// ── 5. Minimal ────────────────────────────────────────────────────────────────
+// ── 8. Minimal ────────────────────────────────────────────────────────────────
 // No photograph at all: the station's own colours, the mode floating in them,
 // and the song set large with a lot of air. The art-print option, and the one
 // that survives being seen at thumbnail size in a feed.
@@ -677,6 +1011,9 @@ export function ShareCardBody(props: StyleProps & { styleId: ShareStyleId }) {
   switch (styleId) {
     case 'poster': return <PosterStyle {...rest} />;
     case 'ticket': return <TicketStyle {...rest} />;
+    case 'sleeve': return <SleeveStyle {...rest} />;
+    case 'polaroid': return <PolaroidStyle {...rest} />;
+    case 'postcard': return <PostcardStyle {...rest} />;
     case 'receiver': return <ReceiverStyle {...rest} />;
     case 'minimal': return <MinimalStyle {...rest} />;
     case 'now':

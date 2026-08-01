@@ -653,155 +653,63 @@ function Vignette({ winW, winH }: { winW: number; winH: number }) {
 }
 
 /**
- * Atmospheric dust (owner's lighting brief, 31.07): a handful of near-
- * invisible motes drifting slowly upward through the light, each catching a
- * brief highlight once per loop. They are what make the rays read as light
- * travelling through AIR — a beam with nothing suspended in it is just a
- * drawn shape. Deliberately few, tiny and slow: dust in a still room, not
- * snow. All native-driver opacity/transform loops.
+ * THE RAYS (owner's reference photograph, 02.08: a real ball in a lit room
+ * throwing a dense burst of fine beams in every direction).
+ *
+ * They do NOT rotate. The last version turned the fan with the ball, and with
+ * nothing else moving in the room the rays read as travelling against their
+ * own light — "the rays move the opposite direction of the reflections". A
+ * real beam is bolted to the geometry of lamp and mirror; on a slowly turning
+ * ball it holds its line and its BRIGHTNESS wanders. So the fan is static and
+ * each ray breathes slowly instead, on one of six staggered loops — alive
+ * without motion, and six animations however many rays are drawn.
+ *
+ * FINE is the whole character: many thin filaments at uneven angles and
+ * uneven lengths, a few longer heroes among them, every one pure gradient
+ * falloff — soft along its length, across its width and at its far end.
  */
-/**
- * THE LIGHT THE BALL THROWS ACROSS THE ROOM.
- *
- * We are looking at the ball HEAD ON, not up at a ceiling (owner, 02.08) — so
- * the room's light reads as ROWS crossing the background, all travelling the
- * same way. The previous version laid the patches on rings and turned them,
- * which is what a ceiling really does but means the top rows and the bottom
- * rows travel in OPPOSITE directions: "gives me a headache looking at it", and
- * she is right.
- *
- * So it is a scrolling field now: rows of patches sliding RIGHT TO LEFT, every
- * row the same way, across the whole screen. Perspective does the rest —
- * rows crowd together toward the top and open out toward the bottom, patches
- * grow and spread as they come toward you, and each row bows gently rather
- * than ruling a straight line across the picture.
- *
- * Three copies a screen apart make the wrap seamless: as one leaves to the
- * left the next is already arriving. The travel rides `spin`, so the light can
- * never disagree with the ball — it stops when the ball stops and follows a
- * finger drag.
- */
-const CAST_ROWS = 9;
-/** Screen-widths of travel per ball revolution. */
-const CAST_SCREENS = 2;
+const RAY_COUNT = 44;
+const RAY_PHASES = 6;
 
-function CastReflections({ eq, spin, lit, winW, winH }: {
-  eq: [string, string, string]; spin: Animated.Value; lit: Animated.Value;
-  winW: number; winH: number;
-}) {
-  const period = winW;
-
-  const spots = useMemo(() => {
-    // Lighter than the mirrors themselves: this is light landing on a surface,
-    // not metal. Pale enough to read against the dark room.
-    const lightPal = [
-      mixHex(eq[0], '#ffffff', 0.62),
-      mixHex(eq[1], '#ffffff', 0.66),
-      '#f2f6ff',
-    ];
-    const out: {
-      x: number; y: number; w: number; h: number; color: string; op: number; bow: number;
-    }[] = [];
-    let n = 0;
-    for (let k = 0; k < CAST_ROWS; k++) {
-      const u = k / (CAST_ROWS - 1);                 // 0 = far/top, 1 = near/foot
-      // Rows crowd at the top and open out at the bottom.
-      const yBase = winH * (0.02 + 0.98 * Math.pow(u, 1.55));
-      // DISPERSION grows downward — the far rows are tight, the near ones are
-      // wide apart. Count must divide the period exactly or the wrap shows.
-      const count = Math.max(5, Math.round(17 - k * 1.35));
-      const gap = period / count;
-      const w = winW * (0.016 + u * 0.052);
-      // Flatter at the top, rounder at the foot: that compression IS the
-      // perspective, and it is what the owner's photographs show.
-      const h = w * (0.42 + u * 0.52);
-      // A gentle periodic bow, so a row curves across the picture instead of
-      // ruling a straight line. Periodic, or the copies would not meet.
-      const bow = winH * (0.012 + u * 0.030);
-      for (let i = 0; i < count; i++) {
-        n++;
-        out.push({
-          x: i * gap + (hash01(n * 5.1) - 0.5) * gap * 0.34,
-          y: yBase + (hash01(n * 9.7) - 0.5) * h * 1.1,
-          w: w * (0.7 + hash01(n * 3.3) * 0.7),
-          h: h * (0.7 + hash01(n * 7.9) * 0.7),
-          color: lightPal[n % 3],
-          op: (0.20 + 0.20 * u) * (0.68 + hash01(n * 8.7) * 0.66),
-          bow,
-        });
-      }
-    }
-    return out;
-  }, [eq, winW, winH, period]);
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: 'absolute', left: 0, top: 0, width: period * 3, height: winH,
-        opacity: lit,
-        transform: [{
-          translateX: spin.interpolate({
-            inputRange: [0, 1], outputRange: [0, -period * CAST_SCREENS],
-          }),
-        }],
-      }}>
-      <Svg width={period * 3} height={winH}>
-        {[0, 1, 2].map((copy) => (
-          <G key={copy} transform={`translate(${copy * period} 0)`}>
-            {spots.map((pt, i) => {
-              // The bow is evaluated from the spot's own x, so it is identical
-              // in every copy and the seam cannot show.
-              const dy = pt.bow * (1 - Math.cos((2 * Math.PI * pt.x) / period)) * 0.5;
-              return (
-                <Rect
-                  key={i}
-                  x={pt.x - pt.w / 2}
-                  y={pt.y + dy - pt.h / 2}
-                  width={pt.w}
-                  height={pt.h}
-                  rx={pt.h * 0.4}
-                  fill={pt.color}
-                  fillOpacity={pt.op}
-                />
-              );
-            })}
-          </G>
-        ))}
-      </Svg>
-    </Animated.View>
-  );
-}
-
-/**
- * The rays, back by request (owner, 02.08) — but built so no single one can
- * ever go stubborn. The old `MirrorBeams` gave every beam its own mirror and
- * its own trajectory, which meant one could park near the right-hand limb and
- * sit there looking like a streak drawn on the picture.
- *
- * These are EVENLY SPACED around the ball and turn as one fan with the spin,
- * so every ray is the same as every other and all of them are always moving.
- * Each is a single stretched radial glow — soft along its length, across its
- * width and at its far end, with no edge anywhere to catch the eye.
- */
-const RAY_COUNT = 18;
-
-function LightRays({ size, eq, winW, winH, spin, lit }: {
+function LightRays({ size, eq, winW, winH, lit }: {
   size: number; eq: [string, string, string]; winW: number; winH: number;
-  spin: Animated.Value; lit: Animated.Value;
+  lit: Animated.Value;
 }) {
   const R = size / 2;
-  const len = Math.max(winW, winH) * 0.92;
+  const len = Math.max(winW, winH) * 0.98;
   const box = len * 2;
+
+  // Six shared breathing values — every ray borrows one, so the whole burst
+  // costs six native-driver opacity loops.
+  const phases = useRef(Array.from({ length: RAY_PHASES }, () => new Animated.Value(0))).current;
+  useEffect(() => {
+    const loops = phases.map((v, i) => {
+      const dur = 2600 + i * 640;
+      const loop = Animated.loop(Animated.sequence([
+        Animated.timing(v, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration: dur * 1.18, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ]));
+      const start = setTimeout(() => loop.start(), i * 430);
+      return { loop, start };
+    });
+    return () => { loops.forEach(({ loop, start }) => { clearTimeout(start); loop.stop(); }); };
+  }, [phases]);
+
   const rays = useMemo(() => {
-    const pal = [mixHex(eq[0], '#ffffff', 0.5), mixHex(eq[1], '#ffffff', 0.55), '#e8eefc'];
-    return Array.from({ length: RAY_COUNT }, (_, i) => ({
-      deg: (i / RAY_COUNT) * 360,
-      w: size * (0.05 + hash01(i * 4.7) * 0.10),
-      reach: len * (0.55 + hash01(i * 2.9) * 0.45),
-      color: pal[i % 3],
-      op: 0.075 + hash01(i * 6.1) * 0.095,
-    }));
+    const pal = [mixHex(eq[0], '#ffffff', 0.55), mixHex(eq[1], '#ffffff', 0.6), '#eef3ff'];
+    return Array.from({ length: RAY_COUNT }, (_, i) => {
+      const hero = hash01(i * 9.3) > 0.8;          // the few long bright shafts
+      return {
+        // Uneven spacing: a machined fan reads as a drawing, the photo's
+        // burst clusters and gaps.
+        deg: (i / RAY_COUNT) * 360 + (hash01(i * 4.7) - 0.5) * (360 / RAY_COUNT) * 1.2,
+        w: size * (hero ? 0.045 : 0.014 + hash01(i * 3.7) * 0.026),
+        reach: len * (hero ? 0.78 + hash01(i * 5.3) * 0.22 : 0.34 + hash01(i * 2.9) * 0.5),
+        color: pal[i % 3],
+        op: hero ? 0.16 + hash01(i * 6.1) * 0.10 : 0.06 + hash01(i * 6.1) * 0.09,
+        phase: i % RAY_PHASES,
+      };
+    });
   }, [size, len, eq]);
 
   return (
@@ -810,16 +718,17 @@ function LightRays({ size, eq, winW, winH, spin, lit }: {
       style={{
         position: 'absolute', left: R - len, top: R - len, width: box, height: box,
         opacity: lit,
-        transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
       }}>
       {rays.map((ray, i) => (
-        <View
+        <Animated.View
           key={i}
           style={{
             position: 'absolute', left: len, top: len - ray.w / 2,
             width: ray.reach, height: ray.w,
             transform: [{ rotate: `${ray.deg}deg` }],
             transformOrigin: 'left center',
+            // Breathes between 55% and 100% of its own brightness.
+            opacity: phases[ray.phase].interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }),
           }}>
           <Svg width={ray.reach} height={ray.w} viewBox="0 0 100 12" preserveAspectRatio="none">
             <Defs>
@@ -834,7 +743,7 @@ function LightRays({ size, eq, winW, winH, spin, lit }: {
                 direction from there. */}
             <Ellipse cx={0} cy={6} rx={100} ry={6} fill={`url(#dbRay${i})`} />
           </Svg>
-        </View>
+        </Animated.View>
       ))}
     </Animated.View>
   );
@@ -1287,8 +1196,6 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             reflections, so they cannot have a life of their own. Two copies a
             screen apart make the wrap seamless: as one leaves to the right the
             other is already arriving. */}
-        <CastReflections eq={eq} spin={spin} lit={live} winW={winW} winH={winH} />
-
         <DustField count={14} eq={eq} live={live} winW={winW} winH={winH} />
 
         {/* The static diagonal streaks that used to hang here are gone
@@ -1340,7 +1247,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
                   Also the scrub target: swipe left/right anywhere on the ball. */}
               <View style={{ width: ballSize, height: ballSize }} {...ballPan.panHandlers}>
                 {/* The rays first, so the ball draws over their roots. */}
-                <LightRays size={ballSize} eq={eq} winW={winW} winH={winH} spin={spin} lit={live} />
+                <LightRays size={ballSize} eq={eq} winW={winW} winH={winH} lit={live} />
                 {/* Bloom is light LEAVING the ball, so it fades out with the
                     music exactly as the flashes do. `MirrorBeams` used to draw
                     here too and is GONE (owner, 02.08: "the light rays that

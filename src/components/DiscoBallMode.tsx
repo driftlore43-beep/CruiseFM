@@ -630,6 +630,129 @@ function MirrorBall({ size, eq, spin, pulse, lit, spotPan }: { size: number; eq:
 // A fixed field of dots; the whole field slowly rotates (one native transform)
 // while each dot twinkles on its own native-driver opacity loop. Zero per-frame
 // CPU — the "sweep" is staggered phases + the group rotation.
+
+/**
+ * GLITTER (owner, 02.08: "add some glitter, sparkles and fun. It's a mirror
+ * ball! Place it all over!").
+ *
+ * Dozens of tiny lights scattered across the whole screen, each TWINKLING in
+ * place — popping bright and sinking back on its own beat. They hold still:
+ * the room's standing rule is that only the ball's own surface may move, and
+ * glitter obeys it — a twinkle is brightness, not motion, which is also what
+ * real glitter does.
+ *
+ * Every drawn thing here is gradient falloff. Each speck is a soft radial dot;
+ * the brighter minority carry a pair of HAIRLINE cross-flares whose gradients
+ * are transparent at both tips — the round-21 soft-glint recipe, the one
+ * drawn-sparkle construction that has survived on device. No strokes, no
+ * solid shapes.
+ *
+ * Cost: the twinkling is EIGHT shared Animated loops however many specks are
+ * drawn — each speck borrows a phase and one of three response curves, so
+ * neighbours sharing a phase still pop at different moments.
+ */
+const GLITTER_COUNT = 64;
+const GLITTER_PHASES = 8;
+
+function GlitterSpeck({ x, y, r, color, flare, opacity }: {
+  x: number; y: number; r: number; color: string; flare: boolean;
+  opacity: Animated.AnimatedInterpolation<number>;
+}) {
+  const arm = r * 7;
+  const box = flare ? arm * 2 : r * 6;
+  const c = box / 2;
+  const gid = `dbGl${Math.round(x)}x${Math.round(y)}`;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{ position: 'absolute', left: x - c, top: y - c, width: box, height: box, opacity }}>
+      <Svg width={box} height={box}>
+        <Defs>
+          <RadialGradient id={gid} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.95" />
+            <Stop offset="0.28" stopColor={color} stopOpacity="0.55" />
+            <Stop offset="1" stopColor={color} stopOpacity="0" />
+          </RadialGradient>
+          {flare && (
+            <>
+              <SvgLinearGradient id={`${gid}h`} x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0" stopColor={color} stopOpacity="0" />
+                <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.7" />
+                <Stop offset="1" stopColor={color} stopOpacity="0" />
+              </SvgLinearGradient>
+              <SvgLinearGradient id={`${gid}v`} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={color} stopOpacity="0" />
+                <Stop offset="0.5" stopColor="#ffffff" stopOpacity="0.7" />
+                <Stop offset="1" stopColor={color} stopOpacity="0" />
+              </SvgLinearGradient>
+            </>
+          )}
+        </Defs>
+        {flare && (
+          <>
+            <Rect x={c - arm} y={c - r * 0.35} width={arm * 2} height={r * 0.7} fill={`url(#${gid}h)`} />
+            <Rect x={c - r * 0.35} y={c - arm} width={r * 0.7} height={arm * 2} fill={`url(#${gid}v)`} />
+          </>
+        )}
+        <Circle cx={c} cy={c} r={r * 3} fill={`url(#${gid})`} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+function GlitterField({ eq, lit, winW, winH }: {
+  eq: [string, string, string]; lit: Animated.Value; winW: number; winH: number;
+}) {
+  const phases = useRef(Array.from({ length: GLITTER_PHASES }, () => new Animated.Value(0))).current;
+  useEffect(() => {
+    const loops = phases.map((v, i) => {
+      const dur = 1500 + hash01(i * 7.7) * 1900;
+      const loop = Animated.loop(Animated.sequence([
+        Animated.timing(v, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration: dur * 1.25, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ]));
+      const start = setTimeout(() => loop.start(), i * 310);
+      return { loop, start };
+    });
+    return () => { loops.forEach(({ loop, start }) => { clearTimeout(start); loop.stop(); }); };
+  }, [phases]);
+
+  const specks = useMemo(() => {
+    const pal = [
+      '#ffffff',
+      mixHex(eq[0], '#ffffff', 0.55),
+      mixHex(eq[1], '#ffffff', 0.5),
+      mixHex(eq[2], '#ffffff', 0.55),
+    ];
+    return Array.from({ length: GLITTER_COUNT }, (_, i) => ({
+      // All over the screen, with a slight pull toward the ball's half so the
+      // sparkle feels thrown by it rather than wallpapered.
+      x: hash01(i * 3.1) * winW,
+      y: hash01(i * 7.9) * winH,
+      r: 1.1 + Math.pow(hash01(i * 5.3), 1.6) * 2.4,
+      color: pal[i % 4],
+      flare: hash01(i * 9.7) > 0.72,
+      phase: i % GLITTER_PHASES,
+      curve: i % 3,
+    }));
+  }, [eq, winW, winH]);
+
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: lit }]}>
+      {specks.map((sp, i) => {
+        const v = phases[sp.phase];
+        // Three response curves per phase, so bucket-mates pop at different
+        // moments instead of blinking in unison.
+        const opacity =
+          sp.curve === 0 ? v.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.08, 1, 0.08] })
+          : sp.curve === 1 ? v.interpolate({ inputRange: [0, 1], outputRange: [0.10, 1] })
+          : v.interpolate({ inputRange: [0, 1], outputRange: [1, 0.10] });
+        return <GlitterSpeck key={i} x={sp.x} y={sp.y} r={sp.r} color={sp.color} flare={sp.flare} opacity={opacity} />;
+      })}
+    </Animated.View>
+  );
+}
+
 /**
  * A dark vignette pulling the corners down (owner's lighting brief, 31.07):
  * the room reads as a deep studio rather than a flat backdrop, and the ball
@@ -1208,6 +1331,11 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             darkens toward its corners, the scene keeps its depth, the type
             stays on top of everything. */}
         <Vignette winW={winW} winH={winH} />
+
+        {/* Glitter over everything in the room (under the chrome): the
+            specks must sparkle in the corners too, so they sit above the
+            vignette rather than being dimmed by it. */}
+        <GlitterField eq={eq} lit={live} winW={winW} winH={winH} />
 
         {/* Drag pill + mode label + centred header are portrait furniture —
             in landscape LandscapeChrome carries the identity at top-left. */}

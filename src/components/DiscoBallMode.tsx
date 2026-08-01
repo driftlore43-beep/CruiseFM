@@ -510,38 +510,6 @@ function KeySpecular({ size, lit }: { size: number; lit: Animated.Value }) {
   );
 }
 
-// The soft glow BENEATH the ball (owner's premium round, 30.07) — the pool
-// of light a hanging mirror ball throws at whatever is under it. Mood-tinted
-// because it is LIGHT leaving the ball, not material (the chrome rule); goes
-// out with the music like everything else. Sits behind the ball, wider than
-// it, fading on its own gradient — no hard edges anywhere near it.
-function UnderGlow({ size, color, lit }: { size: number; color: string; lit: Animated.Value }) {
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        left: -size * 0.3, top: size * 0.72,
-        width: size * 1.6, height: size * 0.8,
-        opacity: lit.interpolate({ inputRange: [0, 1], outputRange: [0, 0.42] }),
-      }}
-    >
-      {/* Explicit size, never "100%" — a percentage canvas is what left the
-          ambient hazes drawn at their old proportions after a turn. */}
-      <Svg width={size * 1.6} height={size * 0.8} viewBox="0 0 160 80" preserveAspectRatio="none">
-        <Defs>
-          <RadialGradient id="dbUnder" cx="50%" cy="38%" rx="50%" ry="55%">
-            <Stop offset="0%" stopColor={color} stopOpacity="0.6" />
-            <Stop offset="55%" stopColor={color} stopOpacity="0.22" />
-            <Stop offset="100%" stopColor={color} stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-        <Ellipse cx={80} cy={30} rx={78} ry={28} fill="url(#dbUnder)" />
-      </Svg>
-    </Animated.View>
-  );
-}
-
 function MirrorBall({ size, eq, spin, pulse, lit, spotPan }: { size: number; eq: [string, string, string]; spin: Animated.Value; pulse: Animated.Value; lit: Animated.Value; spotPan: Animated.Value }) {
   const flip = useMemo(() => buildFlipbook(size, eq), [size, eq]);
   return (
@@ -693,118 +661,182 @@ function Vignette({ winW, winH }: { winW: number; winH: number }) {
  * snow. All native-driver opacity/transform loops.
  */
 /**
- * THE ROOM CATCHES THE LIGHT.
+ * THE LIGHT THE BALL THROWS ACROSS THE ROOM.
  *
- * A mirror ball throws its mirrors onto the walls and ceiling as a grid of
- * bright patches, and that grid is arranged in RINGS around the ball. As the
- * ball turns, each patch travels along its own ring — the pattern does not
- * spin like a pinwheel, which is what the first version did and what the owner
- * spotted straight away (02.08: "light pieces circulate the ball like a
- * circle... not rotate in a clockwise direction").
+ * We are looking at the ball HEAD ON, not up at a ceiling (owner, 02.08) — so
+ * the room's light reads as ROWS crossing the background, all travelling the
+ * same way. The previous version laid the patches on rings and turned them,
+ * which is what a ceiling really does but means the top rows and the bottom
+ * rows travel in OPPOSITE directions: "gives me a headache looking at it", and
+ * she is right.
  *
- * THE TRICK, and it is the whole component: an ellipse is a rotated circle
- * that has been squashed. So the patches are laid on plain CIRCLES inside a
- * view that rotates, and that view sits inside another one that scales it down
- * vertically. Points therefore travel along ELLIPSES — wide sweeps left and
- * right, tight compressed arcs at the top and bottom, exactly like the rows in
- * the owner's reference photographs of a real ceiling. Native-driver transform
- * throughout; the entire room is two nested views and one animated rotation.
+ * So it is a scrolling field now: rows of patches sliding RIGHT TO LEFT, every
+ * row the same way, across the whole screen. Perspective does the rest —
+ * rows crowd together toward the top and open out toward the bottom, patches
+ * grow and spread as they come toward you, and each row bows gently rather
+ * than ruling a straight line across the picture.
  *
- * DIRECTION: anticlockwise, so along the top rows the light travels RIGHT TO
- * LEFT as asked. It rides `spin`, so it can never disagree with the ball —
- * it stops when the ball stops and follows a finger drag. Twice the ball's
- * rate, because reflecting off a turning mirror doubles the angle.
+ * Three copies a screen apart make the wrap seamless: as one leaves to the
+ * left the next is already arriving. The travel rides `spin`, so the light can
+ * never disagree with the ball — it stops when the ball stops and follows a
+ * finger drag.
  */
-const CAST_RINGS = 5;
-/** How hard the rings are squashed. Lower = flatter arcs and more compression
- *  toward the top; at 1 they would be circles and we would be back to a
- *  pinwheel. */
-const CAST_FLATTEN = 0.52;
+const CAST_ROWS = 9;
+/** Screen-widths of travel per ball revolution. */
+const CAST_SCREENS = 2;
 
-function CastReflections({ size, eq, spin, lit, winW, winH }: {
-  size: number; eq: [string, string, string]; spin: Animated.Value; lit: Animated.Value;
+function CastReflections({ eq, spin, lit, winW, winH }: {
+  eq: [string, string, string]; spin: Animated.Value; lit: Animated.Value;
   winW: number; winH: number;
 }) {
-  const R = size / 2;
-  // Far enough that the outer ring still reaches past the screen corners once
-  // it has been squashed.
-  const reach = Math.max(winW, winH) * 0.64;
-  const box = reach * 2;
-  // The pattern hangs from above the ball, so more of it lands on the
-  // "ceiling" — the top of the picture — than on the floor.
-  const lift = R * 0.30;
+  const period = winW;
 
-  const patches = useMemo(() => {
-    const lightPal = [mixHex(eq[0], '#ffffff', 0.45), mixHex(eq[1], '#ffffff', 0.5), '#e9eef8'];
-    const base = R * 1.18;
+  const spots = useMemo(() => {
+    // Lighter than the mirrors themselves: this is light landing on a surface,
+    // not metal. Pale enough to read against the dark room.
+    const lightPal = [
+      mixHex(eq[0], '#ffffff', 0.62),
+      mixHex(eq[1], '#ffffff', 0.66),
+      '#f2f6ff',
+    ];
     const out: {
-      x: number; y: number; w: number; h: number; deg: number; color: string; op: number;
+      x: number; y: number; w: number; h: number; color: string; op: number; bow: number;
     }[] = [];
     let n = 0;
-    for (let ring = 0; ring < CAST_RINGS; ring++) {
-      const t = Math.pow((ring + 0.35) / CAST_RINGS, 0.72);
-      const r = base + (reach - base) * t;
-      const count = 12 + ring * 6;
+    for (let k = 0; k < CAST_ROWS; k++) {
+      const u = k / (CAST_ROWS - 1);                 // 0 = far/top, 1 = near/foot
+      // Rows crowd at the top and open out at the bottom.
+      const yBase = winH * (0.02 + 0.98 * Math.pow(u, 1.55));
+      // DISPERSION grows downward — the far rows are tight, the near ones are
+      // wide apart. Count must divide the period exactly or the wrap shows.
+      const count = Math.max(5, Math.round(17 - k * 1.35));
+      const gap = period / count;
+      const w = winW * (0.016 + u * 0.052);
+      // Flatter at the top, rounder at the foot: that compression IS the
+      // perspective, and it is what the owner's photographs show.
+      const h = w * (0.42 + u * 0.52);
+      // A gentle periodic bow, so a row curves across the picture instead of
+      // ruling a straight line. Periodic, or the copies would not meet.
+      const bow = winH * (0.012 + u * 0.030);
       for (let i = 0; i < count; i++) {
         n++;
-        // A little jitter per spot so the rows read as light rather than as a
-        // machined grid — but only a fraction of the spacing, or the rows stop
-        // being rows.
-        const step = (Math.PI * 2) / count;
-        const a = i * step + (hash01(n * 7.3) - 0.5) * step * 0.55;
-        const rr = r * (1 + (hash01(n * 3.1) - 0.5) * 0.10);
-        // A projected mirror spreads with distance and smears radially.
-        const w = size * (0.020 + t * 0.040) * (0.62 + hash01(n * 5.9) * 0.76);
-        // Drawn TALL so the wrapper's vertical squash leaves it near-round:
-        // without this every patch comes out as a flat dash.
-        const h = (w * 1.18 / CAST_FLATTEN) * 0.82;
         out.push({
-          x: reach + Math.cos(a) * rr,
-          y: reach + Math.sin(a) * rr,
-          w, h,
-          deg: (a * 180) / Math.PI + 90,      // long axis along the radial line
+          x: i * gap + (hash01(n * 5.1) - 0.5) * gap * 0.34,
+          y: yBase + (hash01(n * 9.7) - 0.5) * h * 1.1,
+          w: w * (0.7 + hash01(n * 3.3) * 0.7),
+          h: h * (0.7 + hash01(n * 7.9) * 0.7),
           color: lightPal[n % 3],
-          // Mid-distance patches are brightest: near ones sit in the ball's
-          // own shadowed column, far ones have spread themselves thin.
-          op: (0.09 + 0.17 * Math.sin(Math.min(1, t) * Math.PI)) * (0.62 + hash01(n * 8.7) * 0.6),
+          op: (0.20 + 0.20 * u) * (0.68 + hash01(n * 8.7) * 0.66),
+          bow,
         });
       }
     }
     return out;
-  }, [R, reach, size, eq]);
+  }, [eq, winW, winH, period]);
 
   return (
-    <View
+    <Animated.View
       pointerEvents="none"
       style={{
-        position: 'absolute', left: R - reach, top: R - reach - lift, width: box, height: box,
-        transform: [{ scaleY: CAST_FLATTEN }],
+        position: 'absolute', left: 0, top: 0, width: period * 3, height: winH,
+        opacity: lit,
+        transform: [{
+          translateX: spin.interpolate({
+            inputRange: [0, 1], outputRange: [0, -period * CAST_SCREENS],
+          }),
+        }],
       }}>
-      <Animated.View
-        style={{
-          width: box, height: box,
-          opacity: lit,
-          transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-720deg'] }) }],
-        }}>
-        <Svg width={box} height={box}>
-          <Defs>
-            <RadialGradient id="dbCast" cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor="#ffffff" stopOpacity="1" />
-              <Stop offset="0.55" stopColor="#ffffff" stopOpacity="0.55" />
-              <Stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-            </RadialGradient>
-          </Defs>
-          {patches.map((pt, i) => (
-            <G key={i} transform={`translate(${pt.x} ${pt.y}) rotate(${pt.deg})`} opacity={pt.op}>
-              {/* Soft pool under a brighter core: the wall glows around the
-                  patch, which is what a light landing on a surface does. */}
-              <Ellipse cx={0} cy={0} rx={pt.w * 2.2} ry={pt.h * 1.6} fill={pt.color} fillOpacity={0.15} />
-              <Rect x={-pt.w / 2} y={-pt.h / 2} width={pt.w} height={pt.h} rx={pt.w * 0.35} fill={pt.color} fillOpacity={0.75} />
-            </G>
-          ))}
-        </Svg>
-      </Animated.View>
-    </View>
+      <Svg width={period * 3} height={winH}>
+        {[0, 1, 2].map((copy) => (
+          <G key={copy} transform={`translate(${copy * period} 0)`}>
+            {spots.map((pt, i) => {
+              // The bow is evaluated from the spot's own x, so it is identical
+              // in every copy and the seam cannot show.
+              const dy = pt.bow * (1 - Math.cos((2 * Math.PI * pt.x) / period)) * 0.5;
+              return (
+                <Rect
+                  key={i}
+                  x={pt.x - pt.w / 2}
+                  y={pt.y + dy - pt.h / 2}
+                  width={pt.w}
+                  height={pt.h}
+                  rx={pt.h * 0.4}
+                  fill={pt.color}
+                  fillOpacity={pt.op}
+                />
+              );
+            })}
+          </G>
+        ))}
+      </Svg>
+    </Animated.View>
+  );
+}
+
+/**
+ * The rays, back by request (owner, 02.08) — but built so no single one can
+ * ever go stubborn. The old `MirrorBeams` gave every beam its own mirror and
+ * its own trajectory, which meant one could park near the right-hand limb and
+ * sit there looking like a streak drawn on the picture.
+ *
+ * These are EVENLY SPACED around the ball and turn as one fan with the spin,
+ * so every ray is the same as every other and all of them are always moving.
+ * Each is a single stretched radial glow — soft along its length, across its
+ * width and at its far end, with no edge anywhere to catch the eye.
+ */
+const RAY_COUNT = 18;
+
+function LightRays({ size, eq, winW, winH, spin, lit }: {
+  size: number; eq: [string, string, string]; winW: number; winH: number;
+  spin: Animated.Value; lit: Animated.Value;
+}) {
+  const R = size / 2;
+  const len = Math.max(winW, winH) * 0.92;
+  const box = len * 2;
+  const rays = useMemo(() => {
+    const pal = [mixHex(eq[0], '#ffffff', 0.5), mixHex(eq[1], '#ffffff', 0.55), '#e8eefc'];
+    return Array.from({ length: RAY_COUNT }, (_, i) => ({
+      deg: (i / RAY_COUNT) * 360,
+      w: size * (0.05 + hash01(i * 4.7) * 0.10),
+      reach: len * (0.55 + hash01(i * 2.9) * 0.45),
+      color: pal[i % 3],
+      op: 0.075 + hash01(i * 6.1) * 0.095,
+    }));
+  }, [size, len, eq]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', left: R - len, top: R - len, width: box, height: box,
+        opacity: lit,
+        transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
+      }}>
+      {rays.map((ray, i) => (
+        <View
+          key={i}
+          style={{
+            position: 'absolute', left: len, top: len - ray.w / 2,
+            width: ray.reach, height: ray.w,
+            transform: [{ rotate: `${ray.deg}deg` }],
+            transformOrigin: 'left center',
+          }}>
+          <Svg width={ray.reach} height={ray.w} viewBox="0 0 100 12" preserveAspectRatio="none">
+            <Defs>
+              <RadialGradient id={`dbRay${i}`} cx="50%" cy="50%" r="50%">
+                <Stop offset="0" stopColor={ray.color} stopOpacity={String(ray.op)} />
+                <Stop offset="0.5" stopColor={ray.color} stopOpacity={String(ray.op * 0.45)} />
+                <Stop offset="1" stopColor={ray.color} stopOpacity="0" />
+              </RadialGradient>
+            </Defs>
+            {/* Centred at the ray's ROOT: only the outward half is inside the
+                canvas, so it is brightest at the ball and dissolves in every
+                direction from there. */}
+            <Ellipse cx={0} cy={6} rx={100} ry={6} fill={`url(#dbRay${i})`} />
+          </Svg>
+        </View>
+      ))}
+    </Animated.View>
   );
 }
 
@@ -1255,6 +1287,8 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             reflections, so they cannot have a life of their own. Two copies a
             screen apart make the wrap seamless: as one leaves to the right the
             other is already arriving. */}
+        <CastReflections eq={eq} spin={spin} lit={live} winW={winW} winH={winH} />
+
         <DustField count={14} eq={eq} live={live} winW={winW} winH={winH} />
 
         {/* The static diagonal streaks that used to hang here are gone
@@ -1305,10 +1339,8 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
                   themselves relative to it, not the taller pole+ball stack.
                   Also the scrub target: swipe left/right anywhere on the ball. */}
               <View style={{ width: ballSize, height: ballSize }} {...ballPan.panHandlers}>
-                {/* The room's cast light first, so the ball, its glow and
-                    its beams all draw over it. */}
-                <CastReflections size={ballSize} eq={eq} spin={spin} lit={live} winW={winW} winH={winH} />
-                <UnderGlow size={ballSize} color={bloomColor} lit={live} />
+                {/* The rays first, so the ball draws over their roots. */}
+                <LightRays size={ballSize} eq={eq} winW={winW} winH={winH} spin={spin} lit={live} />
                 {/* Bloom is light LEAVING the ball, so it fades out with the
                     music exactly as the flashes do. `MirrorBeams` used to draw
                     here too and is GONE (owner, 02.08: "the light rays that

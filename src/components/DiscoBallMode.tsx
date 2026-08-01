@@ -276,71 +276,6 @@ function ColourReflections({ size, eq, lit }: { size: number; eq: [string, strin
 }
 
 
-function LightStreaks({ live, winW, winH }: {
-  live: Animated.Value; winW: number; winH: number;
-}) {
-  const streaks = useMemo(() => Array.from({ length: 7 }, (_, i) => ({
-    // Long enough to run off both edges, so no end is ever visible.
-    len: winW * (1.25 + hash01(i * 3.7) * 0.6),
-    thick: 1 + hash01(i * 9.1) * 1.4,
-    x: winW * (0.1 + hash01(i * 5.3) * 0.8),
-    // Stratified down the screen rather than seven independent rolls — those
-    // put two beams within ten pixels of each other at similar angles, which
-    // reads as one accidental double line.
-    y: winH * (0.10 + ((i + hash01(i * 2.9)) / 7) * 0.74),
-    // Shallow angles only. Steep ones read as scratches on the screen.
-    deg: (hash01(i * 6.7) > 0.5 ? 1 : -1) * (14 + hash01(i * 8.3) * 22),
-    peak: 0.05 + hash01(i * 4.9) * 0.09,
-    dur: 2600 + Math.floor(hash01(i * 7.1) * 3400),
-    delay: Math.floor(hash01(i * 1.9) * 2600),
-  })), [winW, winH]);
-
-  const breath = useRef(streaks.map(() => new Animated.Value(0))).current;
-  useEffect(() => {
-    const loops = streaks.map((st, i) => {
-      const loop = Animated.loop(Animated.sequence([
-        Animated.delay(st.delay),
-        Animated.timing(breath[i], { toValue: 1, duration: st.dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(breath[i], { toValue: 0, duration: st.dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]));
-      loop.start();
-      return loop;
-    });
-    return () => loops.forEach((l) => l.stop());
-  }, [streaks]);
-
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {streaks.map((st, i) => (
-        <Animated.View
-          key={i}
-          style={{
-            position: 'absolute',
-            left: st.x - st.len / 2,
-            top: st.y,
-            width: st.len,
-            height: st.thick,
-            opacity: Animated.multiply(
-              breath[i].interpolate({ inputRange: [0, 1], outputRange: [0.012, st.peak] }),
-              live,
-            ),
-            transform: [{ rotate: `${st.deg}deg` }],
-          }}
-        >
-          {/* Faded at both ends. A flat white bar has two hard stops, and if
-              either ever lands on screen it reads as a drawn line rather than
-              light in the air. */}
-          <LinearGradient
-            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0)']}
-            locations={[0, 0.5, 1]}
-            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-      ))}
-    </View>
-  );
-}
 
 // A single soft neon streak drifting down across the ball on its own slow
 // yo-yo loop (opacity + translateY only — native driver). Four of these,
@@ -994,22 +929,25 @@ function MirrorBeams({ size, color, winW, spin, lit }: {
               { translateX: -b.len / 2 },
             ],
           }}>
-          {/* Feathered, not laser-cut (owner's lighting brief, 31.07): the
-              ray is three strips of one gradient — a soft full-width wash
-              with a slightly brighter middle — so its edges dissolve instead
-              of ending in two hard lines. The gradient starts at the ball
-              already soft: the white spark tip was what read as a laser. */}
+          {/* ONE stretched radial glow per beam, centred on its root at the
+              ball. Soft in EVERY direction — along its length, across its
+              width, and at its far end. The previous build was three stacked
+              strips of a lengthwise gradient, and each strip's sides were
+              hard lines, which on device read as a drawn band hanging in the
+              room with a squared-off end (owner, 01.08: "awkward light
+              streak"). A radial falloff has no edges to see. */}
           <Svg width={b.len} height={b.width} viewBox="0 0 100 12" preserveAspectRatio="none">
             <Defs>
-              <SvgLinearGradient id={`dbBeam${i}`} x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor={color} stopOpacity="0.50" />
-                <Stop offset="0.30" stopColor={color} stopOpacity="0.22" />
+              <RadialGradient id={`dbBeam${i}`} cx="50%" cy="50%" r="50%">
+                <Stop offset="0" stopColor={color} stopOpacity="0.55" />
+                <Stop offset="0.5" stopColor={color} stopOpacity="0.20" />
                 <Stop offset="1" stopColor={color} stopOpacity="0" />
-              </SvgLinearGradient>
+              </RadialGradient>
             </Defs>
-            <Rect x={0} y={0} width={100} height={12} fill={`url(#dbBeam${i})`} opacity={0.5} />
-            <Rect x={0} y={3} width={100} height={6} fill={`url(#dbBeam${i})`} opacity={0.7} />
-            <Rect x={0} y={4.8} width={100} height={2.4} fill={`url(#dbBeam${i})`} />
+            {/* Centred at the beam's ROOT: only the outward half is inside
+                the canvas, so it is brightest at the ball and dissolves in
+                every direction from there. */}
+            <Ellipse cx={0} cy={6} rx={100} ry={6} fill={`url(#dbBeam${i})`} />
           </Svg>
         </Animated.View>
       ))}
@@ -1414,12 +1352,11 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             other is already arriving. */}
         <DustField count={14} eq={eq} live={live} winW={winW} winH={winH} />
 
-        {/* Faint diagonal beams — light in the air, the way a shaft shows when
-            it crosses a dark room. These replaced the little twinkling stars,
-            which read as 2D sparkles pasted over the picture. They sit behind
-            the ball and do NOT travel with it: a beam comes from a fixed lamp,
-            so it holds still while the ball's reflections move past it. */}
-        <LightStreaks live={live} winW={winW} winH={winH} />
+        {/* The static diagonal streaks that used to hang here are gone
+            (owner, 01.08: "awkward light streak on the right hand side").
+            They were hired to make the empty room feel lit; now that the
+            ball's own cast reflections fill it, fixed lines crossing the
+            scene read as scratches on the picture. */}
 
         {/* The vignette sits over the room but under the chrome: the studio
             darkens toward its corners, the scene keeps its depth, the type

@@ -134,8 +134,23 @@ function VinylArt({ eq, art, uid }: { eq: Eq; art: string | null; uid: string })
       d={`M ${CX + Math.cos(a) * rr} ${CY + Math.sin(a) * rr} l ${Math.cos(a + 1.4) * len} ${Math.sin(a + 1.4) * len}`}
       stroke="#ffffff" strokeOpacity={0.06 + h01(i * 2.3) * 0.08} strokeWidth={1.4} strokeLinecap="round" />);
   }
-  const armEnd = { x: 694, y: 470 };
-  const pivot = { x: 986, y: 212 };
+  // THE TONEARM. A real arm is a CURVE — it leaves the bearing going down,
+  // bends left, and straightens into the headshell (owner's reference photo,
+  // 02.08). Drawn as a straight line with a wedge on the end it reads as a
+  // stick, which is the "funky line" she spotted.
+  const pivot = { x: 982, y: 238 };
+  // The stylus has to land on the GROOVES. Set further in, it sat on the
+  // label, which is the one place a needle never is.
+  const tip = { x: 806, y: 566 };
+  const armPath = `M ${pivot.x - 4} ${pivot.y + 18} C ${pivot.x - 24} ${pivot.y + 172}, ${tip.x + 116} ${tip.y - 26}, ${tip.x} ${tip.y}`;
+  // The headshell carries on from the tip, angled DOWN-LEFT: that offset angle
+  // is what points the stylus in toward the spindle and completes the J.
+  const HA = (170 * Math.PI) / 180;
+  const dx = Math.cos(HA), dy = Math.sin(HA);
+  const px = -dy, py = dx;                        // perpendicular
+  const HL = 96, HW = 17;
+  const hq = (t: number, u: number) => `${(tip.x + dx * t + px * u).toFixed(1)} ${(tip.y + dy * t + py * u).toFixed(1)}`;
+  const stylusX = tip.x + dx * HL, stylusY = tip.y + dy * HL;
 
   return (
     <>
@@ -161,15 +176,29 @@ function VinylArt({ eq, art, uid }: { eq: Eq; art: string | null; uid: string })
       <Circle cx={CX} cy={CY} r={132} fill="none" stroke="#ffffff" strokeOpacity={0.18} strokeWidth={2} />
       <Circle cx={CX} cy={CY} r={13} fill="#05050a" />
 
-      {/* Tonearm — silver, counterweighted, needle down on the grooves. The
-          headshell angles IN toward the spindle, which is what completes the J. */}
-      <Line x1={pivot.x - 8} y1={pivot.y + 10} x2={armEnd.x} y2={armEnd.y} stroke="#0a0a11" strokeOpacity={0.55} strokeWidth={17} strokeLinecap="round" />
-      <Line x1={pivot.x - 8} y1={pivot.y + 10} x2={armEnd.x} y2={armEnd.y} stroke="#c9cede" strokeOpacity={0.9} strokeWidth={11} strokeLinecap="round" />
-      <Circle cx={pivot.x} cy={pivot.y} r={34} fill="#1b1e2a" stroke="#c9cede" strokeOpacity={0.6} strokeWidth={4} />
-      <Circle cx={pivot.x + 30} cy={pivot.y - 34} r={26} fill="#262b3a" stroke="#c9cede" strokeOpacity={0.45} strokeWidth={3} />
-      <Path d={`M ${armEnd.x + 26} ${armEnd.y - 30} L ${armEnd.x - 22} ${armEnd.y + 22} L ${armEnd.x + 2} ${armEnd.y + 44} L ${armEnd.x + 50} ${armEnd.y - 8} Z`}
-        fill="#dfe4f0" fillOpacity={0.85} />
-      <Circle cx={armEnd.x - 12} cy={armEnd.y + 34} r={6} fill={eq[0]} />
+      {/* Arm tube: a shadow, the chrome, then a hairline catch along the top.
+          Three strokes on ONE path — a tube is round, and a single flat stroke
+          is the difference between chrome and a drawn line. */}
+      <Path d={armPath} fill="none" stroke="#05060b" strokeOpacity={0.55} strokeWidth={19} strokeLinecap="round" />
+      <Path d={armPath} fill="none" stroke="#b9bfd0" strokeOpacity={0.95} strokeWidth={13} strokeLinecap="round" />
+      <Path d={armPath} fill="none" stroke="#f2f5fb" strokeOpacity={0.75} strokeWidth={4} strokeLinecap="round" />
+
+      {/* Bearing housing and counterweight */}
+      <Circle cx={pivot.x} cy={pivot.y} r={40} fill="#1b1e2a" stroke="#c9cede" strokeOpacity={0.6} strokeWidth={4} />
+      <Circle cx={pivot.x} cy={pivot.y} r={24} fill="#0c0e16" stroke="#c9cede" strokeOpacity={0.35} strokeWidth={2.5} />
+      <Circle cx={pivot.x} cy={pivot.y} r={7} fill="#e4e8f2" fillOpacity={0.8} />
+      <Rect x={pivot.x + 22} y={pivot.y - 62} width={26} height={44} rx={10} fill="#262b3a"
+        stroke="#c9cede" strokeOpacity={0.45} strokeWidth={2.5} transform={`rotate(-28 ${pivot.x + 35} ${pivot.y - 40})`} />
+
+      {/* Headshell, cartridge and stylus */}
+      <Path d={`M ${hq(-6, HW)} L ${hq(HL, HW * 0.82)} L ${hq(HL, -HW * 0.82)} L ${hq(-6, -HW)} Z`}
+        fill="#20242f" stroke="#c9cede" strokeOpacity={0.5} strokeWidth={2} />
+      <Path d={`M ${hq(HL * 0.42, HW * 0.5)} L ${hq(HL * 0.9, HW * 0.45)} L ${hq(HL * 0.9, -HW * 0.45)} L ${hq(HL * 0.42, -HW * 0.5)} Z`}
+        fill="#0b0d15" />
+      <Circle cx={tip.x + dx * HL * 0.66 + px * 2} cy={tip.y + dy * HL * 0.66 + py * 2} r={5} fill={eq[0]} fillOpacity={0.9} />
+      <Path d={`M ${stylusX} ${stylusY} L ${stylusX - 3} ${stylusY + 24}`} stroke="#dfe4f0" strokeOpacity={0.9} strokeWidth={3} strokeLinecap="round" />
+      {/* Finger lift */}
+      <Path d={`M ${hq(HL * 0.1, HW)} L ${hq(HL * 0.34, HW + 26)}`} stroke="#c9cede" strokeOpacity={0.6} strokeWidth={4} strokeLinecap="round" />
     </>
   );
 }

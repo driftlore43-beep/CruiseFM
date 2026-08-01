@@ -122,8 +122,7 @@ function heroBox(x: number, y: number, w: number, h: number, mode: 'cover' | 'co
 /**
  * A window showing THE MODE, as it actually appears: the station's own
  * photograph full-bleed behind, the mode's scrim over it, the object on top.
- * Every mode on screen is exactly that stack, and drawing the object on a flat
- * panel instead was most of why the old cards "looked like a different app".
+ * Every mode on screen is exactly that stack.
  */
 function ModeStage({ d, uid, x, y, w, h, rx = 0 }: {
   d: Derived; uid: string; x: number; y: number; w: number; h: number; rx?: number;
@@ -148,6 +147,63 @@ function ModeStage({ d, uid, x, y, w, h, rx = 0 }: {
         <Rect x={x} y={y} width={w} height={h} fill={`url(#${id}s)`} />
         <G transform={heroBox(x, y, w, h)}>{d.hero}</G>
       </G>
+    </>
+  );
+}
+
+/**
+ * The station photograph filling a whole box, with a light scrim over it.
+ *
+ * This is the background for the card ITSELF, not a window inside it (owner,
+ * 02.08: "I would make the image cover the entire background"). It always
+ * COVERS — a photograph may be trimmed, that is what photographs are for. The
+ * mode's object is laid over it separately and is never cropped.
+ */
+function PhotoFill({ d, uid, x, y, w, h }: {
+  d: Derived; uid: string; x: number; y: number; w: number; h: number;
+}) {
+  return (
+    <>
+      <Rect x={x} y={y} width={w} height={h} fill={d.deep} />
+      {!!d.backdrop && (
+        <SvgImage x={x} y={y} width={w} height={h} href={d.backdrop as string}
+          preserveAspectRatio="xMidYMid slice" />
+      )}
+      <Rect x={x} y={y} width={w} height={h} fill="#03040e" fillOpacity={0.34} />
+      <Rect x={x} y={y} width={w} height={h} fill={d.wash} fillOpacity={0.10} />
+    </>
+  );
+}
+
+/**
+ * The dark band that lets type sit on a photograph. Fades to nothing so it
+ * never draws an edge of its own — a scrim with a visible boundary is just a
+ * rectangle, and this card already learned that lesson on the mirror ball.
+ */
+function FadeBand({ uid, x, y, w, h, from, tint, dir }: {
+  uid: string; x: number; y: number; w: number; h: number;
+  from: number; tint?: string; dir: 'down' | 'up';
+}) {
+  const id = `fb${uid}`;
+  const a = dir === 'down' ? '0' : '1';
+  const b = dir === 'down' ? '1' : '0';
+  return (
+    <>
+      <Defs>
+        <SvgLinearGradient id={id} x1="0" y1={a} x2="0" y2={b}>
+          <Stop offset="0" stopColor="#03040c" stopOpacity={String(from)} />
+          <Stop offset="0.55" stopColor="#03040c" stopOpacity={String(from * 0.34)} />
+          <Stop offset="1" stopColor="#03040c" stopOpacity="0" />
+        </SvgLinearGradient>
+        {!!tint && (
+          <SvgLinearGradient id={`${id}t`} x1="0" y1={a} x2="0" y2={b}>
+            <Stop offset="0" stopColor={tint} stopOpacity="0.30" />
+            <Stop offset="1" stopColor={tint} stopOpacity="0" />
+          </SvgLinearGradient>
+        )}
+      </Defs>
+      <Rect x={x} y={y} width={w} height={h} fill={`url(#${id})`} />
+      {!!tint && <Rect x={x} y={y} width={w} height={h} fill={`url(#${id}t)`} />}
     </>
   );
 }
@@ -292,39 +348,36 @@ function TicketStyle(p: StyleProps) {
   const PW = CARD_W - PX * 2;
   const panelBottom = cardH - PY;
   const STUB_X = PX + 46, STUB_W = PW - 92;
+  const extra = cardH - CARD_H_CARD;
 
-  // The owner's own running order (02.08):
-  //   header and text / rule / the mode, full bleed / tear /
-  //   NOW PLAYING · song · album cover / barcode
-  const HEAD_H = 196;
-  const headRule = PY + HEAD_H;
-  const IMG_Y = headRule + 20;
-  // Close to the hero's own 1080:740. A window much wider than that crops the
-  // stage top and bottom, and the Tuner's panel is the first thing to lose its
-  // head — this leaves about 3% off each edge, which every mode can spare.
-  const IMG_H = 600 + (cardH - CARD_H_CARD) * 0.62;
-  const perfY = IMG_Y + IMG_H + 52;
+  // The owner's running order (02.08): header and text / the mode, covering
+  // the whole card / tear / NOW PLAYING · song · album cover / barcode.
+  // The photograph is the card's background end to end; the mode's object sits
+  // on it at full width, so it is never cropped, and the type reads because
+  // the top and bottom are faded rather than boxed off.
+  // A shade under the panel's full width: at 100% the counterfoil lost the
+  // room its artist line needs and ran into the barcode.
+  const HERO_W = Math.round(PW * 0.95);
+  const HERO_H = Math.round((HERO_W * STAGE_H) / CARD_W);
+  const HERO_X = CX - HERO_W / 2;
+  const HERO_Y = PY + 190 + extra * 0.36;
+  const perfY = HERO_Y + HERO_H + 32;
+  const barcodeY = panelBottom - 120;
 
   const COVER = 156;
   const coverX = PX + PW - 46 - COVER;
-  const titleLines = wrapLines(d.title, 44, STUB_W - (d.art ? 200 : 40), 2);
-  const stubContentH = 60 + titleLines.length * 56 + (d.artist ? 36 : 0);
-  const barcodeY = panelBottom - 128;
-  const stubY = perfY + Math.max(60, ((barcodeY - perfY) - stubContentH) / 2);
+  const titleLines = wrapLines(d.title, 40, STUB_W - (d.art ? 200 : 40), 2);
+  const stubContentH = 56 + titleLines.length * 50 + (d.artist ? 34 : 0);
+  const stubY = perfY + Math.max(56, ((barcodeY - perfY) - stubContentH) / 2);
   const nameSize = fitSize(station.name, 58, PW - 92, 28);
 
-  // Deepened hard, and again on the owner's note. At 0.42 the band came out a
-  // bright saturated blue and read as a UI header rather than card stock.
-  const head = mixHex(d.eq[1], '#08090f', 0.80);
-
   // Guilloche. Real tickets carry a fine engraved pattern that a photocopier
-  // can't hold; a low-opacity diagonal weave is the cheapest honest nod to it,
-  // and it is what stops the panel reading as a flat rectangle.
+  // can't hold, and it is what stops the panel reading as a flat rectangle.
   const weave: React.ReactElement[] = [];
   for (let i = 0; i < 48; i++) {
     const x = PX - (panelBottom - PY) + i * 44;
     weave.push(<Path key={`gw${i}`} d={`M ${x} ${panelBottom} L ${x + (panelBottom - PY)} ${PY}`}
-      stroke="#ffffff" strokeOpacity={0.05} strokeWidth={1.3} />);
+      stroke="#ffffff" strokeOpacity={0.045} strokeWidth={1.3} />);
   }
 
   // Perforation, punched rather than drawn. A dashed stroke reads as a border
@@ -346,32 +399,24 @@ function TicketStyle(p: StyleProps) {
   return (
     <>
       <BaseWash d={d} uid={uid} cardH={cardH} glow={0.30} />
-      {/* Photograph kept as texture only — a busy backdrop fights the object,
-          and the mode window carries the real one. */}
-      <Backdrop d={d} uid={uid} cardH={cardH} stops={[0.82, 0.80, 0.84, 0.90]} />
+      <Backdrop d={d} uid={uid} cardH={cardH} stops={[0.86, 0.84, 0.86, 0.92]} />
 
       <Defs>
         <ClipPath id={`tkP${uid}`}>
           <Rect x={PX} y={PY} width={PW} height={panelBottom - PY} rx={40} ry={40} />
         </ClipPath>
-        <SvgLinearGradient id={`tkB${uid}`} x1="0" y1="0" x2="0.6" y2="1">
-          <Stop offset="0" stopColor="#ffffff" stopOpacity="0.10" />
-          <Stop offset="1" stopColor="#ffffff" stopOpacity="0.03" />
-        </SvgLinearGradient>
-        <SvgLinearGradient id={`tkH${uid}`} x1="0" y1="0" x2="1" y2="0.7">
-          <Stop offset="0" stopColor={mixHex(head, '#ffffff', 0.06)} />
-          <Stop offset="1" stopColor={mixHex(head, '#04050a', 0.35)} />
-        </SvgLinearGradient>
       </Defs>
 
-      {/* The stub */}
-      <Rect x={PX} y={PY} width={PW} height={panelBottom - PY} rx={40} fill={`url(#tkB${uid})`} />
       <G clipPath={`url(#tkP${uid})`}>
+        <PhotoFill d={d} uid={uid} x={PX} y={PY} w={PW} h={panelBottom - PY} />
+        {/* The mode's object, at the card's full width. Contained, never
+            cropped — the photograph behind it is what fills the corners. */}
+        <G transform={heroBox(HERO_X, HERO_Y, HERO_W, HERO_H, 'contain')}>{d.hero}</G>
         {weave}
-        <Rect x={PX} y={PY} width={PW} height={HEAD_H} fill={`url(#tkH${uid})`} />
-        <Rect x={PX} y={headRule - 2} width={PW} height={2} fill="#ffffff" fillOpacity={0.20} />
-        {/* THE MODE, full bleed across the ticket. */}
-        <ModeStage d={d} uid={uid} x={PX} y={IMG_Y} w={PW} h={IMG_H} />
+        <FadeBand uid={`t${uid}`} x={PX} y={PY} w={PW} h={286 + extra * 0.2}
+          from={0.92} tint={d.eq[1]} dir="down" />
+        <FadeBand uid={`b${uid}`} x={PX} y={perfY - 150} w={PW} h={panelBottom - (perfY - 150)}
+          from={0.94} dir="up" />
       </G>
       <Rect x={PX} y={PY} width={PW} height={panelBottom - PY} rx={40} fill="none"
         stroke="#ffffff" strokeOpacity={0.26} strokeWidth={3} />
@@ -389,38 +434,36 @@ function TicketStyle(p: StyleProps) {
       </SvgText>
       {/* The dial number gets a row of its own. Sharing one with the station
           name meant budgeting the name against a dot-matrix block whose width
-          swings by a third between "810 AM" and "103.5 FM", and "Mountain Pass
-          FM" duly ran straight through its own number. */}
+          swings by a third between "810 AM" and "103.5 FM". */}
       <DotMatrixGroup text={`${d.dialLabel} ${d.band}`} x={STUB_X} y={PY + 164} dot={5.0} gap={1.9}
         color="#ffffff" dim opacity={0.92} />
-      <SvgText x={CARD_W - STUB_X} y={PY + 186} fill="#ffffff" fillOpacity={0.45} fontSize={21}
+      <SvgText x={CARD_W - STUB_X} y={PY + 186} fill="#ffffff" fillOpacity={0.5} fontSize={21}
         fontWeight="700" letterSpacing={3} textAnchor="end">
         {`No. ${d.serial}`}
       </SvgText>
 
-      {/* Tear line. The notches are filled with the card's own dark, so the
-          stub reads as torn rather than drawn. */}
+      {/* Tear line */}
       <Circle cx={PX} cy={perfY} r={28} fill="#07080f" />
       <Circle cx={CARD_W - PX} cy={perfY} r={28} fill="#07080f" />
       {holes}
 
       {/* Counterfoil: the song on the left, the album cover on the right. */}
-      <SvgText x={STUB_X} y={stubY} fill="#ffffff" fillOpacity={0.42} fontSize={22} fontWeight="700" letterSpacing={5}>
+      <SvgText x={STUB_X} y={stubY} fill="#ffffff" fillOpacity={0.45} fontSize={21} fontWeight="700" letterSpacing={5}>
         NOW PLAYING
       </SvgText>
       {titleLines.map((line, i) => (
-        <SvgText key={i} x={STUB_X} y={stubY + 60 + i * 56} fill="#ffffff" fontSize={44} fontWeight="800" letterSpacing={-0.5}>
+        <SvgText key={i} x={STUB_X} y={stubY + 56 + i * 50} fill="#ffffff" fontSize={40} fontWeight="800" letterSpacing={-0.5}>
           {line}
         </SvgText>
       ))}
       {!!d.artist && (
-        <SvgText x={STUB_X} y={stubY + 60 + titleLines.length * 56 + 4} fill="#ffffff"
-          fillOpacity={0.58} fontSize={29} fontWeight="600">
+        <SvgText x={STUB_X} y={stubY + 56 + titleLines.length * 50 + 4} fill="#ffffff"
+          fillOpacity={0.6} fontSize={27} fontWeight="600">
           {clip(d.artist, 30)}
         </SvgText>
       )}
       {!!d.art && (
-        <CoverTile art={d.art} x={coverX} y={stubY - 42} size={COVER} uid={`tk${uid}`}
+        <CoverTile art={d.art} x={coverX} y={stubY - 40} size={COVER} uid={`tk${uid}`}
           tint={mixHex(d.eq[1], '#101322', 0.45)} />
       )}
 
@@ -615,18 +658,18 @@ function SleeveStyle(p: StyleProps) {
 
 function ReceiverStyle(p: StyleProps) {
   const d = derive(p);
-  const { uid, cardH, station, modeLabel } = p;
+  const { uid, cardH, station, modeLabel, modeId } = p;
   const B = 40;                                        // bezel inset
   const PAD = 88;
   const W = CARD_W - PAD * 2;
+  const extra = cardH - CARD_H_CARD;
 
-  // Brushed metal: vertical hairlines at alternating strengths. Cheap, and it
-  // is what stops the panel reading as flat black.
+  // Brushed metal, now laid OVER the photograph rather than over black.
   const brush = [];
   for (let i = 0; i < 96; i++) {
     const x = (i / 96) * CARD_W;
     brush.push(<Rect key={`br${i}`} x={x} y={0} width={2.6} height={cardH} fill="#ffffff"
-      fillOpacity={0.010 + h01(i * 7.13) * 0.026} />);
+      fillOpacity={0.008 + h01(i * 7.13) * 0.022} />);
   }
 
   // Readout
@@ -637,48 +680,50 @@ function ReceiverStyle(p: StyleProps) {
   const readoutW = freqW + 34 + dmWidth(d.band, bandDot, bandGap);
   const readoutX = CX - readoutW / 2;
 
-  // Glass display, holding the lamp row and the readout.
   const GX = B + 34, GW = CARD_W - (B + 34) * 2;
-  const GY = B + 34, GH = 316;
+  const GY = B + 34, GH = 276;
 
-  // Window. Sized off its HEIGHT: a full-width window is 639 tall, which puts
-  // the song readout straight through the dial along the foot.
-  const WIN_Y = 476 + (cardH - CARD_H_CARD) * 0.18;
-  const WIN_H = 452 + (cardH - CARD_H_CARD) * 0.60;
-  const S = WIN_H / STAGE_H;
-  const WIN_W = CARD_W * S, WIN_X = CX - WIN_W / 2;
+  // The mode's object, laid on the card's own background at 0.80 of its width
+  // and never cropped. The framed window it used to sit in was a SECOND screen
+  // inside the set, which is what made the Tuner-inside-a-tuner look absurd.
+  // A taller pin spends its extra height on a bigger object and a lower
+  // fascia, rather than leaving a dead band of metal above the dial.
+  const HERO_W = Math.round(CARD_W * (0.76 + (extra / CARD_H_CARD) * 0.34));
+  const HERO_H = Math.round((HERO_W * STAGE_H) / CARD_W);
+  const HERO_X = CX - HERO_W / 2;
+  const HERO_Y = 420 + extra * 0.46;
 
   const lineW = W - 24;
   const titleText = clip(d.title.toUpperCase(), Math.max(1, dmFit(lineW, 4.6, 1.7)));
   const artistText = clip(d.artist.toUpperCase(), Math.max(1, dmFit(lineW, 3.4, 1.3)));
 
-  // Dial, with the needle where the station actually sits in its band.
-  const dialY = cardH - 216;
+  // Dial, with the needle where the station actually sits in its band. The
+  // TUNER mode already draws a dial of its own inside the picture, so the set
+  // prints a plain scale there instead of a second working one.
+  const ownDial = modeId !== 'radio';
+  const dialY = cardH - 172;
   const [lo, hi] = BAND_RANGE[d.band] ?? BAND_RANGE.FM;
   const t = Math.max(0.04, Math.min(0.96, (d.dialValue - lo) / (hi - lo)));
   const needleX = PAD + t * W;
   const ticks = [];
-  for (let i = 0; i <= 40; i++) {
-    const x = PAD + (i / 40) * W;
-    const whole = i % 5 === 0;
-    ticks.push(<Rect key={`tk${i}`} x={x - (whole ? 2 : 1.1)} y={dialY - (whole ? 34 : 19)}
-      width={whole ? 4 : 2.2} height={whole ? 34 : 19} fill={AMBER} fillOpacity={whole ? 0.72 : 0.28} />);
+  if (ownDial) {
+    for (let i = 0; i <= 40; i++) {
+      const x = PAD + (i / 40) * W;
+      const whole = i % 5 === 0;
+      ticks.push(<Rect key={`tk${i}`} x={x - (whole ? 2 : 1.1)} y={dialY - (whole ? 34 : 19)}
+        width={whole ? 4 : 2.2} height={whole ? 34 : 19} fill={AMBER} fillOpacity={whole ? 0.72 : 0.28} />);
+    }
   }
 
   return (
     <>
-      <Rect x={0} y={0} width={CARD_W} height={cardH} fill="#06070c" />
-      {brush}
       <Defs>
-        <RadialGradient id={`rcG${uid}`} cx="50%" cy="30%" r="62%">
-          <Stop offset="0" stopColor={d.wash} stopOpacity="0.26" />
-          <Stop offset="1" stopColor={d.wash} stopOpacity="0" />
-        </RadialGradient>
+        <ClipPath id={`rcC${uid}`}><Rect x={0} y={0} width={CARD_W} height={cardH} /></ClipPath>
         <SvgLinearGradient id={`rcB${uid}`} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#ffffff" stopOpacity="0.16" />
-          <Stop offset="0.12" stopColor="#ffffff" stopOpacity="0.03" />
-          <Stop offset="0.9" stopColor="#000000" stopOpacity="0.16" />
-          <Stop offset="1" stopColor="#000000" stopOpacity="0.34" />
+          <Stop offset="0" stopColor="#ffffff" stopOpacity="0.14" />
+          <Stop offset="0.10" stopColor="#ffffff" stopOpacity="0.02" />
+          <Stop offset="0.92" stopColor="#000000" stopOpacity="0.10" />
+          <Stop offset="1" stopColor="#000000" stopOpacity="0.28" />
         </SvgLinearGradient>
         <SvgLinearGradient id={`rcGl${uid}`} x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor="#0b0f18" />
@@ -696,9 +741,17 @@ function ReceiverStyle(p: StyleProps) {
           <Stop offset="1" stopColor={AMBER} stopOpacity="0" />
         </RadialGradient>
       </Defs>
-      <Rect x={0} y={0} width={CARD_W} height={cardH} fill={`url(#rcG${uid})`} />
 
-      {/* Moulded bezel */}
+      {/* The photograph is the whole card. */}
+      <G clipPath={`url(#rcC${uid})`}>
+        <PhotoFill d={d} uid={uid} x={0} y={0} w={CARD_W} h={cardH} />
+        <G transform={heroBox(HERO_X, HERO_Y, HERO_W, HERO_H, 'contain')}>{d.hero}</G>
+        {brush}
+        <FadeBand uid={`rt${uid}`} x={0} y={0} w={CARD_W} h={470 + extra * 0.2} from={0.92} dir="down" />
+        <FadeBand uid={`rb${uid}`} x={0} y={cardH - 430} w={CARD_W} h={430} from={0.94} dir="up" />
+      </G>
+
+      {/* Moulded bezel — a frame only now, so the picture runs under it */}
       <Rect x={B} y={B} width={CARD_W - B * 2} height={cardH - B * 2} rx={44} fill={`url(#rcB${uid})`} />
       <Rect x={B} y={B} width={CARD_W - B * 2} height={cardH - B * 2} rx={44}
         fill="none" stroke="#ffffff" strokeOpacity={0.14} strokeWidth={2} />
@@ -715,47 +768,37 @@ function ReceiverStyle(p: StyleProps) {
         stroke="#000000" strokeOpacity={0.55} strokeWidth={3} />
       <Rect x={GX} y={GY} width={GW} height={GH} rx={20} fill="none" stroke="#ffffff" strokeOpacity={0.09} strokeWidth={1.4} />
 
-      {/* Lamp row */}
-      <Circle cx={GX + 42} cy={GY + 46} r={10} fill={LAMP_RED} />
-      <Circle cx={GX + 42} cy={GY + 46} r={20} fill={LAMP_RED} fillOpacity={0.24} />
-      <DotMatrixGroup text="ON AIR" x={GX + 68} y={GY + 34} dot={3.6} gap={1.4} color="#FF6B5A" opacity={0.95} />
-      <DotMatrixGroup text="STEREO" x={CX - 40} y={GY + 34} dot={3.6} gap={1.4} color="#9FD8FF" opacity={0.5} />
-      <DotMatrixGroup text="TUNED" x={GX + GW - 34} y={GY + 34} dot={3.6} gap={1.4}
+      <Circle cx={GX + 42} cy={GY + 44} r={10} fill={LAMP_RED} />
+      <Circle cx={GX + 42} cy={GY + 44} r={20} fill={LAMP_RED} fillOpacity={0.24} />
+      <DotMatrixGroup text="ON AIR" x={GX + 68} y={GY + 32} dot={3.6} gap={1.4} color="#FF6B5A" opacity={0.95} />
+      <DotMatrixGroup text="STEREO" x={CX - 40} y={GY + 32} dot={3.6} gap={1.4} color="#9FD8FF" opacity={0.5} />
+      <DotMatrixGroup text="TUNED" x={GX + GW - 34} y={GY + 32} dot={3.6} gap={1.4}
         color="#9FD8FF" anchor="end" opacity={0.5} />
 
       {/* Frequency, glowing onto its own glass */}
-      <Ellipse cx={CX} cy={GY + 154} rx={readoutW * 0.78} ry={112} fill={`url(#rcA${uid})`} />
-      <DotMatrixGroup text={freqText} x={readoutX} y={GY + 92} dot={FREQ_DOT} gap={FREQ_GAP} color={AMBER} dim opacity={1} />
-      <DotMatrixGroup text={d.band} x={readoutX + freqW + 34} y={GY + 92 + FREQ_DOT * 3} dot={bandDot} gap={bandGap}
+      <Ellipse cx={CX} cy={GY + 142} rx={readoutW * 0.78} ry={104} fill={`url(#rcA${uid})`} />
+      <DotMatrixGroup text={freqText} x={readoutX} y={GY + 84} dot={FREQ_DOT} gap={FREQ_GAP} color={AMBER} dim opacity={1} />
+      <DotMatrixGroup text={d.band} x={readoutX + freqW + 34} y={GY + 84 + FREQ_DOT * 3} dot={bandDot} gap={bandGap}
         color={AMBER} dim opacity={0.9} />
       <DotMatrixGroup text={clip(station.name.toUpperCase(), Math.max(1, dmFit(GW - 80, 4.0, 1.5)))}
-        x={CX} y={GY + 252} dot={4.0} gap={1.5} color="#CFE6FF" anchor="middle" opacity={0.72} />
+        x={CX} y={GY + 218} dot={4.0} gap={1.5} color="#CFE6FF" anchor="middle" opacity={0.72} />
       <Rect x={GX} y={GY} width={GW} height={GH} rx={20} fill={`url(#rcR${uid})`} />
 
       {/* Silk-screened label under the glass */}
-      <SvgText x={CX} y={GY + GH + 62} fill="#ffffff" fillOpacity={0.34} fontSize={23} fontWeight="700"
+      <SvgText x={CX} y={GY + GH + 56} fill="#ffffff" fillOpacity={0.38} fontSize={23} fontWeight="700"
         letterSpacing={6} textAnchor="middle">
         {modeLabel.toUpperCase()}
       </SvgText>
 
-      {/* Recessed window: paired strokes are what read as moulded, not drawn */}
-      <Rect x={WIN_X - 10} y={WIN_Y - 10} width={WIN_W + 20} height={WIN_H + 20} rx={30}
-        fill="#000000" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.10} strokeWidth={2} />
-      <ModeStage d={d} uid={`rc${uid}`} x={WIN_X} y={WIN_Y} w={WIN_W} h={WIN_H} rx={22} />
-      <Rect x={WIN_X} y={WIN_Y} width={WIN_W} height={WIN_H} rx={22} fill="none"
-        stroke={d.eq[1]} strokeOpacity={0.30} strokeWidth={2.5} />
-
       {/* Song, in the readout's own type */}
-      <DotMatrixGroup text={titleText} x={PAD + 12} y={WIN_Y + WIN_H + 54} dot={4.6} gap={1.7}
-        color={mixHex(d.eq[1], '#ffffff', 0.30)} dim opacity={1} />
+      <DotMatrixGroup text={titleText} x={PAD + 12} y={HERO_Y + HERO_H + 26} dot={4.6} gap={1.7}
+        color={mixHex(d.eq[1], '#ffffff', 0.40)} dim opacity={1} />
       {!!artistText && (
-        <DotMatrixGroup text={artistText} x={PAD + 12} y={WIN_Y + WIN_H + 116} dot={3.4} gap={1.3}
-          color={mixHex(d.eq[1], '#ffffff', 0.30)} opacity={0.66} />
+        <DotMatrixGroup text={artistText} x={PAD + 12} y={HERO_Y + HERO_H + 88} dot={3.4} gap={1.3}
+          color={mixHex(d.eq[1], '#ffffff', 0.40)} opacity={0.68} />
       )}
 
-      {/* Dial. The needle sits where this station really is in its band — the
-          first version parked it dead centre on every card, which is the sort
-          of detail that quietly tells you nothing here is real. */}
+      {/* Dial */}
       {ticks}
       <SvgText x={PAD} y={dialY + 40} fill={AMBER} fillOpacity={0.45} fontSize={20} fontWeight="800" letterSpacing={2}>
         {String(lo)}
@@ -765,16 +808,16 @@ function ReceiverStyle(p: StyleProps) {
         {String(hi)}
       </SvgText>
       <Rect x={PAD} y={dialY} width={W} height={3.5} fill={AMBER} fillOpacity={0.45} />
-      <Rect x={needleX - 7} y={dialY - 68} width={14} height={118} rx={7} fill={LAMP_RED} fillOpacity={0.16} />
-      <Rect x={needleX - 2.4} y={dialY - 68} width={4.8} height={118} rx={2.4} fill={LAMP_RED} fillOpacity={0.8} />
-      <Rect x={needleX - 0.9} y={dialY - 68} width={1.8} height={118} fill="#FFD9D4" fillOpacity={0.9} />
+      {ownDial && (
+        <>
+          <Rect x={needleX - 7} y={dialY - 68} width={14} height={118} rx={7} fill={LAMP_RED} fillOpacity={0.16} />
+          <Rect x={needleX - 2.4} y={dialY - 68} width={4.8} height={118} rx={2.4} fill={LAMP_RED} fillOpacity={0.8} />
+          <Rect x={needleX - 0.9} y={dialY - 68} width={1.8} height={118} fill="#FFD9D4" fillOpacity={0.9} />
+        </>
+      )}
 
-      {/* One footer row. The first version stacked a volume knob, an etched
-          wordmark, the install line AND the dial's own band labels into the
-          same 90px, and all four printed over each other — the knob was the
-          least load-bearing of them, so it went. */}
-      <DotMatrixGroup text="CRUISE FM" x={PAD} y={cardH - 118} dot={3.8} gap={1.5} color="#ffffff" opacity={0.55} />
-      <SvgText x={CARD_W - PAD} y={cardH - 92} fill="#ffffff" fillOpacity={0.34} fontSize={24}
+      <DotMatrixGroup text="CRUISE FM" x={PAD} y={cardH - 104} dot={3.8} gap={1.5} color="#ffffff" opacity={0.55} />
+      <SvgText x={CARD_W - PAD} y={cardH - 78} fill="#ffffff" fillOpacity={0.36} fontSize={24}
         fontWeight="600" textAnchor="end">
         {INSTALL_HOST}
       </SvgText>

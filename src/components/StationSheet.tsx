@@ -1,16 +1,14 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  Animated, Easing, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useDsegFont } from '@/components/StationIdentity';
 import { STATIONS, stationDial } from '@/constants/stations';
-import { Fonts } from '@/constants/theme';
+import { Fonts, TAB_SAFE_INSET } from '@/constants/theme';
 import { customToStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
-
-const SCREEN_H = Dimensions.get('window').height;
 
 type Row = { id: string; name: string; tagline: string; accent: string; icon: string; band: 'AM' | 'FM'; dial: string; mine: boolean };
 
@@ -42,7 +40,7 @@ function toRow(s: { id: string; name: string; tagline: string; eqColors?: readon
  * mid-drive is still the Stations page's business — this is the doorway.
  */
 export function StationSheet({
-  visible, onClose, onPick, currentId, modeLabel,
+  visible, onClose, onPick, currentId, modeLabel, extraBottom = 0,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -51,10 +49,18 @@ export function StationSheet({
   currentId?: string;
   /** Shown in the header so it's clear what you're choosing a mood FOR. */
   modeLabel?: string;
+  /** Extra room at the foot — the mini-player docks above the tab bar when a
+   *  drive is running, and it floats over this sheet. */
+  extraBottom?: number;
 }) {
   const insets = useSafeAreaInsets();
+  const { height: winH } = useWindowDimensions();
   const seg7 = useDsegFont();
-  const y = useRef(new Animated.Value(SCREEN_H)).current;
+  // Parked off-screen using the LIVE window height, not a module-load
+  // constant: if that constant is ever wrong the sheet stays parked below the
+  // screen while its backdrop still swallows every touch, which reads as the
+  // whole app freezing.
+  const y = useRef(new Animated.Value(2000)).current;
   const fade = useRef(new Animated.Value(0)).current;
   const [mine, setMine] = useState<CustomStation[]>([]);
 
@@ -66,10 +72,13 @@ export function StationSheet({
   // down instead of vanishing the instant the Modal closes.
   const [mounted, setMounted] = useState(visible);
   useEffect(() => {
-    if (visible) setMounted(true);
+    // Always start an open from a known off-screen position. Relying on
+    // whatever the value happened to hold is how a sheet ends up parked below
+    // the screen with a live backdrop over the app.
+    if (visible) { setMounted(true); y.setValue(winH); }
     Animated.parallel([
       Animated.timing(y, {
-        toValue: visible ? 0 : SCREEN_H,
+        toValue: visible ? 0 : winH,
         duration: visible ? 300 : 240,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
@@ -112,12 +121,18 @@ export function StationSheet({
 
   if (!mounted) return null;
 
-  // A Modal, not a plain overlay: on a tab page the floating tab bar is a
-  // sibling drawn AFTER this screen, so an in-page sheet had the bottom rows
-  // covered by it and taps there hit the tab bar instead. Portrait only —
-  // the list pages never rotate.
+  // DELIBERATELY NOT A MODAL (owner, 03.08: "it just freezes"). The first cut
+  // wrapped this in one so it could cover the floating tab bar — and on iOS a
+  // second Modal will not stack over the one NowPlayingHost already holds for
+  // the fullscreen player, so it presented an invisible, touch-swallowing
+  // window over the app. Exactly the trap PreviewGate hit on 24.07, and the
+  // fix is the same: stay in the page.
+  //
+  // The tab bar is a sibling drawn after this screen, so it floats over the
+  // dimmed backdrop; the list simply pads past it so no row is ever hidden
+  // underneath or stealing taps.
   return (
-    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+    <>
       <Animated.View
         pointerEvents={visible ? 'auto' : 'none'}
         style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: fade }]}>
@@ -126,7 +141,7 @@ export function StationSheet({
 
       <Animated.View
         pointerEvents={visible ? 'auto' : 'none'}
-        style={[s.sheet, { paddingBottom: insets.bottom + 12, transform: [{ translateY: y }] }]}>
+        style={[s.sheet, { paddingBottom: TAB_SAFE_INSET + insets.bottom + extraBottom, transform: [{ translateY: y }] }]}>
         <View style={s.handle} />
         <View style={s.headerRow}>
           <Text style={[s.title, { fontFamily: Fonts.mono }]}>
@@ -137,7 +152,7 @@ export function StationSheet({
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={{ maxHeight: SCREEN_H * 0.52 }} contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
+        <ScrollView style={{ maxHeight: winH * 0.46 }} contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
           {header('AM')}
           {am.map(row)}
           {header('FM')}
@@ -146,7 +161,7 @@ export function StationSheet({
           {custom.map(row)}
         </ScrollView>
       </Animated.View>
-    </Modal>
+    </>
   );
 }
 

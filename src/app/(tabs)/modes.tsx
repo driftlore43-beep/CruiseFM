@@ -201,6 +201,7 @@ export default function ModesScreen() {
         onPick={start}
         currentId={lastStation}
         modeLabel={MODES.find((m) => m.id === pending?.mode)?.title}
+        extraBottom={np.session ? 76 : 0}
       />
     </View>
   );

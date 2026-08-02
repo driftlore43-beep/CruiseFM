@@ -39,6 +39,22 @@ When it finishes:
 npx eas-cli submit -p ios --profile production --latest
 ```
 
+> **DO NOT INSTALL THIS BUILD ON YOUR OWN PHONE FROM TESTFLIGHT.**
+>
+> It will appear there, because every build does — but a `production`-profile
+> build listens on the **production** channel, and your phone's updates go to
+> **preview**. Installing it silently takes you off the channel everything is
+> shipped to, so the app freezes at whatever the build was made from and no
+> update ever arrives again. Nothing warns you; it just quietly stops
+> improving. (Bitten 02.08 — a day of fixes went to preview while the phone
+> sat on build 14.)
+>
+> Keep your phone on the newest **`testflight`**-profile build. TestFlight
+> lists it under **Previous Builds** if a production one has taken its place,
+> and reinstalling it puts you straight back on the update channel. Check
+> which is which with Actions → *Ship OTA update* → mode **diagnose**: it
+> prints each build's number next to its channel.
+
 ### In App Store Connect
 
 1. Open the rejected version → **select the new build** (it will be build 8

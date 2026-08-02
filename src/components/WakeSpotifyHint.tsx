@@ -58,7 +58,16 @@ export function WakeSpotifyHint({ show, connected = true }: { show: boolean; con
         // the object.
         isLandscape
           ? { top: insets.top + 8, left: Math.max(insets.left, 22) + 46, right: winW * DECK_FRAC + 14 }
-          : { top: insets.top + 64 },
+          // Upright it hangs BELOW the station header, and the number has to
+          // be derived the same way the modes derive theirs or it collides
+          // (found 03.08): every mode puts its identity block at
+          // `max(insets.top, 20) + 52` and that block is ~46 tall, so the old
+          // `insets.top + 64` landed straight on the station's name — at any
+          // inset, on device as well as in the browser. It only shows when
+          // there is no track, which is exactly what a first run looks like
+          // for anyone who hasn't connected Spotify, so it was the first
+          // thing a new user saw.
+          : { top: Math.max(insets.top, 20) + 106 },
         { opacity: fade },
       ]}
       pointerEvents="none">

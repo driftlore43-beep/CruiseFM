@@ -1,5 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useDaylight } from '@/context/MotionContext';
@@ -9,6 +9,7 @@ import { SongListSheet } from '@/components/SongListSheet';
 import { MODE_CATALOG } from '@/constants/modeCatalog';
 import type { Station } from '@/constants/stations';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { getStationPlaylist } from '@/utils/stationPlaylists';
 import type { NowPlaying } from '@/utils/useMusicPlayback';
 
 /**
@@ -42,8 +43,9 @@ export function ModeActionRow({
   onChangeMood: () => void; // opens the mode sheet (historic prop name)
   onPickPlaylist: () => void;
   playlistLabel: string;
-  /** The playlist actually feeding the music. Present = the pill can open
-   *  its songs; absent (Apple Music, no context) = it opens the picker. */
+  /** The playlist Spotify says is feeding the music. When it is missing the
+   *  station's own linked playlist stands in; only with neither (Apple Music,
+   *  an unlinked station) does the pill fall back to the picker. */
   contextUri?: string | null;
   /** The live Spotify track, or null. Drives whether sharing is offered. */
   track: NowPlaying | null;
@@ -58,7 +60,31 @@ export function ModeActionRow({
   // for Spotify). Changing playlist is one row inside that sheet, so the card
   // itself gains nothing.
   const [songs, setSongs] = useState(false);
-  const canList = !!/^spotify:playlist:[A-Za-z0-9]+$/.exec(contextUri ?? '');
+
+  /**
+   * The station's own linked playlist, as a fallback for the song list.
+   *
+   * `contextUri` is whatever SPOTIFY says is playing, and it is empty until
+   * the poll has answered — and stays empty whenever the context isn't a
+   * playlist at all. The pill quietly fell back to the playlist PICKER in
+   * that case, so tapping it mid-drive opened the wrong sheet and the owner
+   * reported the song options simply not coming up (03.08). The station
+   * already knows which playlist it drives, so there is no need to wait on
+   * Spotify to answer before we can list it.
+   */
+  const [linkedUri, setLinkedUri] = useState<string | null>(null);
+  const stationId = np.session?.stationId;
+  useEffect(() => {
+    if (!stationId) { setLinkedUri(null); return; }
+    let live = true;
+    getStationPlaylist(stationId)
+      .then((p) => { if (live) setLinkedUri(p?.uri ?? null); })
+      .catch(() => { if (live) setLinkedUri(null); });
+    return () => { live = false; };
+  }, [stationId]);
+
+  const isPlaylist = (uri?: string | null) => !!/^spotify:playlist:[A-Za-z0-9]+$/.exec(uri ?? '');
+  const canList = isPlaylist(contextUri) || isPlaylist(linkedUri);
   // The mode's own name for the card. Read from the session rather than passed
   // in by each mode — one less prop for eight callers to keep in step.
   const modeId = np.session?.mode ?? 'equalizer';
@@ -97,7 +123,7 @@ export function ModeActionRow({
         visible={songs}
         onClose={() => setSongs(false)}
         onChangePlaylist={onPickPlaylist}
-        contextUri={contextUri ?? null}
+        contextUri={isPlaylist(contextUri) ? (contextUri ?? null) : linkedUri}
         playlistName={playlistLabel}
         currentUri={track?.uri ?? null}
       />

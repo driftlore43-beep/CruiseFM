@@ -380,6 +380,42 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   // togglePlay is defined further down; the responder is built once, so it
   // reaches it through a ref.
   const togglePlayRef = useRef<() => void>(() => {});
+  const closeRef = useRef<() => void>(() => {});
+
+  /**
+   * What a drag that started on the disc turned out to be. Undecided until
+   * the finger has travelled far enough to tell.
+   *
+   * WHY THIS EXISTS (owner, 03.08 — "the app keeps pausing… and preventing me
+   * from swiping, when I pull a card down"): giving the disc the rotational
+   * gesture on 03.08 also had it claim touches on START and refuse to give
+   * them up, so a pull-down on the disc could never reach the mode's own
+   * dismiss. Worse, a short pull fell under the tap threshold on release and
+   * toggled playback — the pull-down PAUSED the music instead of closing the
+   * mode.
+   *
+   * The rule is deliberately the blunt one: a drag within ~35 degrees of
+   * straight DOWN is a pull-down, and everything else winds the disc.
+   *
+   * A physical discriminator was built first and measured (scratchpad
+   * classify.mjs, real 393x852 geometry) — how much ARC the drag had actually
+   * wound, since pulling down through a disc's middle is radial and winds
+   * nothing. It is right about the middle of the disc and wrong everywhere
+   * else: 90px right of a 150px disc, a straight-down drag genuinely IS
+   * mostly tangential and wound 0.86 pixels of arc per pixel travelled. So
+   * physics says scrub while the person plainly meant to leave, and where the
+   * two disagree the person wins.
+   *
+   * What that trades away, knowingly: you cannot wind the disc by dragging
+   * straight down. You wind it the way anyone actually would — a circular
+   * sweep or a drag across — and pull-down-to-dismiss stays true everywhere
+   * on the screen, which is worth more than one redundant winding direction.
+   */
+  const dragRef = useRef<null | 'scrub' | 'dismiss'>(null);
+  /** Pixels of travel before the gesture is judged. Below this it is a tap. */
+  const DECIDE_PX = 16;
+  /** |dy| must beat |dx| by this much to count as a pull-down (~35 degrees). */
+  const DOWN_BIAS = 1.4;
 
   const angleAt = (x: number, y: number) =>
     Math.atan2(y - centerRef.current.y, x - centerRef.current.x) * (180 / Math.PI);
@@ -421,13 +457,12 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
         });
         tapStartRef.current = Date.now();
         hapticAccumRef.current = 0;
+        dragRef.current = null;
         progressBaseRef.current = readAnim(progress);
         scrubPctRef.current = progressBaseRef.current;
-        scrub.begin();
-        setScrubbing(true);
-        setScrubDeltaSec(0);
-        if (scrubPillTimer.current) clearTimeout(scrubPillTimer.current);
-        scrubPillAnim.setValue(1);
+        // The scrub does NOT begin here. Until the drag has been judged this
+        // might be a tap or a pull-down, and neither should wind the song or
+        // raise the scrub pill.
         const at = readPhase();
         phaseRef.current = at;
         turningRef.current = false;
@@ -435,11 +470,31 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
         spin.setValue(at);
         lastAngleRef.current = angleAt(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
       },
-      onPanResponderMove: (evt) => {
+      onPanResponderMove: (evt, g) => {
         if (lastAngleRef.current === null) return;
         const a = angleAt(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
         const diff = angleDiff(a, lastAngleRef.current);
         lastAngleRef.current = a;
+
+        if (dragRef.current === null) {
+          if (Math.hypot(g.dx, g.dy) < DECIDE_PX) return; // still a maybe-tap
+          if (g.dy > 0 && Math.abs(g.dy) > Math.abs(g.dx) * DOWN_BIAS) {
+            dragRef.current = 'dismiss';
+          } else {
+            dragRef.current = 'scrub';
+            scrub.begin();
+            setScrubbing(true);
+            setScrubDeltaSec(0);
+            if (scrubPillTimer.current) clearTimeout(scrubPillTimer.current);
+            scrubPillAnim.setValue(1);
+          }
+        }
+
+        if (dragRef.current === 'dismiss') {
+          if (g.dy > 0) slideY.setValue(g.dy);
+          return;
+        }
+
         // The disc follows the finger exactly...
         const at = wrap01(phaseRef.current + diff / 360);
         spin.setValue(at);
@@ -458,23 +513,41 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
       },
       onPanResponderRelease: (_evt, g) => {
         lastAngleRef.current = null;
+        const kind = dragRef.current;
+        dragRef.current = null;
+
+        if (kind === 'dismiss') {
+          // Same thresholds as the mode's own dismiss, so a pull-down feels
+          // identical whether it starts on the disc or beside it.
+          if (g.dy > 120 || g.vy > 0.8) closeRef.current();
+          else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+          return;
+        }
+
         setScrubbing(false);
-        // Judged by finger travel in PIXELS, not degrees — near the centre a
-        // tiny wobble reads as many degrees (the vinyl lesson).
-        if (Math.hypot(g.dx, g.dy) < 12 && Date.now() - tapStartRef.current < 450) {
-          // A tap must NOT go through scrub.end — that always seeks, and
-          // seeking to a stale position on every play/pause stutters the
-          // song. togglePlay flips `playing`, and the clock effect re-syncs.
+        // Never judged = never travelled DECIDE_PX, i.e. a tap. It must NOT go
+        // through scrub.end — that always seeks, and seeking to a stale
+        // position on every play/pause stutters the song. togglePlay flips
+        // `playing`, and the clock effect re-syncs.
+        if (kind === null && Date.now() - tapStartRef.current < 450) {
           scrubPillAnim.setValue(0);
           togglePlayRef.current();
           return;
         }
+        if (kind === null) { scrubPillAnim.setValue(0); return; } // slow press, no wind
         scrub.end(scrubPctRef.current);
         fadeScrubPill();
       },
       onPanResponderTerminate: () => {
         lastAngleRef.current = null;
+        const kind = dragRef.current;
+        dragRef.current = null;
+        if (kind === 'dismiss') {
+          Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+          return;
+        }
         setScrubbing(false);
+        if (kind === null) return;
         scrub.end(scrubPctRef.current);
         fadeScrubPill();
       },
@@ -557,6 +630,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   const resetTrack = () => progress.setValue(0);
   const togglePlay = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
   togglePlayRef.current = togglePlay;
+  closeRef.current = handleClose;
 
   const hasTrack = !!spotify.track;
   const title = spotify.track?.title ?? station.tagline;

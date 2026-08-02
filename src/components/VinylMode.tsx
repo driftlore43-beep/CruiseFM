@@ -762,6 +762,23 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const tapStartRef       = useRef(0);
   const movedDegRef       = useRef(0);
   const togglePlayRef     = useRef(() => {});
+  const closeRef          = useRef(() => {});
+
+  /**
+   * What a drag that started on the record turned out to be — see the same
+   * refs in CDMode for the full reasoning. In short (owner, 03.08): the
+   * record claims touches on start and refuses to give them up, so a
+   * pull-down on it could never reach the mode's dismiss, and a short one
+   * fell under the tap threshold and PAUSED the music instead.
+   *
+   * A drag within ~35 degrees of straight DOWN is a pull-down; everything
+   * else winds the record. See the fuller note in CDMode for why the
+   * physically-derived test was measured and then rejected, and for what this
+   * knowingly trades away.
+   */
+  const dragRef  = useRef<null | 'scrub' | 'dismiss'>(null);
+  const DECIDE_PX = 16;
+  const DOWN_BIAS = 1.4;
 
   const _getAngleFromCenter = (touchX: number, touchY: number) =>
     Math.atan2(touchY - recordCenterY.current, touchX - recordCenterX.current) * (180 / Math.PI);
@@ -796,22 +813,40 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         });
         tapStartRef.current = Date.now();
         movedDegRef.current = 0;
+        dragRef.current = null;
         scrubStartPosRef.current = progressValue.current * trackMsRef.current;
         progressAnimRef.current?.stop();
         stopSpin();
         accumulatedRotation.current = spinCurrentRef.current * 360;
         lastAngle.current = _getAngleFromCenter(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
         lastHapticAccumRef.current = 0;
-        scrubbingRef.current = true;
-        setIsScrubbing(true);
-        if (scrubFadeTimerRef.current) clearTimeout(scrubFadeTimerRef.current);
-        scrubIndicatorAnim.setValue(1);
+        // The scrub does NOT begin here — until the drag is judged this might
+        // be a tap or a pull-down, and neither should wind the record.
       },
-      onPanResponderMove: (evt) => {
+      onPanResponderMove: (evt, g) => {
         if (lastAngle.current === null) return;
         const angle = _getAngleFromCenter(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
         const diff  = _angleDiff(angle, lastAngle.current);
         lastAngle.current = angle;
+
+        if (dragRef.current === null) {
+          if (Math.hypot(g.dx, g.dy) < DECIDE_PX) return; // still a maybe-tap
+          if (g.dy > 0 && Math.abs(g.dy) > Math.abs(g.dx) * DOWN_BIAS) {
+            dragRef.current = 'dismiss';
+          } else {
+            dragRef.current = 'scrub';
+            scrubbingRef.current = true;
+            setIsScrubbing(true);
+            if (scrubFadeTimerRef.current) clearTimeout(scrubFadeTimerRef.current);
+            scrubIndicatorAnim.setValue(1);
+          }
+        }
+
+        if (dragRef.current === 'dismiss') {
+          if (g.dy > 0) slideY.setValue(g.dy);
+          return;
+        }
+
         accumulatedRotation.current += diff;
         movedDegRef.current += Math.abs(diff);
 
@@ -834,17 +869,29 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       },
       onPanResponderRelease: (_evt, g) => {
         lastAngle.current = null;
+        const kind = dragRef.current;
+        dragRef.current = null;
+
+        if (kind === 'dismiss') {
+          // Same thresholds as the mode's own dismiss, so a pull-down feels
+          // identical whether it starts on the record or beside it.
+          if (g.dy > 120 || g.vy > 0.8) closeRef.current();
+          else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+          return;
+        }
+
         scrubbingRef.current = false;
         setIsScrubbing(false);
         setScrubDir(null);
         if (scrubFadeTimerRef.current) clearTimeout(scrubFadeTimerRef.current);
-        // A still, quick touch is a TAP: the record doubles as a play/pause
-        // button, matching the cassette body. Judged by FINGER TRAVEL in
-        // pixels (not rotation degrees — near the record's centre a tiny
-        // wobble reads as many degrees and taps kept registering as scrubs).
-        if (Math.hypot(g.dx, g.dy) < 12 && Date.now() - tapStartRef.current < 450) {
+        // Never judged = never travelled DECIDE_PX, i.e. a TAP: the record
+        // doubles as a play/pause button, matching the cassette body. Judged
+        // by FINGER TRAVEL in pixels (not rotation degrees — near the
+        // record's centre a tiny wobble reads as many degrees and taps kept
+        // registering as scrubs).
+        if (kind === null) {
           scrubIndicatorAnim.setValue(0);
-          togglePlayRef.current();
+          if (Date.now() - tapStartRef.current < 450) togglePlayRef.current();
           return;
         }
         scrubFadeTimerRef.current = setTimeout(() => {
@@ -859,6 +906,12 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       },
       onPanResponderTerminate: () => {
         lastAngle.current = null;
+        const kind = dragRef.current;
+        dragRef.current = null;
+        if (kind === 'dismiss') {
+          Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+          return;
+        }
         scrubbingRef.current = false;
         setIsScrubbing(false);
         setScrubDir(null);
@@ -1071,6 +1124,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const handleClose = () => {
     Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
+  // The record's responder is built once, so it reaches this through a ref.
+  closeRef.current = handleClose;
 
   const station      = resolveAnyStation(activeId);
   const currentTrack = VINYL_TRACKS[activeTrack];

@@ -142,7 +142,15 @@ function AutoDim() {
   // opposite of what you want with the sun on it, and a driver who then
   // reaches for the brightness slider ends up costing MORE battery than
   // the dim ever saved.
-  const eligible = autoDim && !daylight && !!np.session && np.expanded && np.playing && Platform.OS !== 'web';
+  // …and so does an open sheet, for a harder reason than politeness. The mode
+  // is already a modal window and the sheet is a second one; this catch layer
+  // would be a third, and iOS silently refuses to present it while still
+  // handing it every touch. That is the freeze the owner hit on 03.08 (the
+  // screen dimmed over the song list, taps went nowhere, and the ones that
+  // leaked through to the disc paused the music). Sheets announce themselves
+  // through useSheetOpen — see the note on sheetCount.
+  const eligible = autoDim && !daylight && !!np.session && np.expanded && np.playing
+    && np.sheetCount === 0 && Platform.OS !== 'web';
 
   const restore = useCallback(async () => {
     setDimmed(false);
@@ -230,7 +238,11 @@ function OrientationGate() {
  */
 function PlaybackNotice() {
   const np = useNowPlaying();
-  const notice = np.playbackNotice;
+  // Wait for any open sheet to close before appearing. Not politeness: a third
+  // modal window never presents on iOS and swallows every touch instead, so a
+  // notice that showed up over the song list would freeze the app rather than
+  // inform anyone. The 8s countdown starts once it is genuinely on screen.
+  const notice = np.sheetCount > 0 ? null : np.playbackNotice;
 
   useEffect(() => {
     if (!notice) return;

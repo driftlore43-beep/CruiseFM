@@ -1,13 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, Easing, Modal, ScrollView, StyleSheet, Text,
+  ActivityIndicator, Animated, Easing, Modal, PanResponder, ScrollView, StyleSheet, Text,
   TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
-import { getPlaylistTracks, playTrackInContext, type PlaylistTrack } from '@/utils/spotify';
+import { useSheetOpen } from '@/context/NowPlayingContext';
+import { getPlaylistTracks, playTrackInContext, type FailReason, type PlaylistTrack } from '@/utils/spotify';
+
+/** Plain words for each way the read can fail, and a note on whether trying
+ *  again is worth the tap. Never "something went wrong". */
+const TROUBLE: Record<FailReason, { text: string; retry: boolean }> = {
+  offline: { text: 'Couldn’t reach Spotify. Check your signal and try again.', retry: true },
+  busy: { text: 'Spotify is asking us to slow down. Give it a moment.', retry: true },
+  error: { text: 'Spotify didn’t answer properly. Worth another try.', retry: true },
+  auth: { text: 'Your Spotify connection needs renewing — reconnect it from the home page.', retry: false },
+  forbidden: { text: 'Spotify wouldn’t share this playlist’s songs with Cruise FM.', retry: false },
+  notfound: { text: 'Spotify can’t find this playlist any more. It may have been deleted or made private.', retry: false },
+};
 
 function fmt(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -52,7 +64,27 @@ export function SongListSheet({
   const fade = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(visible);
   const [tracks, setTracks] = useState<PlaylistTrack[] | null>(null);
+  const [trouble, setTrouble] = useState<FailReason | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
+  useSheetOpen(visible);
+
+  // Pull the top of the sheet down to close it. The grabber has to DO
+  // something: the owner reported pulling the card down and the app going
+  // nowhere (03.08). Only the header block claims the gesture — the list
+  // below it has to keep scrolling.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  const drag = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_e, g) => g.dy > 6 && Math.abs(g.dy) > Math.abs(g.dx),
+    onPanResponderMove: (_e, g) => { if (g.dy > 0) y.setValue(g.dy); },
+    onPanResponderRelease: (_e, g) => {
+      if (g.dy > 90 || g.vy > 0.7) closeRef.current();
+      else Animated.spring(y, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
+    },
+    onPanResponderTerminationRequest: () => false,
+  }), [y]);
 
   const playlistId = /^spotify:playlist:([A-Za-z0-9]+)$/.exec(contextUri ?? '')?.[1] ?? null;
 
@@ -60,11 +92,16 @@ export function SongListSheet({
     if (!visible || !playlistId) return;
     let live = true;
     setTracks(null);
+    setTrouble(null);
     getPlaylistTracks(playlistId)
-      .then((t) => { if (live) setTracks(t); })
-      .catch(() => { if (live) setTracks([]); });
+      .then((r) => {
+        if (!live) return;
+        if (r.ok) setTracks(r.tracks);
+        else setTrouble(r.reason);
+      })
+      .catch(() => { if (live) setTrouble('error'); });
     return () => { live = false; };
-  }, [visible, playlistId]);
+  }, [visible, playlistId, attempt]);
 
   useEffect(() => {
     // Same rules as the mood sheet: start every open from a known off-screen
@@ -113,7 +150,8 @@ export function SongListSheet({
       <Animated.View
         pointerEvents={visible ? 'auto' : 'none'}
         style={[s.sheet, { paddingBottom: insets.bottom + 14, transform: [{ translateY: y }] }]}>
-        <View style={s.handle} />
+        <View {...drag.panHandlers}>
+        <View style={s.grabZone}><View style={s.handle} /></View>
 
         <View style={s.headerRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -130,6 +168,7 @@ export function SongListSheet({
           <Text style={s.swapText}>Change playlist</Text>
           <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.35)" />
         </TouchableOpacity>
+        </View>
 
         <ScrollView style={{ maxHeight: winH * 0.46 }} contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
           {!playlistId && (
@@ -137,11 +176,22 @@ export function SongListSheet({
               Songs show up here once Spotify is playing one of your playlists.
             </Text>
           )}
-          {playlistId && tracks === null && (
+          {playlistId && tracks === null && !trouble && (
             <View style={s.loading}><ActivityIndicator color="rgba(255,255,255,0.6)" /></View>
           )}
-          {playlistId && tracks?.length === 0 && (
-            <Text style={s.empty}>Couldn&apos;t read this playlist&apos;s songs.</Text>
+          {playlistId && !!trouble && (
+            <View style={s.troubleWrap}>
+              <Text style={s.empty}>{TROUBLE[trouble].text}</Text>
+              {TROUBLE[trouble].retry && (
+                <TouchableOpacity onPress={() => setAttempt((a) => a + 1)} style={s.retry} activeOpacity={0.8}>
+                  <Ionicons name="refresh" size={14} color="#0a0a10" />
+                  <Text style={s.retryText}>Try again</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          {playlistId && !trouble && tracks?.length === 0 && (
+            <Text style={s.empty}>There are no playable songs in this playlist.</Text>
           )}
           {tracks?.map((t, i) => {
             const now = !!currentUri && t.uri === currentUri;
@@ -183,7 +233,10 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 20,
     zIndex: 300,
   },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', alignSelf: 'center', marginBottom: 12 },
+  // The grabber is 4px tall and nobody can grab 4px — the zone around it is
+  // what the finger actually lands on.
+  grabZone: { paddingTop: 2, paddingBottom: 12, alignItems: 'center' },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 22, marginBottom: 12 },
   eyebrow: { color: 'rgba(255,255,255,0.42)', fontSize: 9.5, fontWeight: '800', letterSpacing: 2.5 },
   title: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: -0.3, marginTop: 2 },
@@ -203,6 +256,13 @@ const s = StyleSheet.create({
   list: { paddingHorizontal: 16, paddingBottom: 8 },
   loading: { paddingVertical: 30, alignItems: 'center' },
   empty: { color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 19, paddingVertical: 18, paddingHorizontal: 6 },
+  troubleWrap: { alignItems: 'flex-start', paddingBottom: 10 },
+  retry: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    marginLeft: 6, paddingHorizontal: 14, paddingVertical: 9,
+    borderRadius: 999, backgroundColor: '#fff',
+  },
+  retryText: { color: '#0a0a10', fontSize: 13, fontWeight: '800' },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 12, paddingVertical: 11,

@@ -162,6 +162,16 @@ type NowPlayingCtx = {
    * and resumes it when music starts elsewhere. Unlike setPlaying this does
    * NOT count as user activity. */
   adoptPlayState: (p: boolean) => void;
+  /** How many sheets are currently open OVER a fullscreen mode.
+   *
+   * iOS will not stack a third modal window: the mode is one, a sheet opened
+   * from inside it is two, and anything that tries to be three simply never
+   * appears — while still swallowing every touch. Auto-dim was the third, and
+   * on 03.08 it froze the app dark over an open song list. Sheets register
+   * here via useSheetOpen so auto-dim can stand down instead. */
+  sheetCount: number;
+  /** Raw counter for useSheetOpen — call the hook, not this. */
+  holdSheet: (open: boolean) => void;
 };
 
 const Ctx = createContext<NowPlayingCtx | null>(null);
@@ -177,6 +187,10 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const [playing, setPlayingRaw] = useState(false);
   const [activityTick, setActivityTick] = useState(0);
   const activityPing = useCallback(() => setActivityTick((t) => t + 1), []);
+  const [sheetCount, setSheetCount] = useState(0);
+  const holdSheet = useCallback((open: boolean) => {
+    setSheetCount((n) => Math.max(0, n + (open ? 1 : -1)));
+  }, []);
   const [playbackNotice, setPlaybackNotice] = useState<string | null>(null);
   const [handoff, setHandoff] = useState(false);
   const clearPlaybackNotice = useCallback(() => setPlaybackNotice(null), []);
@@ -342,8 +356,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, setMode, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching }),
-    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, setMode, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching],
+    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, setMode, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching, sheetCount, holdSheet }),
+    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, setMode, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching, sheetCount, holdSheet],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -361,6 +375,30 @@ const noopPing = () => {};
  * playback-control touches to the drive check. */
 export function useActivityPing(): () => void {
   return useContext(Ctx)?.activityPing ?? noopPing;
+}
+
+const noopHold = (_open: boolean) => {};
+
+/**
+ * Declare that this component is showing a sheet over a fullscreen mode.
+ *
+ * ANY modal sheet that can appear while a mode is up must call this. iOS
+ * allows the mode's own window plus ONE sheet on top; a third never presents
+ * but still eats every touch, which is how auto-dim froze the app dark over
+ * the song list (owner, 03.08 — "pausing… and preventing me from swiping").
+ * Auto-dim is the piece that stands down, because it is the only one of the
+ * three the user did not ask for.
+ *
+ * Safe outside the provider, so sheets shared with the tab pages can call it
+ * unconditionally.
+ */
+export function useSheetOpen(open: boolean): void {
+  const hold = useContext(Ctx)?.holdSheet ?? noopHold;
+  useEffect(() => {
+    if (!open) return;
+    hold(true);
+    return () => hold(false);
+  }, [open, hold]);
 }
 
 /** Safe anywhere — lets the playback hook feed start outcomes to the notice. */

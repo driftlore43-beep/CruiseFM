@@ -78,7 +78,12 @@ export function DriveCheckCard() {
     suspendedRef.current = false;
   }, [np.session]);
 
-  if (!asking || !np.session) return null;
+  // An open sheet holds the card back rather than cancelling it: iOS refuses
+  // to present a third modal window and eats every touch instead, so this
+  // would freeze the app rather than ask a question. `asking` stays true, so
+  // it appears the moment the sheet closes — and someone reading a song list
+  // has plainly answered the question anyway.
+  if (!asking || !np.session || np.sheetCount > 0) return null;
 
   const stillCruising = () => {
     if (suspendedRef.current) {

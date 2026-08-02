@@ -13,6 +13,7 @@ import {
   DEFAULT_SHARE_STYLE, FORMAT_H, SHARE_STYLES, ShareCardBody,
   type ShareFormat, type ShareStyleId,
 } from '@/components/ShareCardStyles';
+import { useSheetOpen } from '@/context/NowPlayingContext';
 import { getProfileName } from '@/utils/spotify';
 import type { NowPlaying } from '@/utils/useMusicPlayback';
 
@@ -84,6 +85,9 @@ export function ShareCardSheet({
   const [styleId, setStyleId] = useState<ShareStyleId>(DEFAULT_SHARE_STYLE);
   const [format, setFormat] = useState<ShareFormat>('card');
   const capRef = useRef<Svg>(null);
+  // Declare ourselves so auto-dim doesn't try to be a third modal window over
+  // the mode and this sheet — see useSheetOpen.
+  useSheetOpen(visible);
 
   useEffect(() => {
     if (!visible) return;

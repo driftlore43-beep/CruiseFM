@@ -248,9 +248,9 @@ async function classify403(res: Response): Promise<'restricted' | 'premium-requi
 // Spotify calls sit between "user pressed play" and music/handoff; an
 // unanswered request should give up fast so the fallback path can run.
 const FETCH_TIMEOUT_MS = 4000;
-function timedFetch(url: string, init?: RequestInit): Promise<Response> {
+function timedFetch(url: string, init?: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
   return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
 }
 
@@ -277,6 +277,47 @@ async function spotifyFetch(endpoint: string, method = 'GET', body?: object) {
   if (res.status === 204 || res.status === 202) return null;
   if (!res.ok) return null;
   try { return await res.json(); } catch { return null; }
+}
+
+/** Why a request came back with nothing. `spotifyFetch` folds all of these
+ *  into null, which is right for the polling paths — a drive must not stop to
+ *  explain itself — but wrong for a screen the user is looking at. */
+export type FailReason = 'offline' | 'auth' | 'forbidden' | 'notfound' | 'busy' | 'error';
+
+export type FetchResult =
+  | { ok: true; data: any }
+  | { ok: false; reason: FailReason };
+
+/**
+ * The same call as spotifyFetch, but it says what happened.
+ *
+ * Use this anywhere a person is waiting on the answer: "couldn't read this"
+ * and "this is empty" look identical to the caller otherwise, which is
+ * exactly how the song list ended up telling the owner her playlist had no
+ * songs in it (03.08). The timeout is separate too — the 4s used everywhere
+ * else exists so a start attempt fails over to the handoff path quickly, and
+ * it is far too impatient for a list fetched over a moving car's signal.
+ */
+export async function spotifyFetchDetailed(endpoint: string, timeoutMs = 12000): Promise<FetchResult> {
+  const token = await getAccessToken();
+  if (!token) return { ok: false, reason: 'auth' };
+  let res: Response;
+  try {
+    res = await timedFetch(
+      `https://api.spotify.com/v1${endpoint}`,
+      { method: 'GET', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } },
+      timeoutMs,
+    );
+  } catch {
+    return { ok: false, reason: 'offline' };
+  }
+  if (res.ok && restrictedCache) setRestricted(false);
+  if (res.status === 401) return { ok: false, reason: 'auth' };
+  if (res.status === 403) { classify403(res); return { ok: false, reason: 'forbidden' }; }
+  if (res.status === 404) return { ok: false, reason: 'notfound' };
+  if (res.status === 429) return { ok: false, reason: 'busy' };
+  if (!res.ok) return { ok: false, reason: 'error' };
+  try { return { ok: true, data: await res.json() }; } catch { return { ok: false, reason: 'error' }; }
 }
 
 export async function getPlaybackState() {
@@ -446,29 +487,70 @@ export type PlaylistTrack = {
   durationMs: number;
 };
 
-/**
- * The songs in a playlist, so a drive can jump straight to one instead of
- * skipping there or hopping out to Spotify (owner, 03.08).
- *
- * Capped at 100 — Spotify's own page size, and a list you thumb through at
- * the wheel has no business being longer. Local tracks and podcast episodes
- * come back with a null uri and are dropped: neither can be started with the
- * play call below.
- */
-export async function getPlaylistTracks(playlistId: string): Promise<PlaylistTrack[]> {
-  const data = await spotifyFetch(
-    `/playlists/${playlistId}/tracks?limit=100&fields=items(track(uri,name,duration_ms,artists(name)))`,
-  );
-  const items: any[] = data?.items ?? [];
+export type PlaylistTracksResult =
+  | { ok: true; tracks: PlaylistTrack[] }
+  | { ok: false; reason: FailReason };
+
+/** Spotify's own page size. Three of them is 300 songs, which is more than
+ *  anyone thumbs through at the wheel and still covers a long playlist. */
+const TRACK_PAGE = 100;
+const MAX_PAGES = 3;
+
+function readTracks(items: any[]): PlaylistTrack[] {
   return items
     .map((it) => it?.track)
-    .filter((t) => t?.uri && !t.is_local)
+    // Local files and podcast episodes come back without a playable uri —
+    // neither can be started by the play call below, so they never list.
+    .filter((t) => t?.uri && typeof t.uri === 'string' && t.uri.startsWith('spotify:track:'))
     .map((t) => ({
       uri: t.uri as string,
       title: (t.name as string) ?? '',
       artist: (t.artists ?? []).map((a: any) => a?.name).filter(Boolean).join(', '),
       durationMs: (t.duration_ms as number) ?? 0,
     }));
+}
+
+/**
+ * The songs in a playlist, so a drive can jump straight to one instead of
+ * skipping there or hopping out to Spotify (owner, 03.08).
+ *
+ * Returns a RESULT, not a list. The first cut returned a bare array and every
+ * failure — offline, timed out, rate-limited, a playlist Spotify won't hand
+ * over — arrived as `[]`, so the sheet told the owner her playlist had no
+ * songs in it. A screen someone is reading has to be able to say which.
+ *
+ * `total` is asked for alongside the items precisely so the two can be told
+ * apart from the other side too: total 0 is genuinely empty, while total > 0
+ * with nothing readable means the projection or the page came back wrong, and
+ * that retries without the projection rather than reporting an empty list.
+ */
+export async function getPlaylistTracks(playlistId: string): Promise<PlaylistTracksResult> {
+  const tracks: PlaylistTrack[] = [];
+  let total = 0;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const offset = page * TRACK_PAGE;
+    const res = await spotifyFetchDetailed(
+      `/playlists/${playlistId}/tracks?limit=${TRACK_PAGE}&offset=${offset}`
+      + `&fields=total,items(track(uri,name,duration_ms,artists(name)))`,
+    );
+    if (!res.ok) return page === 0 ? res : { ok: true, tracks }; // keep what we have
+    const items: any[] = res.data?.items ?? [];
+    total = res.data?.total ?? 0;
+
+    if (page === 0 && items.length === 0 && total > 0) {
+      // The playlist has songs but this projection returned none. Ask again
+      // without `fields` — bigger payload, but no projection to disagree with.
+      const plain = await spotifyFetchDetailed(`/playlists/${playlistId}/tracks?limit=${TRACK_PAGE}`);
+      if (!plain.ok) return plain;
+      return { ok: true, tracks: readTracks(plain.data?.items ?? []) };
+    }
+
+    tracks.push(...readTracks(items));
+    if (items.length < TRACK_PAGE) break;
+  }
+
+  return { ok: true, tracks };
 }
 
 /**

@@ -43,14 +43,39 @@ npx eas-cli submit -p ios --profile production --latest
 
 1. Open the rejected version → **select the new build** (it will be build 8
    or higher; anything below that is the rejected one).
-2. In the **App Review** conversation, reply to the rejection with this:
+2. **Where the reply goes — there are two places and they are not the same:**
 
-> Thank you for the review — you were correct. Cruise FM does not play audio
-> itself and should not have declared the background audio capability. The
-> declaration came from a third-party library that was no longer used by the
-> app; it has been removed entirely and this build declares no
-> UIBackgroundModes at all. Music playback is performed by the user's own
-> music app, which Cruise FM optionally controls while in the foreground.
+   **(a) The review conversation.** On the rejected version there is a banner
+   at the top saying the app was rejected, with a link into the message
+   thread (older App Store Connect called this the *Resolution Center*). Open
+   it and press **Reply**. This goes back to the reviewer who rejected it.
+
+   **(b) Notes for Review** — a text box further down the *same version page*,
+   under **App Review Information**. This is read by whoever picks up the new
+   submission, which may not be the same person. It is the more reliable of
+   the two, so put the explanation here even if you also reply in the thread.
+
+   **Do NOT wipe what is already in Notes for Review** — the existing note is
+   what tells the reviewer they can use the whole app without signing in, and
+   losing it invites a different rejection. Replace it with both parts:
+
+> Regarding the previous rejection (Guideline 2.5.4): you were correct. Cruise
+> FM does not play audio itself and should not have declared the background
+> audio capability. The declaration came from a third-party library that was
+> no longer used by the app; it has been removed entirely and this build
+> declares no UIBackgroundModes at all. Music playback is performed by the
+> user's own music app, which Cruise FM optionally controls while in the
+> foreground.
+>
+> About the app: Cruise FM is a visual driving companion. No account or
+> sign-in is required — on first launch you can choose "None / Other" (or
+> Skip) on the music platform screen and use every feature (mood stations,
+> all visual modes, creating stations) in companion mode. An optional Spotify
+> connection enables in-app playback control for Spotify Premium users;
+> without it, users play music in their own music app while Cruise FM
+> provides the visuals. The app does not use the microphone, collects no
+> personal data, and contains no ads. This version is fully free with no
+> in-app purchases.
 
 3. **Submit to App Review.** Keep **Manually release this version** so you
    still choose the go-live moment.

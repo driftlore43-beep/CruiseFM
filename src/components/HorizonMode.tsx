@@ -244,9 +244,17 @@ function HorizonScene({ phase, amp, eq, geom = GEOM_PORTRAIT }: { phase: number;
       {/* Sky warming down toward the horizon */}
       <Rect x="0" y="0" width={g.W} height={g.HORIZON} fill="url(#hzSky)" />
 
-      {/* Stars */}
+      {/* Stars, twinkling. Each one breathes on its own period driven by the
+          phase the scene already advances every frame, so this costs nothing
+          — and a sky of perfectly steady dots is the one thing that gives a
+          drawn night away. */}
       {g.stars.map((s, i) => (
-        <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#ffffff" opacity={s.o} />
+        <Circle
+          key={i}
+          cx={s.x} cy={s.y} r={s.r}
+          fill="#ffffff"
+          opacity={s.o * (0.55 + 0.45 * (0.5 + 0.5 * Math.sin(phase * (0.7 + (i % 5) * 0.23) + i * 2.4)))}
+        />
       ))}
 
       {/* Sun: wide haze, tighter bloom, then the slatted disc */}

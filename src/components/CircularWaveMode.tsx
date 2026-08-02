@@ -59,19 +59,70 @@ function spectrum(a: number, phase: number): number {
   );
 }
 
+/** One bar's height, 0..1-ish, sharpened so the ring rests as dots. */
+function burstAt(a: number, phase: number): number {
+  return Math.pow(Math.max(0, spectrum(a, phase)), 2.6);
+}
+
 // All outward bars as one path. Peaks are sharpened so the ring reads as
 // resting dots with wave bursts sweeping around it (reference-clip look).
 function ringBars(phase: number, amp: number): string {
   let d = '';
   for (let i = 0; i < NBARS; i++) {
     const a = (i / NBARS) * Math.PI * 2;
-    const burst = Math.pow(Math.max(0, spectrum(a, phase)), 2.6);
-    const len = MINLEN + MAXLEN * amp * burst;
+    const tip = Math.min(R0 + MINLEN + MAXLEN * amp * burstAt(a, phase), R_MAX - 5);
     const c = Math.cos(a), s = Math.sin(a);
-    d += `M${(CX + R0 * c).toFixed(1)} ${(CY + R0 * s).toFixed(1)}L${(CX + (R0 + len) * c).toFixed(1)} ${(CY + (R0 + len) * s).toFixed(1)}`;
+    d += `M${(CX + R0 * c).toFixed(1)} ${(CY + R0 * s).toFixed(1)}L${(CX + tip * c).toFixed(1)} ${(CY + tip * s).toFixed(1)}`;
   }
   return d;
 }
+
+/**
+ * The SHORT INWARD half of each bar. A meter that only grows outwards reads
+ * as a sunburst; mirroring it — briefly, inwards — is what makes it read as a
+ * spectrum wrapped around a circle. Deliberately about a third of the outward
+ * length: the centre of this mode stays hollow, which is its whole silhouette.
+ */
+function ringInner(phase: number, amp: number): string {
+  let d = '';
+  for (let i = 0; i < NBARS; i++) {
+    const a = (i / NBARS) * Math.PI * 2;
+    const len = MINLEN * 0.6 + MAXLEN * INNER_FRAC * amp * burstAt(a, phase);
+    const c = Math.cos(a), s = Math.sin(a);
+    d += `M${(CX + R0 * c).toFixed(1)} ${(CY + R0 * s).toFixed(1)}L${(CX + (R0 - len) * c).toFixed(1)} ${(CY + (R0 - len) * s).toFixed(1)}`;
+  }
+  return d;
+}
+
+/**
+ * Peak dots riding each bar's recent maximum — the polar version of the
+ * Equalizer's white peak caps, which the owner kept. A real meter's peak
+ * hangs above the level and falls back slowly, and that lag is most of what
+ * makes it read as an instrument rather than a pattern.
+ *
+ * No per-bar state: the peak is simply the highest this bar has been across
+ * the last few frames of the same wave, which is the same thing sampled
+ * backwards through `phase`.
+ */
+function ringPeaks(phase: number, amp: number): string {
+  let d = '';
+  for (let i = 0; i < NBARS; i++) {
+    const a = (i / NBARS) * Math.PI * 2;
+    const b = Math.max(burstAt(a, phase), burstAt(a, phase - 0.30), burstAt(a, phase - 0.62));
+    const r = Math.min(R0 + MINLEN + MAXLEN * amp * b + 3.4, R_MAX);
+    const c = Math.cos(a), s = Math.sin(a);
+    // A zero-length dash with a round cap IS a dot — one path for all 64.
+    d += `M${(CX + r * c).toFixed(1)} ${(CY + r * s).toFixed(1)}l0.01 0`;
+  }
+  return d;
+}
+
+/** How far in the mirrored half reaches, as a fraction of the outward bar. */
+const INNER_FRAC = 0.34;
+/** Nothing may cross the canvas edge. `amp` can run past 1 on a loud burst,
+ *  and the longest bars were being sliced off flat against the viewBox — a
+ *  straight vertical cut down the right of the ring. */
+const R_MAX = VB / 2 - 3;
 
 // ── Fullscreen modal ────────────────────────────────────────────────────────────
 export function CircularWaveFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
@@ -269,12 +320,28 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
                   <Stop offset="0.7" stopColor={eq[2]} stopOpacity="0.07" />
                   <Stop offset="1" stopColor={eq[2]} stopOpacity="0" />
                 </RadialGradient>
+                {/* Bloom sitting ON the ring rather than filling the middle —
+                    an annulus, so the hollow centre stays hollow. Breathes
+                    with the level, so the whole instrument brightens on a
+                    burst instead of only its bars. */}
+                <RadialGradient id="cwBloom" cx="0.5" cy="0.5" r="0.5">
+                  <Stop offset="0.52" stopColor={eq[1]} stopOpacity="0" />
+                  <Stop offset="0.74" stopColor={eq[1]} stopOpacity="0.30" />
+                  <Stop offset="0.88" stopColor={eq[2]} stopOpacity="0.16" />
+                  <Stop offset="1" stopColor={eq[2]} stopOpacity="0" />
+                </RadialGradient>
               </Defs>
 
               {/* Soft halo so the ring reads over the scene — centre stays hollow */}
               <Circle cx={CX} cy={CY} r={R0 + MAXLEN} fill="url(#cwCore)" />
+              <Circle cx={CX} cy={CY} r={CX} fill="url(#cwBloom)" opacity={0.45 + amp * 0.55} />
+              {/* The rail the bars stand on. Without it they float, which is
+                  what made this mode read as a pattern rather than a meter. */}
+              <Circle cx={CX} cy={CY} r={R0} fill="none" stroke={eq[1]} strokeOpacity={0.22} strokeWidth={1.1} />
+              <Path d={ringInner(phase, amp)} stroke="url(#cwStroke)" strokeWidth={4} strokeOpacity={0.55} fill="none" strokeLinecap="round" />
               {/* Chunky EQ dashes — resting dots with bursts sweeping the ring */}
               <Path d={ringBars(phase, amp)} stroke="url(#cwStroke)" strokeWidth={5} strokeOpacity={0.97} fill="none" strokeLinecap="round" />
+              <Path d={ringPeaks(phase, amp)} stroke="#FFFFFF" strokeWidth={2.6} strokeOpacity={0.78} fill="none" strokeLinecap="round" />
             </Svg>
             <FloatingNotes playing={playing} emitter="ring" color={eq[0]} />
             </Animated.View>

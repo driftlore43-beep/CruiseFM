@@ -1,10 +1,12 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { ModeThumb, type ModeThumbId } from '@/components/ModeThumb';
+import { StationSheet } from '@/components/StationSheet';
+import { defaultStationForNow, loadLastCruise } from '@/utils/lastCruise';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
@@ -139,10 +141,29 @@ export default function ModesScreen() {
   const np = useNowPlaying();
   const { isPro } = useEntitlements();
 
+  // Picking a mode asks which MOOD to open it on (owner, 03.08). It used to
+  // go straight in, and `np.open` defaults its stationId to a hardcoded
+  // 'night-run', so any other mood meant backing out to the Stations page and
+  // coming in the other way. The sheet is pre-ticked with the last cruise's
+  // station, or the hour's own pick on a first run, so the common case is one
+  // extra tap on something already highlighted.
+  const [pending, setPending] = useState<{ mode: string; locked: boolean } | null>(null);
+  const [lastStation, setLastStation] = useState<string>(defaultStationForNow());
+  useEffect(() => {
+    loadLastCruise().then((c) => { if (c?.stationId) setLastStation(c.stationId); }).catch(() => {});
+  }, []);
+
   function open(mode: string, locked: boolean) {
+    setPending({ mode, locked });
+  }
+
+  function start(stationId: string) {
+    if (!pending) return;
     // Locked modes give a free taste — the gate handles the upsell after.
     // Browsing modes opens them idle; previews auto-play so the taste moves.
-    np.open(mode, undefined, { preview: locked, paused: !locked });
+    np.open(pending.mode, stationId, { preview: pending.locked, paused: !pending.locked });
+    setLastStation(stationId);
+    setPending(null);
   }
 
   const hero = MODES.find((m) => m.id === HERO_ID)!;
@@ -173,6 +194,14 @@ export default function ModesScreen() {
         ))}
 
       </ScrollView>
+
+      <StationSheet
+        visible={!!pending}
+        onClose={() => setPending(null)}
+        onPick={start}
+        currentId={lastStation}
+        modeLabel={MODES.find((m) => m.id === pending?.mode)?.title}
+      />
     </View>
   );
 }

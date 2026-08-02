@@ -1198,6 +1198,13 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         </View>
         )}
 
+        {/* Mode name — top-left corner tag, same treatment as every other mode */}
+        {!isLandscape && (
+        <View style={{ position: 'absolute', top: topPad + 14, left: 20, zIndex: 10 }} pointerEvents="none">
+          <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', letterSpacing: 3, fontFamily: Fonts.mono }}>VINYL</Text>
+        </View>
+        )}
+
         <View style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : bottomPad, alignItems: 'center' }}>
 
           {!isLandscape && (

@@ -1020,6 +1020,11 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
         </View>
 
+        {/* Mode name — top-left corner tag, same treatment as every other mode */}
+        <View style={{ position: 'absolute', top: topPad + 14, left: 20, zIndex: 10 }} pointerEvents="none">
+          <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', letterSpacing: 3, fontFamily: Fonts.mono }}>CASSETTE</Text>
+        </View>
+
         <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: bottomPad }}>
 
           {/* Header — small top-center, Spotify style */}

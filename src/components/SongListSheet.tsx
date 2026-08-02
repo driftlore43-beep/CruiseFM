@@ -8,17 +8,30 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { useSheetOpen } from '@/context/NowPlayingContext';
-import { getPlaylistTracks, playTrackInContext, type FailReason, type PlaylistTrack } from '@/utils/spotify';
+import { connectSpotify, getPlaylistTracks, playTrackInContext, type FailReason, type PlaylistTrack } from '@/utils/spotify';
 
-/** Plain words for each way the read can fail, and a note on whether trying
- *  again is worth the tap. Never "something went wrong". */
-const TROUBLE: Record<FailReason, { text: string; retry: boolean }> = {
+/**
+ * Plain words for each way the read can fail, and — the part that matters —
+ * what to DO about it. A message that only names the problem is a dead end;
+ * the owner's first reply to the honest version was "how can I fix this?".
+ *
+ * `retry` is for causes that might pass on their own; `reconnect` offers the
+ * actual one-tap fix where reconnecting is the fix.
+ */
+const TROUBLE: Record<FailReason, { text: string; retry?: boolean; reconnect?: boolean }> = {
   offline: { text: 'Couldn’t reach Spotify. Check your signal and try again.', retry: true },
   busy: { text: 'Spotify is asking us to slow down. Give it a moment.', retry: true },
   error: { text: 'Spotify didn’t answer properly. Worth another try.', retry: true },
-  auth: { text: 'Your Spotify connection needs renewing — reconnect it from the home page.', retry: false },
-  forbidden: { text: 'Spotify wouldn’t share this playlist’s songs with Cruise FM.', retry: false },
-  notfound: { text: 'Spotify can’t find this playlist any more. It may have been deleted or made private.', retry: false },
+  auth: { text: 'Your Spotify connection has expired. Reconnecting takes a moment and picks up where you left off.', reconnect: true },
+  scope: {
+    text: 'Cruise FM hasn’t been given permission to read your playlists yet. Reconnecting asks Spotify for it — your music keeps playing.',
+    reconnect: true,
+  },
+  forbidden: {
+    text: 'Spotify won’t share this playlist’s songs. Playlists Spotify builds for you — Daily Mixes, Discover Weekly, its own editorial ones — are closed to other apps. One of your own playlists will list its songs fine.',
+    reconnect: true,
+  },
+  notfound: { text: 'Spotify can’t find this playlist any more. It may have been deleted, or made private by whoever owns it.', retry: false },
 };
 
 function fmt(ms: number): string {
@@ -67,6 +80,7 @@ export function SongListSheet({
   const [trouble, setTrouble] = useState<FailReason | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
+  const [linking, setLinking] = useState(false);
   useSheetOpen(visible);
 
   // Pull the top of the sheet down to close it. The grabber has to DO
@@ -117,6 +131,27 @@ export function SongListSheet({
       Animated.timing(fade, { toValue: visible ? 1 : 0, duration: 220, useNativeDriver: true }),
     ]).start(({ finished }) => { if (!visible && finished) setMounted(false); });
   }, [visible]);
+
+  /**
+   * Re-run the Spotify sign-in from right here. The permission Cruise FM asks
+   * for is granted at sign-in, so a connection made before it was added keeps
+   * being refused however many times you retry — reconnecting is the only
+   * thing that changes the answer, and it should not mean hunting for it on
+   * the home page mid-drive. The music is Spotify's, not ours, so it carries
+   * on playing throughout.
+   */
+  const reconnect = async () => {
+    if (linking) return;
+    setLinking(true);
+    try {
+      const ok = await connectSpotify();
+      if (ok) { setTrouble(null); setAttempt((a) => a + 1); }
+    } catch {
+      /* the sheet already says what is wrong; leave it saying so */
+    } finally {
+      setLinking(false);
+    }
+  };
 
   const jump = async (t: PlaylistTrack) => {
     if (!contextUri || busy) return;
@@ -186,6 +221,14 @@ export function SongListSheet({
                 <TouchableOpacity onPress={() => setAttempt((a) => a + 1)} style={s.retry} activeOpacity={0.8}>
                   <Ionicons name="refresh" size={14} color="#0a0a10" />
                   <Text style={s.retryText}>Try again</Text>
+                </TouchableOpacity>
+              )}
+              {TROUBLE[trouble].reconnect && (
+                <TouchableOpacity onPress={reconnect} disabled={linking} style={[s.retry, linking && s.retryBusy]} activeOpacity={0.8}>
+                  {linking
+                    ? <ActivityIndicator size="small" color="#0a0a10" />
+                    : <Ionicons name="link" size={14} color="#0a0a10" />}
+                  <Text style={s.retryText}>Reconnect Spotify</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -262,6 +305,7 @@ const s = StyleSheet.create({
     marginLeft: 6, paddingHorizontal: 14, paddingVertical: 9,
     borderRadius: 999, backgroundColor: '#fff',
   },
+  retryBusy: { opacity: 0.7 },
   retryText: { color: '#0a0a10', fontSize: 13, fontWeight: '800' },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

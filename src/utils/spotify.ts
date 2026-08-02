@@ -229,14 +229,33 @@ function setRestricted(on: boolean) {
   AsyncStorage.setItem(RESTRICTED_KEY, on ? 'true' : 'false').catch(() => {});
 }
 
-/** 403 body sniff: allowlist rejection vs. premium-required. */
-async function classify403(res: Response): Promise<'restricted' | 'premium-required'> {
+/** classify403 narrowed to the vocabulary the start path speaks. */
+async function startResult403(res: Response): Promise<'restricted' | 'premium-required'> {
+  const kind = await classify403(res);
+  return kind === 'restricted' ? 'restricted' : 'premium-required';
+}
+
+/**
+ * 403 body sniff. Spotify uses one status code for several unrelated
+ * refusals, and they have completely different fixes, so the body is the only
+ * thing that can tell them apart:
+ *
+ *  - "not registered"       — this account isn't on the dev-mode allowlist.
+ *  - "Insufficient client scope" — the token was minted before Cruise FM
+ *    asked for a permission it now needs. RECONNECTING FIXES IT, and nothing
+ *    else does; the account and the playlist are both fine.
+ *  - anything else          — Spotify is refusing this particular resource.
+ *    For a playlist that means one of its own (a Daily Mix, Discover Weekly,
+ *    an editorial list), which apps outside Spotify cannot read.
+ */
+async function classify403(res: Response): Promise<'restricted' | 'scope' | 'premium-required'> {
   try {
     const text = await res.text();
     if (/not registered/i.test(text)) {
       setRestricted(true);
       return 'restricted';
     }
+    if (/scope/i.test(text)) return 'scope';
   } catch {
     // fall through
   }
@@ -282,7 +301,7 @@ async function spotifyFetch(endpoint: string, method = 'GET', body?: object) {
 /** Why a request came back with nothing. `spotifyFetch` folds all of these
  *  into null, which is right for the polling paths — a drive must not stop to
  *  explain itself — but wrong for a screen the user is looking at. */
-export type FailReason = 'offline' | 'auth' | 'forbidden' | 'notfound' | 'busy' | 'error';
+export type FailReason = 'offline' | 'auth' | 'scope' | 'forbidden' | 'notfound' | 'busy' | 'error';
 
 export type FetchResult =
   | { ok: true; data: any }
@@ -313,7 +332,12 @@ export async function spotifyFetchDetailed(endpoint: string, timeoutMs = 12000):
   }
   if (res.ok && restrictedCache) setRestricted(false);
   if (res.status === 401) return { ok: false, reason: 'auth' };
-  if (res.status === 403) { classify403(res); return { ok: false, reason: 'forbidden' }; }
+  // Awaited, unlike the polling path's fire-and-forget: which 403 this is
+  // decides what the screen tells the user to do about it.
+  if (res.status === 403) {
+    const kind = await classify403(res);
+    return { ok: false, reason: kind === 'scope' ? 'scope' : 'forbidden' };
+  }
   if (res.status === 404) return { ok: false, reason: 'notfound' };
   if (res.status === 429) return { ok: false, reason: 'busy' };
   if (!res.ok) return { ok: false, reason: 'error' };
@@ -415,7 +439,10 @@ async function startPlaybackInner(contextUri?: string, offset?: { uri: string })
   // one round trip starts the music — no device lookup first.
   let res = await attempt();
   if (res.ok || res.status === 204) return 'playing';
-  if (res.status === 403) return classify403(res);
+  // A start refused for want of a permission is not a scope Cruise FM asks
+  // for on this call, so it can only mean the account or the plan — report it
+  // the way the notice card already knows how to explain.
+  if (res.status === 403) return startResult403(res);
   if (res.status !== 404) return 'error';
 
   // No active session — the phone's Spotify has dozed off (Android does
@@ -429,7 +456,7 @@ async function startPlaybackInner(contextUri?: string, offset?: { uri: string })
 
   res = await attempt(`?device_id=${encodeURIComponent(target.id)}`);
   if (res.ok || res.status === 204) return 'playing';
-  if (res.status === 403) return classify403(res);
+  if (res.status === 403) return startResult403(res);
 
   // Deep asleep — transfer playback onto the device with play=true, which
   // resumes where it left off and is the most reliable wake-up Spotify has.

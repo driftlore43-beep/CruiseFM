@@ -210,38 +210,134 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
 }
 
 // ── Tonearm (shared between preview and fullscreen) ───────────────────────────
+//
+// THE SPINE, in fractions of armLen measured from the pivot. `a` is the tube's
+// lean off the arm's own axis in degrees, POSITIVE = away from the spindle.
+//
+// A real S-arm leaves the bearing leaning slightly OUTWARD, bows back across
+// the middle and straightens into the headshell. Two cubics joined with
+// MATCHING tangents put that inflection exactly where it belongs; a single
+// cubic bends wherever its control points happen to fall, which is how the old
+// arm ended up a straight stick with one kink at the bottom.
+const ARM_A = { x:  0.000, y: 0.075, a:  10 };  // leaves the bearing
+const ARM_J = { x:  0.045, y: 0.450, a: -18 };  // inflection
+const ARM_B = { x: -0.070, y: 0.845, a:  -8 };  // collar, where the shell bolts on
+/** Headshell axis. ~18° off the tube's tangent at the collar — a cartridge's
+ *  real offset angle, which is what finishes the S instead of fighting it. */
+const ARM_HEAD_A = -26;
+/** Collar → stylus, so the needle lands at ~1.03 armLen from the pivot and
+ *  ~0.158 of it toward the spindle. Change these and it walks off the record. */
+const ARM_HEAD_L = 0.20;
+
+/** Unit vector for a lean angle. +y runs down the arm, +x away from the spindle.
+ *  NOTE: SVG `rotate(a)` turns a downward vector toward −x, so a group that
+ *  should point along armDir(θ) is rotated by −θ. */
+function armDir(deg: number) {
+  const r = (deg * Math.PI) / 180;
+  return { x: Math.sin(r), y: Math.cos(r) };
+}
+
+/**
+ * The arm, rebuilt from a reference photograph of a real one (owner, 02.08:
+ * "it has the funky shape... let's start from scratch"). Three things carry it
+ * and all three are structural, not decoration:
+ *
+ *  1. THE SPINE IS AN S (see the constants above), sized in fractions of the
+ *     arm's own length so the same geometry serves the fullscreen deck and the
+ *     little preview card.
+ *  2. THE TUBE IS ROUND — stroked four times on the SAME path: outline, body,
+ *     inner light, hot hairline offset to the lit side. One flat stroke is the
+ *     whole difference between a tube and a drawn line.
+ *  3. THE HARDWARE IS REAL — bearing housing with vents and a centre screw, a
+ *     counterweight on a stub directly behind the pivot, a collar, an angular
+ *     headshell with slots, screws and a finger lift, and the cartridge and
+ *     stylus at the far tip.
+ *
+ * Silver and graphite whatever the station's mood: this is hi-fi kit, and the
+ * colour on this deck belongs to the record.
+ */
 function Tonearm({
-  armLen, armW, headW, headH, pivotX, pivotY, rotation,
+  armLen, armW, headW, pivotX, pivotY, rotation,
 }: {
-  armLen: number; armW: number; headW: number; headH: number;
+  armLen: number; armW: number; headW: number;
   pivotX: number; pivotY: number;
   rotation: Animated.AnimatedInterpolation<string>;
 }) {
-  // Hardware is silver/graphite regardless of mood — reads as real hi-fi kit.
-  const cwW = Math.max(16, armW * 2.6);
-  const cwH = Math.max(10, armW * 1.6);
-  // Faint-J geometry: straight shaft, one gentle hook in to the groove.
-  const BEND  = Math.min(17, armLen * 0.08);
-  const svgW  = headW + BEND * 2 + 28;
-  const scx   = svgW / 2;
-  const ex    = scx - BEND;
-  const TOP   = cwH + 8;               // headroom for the counterweight
-  const eyy   = TOP + armLen * 0.90;
-  const svgH  = TOP + armLen + headH + 16;
-  const armPath = `M ${scx} ${TOP + 8} L ${scx} ${TOP + armLen * 0.58} C ${scx} ${TOP + armLen * 0.76}, ${ex} ${TOP + armLen * 0.72}, ${ex} ${eyy}`;
-  // Headshell offset. The pivot sits top-RIGHT and the shaft hooks LEFT
-  // toward the spindle, so the cartridge has to lean the same way to finish
-  // the J — a positive SVG angle, since y points down. It used to be -18,
-  // which kicked the cartridge back out again and broke the curve (owner,
-  // 30.07). It is also how a real arm is built: the headshell's offset
-  // angles the stylus in toward the spindle.
-  const HEAD_TILT = 18;
-  const innerW  = Math.max(1, armW * 0.55);
-  const screwR  = Math.max(1, headW * 0.08);
-  const bandH   = Math.max(2.5, headH * 0.2);
+  const L  = armLen;
+  const A  = { x: ARM_A.x * L, y: ARM_A.y * L };
+  const J  = { x: ARM_J.x * L, y: ARM_J.y * L };
+  const B  = { x: ARM_B.x * L, y: ARM_B.y * L };
+  const tA = armDir(ARM_A.a), tJ = armDir(ARM_J.a), tB = armDir(ARM_B.a);
+  const hd = armDir(ARM_HEAD_A);
+  const headLen = ARM_HEAD_L * L;
+  const S = { x: B.x + hd.x * headLen, y: B.y + hd.y * headLen };
+
+  // Counterweight — a stub straight back from the pivot with a machined
+  // cylinder on it. Sized off the tube so it stays in proportion at both
+  // scales, with a floor off armLen so it doesn't vanish on the preview card.
+  // Keep the stub SHORT: set further back the weight reads as a lollipop.
+  const stubLen = L * 0.10;
+  const cwW = Math.max(armW * 3.4, L * 0.09);
+  const cwH = Math.max(armW * 2.1, L * 0.058);
+  const cwMid = stubLen + cwH * 0.5;
+
+  // Canvas — room for the bow, the headshell and the counterweight.
+  const minX = Math.min(S.x - headW * 0.8, -cwMid * 0.25 - cwW * 0.62) - armW;
+  const maxX = Math.max(J.x + armW, cwW * 0.62) + armW;
+  const minY = -(cwMid + cwH * 0.62 + armW);
+  const maxY = S.y + armW * 1.8;
+  const PX = -minX, PY = -minY;
+  const svgW = maxX - minX, svgH = maxY - minY;
+
+  const p = (q: { x: number; y: number }) => `${(PX + q.x).toFixed(2)} ${(PY + q.y).toFixed(2)}`;
+  const d1 = 0.40 * Math.hypot(J.x - A.x, J.y - A.y);
+  const d2 = 0.40 * Math.hypot(B.x - J.x, B.y - J.y);
+  const tube =
+    `M ${p(A)} ` +
+    `C ${p({ x: A.x + tA.x * d1, y: A.y + tA.y * d1 })} ${p({ x: J.x - tJ.x * d1, y: J.y - tJ.y * d1 })} ${p(J)} ` +
+    `C ${p({ x: J.x + tJ.x * d2, y: J.y + tJ.y * d2 })} ${p({ x: B.x - tB.x * d2, y: B.y - tB.y * d2 })} ${p(B)}`;
+
+  // Headshell — drawn straight down from the collar, then swung onto its axis.
+  // It is a WEDGE: narrow where it bolts to the tube, widening to the
+  // cartridge face. A shell barely wider than the tube reads as a blob.
+  const bx = PX + B.x, by = PY + B.y;
+  const headRot = `rotate(${-ARM_HEAD_A} ${bx.toFixed(2)} ${by.toFixed(2)})`;
+  const shellTop = by + armW * 0.50;
+  const shellBot = by + headLen * 0.71;
+  const wTop = armW * 1.15, wBot = headW;
+  /** Half-width of the shell a fraction f down its length. */
+  const edge = (f: number) => (wTop + (wBot - wTop) * f) / 2;
+  const yAt  = (f: number) => shellTop + (shellBot - shellTop) * f;
+  const shellPath =
+    `M ${bx - wTop / 2} ${shellTop} L ${bx + wTop / 2} ${shellTop} ` +
+    `L ${bx + wBot / 2} ${shellBot} L ${bx - wBot / 2} ${shellBot} Z`;
+  const cartTop = shellBot;
+  const cartBot = by + headLen * 0.90;
+  const cartW   = wBot * 0.52;
+  // The cartridge tapers to a nose with the stylus at its point. A separate
+  // cantilever line plus a dot just reads as a little "T" hung off the end.
+  const cartPath =
+    `M ${bx - cartW / 2} ${cartTop} L ${bx + cartW / 2} ${cartTop} ` +
+    `L ${bx + cartW * 0.32} ${cartBot} L ${bx - cartW * 0.32} ${cartBot} Z`;
+  const styPath =
+    `M ${bx - cartW * 0.13} ${cartBot} L ${bx + cartW * 0.13} ${cartBot} ` +
+    `L ${bx} ${by + headLen} Z`;
+  // Finger lift — anchored ALONG the shell's real edge, not floating beside it,
+  // and TAPERED (the outer edge spans less than the attachment) so it reads as
+  // a lift rather than a grey rectangle stuck on the side.
+  const lfDX = wBot * 0.36, lfDY = armW * 0.34;
+  const liftPath =
+    `M ${bx + edge(0.54)} ${yAt(0.54)} L ${bx + edge(0.62) + lfDX} ${yAt(0.62) - lfDY} ` +
+    `L ${bx + edge(0.80) + lfDX} ${yAt(0.80) - lfDY} L ${bx + edge(0.88)} ${yAt(0.88)} Z`;
+  const screwR  = Math.max(1, headW * 0.075);
+  const slotH   = Math.max(1, armW * 0.20);
+
+  // Counterweight swings with the arm, so it lives in the same rotating Svg.
+  const cwRot = `rotate(${-ARM_A.a} ${PX.toFixed(2)} ${PY.toFixed(2)})`;
+
   return (
     <View pointerEvents="none" style={{ position: 'absolute', top: pivotY, left: pivotX - armW / 2 }}>
-      {/* Whole arm (shadow + shaft + headshell + counterweight) rotates about the pivot */}
+      {/* Whole arm (shadow + tube + headshell + counterweight) rotates about the pivot */}
       <Animated.View style={{
         width: armW, height: armLen,
         transform: [
@@ -252,41 +348,74 @@ function Tonearm({
       }}>
         <Svg
           width={svgW} height={svgH}
-          style={{ position: 'absolute', top: -(TOP + 8), left: armW / 2 - scx }}
+          style={{ position: 'absolute', top: -PY, left: armW / 2 - PX }}
         >
-          {/* Drop shadow — offset dark clone of shaft and headshell */}
-          <G transform="translate(3,5)" opacity={0.4}>
-            <Path d={armPath} stroke="#000" strokeWidth={armW} fill="none" strokeLinecap="round" />
-            <G transform={`rotate(${HEAD_TILT} ${ex} ${eyy})`}>
-              <SvgRect x={ex - headW / 2} y={eyy - 2} width={headW} height={headH} rx={3.5} fill="#000" />
+          {/* Drop shadow — the tube and the shell, offset and darkened */}
+          <G transform={`translate(${(armW * 0.34).toFixed(2)},${(armW * 0.56).toFixed(2)})`} opacity={0.42}>
+            <Path d={tube} stroke="#000" strokeWidth={armW * 1.05} fill="none" strokeLinecap="round" />
+            <G transform={headRot}>
+              <Path d={shellPath} fill="#000" />
+              <Path d={cartPath} fill="#000" />
             </G>
           </G>
-          {/* Counterweight — knurled cylinder behind the pivot */}
-          <SvgRect x={scx - cwW / 2} y={2} width={cwW} height={cwH} rx={cwH * 0.3} fill="#202024" stroke="#3a3a40" strokeWidth={1} />
-          <SvgRect x={scx - cwW / 2} y={2 + cwH * 0.42} width={cwW} height={cwH * 0.2} fill="#4a4a52" />
-          {[-0.32, -0.11, 0.11, 0.32].map((f, i) => (
-            <Path key={i} d={`M ${scx + cwW * f} 2 V ${2 + cwH}`} stroke="#333338" strokeWidth={1.3} />
-          ))}
-          {/* Shaft — brushed silver: dark edge, bright core, hot stripe */}
-          <Path d={armPath} stroke="#84848E" strokeWidth={armW} fill="none" strokeLinecap="round" />
-          <Path d={armPath} stroke="#E8E8EE" strokeWidth={innerW} fill="none" strokeLinecap="round" />
-          <Path d={armPath} stroke="rgba(255,255,255,0.85)" strokeWidth={Math.max(1, armW * 0.16)} fill="none" strokeLinecap="round" transform="translate(-1.5,0)" />
-          {/* Headshell — graphite cartridge: silver mount band, screws, vents, stylus */}
-          <G transform={`rotate(${HEAD_TILT} ${ex} ${eyy})`}>
-            <SvgRect x={ex - headW / 2} y={eyy - 2} width={headW} height={headH} rx={3.5} fill="#26262c" stroke="#0e0e12" strokeWidth={1} />
-            <SvgRect x={ex - headW / 2} y={eyy - 2} width={headW} height={bandH * 1.4} rx={3} fill="#9C9CA6" />
-            <SvgCircle cx={ex - headW / 2 + headW * 0.24} cy={eyy + headH * 0.34} r={screwR} fill="#8A8A94" />
-            <SvgCircle cx={ex + headW / 2 - headW * 0.24} cy={eyy + headH * 0.34} r={screwR} fill="#8A8A94" />
-            <SvgRect x={ex - headW / 2 + headW * 0.18} y={eyy + headH * 0.48} width={headW * 0.64} height={bandH} rx={bandH / 2} fill="#111116" />
-            <SvgRect x={ex - headW / 2 + headW * 0.18} y={eyy + headH * 0.66} width={headW * 0.64} height={bandH} rx={bandH / 2} fill="#111116" />
-            <SvgRect x={ex - headW * 0.16} y={eyy + headH - 4} width={headW * 0.32} height={6} rx={1} fill="#B9B9C2" />
-            <Path d={`M ${ex} ${eyy + headH + 2} l ${headW * 0.11} ${headH * 0.2} l ${-headW * 0.22} 0 Z`} fill="#FFF" />
+
+          {/* Counterweight — stub, adjustment collar, machined cylinder */}
+          <G transform={cwRot}>
+            <SvgRect x={PX - armW * 0.33} y={PY - stubLen} width={armW * 0.66} height={stubLen + armW * 0.4} rx={armW * 0.3} fill="#5b5e69" />
+            <SvgRect x={PX - armW * 0.24} y={PY - stubLen + armW * 0.1} width={armW * 0.17} height={stubLen - armW * 0.2} rx={armW * 0.08} fill="rgba(255,255,255,0.5)" />
+            <SvgRect x={PX - armW * 0.66} y={PY - stubLen * 0.46} width={armW * 1.32} height={armW * 0.46} rx={armW * 0.16} fill="#3a3c45" />
+            {/* Cylinder */}
+            <SvgRect x={PX - cwW / 2} y={PY - cwMid - cwH / 2} width={cwW} height={cwH} rx={cwH * 0.34} fill="#25262d" stroke="#4a4d58" strokeWidth={1} />
+            <SvgRect x={PX - cwW / 2} y={PY - cwMid - cwH / 2} width={cwW} height={cwH * 0.19} rx={cwH * 0.16} fill="#34363f" />
+            <SvgRect x={PX - cwW / 2} y={PY - cwMid - cwH * 0.07} width={cwW} height={cwH * 0.13} fill="#7d818d" />
+            {[-0.30, -0.20, 0.22, 0.32].map((f, i) => (
+              <SvgRect key={i} x={PX - cwW / 2} y={PY - cwMid + cwH * f} width={cwW} height={Math.max(0.7, cwH * 0.045)} fill="rgba(0,0,0,0.42)" />
+            ))}
+            <SvgRect x={PX - cwW * 0.37} y={PY - cwMid - cwH * 0.34} width={cwW * 0.12} height={cwH * 0.68} rx={cwW * 0.06} fill="rgba(255,255,255,0.16)" />
+          </G>
+
+          {/* Tube — a round chrome pipe: outline, body, inner light, hot hairline */}
+          <Path d={tube} stroke="#3c3e47" strokeWidth={armW + Math.max(1.2, armW * 0.18)} fill="none" strokeLinecap="round" />
+          <Path d={tube} stroke="#8a8d99" strokeWidth={armW} fill="none" strokeLinecap="round" />
+          <Path d={tube} stroke="#c9ccd6" strokeWidth={armW * 0.5} fill="none" strokeLinecap="round" transform={`translate(${(-armW * 0.13).toFixed(2)},0)`} />
+          <Path d={tube} stroke="rgba(255,255,255,0.9)" strokeWidth={Math.max(0.9, armW * 0.15)} fill="none" strokeLinecap="round" transform={`translate(${(-armW * 0.27).toFixed(2)},0)`} />
+
+          {/* Headshell — collar, graphite shell, slots, screws, finger lift, cartridge */}
+          <G transform={headRot}>
+            {/* Collar / bayonet coupling */}
+            <SvgRect x={bx - armW * 0.86} y={by - armW * 0.6} width={armW * 1.72} height={armW * 1.2} rx={armW * 0.34} fill="#9aa0ad" stroke="#4a4d57" strokeWidth={0.8} />
+            <SvgRect x={bx - armW * 0.86} y={by - armW * 0.06} width={armW * 1.72} height={armW * 0.22} fill="rgba(0,0,0,0.38)" />
+            {/* Finger lift — under the shell so it reads as bolted on */}
+            <Path d={liftPath} fill="#7f8592" stroke="#3d404a" strokeWidth={0.7} />
+            {/* Shell body */}
+            <Path d={shellPath} fill="#23252c" stroke="#0c0d11" strokeWidth={1} />
+            <Path
+              d={`M ${bx - wTop / 2} ${shellTop} L ${bx - wTop * 0.10} ${shellTop} L ${bx - wBot * 0.12} ${shellBot} L ${bx - wBot / 2} ${shellBot} Z`}
+              fill="rgba(255,255,255,0.10)"
+            />
+            {/* Mount band under the collar */}
+            <SvgRect x={bx - wTop * 0.72} y={shellTop - armW * 0.06} width={wTop * 1.44} height={armW * 0.42} rx={armW * 0.14} fill="#a7adba" />
+            {/* Vent slots */}
+            {[0.38, 0.58].map((f, i) => {
+              const w = wBot * 0.40;
+              return <SvgRect key={i} x={bx - w / 2} y={yAt(f)} width={w} height={slotH} rx={slotH / 2} fill="#0d0e12" />;
+            })}
+            {/* Cartridge mounting screws */}
+            <SvgCircle cx={bx - wBot * 0.30} cy={shellBot - armW * 0.5} r={screwR} fill="#8d93a0" />
+            <SvgCircle cx={bx + wBot * 0.30} cy={shellBot - armW * 0.5} r={screwR} fill="#8d93a0" />
+            {/* The shell's front FACE, then the cartridge nose below it. Without
+                the bright face the shell and the cartridge merge into one long
+                dark wedge and only the needle reads. */}
+            <Path d={cartPath} fill="#191b21" stroke="#0a0b0e" strokeWidth={0.8} />
+            <SvgRect x={bx - wBot * 0.5} y={shellBot - Math.max(1, armW * 0.3)} width={wBot} height={Math.max(1, armW * 0.3)} fill="#aeb4c1" />
+            <SvgRect x={bx - cartW * 0.34} y={cartTop + armW * 0.26} width={cartW * 0.2} height={(cartBot - cartTop) * 0.46} rx={armW * 0.07} fill="rgba(255,255,255,0.18)" />
+            <Path d={styPath} fill="#e9edf5" />
           </G>
         </Svg>
       </Animated.View>
 
-      {/* Pivot base — fixed round plate with screws, bearing and anti-skate
-          dial (does not swing with the arm) */}
+      {/* Pivot base — fixed round plate with vents, screws, bearing and
+          anti-skate dial (does not swing with the arm) */}
       {(() => {
         const R = Math.max(11, armW * 1.7);
         const dialR = Math.max(3.5, R * 0.32);
@@ -298,17 +427,31 @@ function Tonearm({
             style={{ position: 'absolute', top: -R, left: armW / 2 - R, zIndex: 10 }}
             pointerEvents="none"
           >
-            <SvgCircle cx={bcx} cy={R} r={R} fill="#232327" stroke="#3d3d44" strokeWidth={1.5} />
+            <SvgCircle cx={bcx} cy={R} r={R} fill="#212228" stroke="#3f414a" strokeWidth={1.5} />
+            <SvgCircle cx={bcx} cy={R} r={R * 0.84} fill="none" stroke="#585b66" strokeWidth={Math.max(0.9, R * 0.07)} />
+            {/* Radial vents around the bearing */}
+            {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
+              const t = (deg * Math.PI) / 180;
+              const c = Math.cos(t), s = Math.sin(t);
+              return (
+                <Path
+                  key={deg}
+                  d={`M ${bcx + c * R * 0.56} ${R + s * R * 0.56} L ${bcx + c * R * 0.74} ${R + s * R * 0.74}`}
+                  stroke="rgba(0,0,0,0.5)" strokeWidth={Math.max(0.8, R * 0.09)} strokeLinecap="round"
+                />
+              );
+            })}
             {[[-0.52, -0.42], [0.52, -0.42], [-0.52, 0.42], [0.52, 0.42]].map(([fx, fy], i) => (
               <SvgCircle key={i} cx={bcx + R * fx} cy={R + R * fy} r={Math.max(1.2, R * 0.1)} fill="#6E6E78" />
             ))}
             {/* Anti-skate dial off the plate's shoulder */}
             <SvgCircle cx={bcx + R + dialR + 2} cy={R + R * 0.24} r={dialR} fill="#33333a" stroke="#55555e" strokeWidth={1.2} />
             <Path d={`M ${bcx + R + dialR + 2} ${R + R * 0.24 - dialR + 1.5} V ${R + R * 0.24}`} stroke="#9C9CA6" strokeWidth={1.3} />
-            {/* Bearing housing + spindle cap with a glint */}
-            <SvgCircle cx={bcx} cy={R} r={R * 0.5} fill="#2e2e34" stroke="#4a4a52" strokeWidth={1} />
-            <SvgCircle cx={bcx} cy={R} r={R * 0.24} fill="#55555e" />
-            <SvgCircle cx={bcx - R * 0.08} cy={R - R * 0.08} r={Math.max(1, R * 0.08)} fill="#8A8A94" />
+            {/* Bearing housing + centre screw with a glint */}
+            <SvgCircle cx={bcx} cy={R} r={R * 0.46} fill="#2c2e35" stroke="#4d505b" strokeWidth={1} />
+            <SvgCircle cx={bcx} cy={R} r={R * 0.22} fill="#5c5f6a" />
+            <Path d={`M ${bcx - R * 0.16} ${R} H ${bcx + R * 0.16}`} stroke="#26272d" strokeWidth={Math.max(0.8, R * 0.06)} />
+            <SvgCircle cx={bcx - R * 0.30} cy={R - R * 0.30} r={Math.max(1, R * 0.09)} fill="#9AA0AC" />
           </Svg>
         );
       })()}
@@ -343,8 +486,7 @@ function TurntableHero({
   const recSize  = platSize * 0.865;
   const armLen   = platSize * 0.70;
   const armW     = 10;
-  const headW    = 20;
-  const headH    = 26;
+  const headW    = 26;
   const pivotX   = platSize * 0.935;
   const pivotY   = platSize * 0.048;
   // 0 = parked clear of the record (negative swings right, off the platter),
@@ -438,7 +580,7 @@ function TurntableHero({
       })()}
       {/* Floating music notes */}
       <FloatingNotes playing={playing} emitter="ring" ringRadius={recSize / 2} scrubbing={scrubbing} scrubDir={scrubDir} color={accent} />
-      <Tonearm armLen={armLen} armW={armW} headW={headW} headH={headH} pivotX={pivotX} pivotY={pivotY} rotation={armRot} />
+      <Tonearm armLen={armLen} armW={armW} headW={headW} pivotX={pivotX} pivotY={pivotY} rotation={armRot} />
     </View>
   );
 }
@@ -1305,7 +1447,7 @@ export function VinylModePreview() {
           <VinylDisc size={PV_RECORD} spin={staticRotate} showLabel />
         </Animated.View>
         {/* Tonearm — positioned in same container but outside spinning view */}
-        <Tonearm armLen={PV_ARM_LEN} armW={2.5} headW={9} headH={13} pivotX={PV_PIVOT_X} pivotY={PV_PIVOT_Y} rotation={armRot} />
+        <Tonearm armLen={PV_ARM_LEN} armW={3} headW={13} pivotX={PV_PIVOT_X} pivotY={PV_PIVOT_Y} rotation={armRot} />
       </View>
 
       <VinylFullscreen visible={modalOpen} onClose={handleModalClose} />

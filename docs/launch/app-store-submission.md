@@ -7,6 +7,67 @@ fast-follow update.
 
 ---
 
+## RESUBMISSION after the 29 July rejection — do this first
+
+Apple rejected build 7 under **Guideline 2.5.4** because the app claimed it
+could play audio in the background. That was fair: Cruise FM never plays
+audio itself, Spotify does. The claim came from a leftover library
+(`expo-audio`), which was removed on 29 July. Verified again on 2 August —
+the built app now declares no background audio and no microphone permission.
+
+**Nothing in the code needs changing.** The rejection was about something
+baked into the app file, so it cannot be sent over the air — it just needs a
+new build. Everything you have been testing on your phone all week is
+already the fixed version.
+
+### On the Mac
+
+```
+cd ~/CruiseFM                                  # wherever you cloned it
+git checkout claude/cruise-fm-v4wk5f           # NOT main — main is behind
+git pull origin claude/cruise-fm-v4wk5f
+npx eas-cli build -p ios --profile production
+```
+
+Answer **no** if it offers to commit anything. The build takes roughly 20–30
+minutes and you can close the laptop lid once it says it is queued. Do **not**
+change the version number — EAS increments the build number by itself.
+
+When it finishes:
+
+```
+npx eas-cli submit -p ios --profile production --latest
+```
+
+### In App Store Connect
+
+1. Open the rejected version → **select the new build** (it will be build 8
+   or higher; anything below that is the rejected one).
+2. In the **App Review** conversation, reply to the rejection with this:
+
+> Thank you for the review — you were correct. Cruise FM does not play audio
+> itself and should not have declared the background audio capability. The
+> declaration came from a third-party library that was no longer used by the
+> app; it has been removed entirely and this build declares no
+> UIBackgroundModes at all. Music playback is performed by the user's own
+> music app, which Cruise FM optionally controls while in the foreground.
+
+3. **Submit to App Review.** Keep **Manually release this version** so you
+   still choose the go-live moment.
+
+### After you submit
+
+- Your phone is unaffected — it stays on the preview channel and keeps
+  receiving updates, so polish work can continue while review runs. You do
+  **not** need a second build tonight.
+- Do **not** publish to the *production* channel while the app is in review;
+  that counts as changing the app mid-review. Preview updates are safe.
+- If it sits more than two days, request an expedited review at
+  developer.apple.com/contact/app-store/?topic=expedite, citing first-launch
+  timing. Do **not** cancel and resubmit — that loses your place in the queue.
+
+---
+
 ## 0. Before the form: host the website (one-time, ~10 min)
 
 Apple requires a live **Privacy Policy URL** and a **Support URL**. The pages

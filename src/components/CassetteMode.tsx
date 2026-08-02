@@ -313,28 +313,45 @@ const VB_H = 210;
 const LX = 118, RX = 224, RY = 118;
 const PACK_BASE = 104;
 
-// Reel hub: station-coloured flange, pale centre, dark drive teeth.
+/**
+ * The reel hub, redrawn off the owner's close-up (02.08: "the inner tape
+ * circles with the teeth look sort of cheap. Realistically they're not shaped
+ * like that").
+ *
+ * They weren't: the old one was spokes RADIATING OUTWARD from a glowing
+ * centre, which reads as an asterisk. A real cassette hub is the opposite —
+ * a white plastic ring with a dark spindle hole punched through it, and six
+ * square teeth projecting INWARD from the ring into that hole, which is what
+ * the deck's spindle grips. The teeth are hub, not gaps.
+ */
 function ReelHub({ size, color }: { size: number; color: string }) {
-  const teeth = [0, 45, 90, 135, 180, 225, 270, 315];
+  const teeth = [0, 60, 120, 180, 240, 300];
+  const HUB = '#eef2fb';
   return (
     <Svg width={size} height={size} viewBox="-24 -24 48 48">
-      <SvgCircle cx={0} cy={0} r={19} fill={color} />
-      <SvgCircle cx={0} cy={0} r={19} fill="none" stroke="#ffffff" strokeOpacity={0.40} strokeWidth={1} />
+      {/* Clear flange, tinted by the station — the mood colour lives here */}
+      <SvgCircle cx={0} cy={0} r={19} fill={color} fillOpacity={0.34} />
+      <SvgCircle cx={0} cy={0} r={19} fill="none" stroke="#ffffff" strokeOpacity={0.34} strokeWidth={1} />
       {/* one bright arc so the flange reads as moulded, not printed */}
-      <SvgPath d="M -13 -13 A 19 19 0 0 1 6 -18" fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={2} strokeLinecap="round" />
-      <SvgCircle cx={0} cy={0} r={10.5} fill="#f2f5ff" fillOpacity={0.92} />
-      {teeth.map((deg) => {
-        const a = (deg * Math.PI) / 180;
-        return (
-          <SvgLine
-            key={deg}
-            x1={Math.cos(a) * 9} y1={Math.sin(a) * 9}
-            x2={Math.cos(a) * 15.5} y2={Math.sin(a) * 15.5}
-            stroke="#0a0c14" strokeOpacity={0.75} strokeWidth={4.4} strokeLinecap="round"
-          />
-        );
-      })}
-      <SvgCircle cx={0} cy={0} r={6.4} fill="#05070e" />
+      <SvgPath d="M -13 -13 A 19 19 0 0 1 6 -18" fill="none" stroke="#ffffff" strokeOpacity={0.5} strokeWidth={1.8} strokeLinecap="round" />
+
+      {/* White hub, with its moulding ring */}
+      <SvgCircle cx={0} cy={0} r={14.5} fill={HUB} fillOpacity={0.92} />
+      <SvgCircle cx={0} cy={0} r={14.5} fill="none" stroke="#05070e" strokeOpacity={0.20} strokeWidth={0.8} />
+      <SvgCircle cx={0} cy={0} r={11.6} fill="none" stroke="#05070e" strokeOpacity={0.13} strokeWidth={0.7} />
+
+      {/* The spindle hole, then the teeth standing INTO it */}
+      <SvgCircle cx={0} cy={0} r={9.4} fill="#05070e" fillOpacity={0.94} />
+      {teeth.map((deg) => (
+        <SvgRect
+          key={deg}
+          x={-1.85} y={-9.9} width={3.7} height={5.4} rx={0.5}
+          fill={HUB} fillOpacity={0.94}
+          transform={`rotate(${deg})`}
+        />
+      ))}
+      <SvgCircle cx={0} cy={0} r={4.3} fill="#05070e" />
+      <SvgCircle cx={0} cy={0} r={9.4} fill="none" stroke="#ffffff" strokeOpacity={0.22} strokeWidth={0.6} />
     </Svg>
   );
 }
@@ -351,16 +368,6 @@ function Screw({ cx, cy, r = 4, angle = 0 }: { cx: number; cy: number; r?: numbe
       <SvgLine x1={cx - s * cos} y1={cy - s * sin} x2={cx + s * cos} y2={cy + s * sin} stroke="#ffffff" strokeOpacity={0.62} strokeWidth={1.2} strokeLinecap="round" />
       <SvgLine x1={cx + s * sin} y1={cy - s * cos} x2={cx - s * sin} y2={cy + s * cos} stroke="#ffffff" strokeOpacity={0.62} strokeWidth={1.2} strokeLinecap="round" />
     </>
-  );
-}
-
-function Sparkle({ cx, cy, s }: { cx: number; cy: number; s: number }) {
-  const k = s * 0.16;
-  return (
-    <SvgPath
-      d={`M ${cx} ${cy - s} Q ${cx + k} ${cy - k} ${cx + s} ${cy} Q ${cx + k} ${cy + k} ${cx} ${cy + s} Q ${cx - k} ${cy + k} ${cx - s} ${cy} Q ${cx - k} ${cy - k} ${cx} ${cy - s} Z`}
-      fill="#ffffff" fillOpacity={0.9}
-    />
   );
 }
 
@@ -491,15 +498,48 @@ function CassetteBody({
           <SvgCircle cx={43} cy={134} r={4.4} fill="none" stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
           <SvgCircle cx={43} cy={150} r={3} fill="none" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.9} />
           <SvgRect x={37} y={160} width={12} height={12} rx={2} fill={color} fillOpacity={0.55} />
-          {/* guide rollers */}
-          <SvgCircle cx={74} cy={168} r={4.6} fill="none" stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.2} />
-          <SvgCircle cx={268} cy={168} r={4.6} fill="none" stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.2} />
-          {/* bottom access door */}
-          <SvgPath d="M112 182 L228 182 L218 200 L122 200 Z" fill="#ffffff" fillOpacity={0.04} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1.2} />
-          <SvgCircle cx={136} cy={190} r={3.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.34} strokeWidth={1} />
-          <SvgRect x={152} y={186} width={15} height={9} rx={3} fill="#05070e" fillOpacity={0.45} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
-          <SvgRect x={174} y={186} width={15} height={9} rx={3} fill="#05070e" fillOpacity={0.45} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
-          <SvgCircle cx={204} cy={190} r={3.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.34} strokeWidth={1} />
+          {/* Guide rollers, on their posts */}
+          {[74, 268].map((gx) => (
+            <G key={`gr${gx}`}>
+              <SvgCircle cx={gx} cy={168} r={5.4} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.2} />
+              <SvgCircle cx={gx} cy={168} r={2.6} fill="none" stroke="#ffffff" strokeOpacity={0.30} strokeWidth={0.8} />
+              <SvgCircle cx={gx} cy={168} r={0.9} fill="#05070e" fillOpacity={0.6} />
+            </G>
+          ))}
+
+          {/* ── THE BOTTOM EDGE ──────────────────────────────────────────────
+              The end you actually hold, and the busiest part of a real shell
+              (owner, 02.08). Head window with the felt pressure pad on its
+              leaf spring, two pinch-roller openings with the rollers sitting
+              in them, two capstan holes, locating holes either side, and the
+              moulded lip running the full width. */}
+          <SvgRect x={14} y={195} width={312} height={7} rx={3.5} fill="#ffffff" fillOpacity={0.04} stroke="#ffffff" strokeOpacity={0.20} strokeWidth={0.8} />
+          <SvgPath d="M108 180 L232 180 L222 200 L118 200 Z" fill="#ffffff" fillOpacity={0.04} stroke="#ffffff" strokeOpacity={0.32} strokeWidth={1.2} />
+          {/* the shield behind the tape, and the tape itself crossing it */}
+          <SvgRect x={120} y={183} width={100} height={5} rx={1} fill="#ffffff" fillOpacity={0.07} stroke="#ffffff" strokeOpacity={0.18} strokeWidth={0.6} />
+          {/* pressure pad on its leaf spring */}
+          <SvgPath d="M158 197 L162 190 L178 190 L182 197" fill="none" stroke="#ffffff" strokeOpacity={0.28} strokeWidth={0.8} />
+          <SvgRect x={161} y={186} width={18} height={6} rx={1.4} fill="#05070e" fillOpacity={0.72} stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.7} />
+          {/* pinch-roller openings, with the rollers in them */}
+          {[[143, 1], [193, -1]].map(([px]) => (
+            <G key={`pr${px}`}>
+              <SvgRect x={px - 7.5} y={184} width={15} height={13} rx={3} fill="#05070e" fillOpacity={0.42} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
+              <SvgCircle cx={px} cy={190.5} r={4.4} fill="#ffffff" fillOpacity={0.06} stroke="#ffffff" strokeOpacity={0.34} strokeWidth={0.9} />
+              <SvgCircle cx={px} cy={190.5} r={1.5} fill="#05070e" fillOpacity={0.7} />
+            </G>
+          ))}
+          {/* capstan holes */}
+          {[128, 208].map((cxx) => (
+            <G key={`cp${cxx}`}>
+              <SvgCircle cx={cxx} cy={190} r={4} fill="#05070e" fillOpacity={0.55} stroke="#ffffff" strokeOpacity={0.36} strokeWidth={1} />
+              <SvgCircle cx={cxx} cy={190} r={1.7} fill="none" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.6} />
+            </G>
+          ))}
+          {/* locating holes either side of the window */}
+          <SvgCircle cx={92} cy={191} r={2.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={0.8} />
+          <SvgCircle cx={248} cy={191} r={2.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={0.8} />
+          {/* chamfer catching the light along the very bottom */}
+          <SvgPath d="M20 199.5 L320 199.5" stroke="#ffffff" strokeOpacity={0.16} strokeWidth={0.8} />
           {/* label — frosted, with the station colour as its spine */}
           <SvgRect x={30} y={24} width={280} height={40} rx={4} fill="url(#csLabel)" />
           <SvgRect x={30} y={24} width={280} height={13} rx={4} fill={color} fillOpacity={0.60} />
@@ -526,9 +566,6 @@ function CassetteBody({
         <Screw cx={26} cy={186} angle={57} />
         <Screw cx={314} cy={186} angle={-8} />
         <Screw cx={170} cy={16} r={2.8} angle={40} />
-        <Sparkle cx={330} cy={12} s={7} />
-        <Sparkle cx={12} cy={196} s={5} />
-        <Sparkle cx={322} cy={198} s={4} />
       </Svg>
     </View>
   );
@@ -856,7 +893,9 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const bottomPad = Math.max(insets.bottom, 24) + 24;
   // Landscape: the shell is the whole show — winH*0.72 was the OLD branch's
   // side-column size and reads small alone on a full screen.
-  const cassetteW = isLandscape ? Math.min(winH * 1.30, winW * 0.60) : winW * 0.92;
+  // Landscape had room left over: the deck docks at 0.86 scale beside the
+  // panel, so 1.30/0.60 was leaving a band of empty table on both sides.
+  const cassetteW = isLandscape ? Math.min(winH * 1.46, winW * 0.66) : winW * 0.92;
   const cassetteH = cassetteW * 0.62;
 
 

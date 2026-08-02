@@ -786,6 +786,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
           />
 
           <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
@@ -932,6 +933,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
             track={spotify.track}
             station={lockedStation}
           />

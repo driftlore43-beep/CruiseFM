@@ -164,7 +164,7 @@ export function LandscapeChrome({
   chrome, rested, station, track, playing, tagline,
   progress, scrub, seekBar,
   onPlayPause, onPrev, onNext, onClose,
-  onChangeMood, onPickPlaylist, playlistLabel,
+  onChangeMood, onPickPlaylist, playlistLabel, contextUri,
 }: {
   chrome: Animated.Value;
   rested: boolean;
@@ -185,6 +185,8 @@ export function LandscapeChrome({
   onChangeMood: () => void;
   onPickPlaylist: () => void;
   playlistLabel: string;
+  /** Passed straight through to the action row's song list. */
+  contextUri?: string | null;
 }) {
   const insets = useSafeAreaInsets();
   const day = useDaylight();
@@ -280,6 +282,7 @@ export function LandscapeChrome({
             onChangeMood={onChangeMood}
             onPickPlaylist={onPickPlaylist}
             playlistLabel={playlistLabel}
+            contextUri={contextUri}
             track={track}
             station={station}
             style={st.pillsOverride}

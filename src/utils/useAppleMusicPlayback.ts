@@ -117,6 +117,9 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
     connected,
     track,
     contextName,
+    // Apple's system player exposes no queue-source id — the in-drive song
+    // list is Spotify-only for now, and null is how it knows.
+    contextUri: null as string | null,
     shuffleOn,
     repeatMode,
     // Controls are optimistic: fire, then re-read so the display catches up.

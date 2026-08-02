@@ -1286,6 +1286,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
             track={spotify.track}
             station={station}
           />
@@ -1316,6 +1317,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
           />
         )}
 

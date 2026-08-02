@@ -462,6 +462,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
           />
 
           <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
@@ -645,6 +646,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
             track={spotify.track}
             station={currentStation}
           />

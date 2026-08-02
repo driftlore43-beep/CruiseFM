@@ -1002,6 +1002,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
           />
 
           <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
@@ -1141,6 +1142,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
             track={spotify.track}
             station={station}
           />

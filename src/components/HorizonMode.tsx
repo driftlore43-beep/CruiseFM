@@ -553,6 +553,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
             track={spotify.track}
             station={station}
           />
@@ -576,6 +577,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
           />
         )}
 

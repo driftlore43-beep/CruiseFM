@@ -20,6 +20,8 @@ export type RepeatMode = 'off' | 'context' | 'track';
 export type NowPlaying = {
   title: string;
   artist: string;
+  /** Spotify track uri — lets the in-drive song list mark the current row. */
+  uri?: string | null;
   /** Album cover URL (mid-size), null when Spotify doesn't provide one. */
   albumArt: string | null;
   /** Real track length from Spotify, null when unknown. */
@@ -48,6 +50,9 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
   // differ from the station's linked playlist — e.g. user picked another
   // one in Spotify). Null when unknown / not a playlist context.
   const [contextName, setContextName] = useState<string | null>(null);
+  // The playlist actually feeding the music, so the in-drive song list can
+  // show what is playing rather than whatever is merely linked to the station.
+  const [contextUri, setContextUri] = useState<string | null>(null);
   const lastCtxUriRef = useRef<string | null | undefined>(undefined);
   const cancelledRef = useRef(false);
   const refreshRef = useRef<() => void>(() => {});
@@ -101,6 +106,7 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
             title: item.name,
             artist: item.artists?.map((a: any) => a.name).join(', ') ?? '',
             // Spotify sorts images largest-first; [1] (~300px) suits the label.
+            uri: item.uri ?? null,
             albumArt: item.album?.images?.[1]?.url ?? item.album?.images?.[0]?.url ?? null,
             durationMs: item.duration_ms ?? null,
             progressMs: data.progress_ms ?? null,
@@ -118,6 +124,7 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
         const ctxUri: string | null = data?.context?.uri ?? null;
         if (ctxUri !== lastCtxUriRef.current) {
           lastCtxUriRef.current = ctxUri;
+          setContextUri(ctxUri);
           const m = /^spotify:playlist:([A-Za-z0-9]+)$/.exec(ctxUri ?? '');
           if (m) {
             getPlaylistName(m[1]).then((n) => { if (!cancelledRef.current && n) setContextName(n); }).catch(() => {});
@@ -176,6 +183,7 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
     connected,
     track,
     contextName,
+    contextUri,
     shuffleOn,
     repeatMode,
     // Only surface Spotify's verdict for users who actually connected it —

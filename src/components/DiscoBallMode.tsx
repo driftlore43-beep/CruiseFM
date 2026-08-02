@@ -1443,6 +1443,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
             track={spotify.track}
             station={station}
           />
@@ -1469,6 +1470,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
           />
         )}
 

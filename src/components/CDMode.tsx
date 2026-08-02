@@ -665,6 +665,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
             track={spotify.track}
             station={station}
           />
@@ -689,6 +690,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}
             playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
           />
         )}
 

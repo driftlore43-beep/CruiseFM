@@ -341,9 +341,14 @@ export type StartResult =
  * the caller should then open the Spotify app so it becomes a device — and
  * 'premium-required' when Spotify refuses remote control (free accounts).
  */
-export async function startPlayback(contextUri?: string): Promise<StartResult> {
+export async function startPlayback(
+  contextUri?: string,
+  /** Start partway into the context — the in-drive song list uses this to
+   *  begin at a chosen track without losing the playlist. */
+  offset?: { uri: string },
+): Promise<StartResult> {
   try {
-    return await startPlaybackInner(contextUri);
+    return await startPlaybackInner(contextUri, offset);
   } catch {
     // Timed out / offline mid-sequence — report error so the caller can
     // fall back (e.g. hand the playlist to the Spotify app) without waiting.
@@ -351,7 +356,7 @@ export async function startPlayback(contextUri?: string): Promise<StartResult> {
   }
 }
 
-async function startPlaybackInner(contextUri?: string): Promise<StartResult> {
+async function startPlaybackInner(contextUri?: string, offset?: { uri: string }): Promise<StartResult> {
   const token = await getAccessToken();
   if (!token) return 'error';
 
@@ -359,7 +364,9 @@ async function startPlaybackInner(contextUri?: string): Promise<StartResult> {
     'Authorization': `Bearer ${token}`,
     'Content-Type':  'application/json',
   };
-  const body = contextUri ? JSON.stringify({ context_uri: contextUri }) : undefined;
+  const body = contextUri
+    ? JSON.stringify(offset ? { context_uri: contextUri, offset } : { context_uri: contextUri })
+    : undefined;
   const attempt = (query = '') =>
     timedFetch(`https://api.spotify.com/v1/me/player/play${query}`, { method: 'PUT', headers, body });
 
@@ -429,6 +436,51 @@ export async function skipPrev() {
 
 export async function getCurrentTrack() {
   return spotifyFetch('/me/player/currently-playing');
+}
+
+/** One row of a playlist, for the in-drive song list. */
+export type PlaylistTrack = {
+  uri: string;
+  title: string;
+  artist: string;
+  durationMs: number;
+};
+
+/**
+ * The songs in a playlist, so a drive can jump straight to one instead of
+ * skipping there or hopping out to Spotify (owner, 03.08).
+ *
+ * Capped at 100 — Spotify's own page size, and a list you thumb through at
+ * the wheel has no business being longer. Local tracks and podcast episodes
+ * come back with a null uri and are dropped: neither can be started with the
+ * play call below.
+ */
+export async function getPlaylistTracks(playlistId: string): Promise<PlaylistTrack[]> {
+  const data = await spotifyFetch(
+    `/playlists/${playlistId}/tracks?limit=100&fields=items(track(uri,name,duration_ms,artists(name)))`,
+  );
+  const items: any[] = data?.items ?? [];
+  return items
+    .map((it) => it?.track)
+    .filter((t) => t?.uri && !t.is_local)
+    .map((t) => ({
+      uri: t.uri as string,
+      title: (t.name as string) ?? '',
+      artist: (t.artists ?? []).map((a: any) => a?.name).filter(Boolean).join(', '),
+      durationMs: (t.duration_ms as number) ?? 0,
+    }));
+}
+
+/**
+ * Start a specific song WITHIN its playlist.
+ *
+ * The `offset` is what keeps the context: play the track on its own and
+ * Spotify forgets the playlist, so the next/back buttons stop walking it and
+ * the "playing from" pill empties. Reuses startPlayback's device-waking
+ * sequence, because the phone's Spotify dozes off just as readily here.
+ */
+export async function playTrackInContext(contextUri: string, trackUri: string): Promise<StartResult> {
+  return startPlayback(contextUri, { uri: trackUri });
 }
 
 export async function getUserPlaylists() {

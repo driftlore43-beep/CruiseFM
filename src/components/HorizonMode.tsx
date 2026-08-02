@@ -14,6 +14,7 @@ import { ModeSheet } from '@/components/ModeSheet';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { mixHex } from '@/components/GlassPane';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
@@ -56,11 +57,35 @@ const STARS = Array.from({ length: 22 }, (_, i) => {
   };
 });
 
-// Slat cuts across the lower half of the sun — the classic outrun look.
-const SUN_CUTS = Array.from({ length: 6 }, (_, i) => {
-  const y = SUN_CY + 6 + i * (10 + i * 1.6);
-  return { y, h: 2.2 + i * 0.9 };
-});
+/** Slats through the sun's lower half. See `sunCuts` — this is the count. */
+const SUN_SLATS = 7;
+
+/**
+ * The sun's own gradient, DERIVED rather than taken straight from the
+ * station's three eq stops.
+ *
+ * WHY (owner screenshot, 03.08 — "the sun is a flat red shape"): a station's
+ * ramp is tuned for equalizer bars and mirror facets, and several of them have
+ * almost no internal contrast at all. After Hours is #FF4444 / #FF1111 /
+ * #FF0000 — three near-identical reds — and Mountain Pass is three whites. Fed
+ * straight into the sun that paints a flat disc, whatever the station.
+ *
+ * So the ramp is rebuilt: a hot near-white top, the station's own three stops
+ * through the middle, and a deep bottom. Deepening goes toward a very dark
+ * INDIGO rather than black — pure black flattens into a silhouette, and the
+ * cool bias is what keeps a white station reading as ice instead of dirt.
+ */
+const SUN_TOP = '#FFFFFF';
+const SUN_DEEP = '#140F2A';
+function sunRamp(eq: [string, string, string]) {
+  return [
+    { o: 0,    c: mixHex(eq[0], SUN_TOP, 0.62) },
+    { o: 0.22, c: mixHex(eq[0], SUN_TOP, 0.18) },
+    { o: 0.5,  c: eq[1] },
+    { o: 0.78, c: eq[2] },
+    { o: 1,    c: mixHex(eq[2], SUN_DEEP, 0.55) },
+  ];
+}
 
 // ── Aspect-aware geometry ────────────────────────────────────────────────────
 // The scene was drawn in a portrait viewBox; "slice"-cropping that into a
@@ -92,11 +117,36 @@ function makeGeom(W: number, H: number): HzGeom {
         o: 0.18 + Math.abs(Math.sin(i * 7.7)) * 0.4,
       };
     }),
-    cuts: Array.from({ length: 6 }, (_, i) => ({
-      y: SUN_CY2 + 6 * s + i * (10 + i * 1.6) * s,
-      h: (2.2 + i * 0.9) * s,
-    })),
+    cuts: sunCuts(SUN_CY2, SUN_R2, HORIZON),
   };
+}
+
+/**
+ * The slats, spread across the sun's VISIBLE lower half and thickening
+ * downward so it dissolves into the horizon.
+ *
+ * The old set was spaced in flat viewBox units from the sun's centre, which
+ * ignored two things: the sun is masked at the horizon, so only its top ~70%
+ * is ever on screen, and the whole slatted band is therefore just 0.42 of a
+ * radius tall. Three of the six cuts landed underneath the horizon and were
+ * never drawn at all — which is why the owner's screenshot shows a solid dome
+ * with a couple of thin slots near the bottom instead of the outrun look.
+ * Everything here is a fraction of the sun's radius, so it holds at any size.
+ */
+function sunCuts(cy: number, r: number, horizon: number) {
+  // Start from the middle of the VISIBLE disc, not from the sun's own centre:
+  // the centre sits only 0.42 of a radius above the horizon, so "from the
+  // centre down" is the bottom third of what you can actually see, and the
+  // slats bunch into a stripe (first render of this round).
+  const top = cy - r * 0.36;
+  const bot = horizon - r * 0.05;         // last full slat before the horizon
+  return Array.from({ length: SUN_SLATS }, (_, i) => {
+    const f = i / (SUN_SLATS - 1);
+    return {
+      y: top + Math.pow(f, 1.25) * (bot - top),
+      h: r * (0.022 + 0.075 * Math.pow(f, 1.5)),
+    };
+  });
 }
 
 const GEOM_PORTRAIT = makeGeom(VB_W, VB_H);
@@ -114,14 +164,19 @@ function HorizonScene({ phase, amp, eq, geom = GEOM_PORTRAIT }: { phase: number;
   // with `slice` cropping that would crop the scene for the OLD screen.
   const { width: winW, height: winH } = useWindowDimensions();
   const g = geom;
+  const ramp = useMemo(() => sunRamp(eq), [eq]);
   // Rolling grid: each line loops from the horizon toward the viewer,
   // accelerating as it approaches (q^2.2 ≈ perspective).
   const speed = 0.16 + amp * 0.14;
   const lines = Array.from({ length: H_LINES }, (_, i) => {
     const q = ((i / H_LINES + phase * speed) % 1 + 1) % 1;
+    // Fade back out in the near foreground, where the song title and the
+    // transport row sit. The lines are widest there (perspective) so they
+    // read as travelling even at a fraction of the brightness.
+    const near = Math.max(0, (q - 0.34) / 0.66);
     return {
       y: g.HORIZON + Math.pow(q, 2.2) * (g.H - g.HORIZON),
-      o: Math.min(1, q * 2.4) * 0.75,
+      o: Math.min(1, q * 2.4) * 0.75 * (1 - near * near * 0.86),
       w: 0.6 + q * 2.2,
     };
   });
@@ -139,14 +194,42 @@ function HorizonScene({ phase, amp, eq, geom = GEOM_PORTRAIT }: { phase: number;
     <Svg width={winW} height={winH} viewBox={`0 0 ${g.W} ${g.H}`} preserveAspectRatio="xMidYMid slice">
       <Defs>
         <SvgGradient id="hzSun" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={eq[0]} />
-          <Stop offset="0.55" stopColor={eq[1]} />
-          <Stop offset="1" stopColor={eq[2]} />
+          {ramp.map((s) => <Stop key={s.o} offset={s.o} stopColor={s.c} />)}
         </SvgGradient>
+        {/* Two-stage bloom: a tight hot core plus a wide soft haze. One
+            gradient can't do both — widen it and the core washes out, tighten
+            it and the sun sits on the sky with a hard edge. */}
         <RadialGradient id="hzSunGlow" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
-          <Stop offset="0" stopColor={eq[1]} stopOpacity="0.35" />
+          <Stop offset="0" stopColor={ramp[1].c} stopOpacity="0.55" />
+          <Stop offset="0.45" stopColor={eq[1]} stopOpacity="0.22" />
           <Stop offset="1" stopColor={eq[1]} stopOpacity="0" />
         </RadialGradient>
+        <RadialGradient id="hzSunHaze" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
+          <Stop offset="0" stopColor={eq[1]} stopOpacity="0.20" />
+          <Stop offset="1" stopColor={eq[1]} stopOpacity="0" />
+        </RadialGradient>
+        {/* The sky warms toward the horizon instead of staying dead black,
+            and the sun's light spills down the grid the way it would on a
+            wet road. Both fade to nothing at their far edge — a band with a
+            visible boundary just reads as a drawn rectangle. */}
+        <SvgGradient id="hzSky" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={eq[2]} stopOpacity="0" />
+          <Stop offset="0.62" stopColor={eq[1]} stopOpacity="0.05" />
+          <Stop offset="1" stopColor={ramp[1].c} stopOpacity="0.16" />
+        </SvgGradient>
+        <RadialGradient id="hzSpill" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
+          <Stop offset="0" stopColor={ramp[1].c} stopOpacity="0.30" />
+          <Stop offset="1" stopColor={eq[1]} stopOpacity="0" />
+        </RadialGradient>
+        {/* The grid fades into the foreground. Without this the lines are at
+            their BRIGHTEST exactly where the song title and the transport sit
+            — `o` grows with `q`, which is right for perspective and wrong for
+            legibility. userSpaceOnUse so one gradient serves every ray. */}
+        <SvgGradient id="hzRay" x1="0" y1={g.HORIZON} x2="0" y2={g.H} gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor={eq[1]} stopOpacity="0.34" />
+          <Stop offset="0.45" stopColor={eq[1]} stopOpacity="0.26" />
+          <Stop offset="1" stopColor={eq[1]} stopOpacity="0.04" />
+        </SvgGradient>
         <Mask id="hzSunMask">
           <Rect x="0" y="0" width={g.W} height={g.H} fill="#000" />
           {/* Visible only above the horizon */}
@@ -158,14 +241,27 @@ function HorizonScene({ phase, amp, eq, geom = GEOM_PORTRAIT }: { phase: number;
         </Mask>
       </Defs>
 
+      {/* Sky warming down toward the horizon */}
+      <Rect x="0" y="0" width={g.W} height={g.HORIZON} fill="url(#hzSky)" />
+
       {/* Stars */}
       {g.stars.map((s, i) => (
         <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#ffffff" opacity={s.o} />
       ))}
 
-      {/* Sun halo + slatted sun */}
-      <Ellipse cx={g.SUN_CX} cy={g.SUN_CY} rx={g.SUN_R * 2.1} ry={g.SUN_R * 1.7} fill="url(#hzSunGlow)" opacity={0.5 + amp * 0.5} />
+      {/* Sun: wide haze, tighter bloom, then the slatted disc */}
+      <Ellipse cx={g.SUN_CX} cy={g.SUN_CY} rx={g.SUN_R * 3.4} ry={g.SUN_R * 2.6} fill="url(#hzSunHaze)" opacity={0.6 + amp * 0.4} />
+      <Ellipse cx={g.SUN_CX} cy={g.SUN_CY} rx={g.SUN_R * 1.9} ry={g.SUN_R * 1.55} fill="url(#hzSunGlow)" opacity={0.5 + amp * 0.5} />
       <Circle cx={g.SUN_CX} cy={g.SUN_CY} r={g.SUN_R} fill="url(#hzSun)" mask="url(#hzSunMask)" />
+
+      {/* The sun's light spilling down the grid. An ELLIPSE, not a band: a
+          rectangle of glow has two hard vertical edges and on the first
+          render they showed as seams down the sides of the road. */}
+      <Ellipse
+        cx={g.SUN_CX} cy={g.HORIZON}
+        rx={g.SUN_R * 2.4} ry={(g.H - g.HORIZON) * 0.8}
+        fill="url(#hzSpill)"
+      />
 
       {/* Horizon line — bright accent edge */}
       <Rect x="0" y={g.HORIZON - 3} width={g.W} height={6} fill={eq[1]} opacity={0.16} />
@@ -177,7 +273,7 @@ function HorizonScene({ phase, amp, eq, geom = GEOM_PORTRAIT }: { phase: number;
           key={i}
           x1={g.SUN_CX} y1={g.HORIZON}
           x2={x} y2={g.H + 30}
-          stroke={eq[1]} strokeWidth={1} strokeOpacity={0.30}
+          stroke="url(#hzRay)" strokeWidth={1}
         />
       ))}
 
@@ -350,6 +446,28 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
             <HorizonScene phase={phase} amp={ampRef.current} eq={eq} geom={geomPortrait} />
           </View>
+        )}
+
+        {/* Scrim ABOVE the scene. The backdrop's own scrim (further up) sits
+            UNDER the scene, so it does nothing here — which is why the grid
+            was drawing straight across the song title, the seek bar and the
+            transport row (owner screenshot, 03.08). The scene deliberately
+            runs behind the controls (31.07), so this doesn't hide it: it
+            starts at nothing well above the type and only reaches full
+            strength at the very bottom, so the grid still recedes underneath
+            while the words sit on something solid. Fading to zero at the top
+            edge is load-bearing — any hard boundary reads as a drawn band. */}
+        {!isLandscape && (
+          <LinearGradient
+            colors={[
+              'rgba(4,5,14,0)', 'rgba(4,5,14,0.34)',
+              'rgba(4,5,14,0.70)', 'rgba(4,5,14,0.88)',
+            ]}
+            locations={[0, 0.36, 0.66, 1]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={{ position: 'absolute', left: 0, right: 0, top: '46%', bottom: 0 }}
+            pointerEvents="none"
+          />
         )}
 
         {!isLandscape && (

@@ -72,16 +72,12 @@ function buildFan(size: number): Wedge[] {
   const out: Wedge[] = [];
   for (let i = 0; i < N; i++) {
     const ang = (i / N) * Math.PI * 2;
-    // Never zero. `|cos|^3` bottomed out completely at the top and bottom of
-    // the disc, which is what the owner saw as dark areas cutting the rainbow
-    // (02.08). It still peaks left and right — a real disc's diffraction is
-    // brightest along the light's axis — but the sweep now runs unbroken all
-    // the way round.
-    const strength = 0.34 + 0.66 * Math.pow(Math.abs(Math.cos(ang)), 1.5);
+    const strength = Math.pow(Math.abs(Math.cos(ang)), 3.0);   // peaks left & right
+    if (strength < 0.04) continue;
     const d = `M ${cx} ${cy} L ${pt(ang - WIDTH / 2, R)} A ${R} ${R} 0 0 1 ${pt(ang + WIDTH / 2, R)} Z`;
     out.push({
       d, id: `cdIr${i}`, hue: SPECTRUM[i % SPECTRUM.length],
-      a: 0.165 * strength, b: 0.108 * strength, c: 0,
+      a: 0.20 * strength, b: 0.13 * strength, c: 0,
     });
   }
   return out;
@@ -213,8 +209,9 @@ function CDDisc({ size, spin, albumArt }: {
                 preserveAspectRatio="xMidYMid slice" opacity={0.60}
               />
               {/* pewter wash — etched into the disc rather than pasted on.
-                  Lightened along with the artwork: the disc should still read
-                  as etched, but the song deserves to be recognisable. */}
+                  Lightened along with the artwork (owner, 03.08: "so each song
+                  feels more personal") — the disc still reads as etched, but
+                  the record you're playing is recognisable. */}
               <Circle cx={R} cy={R} r={ART_OUT} fill="#9fb0d4" fillOpacity={0.09} />
             </G>
           )}
@@ -239,102 +236,52 @@ function CDDisc({ size, spin, albumArt }: {
   );
 }
 
-/**
- * The clear case, redrawn off the owner's reference photograph (02.08): a
- * SLIMLINE jewel case, not a plain rounded square.
- *
- * What makes it read as a real one is all moulding, not outline: generous
- * corner radii, a double wall with a tray wall inside it, an L-shaped rib
- * stiffening each corner, moulded lugs straddling the top and bottom edges,
- * and the hinge clip protruding from the left. Thickness is faked with PAIRED
- * strokes — a lit outer edge, a dark line just behind it, then a faint inner
- * highlight — which is what reads as plastic rather than a drawn rectangle.
- */
+/** The clear case. Thickness is faked with paired strokes — a lit outer edge,
+ *  a dark inner line just behind it, then a faint inner highlight — which is
+ *  what reads as moulded plastic rather than a drawn rectangle. */
 function JewelCase({ size, children }: { size: number; children: React.ReactNode }) {
   const dust = useMemo(() => Array.from({ length: 22 }, (_, i) => ({
     x: hash01(i * 2.7) * size, y: hash01(i * 5.9 + 3.1) * size,
     r: 0.3 + hash01(i * 8.2) * 0.6, op: 0.06 + hash01(i * 4.4) * 0.14,
   })), [size]);
-
-  // Everything is proportional so the case holds together at any size.
-  const P = size * 0.052;                 // body inset; the hinge lives in it
-  const W = size - P * 2;
-  const RX = size * 0.055;                // the reference's generous corners
-  const wall = Math.max(1.4, size * 0.004);
-  const brk = size * 0.085;               // corner rib arm length
-  const bIn = P + size * 0.030;           // rib inset from the body edge
-
-  const corners = [
-    [bIn, bIn, 1, 1], [size - bIn, bIn, -1, 1],
-    [bIn, size - bIn, 1, -1], [size - bIn, size - bIn, -1, -1],
-  ] as const;
-  // Moulded lugs straddling the top and bottom walls, as the reference shows.
-  const lugs = [0.28, 0.62];
-  const lugW = size * 0.11, lugH = size * 0.028;
-  const hingeY = size * 0.5, hingeH = size * 0.19, hingeW = size * 0.055;
-
+  const clips = [0.20, 0.5, 0.80];
+  const corners = [[20, 20, 1, 1], [size - 20, 20, -1, 1], [20, size - 20, 1, -1], [size - 20, size - 20, -1, -1]] as const;
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       {children}
       <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
         <Defs>
           <SvgLinearGradient id="cdCaseEdge" x1="0" y1="0" x2="0.9" y2="1">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.90" />
-            <Stop offset="28%" stopColor="#ffffff" stopOpacity="0.26" />
-            <Stop offset="60%" stopColor="#ffffff" stopOpacity="0.60" />
-            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.22" />
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.88" />
+            <Stop offset="28%" stopColor="#ffffff" stopOpacity="0.24" />
+            <Stop offset="60%" stopColor="#ffffff" stopOpacity="0.58" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.20" />
           </SvgLinearGradient>
-          <SvgLinearGradient id="cdHinge" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.34" />
-            <Stop offset="55%" stopColor="#ffffff" stopOpacity="0.07" />
-            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.26" />
+          <SvgLinearGradient id="cdSpine" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.26" />
+            <Stop offset="45%" stopColor="#ffffff" stopOpacity="0.05" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.20" />
           </SvgLinearGradient>
         </Defs>
-
-        {/* Outer wall, the dark line behind it, and the inner highlight */}
-        <Rect x={P} y={P} width={W} height={W} rx={RX} fill="none" stroke="url(#cdCaseEdge)" strokeWidth={wall * 1.9} />
-        <Rect x={P + wall * 2.2} y={P + wall * 2.2} width={W - wall * 4.4} height={W - wall * 4.4}
-          rx={RX - wall * 1.6} fill="none" stroke="#000000" strokeOpacity={0.45} strokeWidth={wall} />
-        <Rect x={P + wall * 3.8} y={P + wall * 3.8} width={W - wall * 7.6} height={W - wall * 7.6}
-          rx={RX - wall * 2.8} fill="none" stroke="#ffffff" strokeOpacity={0.22} strokeWidth={wall * 0.7} />
-
-        {/* The tray wall — the second rectangle the reference clearly shows,
-            set well in from the shell and much fainter */}
-        <Rect x={P + size * 0.028} y={P + size * 0.028} width={W - size * 0.056} height={W - size * 0.056}
-          rx={RX * 0.75} fill="none" stroke="#ffffff" strokeOpacity={0.13} strokeWidth={wall * 0.7} />
-
-        {/* Corner ribs */}
+        <Rect x={7} y={7} width={size - 14} height={size - 14} rx={14} fill="none" stroke="url(#cdCaseEdge)" strokeWidth={2.6} />
+        <Rect x={11.5} y={11.5} width={size - 23} height={size - 23} rx={11} fill="none" stroke="#000000" strokeOpacity={0.45} strokeWidth={1.4} />
+        <Rect x={14} y={14} width={size - 28} height={size - 28} rx={10} fill="none" stroke="#ffffff" strokeOpacity={0.20} strokeWidth={1} />
+        <Rect x={7} y={7} width={26} height={size - 14} rx={13} fill="url(#cdSpine)" />
+        <Rect x={33} y={9} width={1.6} height={size - 18} fill="#ffffff" fillOpacity={0.30} />
+        {clips.map((f, i) => (
+          <G key={`h${i}`}>
+            <Rect x={11} y={size * f - 21} width={18} height={42} rx={4} fill="#ffffff" fillOpacity={0.07} stroke="#ffffff" strokeOpacity={0.52} strokeWidth={1.2} />
+            <Rect x={14} y={size * f - 13} width={12} height={26} rx={3} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.20} strokeWidth={0.8} />
+          </G>
+        ))}
         {corners.map(([x, y, sx, sy], i) => (
           <G key={`c${i}`}>
-            <Path d={`M ${x} ${y + brk * sy} L ${x} ${y} L ${x + brk * sx} ${y}`}
-              fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={wall * 1.4} strokeLinecap="round" />
-            <Path d={`M ${x + size * 0.014 * sx} ${y + brk * 0.82 * sy} L ${x + size * 0.014 * sx} ${y + size * 0.014 * sy} L ${x + brk * 0.82 * sx} ${y + size * 0.014 * sy}`}
-              fill="none" stroke="#ffffff" strokeOpacity={0.16} strokeWidth={wall * 0.7} strokeLinecap="round" />
+            <Path d={`M ${x} ${y + 30 * sy} L ${x} ${y} L ${x + 30 * sx} ${y}`} fill="none" stroke="#ffffff" strokeOpacity={0.52} strokeWidth={2} strokeLinecap="round" />
+            <Path d={`M ${x + 5 * sx} ${y + 30 * sy} L ${x + 5 * sx} ${y + 5 * sy} L ${x + 30 * sx} ${y + 5 * sy}`} fill="none" stroke="#ffffff" strokeOpacity={0.13} strokeWidth={1} strokeLinecap="round" />
           </G>
         ))}
-
-        {/* Moulded lugs on the top and bottom walls */}
-        {lugs.map((f, i) => (
-          <G key={`l${i}`}>
-            <Rect x={size * f} y={P - lugH * 0.4} width={lugW} height={lugH} rx={lugH * 0.35}
-              fill="#ffffff" fillOpacity={0.07} stroke="#ffffff" strokeOpacity={0.46} strokeWidth={wall * 0.7} />
-            <Rect x={size * f} y={size - P - lugH * 0.6} width={lugW} height={lugH} rx={lugH * 0.35}
-              fill="#ffffff" fillOpacity={0.07} stroke="#ffffff" strokeOpacity={0.46} strokeWidth={wall * 0.7} />
-          </G>
-        ))}
-
-        {/* Hinge clip, protruding from the left wall the way a slimline case's
-            does — the old full-height spine was the wrong part entirely */}
-        <Rect x={P - hingeW * 0.72} y={hingeY - hingeH / 2} width={hingeW * 1.5} height={hingeH}
-          rx={hingeW * 0.34} fill="url(#cdHinge)" stroke="#ffffff" strokeOpacity={0.52} strokeWidth={wall * 0.9} />
-        <Rect x={P - hingeW * 0.34} y={hingeY - hingeH * 0.26} width={hingeW * 0.8} height={hingeH * 0.52}
-          rx={hingeW * 0.18} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={wall * 0.6} />
-        <Rect x={P - hingeW * 0.1} y={hingeY - hingeH * 0.42} width={wall * 0.9} height={hingeH * 0.84}
-          fill="#ffffff" fillOpacity={0.26} />
-
-        {/* One broad diagonal reflection across the whole face */}
-        <Path d={`M ${size * 0.12} ${P} L ${size * 0.52} ${P} L ${size * 0.20} ${size - P} L ${P} ${size - P} Z`}
-          fill="#ffffff" fillOpacity={0.030} />
+        {/* one broad diagonal reflection across the whole face */}
+        <Path d={`M ${size * 0.12} 8 L ${size * 0.52} 8 L ${size * 0.20} ${size - 8} L 8 ${size - 8} Z`} fill="#ffffff" fillOpacity={0.030} />
         {dust.map((d, i) => <Circle key={`d${i}`} cx={d.x} cy={d.y} r={d.r} fill="#ffffff" fillOpacity={d.op} />)}
       </Svg>
     </View>

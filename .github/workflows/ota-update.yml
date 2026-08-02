@@ -107,16 +107,41 @@ jobs:
       - name: Ask Expo what state things are in
         if: inputs.mode == 'diagnose'
         run: |
-          echo "════════ preview channel → branch ════════"
-          eas channel:view preview --non-interactive 2>&1 | head -30 || true
-          echo "════════ newest updates on the preview branch ════════"
-          eas update:list --branch preview --limit 4 --non-interactive 2>&1 | head -60 || true
+          CH="${{ inputs.channel }}"
+          echo "════════ $CH channel → branch ════════"
+          eas channel:view "$CH" --non-interactive 2>&1 | head -30 || true
+          echo "════════ newest updates on the $CH branch ════════"
+          eas update:list --branch "$CH" --limit 4 --non-interactive 2>&1 | head -60 || true
           echo "════════ the iOS builds people actually have ════════"
-          eas build:list --platform ios --limit 2 --non-interactive 2>&1 \
-            | grep -E "Build number|Runtime Version|Channel|Profile|Commit" || true
+          eas build:list --platform ios --limit 6 --non-interactive 2>&1 \
+            | grep -E "Build number|Runtime Version|Channel|Profile|Commit|Status|Version" || true
           echo "════════ runtime version this code publishes as ════════"
           npx expo config --type public --json 2>/dev/null \
             | python3 -c "import sys,json; print(json.load(sys.stdin).get('runtimeVersion'))" || true
+          # The BUILD reads its environment from eas.json's `environment` key,
+          # not from the channel — the production profile builds against the
+          # `production` environment. If the Spotify keys are missing there,
+          # the store build ships with empty credentials and sign-in is broken
+          # for everyone who downloads it, which costs another whole build to
+          # fix. Read-only, and reports rather than failing: this mode exists
+          # to answer questions, not to gate anything.
+          echo "════════ Spotify keys in the '$CH' environment ════════"
+          if vars=$(eas env:list --environment "$CH" --include-sensitive --format short 2>&1); then
+            for key in EXPO_PUBLIC_SPOTIFY_CLIENT_ID EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET; do
+              line=$(echo "$vars" | grep -E "^${key}=" || true)
+              value=${line#*=}
+              if [ -z "$line" ]; then
+                echo "  $key: MISSING — a build here would have no Spotify credentials"
+              elif [ -z "$value" ] || case "$value" in '*****'*) true ;; *) false ;; esac; then
+                echo "  $key: present but NOT READABLE (stored as 'secret')"
+              else
+                echo "  $key: present and readable (${#value} chars)"
+              fi
+            done
+          else
+            echo "  could not read them; eas said:"
+            echo "$vars" | head -20
+          fi
 
       - name: Check the Spotify keys are present AND readable
         if: inputs.mode == 'publish'

@@ -371,12 +371,28 @@ function Screw({ cx, cy, r = 4, angle = 0 }: { cx: number; cy: number; r?: numbe
   );
 }
 
-const SHEEN = ['#7CF3D4', '#7FD0FF', '#B9A6FF', '#FF9AE0', '#FFC79C', '#FFF6AE'];
+/**
+ * The sheen on the plastic. NEARLY NEUTRAL on purpose (03.08).
+ *
+ * This was a full rainbow — mint, sky, lilac, pink, peach, yellow — laid out
+ * as six diagonal bands 44 apart at -18°. The two reels sit at the same
+ * height but 106 apart horizontally, which at that angle is 34 units of
+ * vertical shift: almost exactly one band. So each reel sat under a
+ * DIFFERENT colour of the rainbow and the wound tape came out two-tone,
+ * green on one hub and warm on the other. Measured on Daylight before the
+ * fix: R-B of +36 on the left pack against +22 on the right.
+ *
+ * Same rule the mirror ball settled on: the material may not carry a hue.
+ * These are all ~90% white, so the bands still read as light travelling
+ * across plastic but no band can recolour what is underneath it. The mood
+ * comes from the shell's station tint, which is applied evenly.
+ */
+const SHEEN = ['#EAF6FF', '#DEEAFF', '#E9E2FF', '#FFEAF7', '#FFF1E4', '#FFFBE9'];
 
 function CassetteBody({
   size, leftSpin, rightSpin, progress,
   color = '#FF3DF0', accent = '#33E1FF',
-  songName = 'YOUR SONG NAME', artist = 'CRUISE FM', timeText = '00:00',
+  songName = 'YOUR SONG NAME', artist = 'CRUISE FM',
 }: {
   size: number;
   leftSpin: Animated.AnimatedInterpolation<string>;
@@ -385,7 +401,7 @@ function CassetteBody({
   progress?: Animated.Value;
   tapeFlow?: Animated.Value;
   color?: string; accent?: string;
-  songName?: string; artist?: string; timeText?: string;
+  songName?: string; artist?: string;
 }) {
   const scale = size / VB_W;
   const H = size * (VB_H / VB_W);
@@ -417,10 +433,17 @@ function CassetteBody({
       }}
     >
       <Svg width={packBase} height={packBase} viewBox={`0 0 ${PACK_BASE} ${PACK_BASE}`}>
-        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill="#0a0c14" fillOpacity={0.80} />
-        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill={color} fillOpacity={0.13} />
+        {/* Wound tape is OPAQUE and always dark brown — you cannot see the
+            road through it, and real tape is the same colour whatever is
+            playing. The mood arrives as a tint on top, the way the mirror
+            ball's chrome works. (This alone did NOT fix the two-tone reels:
+            measured before and after, the gap was 13.7 then 14.1. The cause
+            was the rainbow SHEEN above — see the note there. Kept because it
+            is correct, not because it moved the number.) */}
+        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill="#17100a" fillOpacity={0.97} />
+        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill={color} fillOpacity={0.10} />
         {winds.map((r, i) => (
-          <SvgCircle key={i} cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.06} strokeWidth={0.7} />
+          <SvgCircle key={i} cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.075} strokeWidth={0.7} />
         ))}
         <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill="none" stroke={color} strokeOpacity={0.42} strokeWidth={1} />
       </Svg>
@@ -550,8 +573,13 @@ function CassetteBody({
           </SvgText>
           <SvgText x={300} y={60} fill="#0d1020" fillOpacity={0.66} fontSize={7} fontWeight="700" fontFamily={Fonts.mono} textAnchor="end">{artist}</SvgText>
           {/* embossed markings + running time */}
+          {/* No counter on the tape. A real cassette hasn't got one — the
+              counter lives on the DECK — so a big digital readout floating on
+              the shell was the one element that read as app-on-object rather
+              than object. It also printed straight over this line, and said
+              exactly what the elapsed time under the seek bar already says
+              (owner, 03.08). */}
           <SvgText x={300} y={176} fill="#ffffff" fillOpacity={0.20} fontSize={5} fontFamily={Fonts.mono} textAnchor="end">CR-02 · HIGH BIAS · MADE FOR THE ROAD</SvgText>
-          <SvgText x={170} y={178} fill="#ffffff" fillOpacity={0.72} textAnchor="middle" fontSize={12} fontWeight="700" fontFamily={Fonts.mono}>{timeText}</SvgText>
           {/* broad glass reflections across the whole face */}
           <SvgPath d="M 20 8 L 96 8 L 40 202 L 8 202 Z" fill="#ffffff" fillOpacity={0.045} />
           <SvgPath d="M 250 8 L 282 8 L 214 202 L 190 202 Z" fill="#ffffff" fillOpacity={0.025} />
@@ -954,7 +982,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <Animated.View style={deckScene}>
-            <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
+            <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} />
             </Animated.View>
           </View>
 
@@ -1034,10 +1062,13 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
           {/* Cassette hero — flex:1 so it grows to fill available space */}
           <View style={[fs.cassetteWrap, { flex: 1 }]}>
-            <TouchableOpacity onPress={togglePlay} activeOpacity={0.92}>
-              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} timeText={elapsedTxt} />
-            </TouchableOpacity>
+            {/* Notes BEHIND the shell. Drawn after it they landed on the
+                plastic — between the reels, on the top edge — and on a
+                physical object that reads as dirt rather than atmosphere. */}
             <FloatingNotes playing={playing} color={neonColor} />
+            <TouchableOpacity onPress={togglePlay} activeOpacity={0.92}>
+              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} />
+            </TouchableOpacity>
           </View>
 
           {/* Song title when connected, else the mood's own line — never a fake track */}
@@ -1202,7 +1233,7 @@ export function CassettePreview() {
           <Ionicons name="play" size={9} color={C.textFaint} />
           <Text style={[pv.tapHintText, { fontFamily: Fonts.mono }]}>tap to open</Text>
         </View>
-        <CassetteBody size={275} leftSpin={leftSpin} rightSpin={rightSpin} color="#FF3DF0" accent="#33E1FF" songName="YOUR SONG NAME" artist="CRUISE FM" timeText="00:00" />
+        <CassetteBody size={275} leftSpin={leftSpin} rightSpin={rightSpin} color="#FF3DF0" accent="#33E1FF" songName="YOUR SONG NAME" artist="CRUISE FM" />
         {OWNER_MODE && (
           <View style={pv.devBadge} pointerEvents="none">
             <Text style={pv.devBadgeText}>DEV</Text>

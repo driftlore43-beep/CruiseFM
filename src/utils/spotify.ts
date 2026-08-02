@@ -620,6 +620,17 @@ export async function diagnoseSpotify(playlistId: string | null): Promise<string
   if (playlistId) {
     await probe('This playlist', `/playlists/${playlistId}`);
     await probe('Its songs', `/playlists/${playlistId}/tracks?limit=1`);
+    // The probes above only check the STATUS — reading nothing is exactly how
+    // the first fallback looked fine here while failing in the app. This one
+    // does the real read, the way the song list does it.
+    const viaObj = await spotifyFetchDetailed(
+      `/playlists/${playlistId}?fields=tracks(items(track(uri,name,duration_ms,artists(name))))`,
+    );
+    out.push(
+      viaObj.ok
+        ? `Songs via the playlist: ${readTracks(viaObj.data?.tracks?.items ?? []).length} found`
+        : `Songs via the playlist: failed (${viaObj.reason})`,
+    );
   }
 
   const scopes = await getGrantedScopes();
@@ -646,13 +657,26 @@ export async function getPlaylistTracks(playlistId: string): Promise<PlaylistTra
     if (!res.ok && page === 0 && (res.reason === 'forbidden' || res.reason === 'error')) {
       const bare = await spotifyFetchDetailed(`/playlists/${playlistId}/tracks?limit=${TRACK_PAGE}`);
       if (bare.ok) return { ok: true, tracks: readTracks(bare.data?.items ?? []) };
-      // Last route: the playlist OBJECT carries its own first page of tracks,
-      // and it is a different endpoint — if only /tracks is being refused,
-      // this still answers. Costs one request in a state that has already
-      // failed twice, so it is free in every case that matters.
-      const obj = await spotifyFetchDetailed(`/playlists/${playlistId}`);
+      // THE ROUTE THAT WORKS. Measured on the owner's phone, 03.08:
+      //   /playlists/{id}          → 200
+      //   /playlists/{id}/tracks   → 403 Forbidden
+      // Only the sub-endpoint is refused, and the playlist OBJECT carries its
+      // own first page of tracks — so ask for those instead.
+      //
+      // THE `fields` PROJECTION IS LOAD-BEARING HERE, and leaving it off is
+      // why the first attempt at this route still failed. A bare playlist
+      // object expands every track's album and artists AND their
+      // `available_markets` — ~180 country codes per track and per album — so
+      // 100 songs arrive as megabytes, and reading that on a phone blew the
+      // 12s budget. The projection asks for four fields per track and the
+      // reply lands in kilobytes. (The diagnostic probe missed this because
+      // it only reads the STATUS on success, never the body.)
+      const obj = await spotifyFetchDetailed(
+        `/playlists/${playlistId}?fields=tracks(items(track(uri,name,duration_ms,artists(name))))`,
+      );
       if (obj.ok && Array.isArray(obj.data?.tracks?.items)) {
-        return { ok: true, tracks: readTracks(obj.data.tracks.items) };
+        const viaObject = readTracks(obj.data.tracks.items);
+        if (viaObject.length) return { ok: true, tracks: viaObject };
       }
       return { ok: false, reason: bare.reason, detail: bare.detail ?? res.detail };
     }

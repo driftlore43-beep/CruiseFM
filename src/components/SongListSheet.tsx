@@ -27,9 +27,15 @@ const TROUBLE: Record<FailReason, { text: string; retry?: boolean; reconnect?: b
     text: 'Cruise FM hasn’t been given permission to read your playlists yet. Reconnecting asks Spotify for it — your music keeps playing.',
     reconnect: true,
   },
+  restricted: {
+    text: 'This Spotify account isn’t on Cruise FM’s tester list, so Spotify blocks everything except playing. Nothing here can change that from your side.',
+  },
   forbidden: {
-    text: 'Spotify won’t share this playlist’s songs. Playlists Spotify builds for you — Daily Mixes, Discover Weekly, its own editorial ones — are closed to other apps. One of your own playlists will list its songs fine.',
-    reconnect: true,
+    // Deliberately NOT a diagnosis. Two confident guesses at this 403 — a
+    // missing permission, then an editorial playlist — were both wrong, and
+    // each sent the owner to reconnect for nothing. Spotify's own words are
+    // printed underneath instead; they are the only reliable answer.
+    text: 'Spotify refused to hand over this playlist’s songs. Playing it still works — this only affects listing the tracks.',
   },
   notfound: { text: 'Spotify can’t find this playlist any more. It may have been deleted, or made private by whoever owns it.', retry: false },
 };
@@ -78,6 +84,7 @@ export function SongListSheet({
   const [mounted, setMounted] = useState(visible);
   const [tracks, setTracks] = useState<PlaylistTrack[] | null>(null);
   const [trouble, setTrouble] = useState<FailReason | null>(null);
+  const [detail, setDetail] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
@@ -107,11 +114,12 @@ export function SongListSheet({
     let live = true;
     setTracks(null);
     setTrouble(null);
+    setDetail(null);
     getPlaylistTracks(playlistId)
       .then((r) => {
         if (!live) return;
-        if (r.ok) setTracks(r.tracks);
-        else setTrouble(r.reason);
+        if (r.ok) { setTracks(r.tracks); }
+        else { setTrouble(r.reason); setDetail(r.detail ?? null); }
       })
       .catch(() => { if (live) setTrouble('error'); });
     return () => { live = false; };
@@ -217,6 +225,7 @@ export function SongListSheet({
           {playlistId && !!trouble && (
             <View style={s.troubleWrap}>
               <Text style={s.empty}>{TROUBLE[trouble].text}</Text>
+              {!!detail && <Text style={s.detail}>Spotify said: “{detail}”</Text>}
               {TROUBLE[trouble].retry && (
                 <TouchableOpacity onPress={() => setAttempt((a) => a + 1)} style={s.retry} activeOpacity={0.8}>
                   <Ionicons name="refresh" size={14} color="#0a0a10" />
@@ -300,6 +309,12 @@ const s = StyleSheet.create({
   loading: { paddingVertical: 30, alignItems: 'center' },
   empty: { color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 19, paddingVertical: 18, paddingHorizontal: 6 },
   troubleWrap: { alignItems: 'flex-start', paddingBottom: 10 },
+  // Spotify's own message, verbatim. Small, quiet, and the thing worth
+  // screenshotting when something here needs explaining.
+  detail: {
+    color: 'rgba(255,255,255,0.34)', fontSize: 11.5, lineHeight: 16,
+    paddingHorizontal: 6, paddingBottom: 14, fontStyle: 'italic',
+  },
   retry: {
     flexDirection: 'row', alignItems: 'center', gap: 7,
     marginLeft: 6, paddingHorizontal: 14, paddingVertical: 9,

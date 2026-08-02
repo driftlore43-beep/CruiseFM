@@ -249,17 +249,33 @@ async function startResult403(res: Response): Promise<'restricted' | 'premium-re
  *    an editorial list), which apps outside Spotify cannot read.
  */
 async function classify403(res: Response): Promise<'restricted' | 'scope' | 'premium-required'> {
+  return (await classify403Detailed(res)).kind;
+}
+
+/** As classify403, but also hands back what Spotify actually said, for the
+ *  screens that can show it. Reads the body ONCE — a Response body cannot be
+ *  consumed twice, so everything that wants it goes through here. */
+async function classify403Detailed(
+  res: Response,
+): Promise<{ kind: 'restricted' | 'scope' | 'premium-required'; detail?: string }> {
+  let text = '';
   try {
-    const text = await res.text();
-    if (/not registered/i.test(text)) {
-      setRestricted(true);
-      return 'restricted';
-    }
-    if (/scope/i.test(text)) return 'scope';
+    text = await res.text();
   } catch {
-    // fall through
+    return { kind: 'premium-required' };
   }
-  return 'premium-required';
+  let detail: string | undefined;
+  try {
+    detail = JSON.parse(text)?.error?.message || undefined;
+  } catch {
+    detail = text.slice(0, 200) || undefined;
+  }
+  if (/not registered/i.test(text)) {
+    setRestricted(true);
+    return { kind: 'restricted', detail };
+  }
+  if (/scope/i.test(text)) return { kind: 'scope', detail };
+  return { kind: 'premium-required', detail };
 }
 
 
@@ -301,11 +317,12 @@ async function spotifyFetch(endpoint: string, method = 'GET', body?: object) {
 /** Why a request came back with nothing. `spotifyFetch` folds all of these
  *  into null, which is right for the polling paths — a drive must not stop to
  *  explain itself — but wrong for a screen the user is looking at. */
-export type FailReason = 'offline' | 'auth' | 'scope' | 'forbidden' | 'notfound' | 'busy' | 'error';
+export type FailReason =
+  | 'offline' | 'auth' | 'scope' | 'restricted' | 'forbidden' | 'notfound' | 'busy' | 'error';
 
 export type FetchResult =
   | { ok: true; data: any }
-  | { ok: false; reason: FailReason };
+  | { ok: false; reason: FailReason; detail?: string };
 
 /**
  * The same call as spotifyFetch, but it says what happened.
@@ -335,8 +352,13 @@ export async function spotifyFetchDetailed(endpoint: string, timeoutMs = 12000):
   // Awaited, unlike the polling path's fire-and-forget: which 403 this is
   // decides what the screen tells the user to do about it.
   if (res.status === 403) {
-    const kind = await classify403(res);
-    return { ok: false, reason: kind === 'scope' ? 'scope' : 'forbidden' };
+    // Spotify's own words, carried all the way to the screen. Two rounds of
+    // theorising about this 403 (missing scope? an editorial playlist?) were
+    // both wrong, and each cost the owner a reconnect that could never have
+    // helped. Whatever it says next is the answer, so stop paraphrasing it.
+    const { kind, detail } = await classify403Detailed(res);
+    if (kind === 'restricted') return { ok: false, reason: 'restricted', detail };
+    return { ok: false, reason: kind === 'scope' ? 'scope' : 'forbidden', detail };
   }
   if (res.status === 404) return { ok: false, reason: 'notfound' };
   if (res.status === 429) return { ok: false, reason: 'busy' };
@@ -516,7 +538,7 @@ export type PlaylistTrack = {
 
 export type PlaylistTracksResult =
   | { ok: true; tracks: PlaylistTrack[] }
-  | { ok: false; reason: FailReason };
+  | { ok: false; reason: FailReason; detail?: string };
 
 /** Spotify's own page size. Three of them is 300 songs, which is more than
  *  anyone thumbs through at the wheel and still covers a long playlist. */
@@ -561,6 +583,13 @@ export async function getPlaylistTracks(playlistId: string): Promise<PlaylistTra
       `/playlists/${playlistId}/tracks?limit=${TRACK_PAGE}&offset=${offset}`
       + `&fields=total,items(track(uri,name,duration_ms,artists(name)))`,
     );
+    // A refusal on the FIRST page is worth one more try without the field
+    // projection, in case the projection itself is what is being refused.
+    if (!res.ok && page === 0 && (res.reason === 'forbidden' || res.reason === 'error')) {
+      const bare = await spotifyFetchDetailed(`/playlists/${playlistId}/tracks?limit=${TRACK_PAGE}`);
+      if (bare.ok) return { ok: true, tracks: readTracks(bare.data?.items ?? []) };
+      return { ok: false, reason: bare.reason, detail: bare.detail ?? res.detail };
+    }
     if (!res.ok) return page === 0 ? res : { ok: true, tracks }; // keep what we have
     const items: any[] = res.data?.items ?? [];
     total = res.data?.total ?? 0;

@@ -18,6 +18,7 @@ const SCOPES = [
 ].join(' ');
 
 const TOKEN_KEY         = 'spotify_access_token';
+const SCOPE_KEY         = 'spotify_granted_scopes';
 const REFRESH_TOKEN_KEY = 'spotify_refresh_token';
 const EXPIRY_KEY        = 'spotify_token_expiry';
 const VERIFIER_KEY      = 'spotify_pkce_verifier';
@@ -140,7 +141,7 @@ export async function exchangeCodeForToken(code: string, codeVerifier: string): 
     const data = await res.json();
     if (!data.access_token) return false;
 
-    await saveTokens(data.access_token, data.refresh_token, data.expires_in);
+    await saveTokens(data.access_token, data.refresh_token, data.expires_in, data.scope);
     return true;
   } catch {
     return false;
@@ -168,20 +169,33 @@ async function refreshAccessToken(): Promise<string | null> {
     const data = await res.json();
     if (!data.access_token) return null;
 
-    await saveTokens(data.access_token, data.refresh_token ?? refreshToken, data.expires_in);
+    await saveTokens(data.access_token, data.refresh_token ?? refreshToken, data.expires_in, data.scope);
     return data.access_token;
   } catch {
     return null;
   }
 }
 
-async function saveTokens(accessToken: string, refreshToken: string, expiresIn: number) {
+async function saveTokens(
+  accessToken: string, refreshToken: string, expiresIn: number, scope?: string,
+) {
   const expiry = Date.now() + expiresIn * 1000;
   await AsyncStorage.multiSet([
     [TOKEN_KEY,         accessToken],
     [REFRESH_TOKEN_KEY, refreshToken],
     [EXPIRY_KEY,        String(expiry)],
   ]);
+  // Spotify names the granted scopes in the token response, and a refresh
+  // NEVER adds one that wasn't granted at sign-in. Keeping them means the
+  // question "does this connection have permission to read playlists?" can be
+  // ANSWERED rather than argued about — two rounds were lost to guessing.
+  if (scope) await AsyncStorage.setItem(SCOPE_KEY, scope);
+}
+
+/** The scopes Spotify granted this connection, or null if unknown (a token
+ *  minted before this was recorded). */
+export async function getGrantedScopes(): Promise<string | null> {
+  try { return await AsyncStorage.getItem(SCOPE_KEY); } catch { return null; }
 }
 
 export async function getAccessToken(): Promise<string | null> {
@@ -201,7 +215,7 @@ export async function isSpotifyConnected(): Promise<boolean> {
 }
 
 export async function disconnectSpotify(): Promise<void> {
-  await AsyncStorage.multiRemove([TOKEN_KEY, REFRESH_TOKEN_KEY, EXPIRY_KEY, RESTRICTED_KEY]);
+  await AsyncStorage.multiRemove([TOKEN_KEY, REFRESH_TOKEN_KEY, EXPIRY_KEY, RESTRICTED_KEY, SCOPE_KEY]);
   restrictedCache = null;
 }
 
@@ -573,6 +587,50 @@ function readTracks(items: any[]): PlaylistTrack[] {
  * with nothing readable means the projection or the page came back wrong, and
  * that retries without the projection rather than reporting an empty list.
  */
+/**
+ * Ask Spotify the same question four ways and report each answer verbatim.
+ *
+ * WHY THIS EXISTS: the owner hit a bare "Forbidden" on reading a playlist
+ * while playback, the playlist picker and now-playing all worked. Two
+ * diagnoses argued from plausibility were both wrong and both cost her a
+ * pointless reconnect. This returns FACTS — which endpoints answer, which
+ * refuse, and what permissions the connection actually holds.
+ */
+export async function diagnoseSpotify(playlistId: string | null): Promise<string[]> {
+  const out: string[] = [];
+  const token = await getAccessToken();
+  if (!token) return ['No Spotify connection at all.'];
+
+  const probe = async (label: string, path: string) => {
+    try {
+      const res = await fetch(`https://api.spotify.com/v1${path}`, { headers: { Authorization: `Bearer ${token}` } });
+      let note = '';
+      if (!res.ok) {
+        const body = await res.text();
+        try { note = ` — ${JSON.parse(body)?.error?.message ?? ''}`; } catch { note = ''; }
+      }
+      out.push(`${label}: ${res.status}${note}`);
+    } catch {
+      out.push(`${label}: no answer`);
+    }
+  };
+
+  await probe('Your account', '/me');
+  await probe('Your playlists', '/me/playlists?limit=1');
+  if (playlistId) {
+    await probe('This playlist', `/playlists/${playlistId}`);
+    await probe('Its songs', `/playlists/${playlistId}/tracks?limit=1`);
+  }
+
+  const scopes = await getGrantedScopes();
+  out.push(
+    scopes
+      ? `Permissions granted: ${scopes.split(' ').join(', ')}`
+      : 'Permissions granted: not recorded (reconnect once to record them)',
+  );
+  return out;
+}
+
 export async function getPlaylistTracks(playlistId: string): Promise<PlaylistTracksResult> {
   const tracks: PlaylistTrack[] = [];
   let total = 0;
@@ -588,6 +646,14 @@ export async function getPlaylistTracks(playlistId: string): Promise<PlaylistTra
     if (!res.ok && page === 0 && (res.reason === 'forbidden' || res.reason === 'error')) {
       const bare = await spotifyFetchDetailed(`/playlists/${playlistId}/tracks?limit=${TRACK_PAGE}`);
       if (bare.ok) return { ok: true, tracks: readTracks(bare.data?.items ?? []) };
+      // Last route: the playlist OBJECT carries its own first page of tracks,
+      // and it is a different endpoint — if only /tracks is being refused,
+      // this still answers. Costs one request in a state that has already
+      // failed twice, so it is free in every case that matters.
+      const obj = await spotifyFetchDetailed(`/playlists/${playlistId}`);
+      if (obj.ok && Array.isArray(obj.data?.tracks?.items)) {
+        return { ok: true, tracks: readTracks(obj.data.tracks.items) };
+      }
       return { ok: false, reason: bare.reason, detail: bare.detail ?? res.detail };
     }
     if (!res.ok) return page === 0 ? res : { ok: true, tracks }; // keep what we have

@@ -754,6 +754,110 @@ function GlitterField({ eq, lit, winW, winH }: {
 }
 
 /**
+ * FIREFLIES (owner, 03.08: "go softly into the mirror ball… add more glitter
+ * floating and moving around. It doesn't have to be moving in the same
+ * direction as the spinning sphere. It can be as simple as moving fireflies
+ * when music is playing").
+ *
+ * The room already had two still things — glitter that twinkles in place and
+ * a static burst of rays — so the ball was the only thing that MOVED. These
+ * wander. Deliberately NOT tied to the spin: the earlier rounds all tried to
+ * make the room travel with the ball and every one of them ended up reading
+ * as a second light system arguing with the first. A firefly answers to
+ * nothing, which is exactly why it works here.
+ *
+ * COST: five shared loops however many are drawn. Each firefly picks one and
+ * traces its OWN path from it, so bucket-mates never move in step; the path
+ * returns to where it began at t=1, so a linear loop cycles seamlessly with
+ * no retracing. Brightness reads the same value through different stops, so
+ * a firefly does not dim at a fixed point on its journey.
+ */
+const FIREFLY_COUNT = 14;
+const FIREFLY_PHASES = 5;
+
+function Firefly({ x, y, r, color, drift, path, glow }: {
+  x: number; y: number; r: number; color: string;
+  drift: Animated.Value; path: number[]; glow: number;
+}) {
+  const box = r * 7;
+  const c = box / 2;
+  const gid = `dbFf${Math.round(x)}x${Math.round(y)}`;
+  const stops = [0, 0.25, 0.5, 0.75, 1];
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', left: x - c, top: y - c, width: box, height: box,
+        opacity: drift.interpolate({
+          inputRange: stops,
+          // Peaks at a different point for each firefly, and never quite goes
+          // out — a blink, not a strobe.
+          outputRange: [0.10, glow * 0.55, glow, glow * 0.42, 0.10],
+        }),
+        transform: [
+          { translateX: drift.interpolate({ inputRange: stops, outputRange: [0, path[0], path[1], path[2], 0] }) },
+          { translateY: drift.interpolate({ inputRange: stops, outputRange: [0, path[3], path[4], path[5], 0] }) },
+        ],
+      }}>
+      <Svg width={box} height={box}>
+        <Defs>
+          <RadialGradient id={gid} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#ffffff" stopOpacity="0.92" />
+            <Stop offset="0.22" stopColor={color} stopOpacity="0.62" />
+            <Stop offset="1" stopColor={color} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={c} cy={c} r={c} fill={`url(#${gid})`} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+function Fireflies({ eq, live, winW, winH }: {
+  eq: [string, string, string]; live: Animated.Value; winW: number; winH: number;
+}) {
+  const phases = useRef(Array.from({ length: FIREFLY_PHASES }, () => new Animated.Value(0))).current;
+  useEffect(() => {
+    const loops = phases.map((v, i) => {
+      // Linear, because the path itself carries the easing — a sine here
+      // would make every firefly pause at the same two points.
+      const loop = Animated.loop(
+        Animated.timing(v, { toValue: 1, duration: 9000 + hash01(i * 4.4) * 7000, easing: Easing.linear, useNativeDriver: true }),
+      );
+      const start = setTimeout(() => loop.start(), i * 900);
+      return { loop, start };
+    });
+    return () => { loops.forEach(({ loop, start }) => { clearTimeout(start); loop.stop(); }); };
+  }, [phases]);
+
+  const flies = useMemo(() => {
+    const pal = ['#fff6e0', mixHex(eq[0], '#ffffff', 0.5), mixHex(eq[1], '#ffffff', 0.45), '#ffffff'];
+    return Array.from({ length: FIREFLY_COUNT }, (_, i) => {
+      const amp = 26 + hash01(i * 5.9) * 54;
+      const wander = (k: number) => (hash01(i * 3.3 + k) - 0.5) * 2 * amp;
+      return {
+        x: winW * (0.06 + hash01(i * 2.1) * 0.88),
+        y: winH * (0.10 + hash01(i * 6.7 + 1.4) * 0.76),
+        r: 2.4 + hash01(i * 8.2) * 2.6,
+        color: pal[i % pal.length],
+        glow: 0.5 + hash01(i * 9.4) * 0.35,
+        path: [wander(0.2), wander(0.9), wander(1.6), wander(2.3), wander(3.1), wander(4.0)],
+        phase: i % FIREFLY_PHASES,
+      };
+    });
+  }, [eq, winW, winH]);
+
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: live }]}>
+      {flies.map((f, i) => (
+        <Firefly key={i} x={f.x} y={f.y} r={f.r} color={f.color} glow={f.glow}
+          path={f.path} drift={phases[f.phase]} />
+      ))}
+    </Animated.View>
+  );
+}
+
+/**
  * A dark vignette pulling the corners down (owner's lighting brief, 31.07):
  * the room reads as a deep studio rather than a flat backdrop, and the ball
  * — the one bright thing — gains depth for free. Static, costs nothing.
@@ -1359,6 +1463,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             specks must sparkle in the corners too, so they sit above the
             vignette rather than being dimmed by it. */}
         <GlitterField eq={eq} lit={live} winW={winW} winH={winH} />
+        <Fireflies eq={eq} live={live} winW={winW} winH={winH} />
 
         {/* Drag pill + mode label + centred header are portrait furniture —
             in landscape LandscapeChrome carries the identity at top-left. */}

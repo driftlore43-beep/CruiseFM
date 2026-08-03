@@ -596,6 +596,30 @@ function readTracks(items: any[]): PlaylistTrack[] {
  * pointless reconnect. This returns FACTS — which endpoints answer, which
  * refuse, and what permissions the connection actually holds.
  */
+/**
+ * The songs QUEUED UP in the player — a completely different thing from a
+ * playlist's contents, and the reason it is worth trying.
+ *
+ * MEASURED on the owner's phone, 03.08, after everything else was ruled out:
+ * `/playlists/{id}` answers 200 but hands back an EMPTY track list, and
+ * `/playlists/{id}/tracks` answers 403, with every playlist permission
+ * granted. Spotify will not give a development-tier app the contents of a
+ * playlist by any route. The queue is player state rather than playlist
+ * content, and it rides `user-read-playback-state`, which demonstrably works
+ * here — so it can show what is coming up even when the playlist itself is
+ * closed to us.
+ *
+ * Returns null when the queue is unavailable, so callers can tell "nothing
+ * queued" from "couldn't ask".
+ */
+export async function getPlaybackQueue(): Promise<PlaylistTrack[] | null> {
+  const res = await spotifyFetchDetailed('/me/player/queue');
+  if (!res.ok) return null;
+  const items: any[] = res.data?.queue ?? [];
+  // The queue is a bare list of tracks, not playlist items wrapping a track.
+  return readTracks(items.map((t) => ({ track: t })));
+}
+
 export async function diagnoseSpotify(playlistId: string | null): Promise<string[]> {
   const out: string[] = [];
   const token = await getAccessToken();
@@ -632,6 +656,8 @@ export async function diagnoseSpotify(playlistId: string | null): Promise<string
         : `Songs via the playlist: failed (${viaObj.reason})`,
     );
   }
+  const q = await getPlaybackQueue();
+  out.push(q ? `Songs in the queue: ${q.length} found` : 'Songs in the queue: unavailable');
 
   const scopes = await getGrantedScopes();
   out.push(

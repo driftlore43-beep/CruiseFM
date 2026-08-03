@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { useSheetOpen } from '@/context/NowPlayingContext';
-import { connectSpotify, diagnoseSpotify, getPlaylistTracks, playTrackInContext, type FailReason, type PlaylistTrack } from '@/utils/spotify';
+import { connectSpotify, diagnoseSpotify, getPlaybackQueue, getPlaylistTracks, playTrackInContext, type FailReason, type PlaylistTrack } from '@/utils/spotify';
 
 /**
  * Plain words for each way the read can fail, and — the part that matters —
@@ -86,6 +86,12 @@ export function SongListSheet({
   const [trouble, setTrouble] = useState<FailReason | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
   const [checks, setChecks] = useState<string[] | null>(null);
+  // Spotify will not give a development-tier app a playlist's contents (03.08,
+  // measured every way there is). The player's QUEUE is a different thing and
+  // still answers, so when the playlist is closed to us the sheet shows what
+  // is coming up instead — clearly labelled as that, not passed off as the
+  // playlist.
+  const [queue, setQueue] = useState<PlaylistTrack[] | null>(null);
   const [checking, setChecking] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
@@ -118,11 +124,16 @@ export function SongListSheet({
     setTrouble(null);
     setDetail(null);
     setChecks(null);
+    setQueue(null);
     getPlaylistTracks(playlistId)
       .then((r) => {
         if (!live) return;
         if (r.ok) { setTracks(r.tracks); }
-        else { setTrouble(r.reason); setDetail(r.detail ?? null); }
+        else {
+          setTrouble(r.reason);
+          setDetail(r.detail ?? null);
+          getPlaybackQueue().then((q) => { if (live && q?.length) setQueue(q); }).catch(() => {});
+        }
       })
       .catch(() => { if (live) setTrouble('error'); });
     return () => { live = false; };
@@ -225,10 +236,35 @@ export function SongListSheet({
           {playlistId && tracks === null && !trouble && (
             <View style={s.loading}><ActivityIndicator color="rgba(255,255,255,0.6)" /></View>
           )}
+          {/* Spotify closes a playlist's contents to us but still answers
+              for the player's queue, so what's coming up stands in. Labelled
+              honestly — this is the queue, not the playlist. */}
+          {playlistId && !!trouble && !!queue?.length && (
+            <View style={s.queueHead}>
+              <Text style={s.queueTitle}>Coming up</Text>
+              <Text style={s.queueNote}>
+                Spotify won’t share the full playlist, but these are queued next.
+              </Text>
+            </View>
+          )}
+          {playlistId && !!trouble && queue?.map((t, i) => (
+            <TouchableOpacity
+              key={t.uri + i} style={s.row} activeOpacity={0.75}
+              onPress={() => jump(t)}>
+              <View style={s.numWrap}><Text style={s.num}>{i + 1}</Text></View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={s.song} numberOfLines={1}>{t.title}</Text>
+                <Text style={s.artist} numberOfLines={1}>{t.artist}</Text>
+              </View>
+              {busy === t.uri
+                ? <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
+                : <Text style={s.dur}>{fmt(t.durationMs)}</Text>}
+            </TouchableOpacity>
+          ))}
           {playlistId && !!trouble && (
             <View style={s.troubleWrap}>
-              <Text style={s.empty}>{TROUBLE[trouble].text}</Text>
-              {!!detail && <Text style={s.detail}>Spotify said: “{detail}”</Text>}
+              {!queue?.length && <Text style={s.empty}>{TROUBLE[trouble].text}</Text>}
+              {!!detail && !queue?.length && <Text style={s.detail}>Spotify said: “{detail}”</Text>}
 
               {/* The refusal alone doesn't say WHY, and "Forbidden" says even
                   less. This asks Spotify the same question four ways and
@@ -341,6 +377,9 @@ const s = StyleSheet.create({
   troubleWrap: { alignItems: 'flex-start', paddingBottom: 10 },
   // Spotify's own message, verbatim. Small, quiet, and the thing worth
   // screenshotting when something here needs explaining.
+  queueHead: { paddingHorizontal: 6, paddingTop: 2, paddingBottom: 12 },
+  queueTitle: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
+  queueNote: { color: 'rgba(255,255,255,0.45)', fontSize: 12, lineHeight: 17, paddingTop: 4 },
   ghostBtn: {
     alignSelf: 'flex-start', marginTop: 4, marginBottom: 14,
     paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20,

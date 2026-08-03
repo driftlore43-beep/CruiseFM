@@ -1237,11 +1237,11 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         <StationBackdrop station={station} blurRadius={2.5} />
         <LinearGradient
           colors={[
-            'rgba(2,2,12,0.20)',
-            'rgba(2,2,12,0.15)',
-            'rgba(2,2,12,0.30)',
+            'rgba(2,2,12,0.10)',
+            'rgba(2,2,12,0.06)',
+            'rgba(2,2,12,0.18)',
+            'rgba(2,2,12,0.32)',
             'rgba(2,2,12,0.46)',
-            'rgba(2,2,12,0.58)',
           ]}
           locations={[0, 0.4, 0.65, 0.85, 1]}
           start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}

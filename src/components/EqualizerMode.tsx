@@ -286,9 +286,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     if (!visible) return;
     if (stationId) setActiveStation(stationId);
     slideY.setValue(winH);
-    // Respect the session's play state — a browse from the Modes tab opens
-    // paused, so the bars hold still until the user presses play.
-    if (playing) startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
     // Pulse the close button once to draw attention
     closePulse.setValue(1);
@@ -303,14 +300,27 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     };
   }, [visible]);
 
-  // ── Restart bar heights when orientation flips ────────────────────────────
+  /**
+   * The meter follows `playing`, wherever it changed.
+   *
+   * It used to be driven only by the play button and by opening the mode, so
+   * anything ELSE that set the play state left the bars sitting dead: opening
+   * onto music that was already going, the mini-player's button, and the
+   * foreground re-sync adopting Spotify's own state. The owner's report was
+   * exactly that (03.08) — "it only animates when you press play even though
+   * a song is running… you'd have to stop the song and replay", which then
+   * looks like Spotify snoozing because the restart takes a beat.
+   *
+   * One effect for every path, so a new caller can't miss it. Orientation is
+   * in here too: the bell curve is sized per orientation, so a turn has to
+   * restart them anyway.
+   */
   useEffect(() => {
     if (!visible) return;
     stopBarAnims(fsValues, timers);
-    if (playing) {
-      startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
-    }
-  }, [isLandscape]);
+    if (playing) startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
+    return () => stopBarAnims(fsValues, timers);
+  }, [visible, playing, isLandscape]);
 
   // ── Ambient glow breathes slowly while the music plays — steady and calm,
   //    with no microphone involved. ──
@@ -345,15 +355,10 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   });
 
   const togglePlay = () => {
-    if (playing) {
-      stopBarAnims(fsValues, timers);
-      setPlaying(false);
-      spotify.pause();
-    } else {
-      startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
-      setPlaying(true);
-      spotify.play();
-    }
+    // The bars are not touched here — the effect above owns them, so every
+    // route into a play state animates, not just this button.
+    if (playing) { setPlaying(false); spotify.pause(); }
+    else { setPlaying(true); spotify.play(); }
   };
 
   const topPad    = Math.max(insets.top, 20);
@@ -415,13 +420,19 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const background = (
     <>
       <StationBackdrop station={currentStation} blurRadius={2.5} />
+      {/* Eased 03.08 (owner: "all mood backgrounds have been heavily blurred
+          and darkened… it sort of makes the mood themes insignificant"). The
+          foot still has to carry white type and the transport, so it keeps
+          most of its weight; the top two thirds — which carry nothing but the
+          station's own picture — give theirs up. Paired with a lighter blur
+          on the assets themselves (radius ~8 -> 3.5). */}
       <LinearGradient
         colors={[
-          'rgba(2,2,12,0.20)',
-          'rgba(2,2,12,0.15)',
-          'rgba(2,2,12,0.30)',
+          'rgba(2,2,12,0.10)',
+          'rgba(2,2,12,0.06)',
+          'rgba(2,2,12,0.18)',
+          'rgba(2,2,12,0.32)',
           'rgba(2,2,12,0.46)',
-          'rgba(2,2,12,0.58)',
         ]}
         locations={[0, 0.4, 0.65, 0.85, 1]}
         start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}

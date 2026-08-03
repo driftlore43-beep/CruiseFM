@@ -1,6 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { GlossSheen } from '@/components/GlossSheen';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -35,7 +34,7 @@ const PLATFORM_ENTRIES = [
 // flagged as the next full integration.
 const TIER_CAPTIONS: Record<string, string> = {
   spotify:      'Full in-app control',
-  appleMusic:   'Visuals now · full control coming',
+  appleMusic:   'Full in-app control',
   youtubeMusic: 'Visuals + your app',
   amazonMusic:  'Visuals + your app',
   tidal:        'Visuals + your app',
@@ -160,7 +159,7 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
 
           <Text style={styles.title}>Connect Your Music</Text>
           <Text style={styles.subtitle}>
-            Spotify unlocks full in-app control. On every other platform, Cruise FM runs the cinematic visuals alongside your own music app.
+            Spotify and Apple Music play inside Cruise FM, with the controls on the card. Anywhere else, the visuals run alongside your own music app.
           </Text>
 
           {/* ── Platform grid ────────────────────────────────────────────── */}
@@ -173,7 +172,7 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
                   key={platform.id}
                   style={({ pressed }) => [
                     styles.platformBtn,
-                    { borderColor: isSelected ? platform.color : `${platform.color}55` },
+                    { borderColor: isSelected ? platform.color : 'rgba(255,255,255,0.12)' },
                     isSelected && { borderWidth: 2 },
                     pressed && { opacity: 0.82 },
                   ]}
@@ -183,8 +182,8 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
                   <LinearGradient
                     colors={
                       isSelected
-                        ? [`${platform.color}66`, `${platform.color}2e`]
-                        : ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.05)']
+                        ? [`${platform.color}2e`, `${platform.color}12`]
+                        : ['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.03)']
                     }
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
@@ -238,14 +237,8 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
             {isReady ? (
               <View style={styles.confirmGradient}>
                 {/* Glassy translucent gradient — the sheet glows through */}
-                <LinearGradient
-                  colors={['rgba(160,98,255,0.55)', 'rgba(123,56,224,0.42)', 'rgba(96,40,190,0.38)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <GlossSheen radius={16} />
-                <Text style={styles.confirmText}>Let's Drive</Text>
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#ffffff' }]} />
+                <Text style={[styles.confirmText, { color: '#0a0a10' }]}>Let&apos;s Drive</Text>
               </View>
             ) : (
               <Text style={[styles.confirmText, { color: 'rgba(255,255,255,0.3)' }]}>
@@ -288,7 +281,7 @@ export function usePlatformSelector() {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(6,6,18,0.94)',
+    backgroundColor: 'rgba(4,4,10,0.92)',
     justifyContent: 'flex-end',
   },
   glowOrb: {
@@ -298,10 +291,10 @@ const styles = StyleSheet.create({
     width: 380,
     height: 380,
     borderRadius: 190,
-    backgroundColor: 'rgba(123,56,224,0.22)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   sheet: {
-    backgroundColor: '#0F0F22',
+    backgroundColor: '#0a0a10',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingHorizontal: 22,
@@ -309,7 +302,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: 'rgba(123,56,224,0.35)',
+    borderColor: 'rgba(255,255,255,0.12)',
     overflow: 'hidden',
   },
 
@@ -353,10 +346,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    borderWidth: 1.5,
+    borderWidth: 1,
     overflow: 'hidden',
-    // base background (gradient overlays this)
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   emojiWrap: {
     width: 32, height: 32, borderRadius: 9,

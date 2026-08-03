@@ -681,17 +681,25 @@ function ReceiverStyle(p: StyleProps) {
   const readoutX = CX - readoutW / 2;
 
   const GX = B + 34, GW = CARD_W - (B + 34) * 2;
-  const GY = B + 34, GH = 276;
+  // Glass tall enough for its three rows to BREATHE. At 276 the frequency's
+  // 124-tall digits ended 9px above the station name and the whole readout
+  // read as one block (owner, 03.08: "the top station information looks
+  // cramped"). Every row below is positioned off GY, so the spacing is set in
+  // one place — see the y values on the readout group.
+  const GY = B + 34, GH = 330;
 
   // The mode's object, laid on the card's own background at 0.80 of its width
   // and never cropped. The framed window it used to sit in was a SECOND screen
   // inside the set, which is what made the Tuner-inside-a-tuner look absurd.
   // A taller pin spends its extra height on a bigger object and a lower
   // fascia, rather than leaving a dead band of metal above the dial.
-  const HERO_W = Math.round(CARD_W * (0.76 + (extra / CARD_H_CARD) * 0.34));
+  // Slightly smaller than it was: the glass above grew to un-cram the
+  // readout, and that height has to come from somewhere or the song block
+  // below lands on the dial.
+  const HERO_W = Math.round(CARD_W * (0.645 + (extra / CARD_H_CARD) * 0.34));
   const HERO_H = Math.round((HERO_W * STAGE_H) / CARD_W);
   const HERO_X = CX - HERO_W / 2;
-  const HERO_Y = 420 + extra * 0.46;
+  const HERO_Y = 474 + extra * 0.46;   // follows the taller glass
 
   const lineW = W - 24;
   const titleText = clip(d.title.toUpperCase(), Math.max(1, dmFit(lineW, 4.6, 1.7)));
@@ -770,18 +778,18 @@ function ReceiverStyle(p: StyleProps) {
 
       <Circle cx={GX + 42} cy={GY + 44} r={10} fill={LAMP_RED} />
       <Circle cx={GX + 42} cy={GY + 44} r={20} fill={LAMP_RED} fillOpacity={0.24} />
-      <DotMatrixGroup text="ON AIR" x={GX + 68} y={GY + 32} dot={3.6} gap={1.4} color="#FF6B5A" opacity={0.95} />
-      <DotMatrixGroup text="STEREO" x={CX - 40} y={GY + 32} dot={3.6} gap={1.4} color="#9FD8FF" opacity={0.5} />
-      <DotMatrixGroup text="TUNED" x={GX + GW - 34} y={GY + 32} dot={3.6} gap={1.4}
+      <DotMatrixGroup text="ON AIR" x={GX + 68} y={GY + 30} dot={3.6} gap={1.4} color="#FF6B5A" opacity={0.95} />
+      <DotMatrixGroup text="STEREO" x={CX - 40} y={GY + 30} dot={3.6} gap={1.4} color="#9FD8FF" opacity={0.5} />
+      <DotMatrixGroup text="TUNED" x={GX + GW - 34} y={GY + 30} dot={3.6} gap={1.4}
         color="#9FD8FF" anchor="end" opacity={0.5} />
 
       {/* Frequency, glowing onto its own glass */}
-      <Ellipse cx={CX} cy={GY + 142} rx={readoutW * 0.78} ry={104} fill={`url(#rcA${uid})`} />
-      <DotMatrixGroup text={freqText} x={readoutX} y={GY + 84} dot={FREQ_DOT} gap={FREQ_GAP} color={AMBER} dim opacity={1} />
-      <DotMatrixGroup text={d.band} x={readoutX + freqW + 34} y={GY + 84 + FREQ_DOT * 3} dot={bandDot} gap={bandGap}
+      <Ellipse cx={CX} cy={GY + 156} rx={readoutW * 0.78} ry={104} fill={`url(#rcA${uid})`} />
+      <DotMatrixGroup text={freqText} x={readoutX} y={GY + 94} dot={FREQ_DOT} gap={FREQ_GAP} color={AMBER} dim opacity={1} />
+      <DotMatrixGroup text={d.band} x={readoutX + freqW + 34} y={GY + 94 + FREQ_DOT * 3} dot={bandDot} gap={bandGap}
         color={AMBER} dim opacity={0.9} />
       <DotMatrixGroup text={clip(station.name.toUpperCase(), Math.max(1, dmFit(GW - 80, 4.0, 1.5)))}
-        x={CX} y={GY + 218} dot={4.0} gap={1.5} color="#CFE6FF" anchor="middle" opacity={0.72} />
+        x={CX} y={GY + 258} dot={4.0} gap={1.5} color="#CFE6FF" anchor="middle" opacity={0.72} />
       <Rect x={GX} y={GY} width={GW} height={GH} rx={20} fill={`url(#rcR${uid})`} />
 
       {/* Silk-screened label under the glass */}
@@ -790,11 +798,14 @@ function ReceiverStyle(p: StyleProps) {
         {modeLabel.toUpperCase()}
       </SvgText>
 
-      {/* Song, in the readout's own type */}
-      <DotMatrixGroup text={titleText} x={PAD + 12} y={HERO_Y + HERO_H + 26} dot={4.6} gap={1.7}
+      {/* Song, in the readout's own type. Anchored UP FROM THE DIAL rather
+          than down from the hero: the dial sits at a fixed height off the
+          card's foot, so hanging the song off the hero meant any change to
+          the hero's size landed the artist on the tick marks. */}
+      <DotMatrixGroup text={titleText} x={PAD + 12} y={dialY - 214} dot={4.6} gap={1.7}
         color={mixHex(d.eq[1], '#ffffff', 0.40)} dim opacity={1} />
       {!!artistText && (
-        <DotMatrixGroup text={artistText} x={PAD + 12} y={HERO_Y + HERO_H + 88} dot={3.4} gap={1.3}
+        <DotMatrixGroup text={artistText} x={PAD + 12} y={dialY - 150} dot={3.4} gap={1.3}
           color={mixHex(d.eq[1], '#ffffff', 0.40)} opacity={0.68} />
       )}
 

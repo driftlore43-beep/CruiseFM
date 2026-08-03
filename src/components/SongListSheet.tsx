@@ -98,23 +98,6 @@ export function SongListSheet({
   const [linking, setLinking] = useState(false);
   useSheetOpen(visible);
 
-  // Pull the top of the sheet down to close it. The grabber has to DO
-  // something: the owner reported pulling the card down and the app going
-  // nowhere (03.08). Only the header block claims the gesture — the list
-  // below it has to keep scrolling.
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
-  const drag = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_e, g) => g.dy > 6 && Math.abs(g.dy) > Math.abs(g.dx),
-    onPanResponderMove: (_e, g) => { if (g.dy > 0) y.setValue(g.dy); },
-    onPanResponderRelease: (_e, g) => {
-      if (g.dy > 90 || g.vy > 0.7) closeRef.current();
-      else Animated.spring(y, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
-    },
-    onPanResponderTerminationRequest: () => false,
-  }), [y]);
-
   /**
    * Swallow any vertical drag the list itself declines.
    *
@@ -227,16 +210,21 @@ export function SongListSheet({
         pointerEvents={visible ? 'auto' : 'none'}
         {...gestureTrap.panHandlers}
         style={[s.sheet, { paddingBottom: insets.bottom + 14, transform: [{ translateY: y }] }]}>
-        <View {...drag.panHandlers}>
-        <View style={s.grabZone}><View style={s.handle} /></View>
-
+        {/* NO drag-to-close on this sheet, deliberately (owner, 03.08 — she
+            swiped it down, "it brought the station card with me as well and
+            now all the buttons can't work"). This sheet's React tree sits
+            inside the mode's, so any downward gesture here is one the mode's
+            pull-to-dismiss can also want; a grabber that promises a swipe is
+            inviting exactly the gesture that can go to the wrong owner. The
+            ✕ is the only exit, so it is made big enough to be the obvious
+            one — her suggestion, and the right call. */}
         <View style={s.headerRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={[s.eyebrow, { fontFamily: Fonts.mono }]}>PLAYING FROM</Text>
             <Text style={s.title} numberOfLines={1}>{playlistName}</Text>
           </View>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={s.closeBtn}>
-            <Ionicons name="close" size={16} color="rgba(255,255,255,0.7)" />
+            <Ionicons name="close" size={21} color="#ffffff" />
           </TouchableOpacity>
         </View>
 
@@ -245,7 +233,6 @@ export function SongListSheet({
           <Text style={s.swapText}>Change playlist</Text>
           <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.35)" />
         </TouchableOpacity>
-        </View>
 
         <ScrollView style={{ maxHeight: winH * 0.46 }} contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
           {!playlistId && (
@@ -373,14 +360,15 @@ const s = StyleSheet.create({
   },
   // The grabber is 4px tall and nobody can grab 4px — the zone around it is
   // what the finger actually lands on.
-  grabZone: { paddingTop: 2, paddingBottom: 12, alignItems: 'center' },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 22, marginBottom: 12 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 22, paddingTop: 16, marginBottom: 12 },
   eyebrow: { color: 'rgba(255,255,255,0.42)', fontSize: 9.5, fontWeight: '800', letterSpacing: 2.5 },
   title: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: -0.3, marginTop: 2 },
+  // The one way out, so it reads as a button rather than a hint: bigger,
+  // brighter fill, a rim, and a full-strength glyph.
   closeBtn: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)',
     alignItems: 'center', justifyContent: 'center',
   },
   swap: {

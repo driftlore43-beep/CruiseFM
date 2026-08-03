@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Modal, Platform, Pressable, ScrollView, Share, StyleSheet,
@@ -121,9 +122,13 @@ export function ShareCardSheet({
       await FileSystem.writeAsStringAsync(path, clean, { encoding: FileSystem.EncodingType.Base64 });
       if (Platform.OS === 'ios') {
         await Share.share({ url: path, message: text });
+      } else if (await Sharing.isAvailableAsync()) {
+        // React Native's own Share cannot attach a file on Android — it needs
+        // a content:// provider — which is why Android sent text only until
+        // expo-sharing landed in the 1.1.0 build. The text form stays as the
+        // fallback below for anything older or without a share target.
+        await Sharing.shareAsync(path, { mimeType: 'image/png', dialogTitle: text });
       } else {
-        // React Native's Share can't attach a file on Android (it needs a
-        // content:// provider), so Android shares the text form.
         await Share.share({ message: text });
       }
       onClose();

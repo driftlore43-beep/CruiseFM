@@ -115,6 +115,25 @@ export function SongListSheet({
     onPanResponderTerminationRequest: () => false,
   }), [y]);
 
+  /**
+   * Swallow any vertical drag the list itself declines.
+   *
+   * iOS presents this sheet in its own window, but RN's responder system is
+   * TREE-based, not window-based — and this sheet's tree sits inside the
+   * mode's. So a drag the ScrollView turned down (list already at the top)
+   * bubbled straight up to the mode's pull-to-dismiss, and scrolling the
+   * songs dragged the card down behind the sheet (owner, 03.08: "the card
+   * likes to also scroll down with the tab"). Exactly the bug PlaylistSheet
+   * hit on 28.07, and the same fix: trap it here, so every caller is covered
+   * at once. The list still scrolls, because the deeper responder is asked
+   * first, and the header's own drag-to-close still wins for the same reason.
+   */
+  const gestureTrap = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 6 || Math.abs(g.dx) > 6,
+    onPanResponderTerminationRequest: () => false,
+  }), []);
+
   const playlistId = /^spotify:playlist:([A-Za-z0-9]+)$/.exec(contextUri ?? '')?.[1] ?? null;
 
   useEffect(() => {
@@ -206,6 +225,7 @@ export function SongListSheet({
 
       <Animated.View
         pointerEvents={visible ? 'auto' : 'none'}
+        {...gestureTrap.panHandlers}
         style={[s.sheet, { paddingBottom: insets.bottom + 14, transform: [{ translateY: y }] }]}>
         <View {...drag.panHandlers}>
         <View style={s.grabZone}><View style={s.handle} /></View>

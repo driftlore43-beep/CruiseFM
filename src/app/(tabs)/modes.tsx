@@ -159,9 +159,14 @@ export default function ModesScreen() {
 
   function start(stationId: string) {
     if (!pending) return;
-    // Locked modes give a free taste — the gate handles the upsell after.
-    // Browsing modes opens them idle; previews auto-play so the taste moves.
-    np.open(pending.mode, stationId, { preview: pending.locked, paused: !pending.locked });
+    // A real drive, exactly like the Stations page. It used to open PAUSED,
+    // which made sense while tapping a mode meant "let me look at this one" —
+    // but since the mood sheet landed (03.08) you pick a mode AND a station
+    // before anything opens, which is a drive by any reading. Opening idle
+    // also meant `playStationMusic` never ran, so the station's playlist
+    // never started and Spotify was never woken (owner: "the redirect doesn't
+    // open for … modes page -> stations mood -> plain mode").
+    np.open(pending.mode, stationId, { preview: pending.locked });
     setLastStation(stationId);
     setPending(null);
   }

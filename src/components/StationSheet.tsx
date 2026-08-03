@@ -102,14 +102,20 @@ export function StationSheet({
         key={r.id}
         activeOpacity={0.8}
         onPress={() => { onPick(r.id); onClose(); }}
-        style={[s.row, active && s.rowActive]}>
+        style={[s.row, active && s.rowActive, active && { borderColor: `${r.accent}99` }]}>
+        {/* Tuned marker: the same language as the Stations page — a bar down
+            the left edge in the station's own colour. It used to be a solid
+            white fill over the whole row, which buried the tagline (white at
+            42% on white is invisible) and made the selected station the one
+            you could read least. */}
+        {active && <View style={[s.marker, { backgroundColor: r.accent }]} />}
         <Text style={[s.dial, { fontFamily: seg7 }, active && s.dialActive]}>{r.dial}</Text>
         <View style={s.rowText}>
           <Text style={[s.name, active && s.nameActive]} numberOfLines={1}>{r.name}</Text>
-          <Text style={s.tagline} numberOfLines={1}>{r.tagline}</Text>
+          <Text style={[s.tagline, active && s.taglineActive]} numberOfLines={1}>{r.tagline}</Text>
         </View>
         {active
-          ? <Ionicons name="checkmark" size={16} color="#0a0a10" />
+          ? <Ionicons name="checkmark" size={16} color={r.accent} />
           : <MaterialCommunityIcons name={r.icon as any} size={18} color={r.accent} />}
       </TouchableOpacity>
     );
@@ -200,13 +206,18 @@ const s = StyleSheet.create({
     borderRadius: 14, marginBottom: 6,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    // The marker is an absolutely-positioned edge bar, so the row has to clip
+    // it to its own corner radius.
+    overflow: 'hidden',
   },
-  rowActive: { backgroundColor: '#ffffff', borderColor: '#ffffff' },
+  rowActive: { backgroundColor: 'rgba(255,255,255,0.11)' },
+  marker: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
   // Fixed width so every name starts at the same x, like the Stations page.
   dial: { width: 54, color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: '700' },
-  dialActive: { color: 'rgba(0,0,0,0.55)' },
+  dialActive: { color: '#ffffff' },
   rowText: { flex: 1, minWidth: 0 },
   name: { color: '#fff', fontSize: 14.5, fontWeight: '700' },
-  nameActive: { color: '#0a0a10' },
+  nameActive: { color: '#ffffff' },
   tagline: { color: 'rgba(255,255,255,0.42)', fontSize: 11.5, marginTop: 1 },
+  taglineActive: { color: 'rgba(255,255,255,0.66)' },
 });

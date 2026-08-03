@@ -440,6 +440,8 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   };
   useEffect(() => () => { if (scrubPillTimer.current) clearTimeout(scrubPillTimer.current); }, []);
 
+  const settleDismissRef = useRef<(g: { dy: number; vy: number }) => void>(() => {});
+
   const discPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -538,12 +540,16 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
         scrub.end(scrubPctRef.current);
         fadeScrubPill();
       },
-      onPanResponderTerminate: () => {
+      onPanResponderTerminate: (_evt, g) => {
         lastAngleRef.current = null;
         const kind = dragRef.current;
         dragRef.current = null;
         if (kind === 'dismiss') {
-          Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+          // Settle exactly as a release would. Springing back unconditionally
+          // meant a pull-down that ran off the bottom edge — where iOS cancels
+          // the touch rather than releasing it — left the card half-open with
+          // nothing to grab.
+          settleDismissRef.current(g);
           return;
         }
         setScrubbing(false);
@@ -617,14 +623,40 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
     Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
+  /**
+   * The dismiss gesture reaches handleClose through a ref because the
+   * responder below is built once — closing over the first render's copy
+   * would leave it using a stale window height after a rotation.
+   */
+  const dismissCloseRef = useRef(handleClose);
+  dismissCloseRef.current = handleClose;
+
+  /** Where the card ends up when the finger leaves — or is taken away. */
+  const settleDismiss = (g: { dy: number; vy: number }) => {
+    if (g.dy > 120 || g.vy > 0.8) dismissCloseRef.current();
+    else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+  };
+  // The disc's own responder is built above this, so it reaches the same
+  // settling rule through a ref — one definition of "where does the card go".
+  settleDismissRef.current = settleDismiss;
+
   const dismissPan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.4,
     onPanResponderMove: (_, g) => { if (g.dy > 0) slideY.setValue(g.dy); },
-    onPanResponderRelease: (_, g) => {
-      if (g.dy > 120 || g.vy > 0.8) handleClose();
-      else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
-    },
+    onPanResponderRelease: (_, g) => settleDismiss(g),
+    /**
+     * iOS CANCELS a touch that leaves the bottom edge of the screen — which
+     * is exactly how you drag a card away. With no terminate handler the
+     * gesture just stopped: `slideY` stayed parked wherever the finger left
+     * it, so the mode was still "open" with its content off-screen and its
+     * modal window still over the app. Taps fell through to the page beneath
+     * (which is why the tab bar kept working) but scrolling did not, and the
+     * only ways out were to swipe again — re-grabbing the stranded card —
+     * or to kill the app. Terminating settles it exactly like a release.
+     */
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderTerminate: (_, g) => settleDismiss(g),
   })).current;
 
   const resetTrack = () => progress.setValue(0);

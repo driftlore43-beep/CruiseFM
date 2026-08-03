@@ -79,7 +79,16 @@ async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean 
       // Allowlist rejection discovered mid-drive falls through to handoff —
       // and so does a dead/slow network ('error'): opening the playlist in
       // the Spotify app beats asking the user to retry.
-      if (r !== 'restricted' && r !== 'error') return r;
+      //
+      // 'no-device' falls through too, and that one matters most (owner,
+      // 03.08: "Spotify likes to snooze… it becomes a game of opening,
+      // closing and switching apps"). Spotify drops off Connect once its own
+      // app has been paused and backgrounded for a while, so there is no
+      // device left to start — and we used to answer that by telling the
+      // user to go and open Spotify themselves, which is precisely the
+      // errand worth removing. Deep-linking the playlist wakes the app AND
+      // starts the right music in one tap.
+      if (r !== 'restricted' && r !== 'error' && r !== 'no-device') return r;
     }
 
     return (await openInSpotify(linked.uri)) ? 'handoff' : 'error';
@@ -91,7 +100,10 @@ async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean 
 /** Plain-words translation of a start attempt, shown over the player. */
 const START_NOTICES: Record<StartResult, string | null> = {
   'playing': null,
-  'no-device': "Spotify isn't awake. Open Spotify, play any song for a second, then come back and press play.",
+  // Only reachable now if the deep-link itself failed (no Spotify app
+  // installed, or the OS refused the URL) — the snoozing case opens Spotify
+  // for the user rather than asking them to.
+  'no-device': "Spotify isn't awake and wouldn't open. Open it, play any song for a second, then come back and press play.",
   'premium-required': 'Spotify needs a Premium account to let Cruise FM control playback.',
   'restricted': 'This Spotify account isn’t on the Cruise FM test list, so in-app control is off. Link a playlist to this station (paste a Spotify link) and drives will play through the Spotify app instead.',
   // Handoff is explained by the persistent in-mode panel, not a transient toast.

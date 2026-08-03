@@ -1,3 +1,4 @@
+import { requireOptionalNativeModule } from 'expo-modules-core';
 import { NativeModules, Platform } from 'react-native';
 
 import type { LinkedPlaylist } from './stationPlaylists';
@@ -51,9 +52,20 @@ type RawEntry = {
   contextName?: string | null;
 };
 
+/**
+ * CruiseMusicKit lives in modules/cruise-music-kit and is an EXPO module, so
+ * it is reached through the Expo registry rather than React Native's legacy
+ * `NativeModules` map. `requireOptionalNativeModule` returns null instead of
+ * throwing when the module is absent, which is exactly the contract this file
+ * needs: the JS ships over the air into builds that predate the module, and
+ * nothing here may throw. The NativeModules lookup is kept as a fallback so
+ * an older build that somehow carries a legacy-bridge build still resolves.
+ */
 const bridge: Bridge | null =
   Platform.OS === 'ios'
-    ? ((NativeModules as Record<string, unknown>).CruiseMusicKit as Bridge | undefined) ?? null
+    ? (requireOptionalNativeModule<Bridge>('CruiseMusicKit')
+       ?? ((NativeModules as Record<string, unknown>).CruiseMusicKit as Bridge | undefined)
+       ?? null)
     : null;
 
 /**

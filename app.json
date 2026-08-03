@@ -2,7 +2,7 @@
   "expo": {
     "name": "CruiseFM",
     "slug": "CruiseFM",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cruisefm",
@@ -10,12 +10,16 @@
     "updates": {
       "url": "https://u.expo.dev/95c6799b-4a44-45f4-89b2-81962388e88e"
     },
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": "1.1.0",
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.driftlore.CruiseFM",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppleMusicUsageDescription": "Cruise FM plays your own Apple Music playlists inside its driving visuals. It only ever plays what you choose."
+      },
+      "entitlements": {
+        "com.apple.developer.applemusic": true
       }
     },
     "android": {

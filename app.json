@@ -17,9 +17,6 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppleMusicUsageDescription": "Cruise FM plays your own Apple Music playlists inside its driving visuals. It only ever plays what you choose."
-      },
-      "entitlements": {
-        "com.apple.developer.applemusic": true
       }
     },
     "android": {

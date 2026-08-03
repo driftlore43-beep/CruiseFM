@@ -15,6 +15,7 @@ import {
   startApplePlaylist,
 } from '@/utils/appleMusic';
 import { getPlaybackState, isRestrictedAccount, isSpotifyConnected, pause as pauseSpotify, startPlayback, type StartResult } from '@/utils/spotify';
+import { markSpotifyWoken, shouldWakeSpotify } from '@/utils/spotifyWake';
 import { openInSpotify } from '@/utils/spotifyHandoff';
 import { getStationPlaylist } from '@/utils/stationPlaylists';
 
@@ -74,7 +75,20 @@ async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean 
 
     const restricted = connected && (await isRestrictedAccount());
 
+    // First play of a fresh app session (or after a long spell in the
+    // background): open the playlist in Spotify rather than discovering it is
+    // asleep the slow way. Owner's call, 03.08 — "I only want the redirect
+    // for the first play. Like a new opened app or even after a time limit."
+    // Deliberately NOT a handoff: the music is still ours to control the
+    // moment Spotify is awake, so the transport stays live and the next poll
+    // picks the track up.
+    if (connected && !restricted && shouldWakeSpotify()) {
+      markSpotifyWoken();
+      if (await openInSpotify(linked.uri)) return 'waking';
+    }
+
     if (connected && !restricted) {
+      markSpotifyWoken();
       const r = await startPlayback(linked.uri);
       // Allowlist rejection discovered mid-drive falls through to handoff —
       // and so does a dead/slow network ('error'): opening the playlist in
@@ -100,6 +114,7 @@ async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean 
 /** Plain-words translation of a start attempt, shown over the player. */
 const START_NOTICES: Record<StartResult, string | null> = {
   'playing': null,
+  'waking': 'Opened Spotify so it wakes up — press play there, then come back. Everything works from here after that.',
   // Only reachable now if the deep-link itself failed (no Spotify app
   // installed, or the OS refused the URL) — the snoozing case opens Spotify
   // for the user rather than asking them to.

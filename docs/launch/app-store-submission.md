@@ -7,6 +7,23 @@ fast-follow update.
 
 ---
 
+## Getting a TESTFLIGHT build onto your phone
+
+Two commands, and the second is the one that's easy to forget — `eas build`
+only *builds*. Nothing reaches TestFlight until you submit it.
+
+```
+cd ~/CruiseFM
+git pull origin claude/cruise-fm-v4wk5f
+npx eas-cli build  -p ios --profile testflight        # 20-40 min
+npx eas-cli submit -p ios --profile testflight --latest
+```
+
+`--latest` picks the build that just finished. After the upload, Apple
+processes it for 5-15 minutes and it shows as "Processing" in TestFlight
+before it can be installed — that wait is normal.
+
+
 ## RESUBMISSION after the 29 July rejection — do this first
 
 Apple rejected build 7 under **Guideline 2.5.4** because the app claimed it

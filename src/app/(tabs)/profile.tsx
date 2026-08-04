@@ -82,9 +82,11 @@ function IconChip({ icon, size = 38 }: { icon: keyof typeof MaterialCommunityIco
 function useMusicPlatformInfo() {
   const [name, setName] = useState<string | null>(null);
   const [color, setColor] = useState<string | null>(null);
+  const [id, setId] = useState<PlatformId | null>(null);
 
   const refresh = () => {
     getSavedPlatform().then((id) => {
+      setId(id);
       if (id && id !== 'none') {
         const p = PLATFORMS[id as Exclude<PlatformId, 'none'>];
         setName(p?.name ?? null);
@@ -97,7 +99,7 @@ function useMusicPlatformInfo() {
   };
 
   useEffect(() => { refresh(); }, []);
-  return { name, color, refresh };
+  return { name, color, id, refresh };
 }
 
 export default function ProfileScreen() {
@@ -105,7 +107,7 @@ export default function ProfileScreen() {
   const { theme } = useTheme();
   const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere, daylight, setDaylight } = useMotion();
   const { devFreePreview, setDevFreePreview, isPro } = useEntitlements();
-  const { name: platformName, color: platformColor, refresh: refreshPlatform } = useMusicPlatformInfo();
+  const { name: platformName, color: platformColor, id: platformId, refresh: refreshPlatform } = useMusicPlatformInfo();
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage | null>(null);
   const [stats, setStats] = useState<{ totalDrives: number; totalMinutes: number; favoriteStationId: string | null } | null>(null);
@@ -379,8 +381,15 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
           </Pressable>
 
-          {/* Spotify Connect row */}
-          <SpotifyConnectRow />
+          {/* Spotify's connection belongs to the Spotify CHOICE, not to the
+              app at large (owner, 04.08: "I've accidentally pressed Spotify
+              connect multiple times where I either unlink Spotify by accident
+              or link Spotify when I'm using Apple Music"). Showing it beside
+              Music Platform regardless of the platform invited exactly that,
+              and offering two live services at once is the same mistake the
+              playback switchboard was making underneath. Pick a service and
+              the app commits to it. */}
+          {platformId === 'spotify' && <SpotifyConnectRow />}
 
           {/* Over-the-air updates arrive silently, which made them look like
               they never arrived at all. This gives them a button. */}

@@ -7,6 +7,34 @@ fast-follow update.
 
 ---
 
+## Replacing the build that is Waiting for Review (decided 04.08)
+
+The submitted build 14 is version 1.0.0 — it predates Apple Music. Store
+users on it would get every 1.0.0 over-the-air fix, but never MusicKit,
+which is the app's answer to Spotify's 5-user cap. Swapping the build is
+worth it, but be clear on the cost: **changing the build requires removing
+the submission from review and resubmitting, which resets your place in the
+queue.** There is no way to swap a build and keep the queue position.
+
+1. On the Mac (this is a SECOND build — the store one; do NOT install it on
+   your phone from TestFlight):
+
+   ```
+   npx eas-cli build  -p ios --profile production
+   npx eas-cli submit -p ios --profile production --latest
+   ```
+
+2. In App Store Connect, open the version page → remove the submission from
+   review (the link is on the submission banner).
+3. Change the **Version** field to `1.1.0`, and under Build press ⊕ / the
+   edit control and select the new build once it finishes processing
+   (5–15 min after submit).
+4. Notes for Review: KEEP the existing text (the 2.5.4 explanation and the
+   no-sign-in walkthrough). Add one line: "This build also adds optional
+   Apple Music playback via MusicKit for subscribers; no account is required
+   to use the app."
+5. Submit, keeping Manually release this version.
+
 ## Getting a TESTFLIGHT build onto your phone
 
 Two commands, and the second is the one that's easy to forget — `eas build`

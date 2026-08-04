@@ -40,6 +40,36 @@ const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get('window');
 const APPLE_MUSIC_RED = '#FA243C';
 const SPOTIFY_GREEN = '#1DB954';
 
+/**
+ * The playlist card wears the platform's own mark — ALL of it, not just the
+ * little note icon (owner, 04.08: "I still haven't got the Apple Music colour
+ * on the playlists, they're still green"). A green card on an Apple Music
+ * drive says Spotify at a glance, which is exactly the confusion that has her
+ * linking the wrong thing.
+ *
+ * TRAP found fixing this: `styles.playlistBtnIcon` carried `color`, and
+ * react-native-vector-icons applies `style` AFTER the `color` prop — so a
+ * per-platform colour passed as a prop was being silently overridden by the
+ * stylesheet. Colour for these icons must come from the style, or from a
+ * style with no competing colour in it.
+ */
+const PLATFORM_TINT = {
+  apple: {
+    solid: APPLE_MUSIC_RED,
+    wash: 'rgba(250,36,60,0.12)',
+    washHero: 'rgba(250,36,60,0.30)',
+    rim: 'rgba(250,36,60,0.40)',
+    rimStrong: 'rgba(250,36,60,0.50)',
+  },
+  spotify: {
+    solid: SPOTIFY_GREEN,
+    wash: 'rgba(29,185,84,0.12)',
+    washHero: 'rgba(29,185,84,0.30)',
+    rim: 'rgba(29,185,84,0.40)',
+    rimStrong: 'rgba(29,185,84,0.50)',
+  },
+};
+
 /** Darken a hex colour toward black by `amount` (0–1) — used to build a
  * two-stop gradient from the user's chosen accent colour, whatever it is. */
 function darken(hex: string, amount: number): string {
@@ -210,6 +240,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const appleActive = applePlatform && appleMusicAvailable();
   const linkUsable = !!linked && (appleActive ? isApplePlaylist(linked.uri) : !isApplePlaylist(linked.uri));
   const needsPlaylist = !linkUsable && (spotifyPlatform || appleActive);
+  const tint = appleActive ? PLATFORM_TINT.apple : PLATFORM_TINT.spotify;
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={() => handleClose()}>
@@ -322,14 +353,19 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
 
           {/* Add your playlist */}
           <Pressable
-            style={({ pressed }) => [styles.playlistBtn, needsPlaylist && styles.playlistBtnHero, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [
+              styles.playlistBtn,
+              { backgroundColor: tint.wash, borderColor: tint.rim },
+              needsPlaylist && styles.playlistBtnHero,
+              needsPlaylist && { backgroundColor: tint.washHero, borderColor: tint.solid, shadowColor: tint.solid },
+              pressed && { opacity: 0.85 },
+            ]}
             onPress={() => setShowPicker(true)}>
             {/* Apple's mark is red, Spotify's green — showing the wrong one
                 is half of why a stale link read as usable. */}
             <MaterialCommunityIcons
               name="music" size={20}
-              color={appleActive ? APPLE_MUSIC_RED : SPOTIFY_GREEN}
-              style={styles.playlistBtnIcon} />
+              style={[styles.playlistBtnIcon, { color: tint.solid }]} />
             <View style={{ flex: 1 }}>
               <Text style={styles.playlistBtnText}>
                 {linkUsable ? linked!.name : 'Add your playlist'}
@@ -350,7 +386,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
                         : 'Drop in your own Spotify playlist'}
               </Text>
             </View>
-            <MaterialCommunityIcons name={linked ? 'pencil' : 'plus'} size={18} color={SPOTIFY_GREEN} />
+            <MaterialCommunityIcons name={linked ? 'pencil' : 'plus'} size={18} style={{ color: tint.solid }} />
           </Pressable>
 
           {/* Mode picker */}
@@ -410,8 +446,8 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
         </ScrollView>
 
         {linkToast && (
-          <View style={[styles.linkToast, { bottom: insets.bottom + 24 }]} pointerEvents="none">
-            <MaterialCommunityIcons name="check-circle" size={16} color={SPOTIFY_GREEN} />
+          <View style={[styles.linkToast, { bottom: insets.bottom + 24, borderColor: tint.rimStrong }]} pointerEvents="none">
+            <MaterialCommunityIcons name="check-circle" size={16} style={{ color: tint.solid }} />
             <Text style={styles.linkToastText} numberOfLines={1}>{linkToast}</Text>
           </View>
         )}
@@ -487,10 +523,7 @@ const styles = StyleSheet.create({
   menuRowText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   menuDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: 10 },
   playlistBtnHero: {
-    backgroundColor: 'rgba(29,185,84,0.30)',
-    borderColor: SPOTIFY_GREEN,
     paddingVertical: 20,
-    shadowColor: SPOTIFY_GREEN,
     shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 16, elevation: 10,
   },
   startBtnQuiet: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' },
@@ -500,7 +533,7 @@ const styles = StyleSheet.create({
     maxWidth: '86%',
     backgroundColor: 'rgba(16,16,26,0.96)',
     borderRadius: 999, paddingVertical: 11, paddingHorizontal: 18,
-    borderWidth: 1, borderColor: 'rgba(29,185,84,0.5)',
+    borderWidth: 1,
     shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 12,
   },
   linkToastText: { color: '#fff', fontSize: 13.5, fontWeight: '600', flexShrink: 1 },
@@ -518,17 +551,17 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 8,
   },
 
+  // Colours here are placeholders — the card is tinted per platform at the
+  // call site (PLATFORM_TINT), which always wins over these.
   playlistBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: 'rgba(29,185,84,0.12)',
     borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: 'rgba(29,185,84,0.4)',
+    borderWidth: 1,
     marginBottom: 26,
   },
-  playlistBtnIcon: { fontSize: 20, color: SPOTIFY_GREEN, width: 24, textAlign: 'center' },
+  playlistBtnIcon: { fontSize: 20, width: 24, textAlign: 'center' },
   playlistBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 2 },
   playlistBtnSub: { color: 'rgba(255,255,255,0.55)', fontSize: 12 },
-  playlistBtnArrow: { color: SPOTIFY_GREEN, fontSize: 18, fontWeight: '700' },
 
   sectionLabel: {
     color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '700',

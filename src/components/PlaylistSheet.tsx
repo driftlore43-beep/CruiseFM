@@ -146,7 +146,13 @@ export function PlaylistSheet({
                           — Spotify green on an Apple Music list read as the
                           wrong service entirely (owner, 04.08). */}
                       <Text style={[ps.rowText, active && { color: apple ? APPLE_MUSIC_RED : SPOTIFY_GREEN }]} numberOfLines={1}>{pl.name}</Text>
-                      {active && <MaterialCommunityIcons name="check" size={15} color={apple ? APPLE_MUSIC_RED : SPOTIFY_GREEN} style={ps.check} />}
+                      {active && (
+                        // Colour goes in the STYLE, not the prop: react-native-vector-icons
+                        // applies style after color, so a prop here is silently ignored.
+                        <MaterialCommunityIcons
+                          name="check" size={15}
+                          style={[ps.check, { color: apple ? APPLE_MUSIC_RED : SPOTIFY_GREEN }]} />
+                      )}
                     </Pressable>
                   );
                 })}
@@ -207,7 +213,7 @@ const ps = StyleSheet.create({
   rowActive: { backgroundColor: 'rgba(29,185,84,0.12)', borderWidth: 1, borderColor: 'rgba(29,185,84,0.4)' },
   rowActiveApple: { backgroundColor: 'rgba(250,36,60,0.12)', borderColor: 'rgba(250,36,60,0.42)' },
   rowText: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '500', flex: 1 },
-  check: { color: SPOTIFY_GREEN, fontSize: 15, fontWeight: '800', marginLeft: 8 },
+  check: { fontSize: 15, fontWeight: '800', marginLeft: 8 },
 
   pasteWrap: { marginTop: 10 },
   pasteRow: { flexDirection: 'row', gap: 8 },

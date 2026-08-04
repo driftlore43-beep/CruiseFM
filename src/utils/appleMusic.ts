@@ -1,7 +1,7 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { NativeModules, Platform } from 'react-native';
 
-import { lookupAppleArtwork } from './appleArtwork';
+import { probeAppleArtwork } from './appleArtwork';
 import type { LinkedPlaylist } from './stationPlaylists';
 
 /**
@@ -276,11 +276,12 @@ export async function diagnoseAppleMusic(playlistUri: string | null): Promise<st
       out.push(`Backup artwork: ${img ? `found (${img.slice(-22)})` : 'MISSING too'}`);
     }
     // The third route, and the only one that does not depend on the phone
-    // holding a copy of the picture. If this line says found and the deck is
-    // still blank, the fault is in the deck, not in the lookup.
+    // holding a copy of the picture. Probed FRESH — no caches — and the
+    // answer names the real failure, so one screenshot settles which side
+    // is broken. "found" with a still-blank deck = the deck; anything else
+    // is the words to bring back.
     if (entry?.title) {
-      const cat = await lookupAppleArtwork(entry.title, entry.artist);
-      out.push(`Catalogue artwork: ${cat ? 'found' : 'no match'}`);
+      out.push(`Catalogue artwork: ${await probeAppleArtwork(entry.title, entry.artist)}`);
     }
   } catch { out.push('Now playing: no answer'); }
   return out;

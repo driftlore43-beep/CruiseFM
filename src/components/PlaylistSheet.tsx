@@ -14,6 +14,7 @@ import { parseSpotifyPlaylistLink } from '@/utils/spotifyHandoff';
 import { type LinkedPlaylist } from '@/utils/stationPlaylists';
 
 const SPOTIFY_GREEN = '#1DB954';
+const APPLE_MUSIC_RED = '#FA243C';
 
 /**
  * Paste-a-link fallback: works for everyone, including accounts that can't
@@ -129,7 +130,7 @@ export function PlaylistSheet({
         <Text style={ps.sub}>for {stationName}</Text>
 
         {loading ? (
-          <ActivityIndicator color={SPOTIFY_GREEN} style={{ marginVertical: 32 }} />
+          <ActivityIndicator color={apple ? APPLE_MUSIC_RED : SPOTIFY_GREEN} style={{ marginVertical: 32 }} />
         ) : (
           <>
             {connected && playlists.length > 0 && (
@@ -137,9 +138,15 @@ export function PlaylistSheet({
                 {playlists.map((pl) => {
                   const active = current?.uri === pl.uri;
                   return (
-                    <Pressable key={pl.uri} style={[ps.row, active && ps.rowActive]} onPress={() => onPick(pl)}>
-                      <Text style={[ps.rowText, active && { color: SPOTIFY_GREEN }]} numberOfLines={1}>{pl.name}</Text>
-                      {active && <MaterialCommunityIcons name="check" size={15} color={SPOTIFY_GREEN} style={ps.check} />}
+                    <Pressable
+                      key={pl.uri}
+                      style={[ps.row, active && ps.rowActive, active && apple && ps.rowActiveApple]}
+                      onPress={() => onPick(pl)}>
+                      {/* The tick and highlight wear the platform's own colour
+                          — Spotify green on an Apple Music list read as the
+                          wrong service entirely (owner, 04.08). */}
+                      <Text style={[ps.rowText, active && { color: apple ? APPLE_MUSIC_RED : SPOTIFY_GREEN }]} numberOfLines={1}>{pl.name}</Text>
+                      {active && <MaterialCommunityIcons name="check" size={15} color={apple ? APPLE_MUSIC_RED : SPOTIFY_GREEN} style={ps.check} />}
                     </Pressable>
                   );
                 })}
@@ -198,6 +205,7 @@ const ps = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
   rowActive: { backgroundColor: 'rgba(29,185,84,0.12)', borderWidth: 1, borderColor: 'rgba(29,185,84,0.4)' },
+  rowActiveApple: { backgroundColor: 'rgba(250,36,60,0.12)', borderColor: 'rgba(250,36,60,0.42)' },
   rowText: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '500', flex: 1 },
   check: { color: SPOTIFY_GREEN, fontSize: 15, fontWeight: '800', marginLeft: 8 },
 

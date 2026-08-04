@@ -17,7 +17,7 @@ import { seekTo } from './spotify';
 let cachedPlatform: string | null = null;
 getSavedPlatform().then((p) => { cachedPlatform = p; }).catch(() => {});
 
-function seekActive(ms: number): void {
+export function seekActive(ms: number): void {
   if (appleMusicAvailable() && cachedPlatform === 'appleMusic') {
     appleSeekTo(ms).catch(() => {});
     return;

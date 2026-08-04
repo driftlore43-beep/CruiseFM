@@ -18,7 +18,11 @@ import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
-import { seekTo } from '@/utils/spotify';
+// NOT spotify's seekTo. Vinyl predates the shared clock and kept its own
+// scrub plumbing, so it went on seeking Spotify while Apple Music played —
+// the record turned, the bar moved, and the song snapped back (owner, 04.08).
+// CD works because it goes through useTrackClock. Same router for both now.
+import { seekActive } from '@/utils/useTrackClock';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
@@ -898,7 +902,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           Animated.timing(scrubIndicatorAnim, { toValue: 0, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
         }, 1000);
         // Real track: the spin you gave the record seeks the actual song.
-        if (realTrackRef.current) seekTo(progressValue.current * trackMsRef.current).catch(() => {});
+        if (realTrackRef.current) seekActive(progressValue.current * trackMsRef.current);
         if (playingRef.current) {
           startSpin();
           _restartProgressFrom(progressValue.current * trackMsRef.current, trackMsRef.current);
@@ -1217,7 +1221,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   pbHandlerRef.current.onRelease = () => {
     scrubbingRef.current = false;
     setIsScrubbing(false);
-    if (realTrackRef.current) seekTo(progressValue.current * trackMsRef.current).catch(() => {});
+    if (realTrackRef.current) seekActive(progressValue.current * trackMsRef.current);
     if (playingRef.current) {
       _restartProgressFrom(progressValue.current * trackMsRef.current, trackMsRef.current);
     }

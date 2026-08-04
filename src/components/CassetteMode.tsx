@@ -22,7 +22,9 @@ import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { ModeSheet } from '@/components/ModeSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
-import { seekTo } from '@/utils/spotify';
+// Platform-routed, not Spotify's own — same fault Vinyl had (04.08), found
+// by grepping for the rest rather than waiting for it to be reported.
+import { seekActive } from '@/utils/useTrackClock';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
@@ -921,7 +923,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     move: (pct: number) => { progress.setValue(pct); progressValue.current = pct; },
     end: (pct: number) => {
       progressValue.current = pct;
-      if (realTrackRef.current) seekTo(pct * trackMsRef.current).catch(() => {});
+      if (realTrackRef.current) seekActive(pct * trackMsRef.current);
       const remaining = (1 - pct) * trackMsRef.current;
       if (playing && remaining > 0) {
         progressAnimRef.current = Animated.timing(progress, {

@@ -219,6 +219,14 @@ export default function ProfileScreen() {
           })}
         </View>
 
+        {/* Never sell Premium to someone who already has it — which, while
+            LAUNCH_FREE is on, is EVERYONE. Beyond being nonsense to the user,
+            it is an App Review risk: this submission declares no in-app
+            purchases, so a reviewer reaching a card that advertises
+            "£1.99 / month" with nothing able to take the money is squarely
+            Guideline 3.1.1. The card returns by itself when payments ship,
+            because isPro will then mean what it says. */}
+        {!isPro && (
         <View style={styles.upgradeCard}>
           <LinearGradient colors={UPGRADE_GRADIENT} locations={GRADIENT_LOCATIONS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           <View style={styles.upgradeGlow} pointerEvents="none" />
@@ -234,6 +242,7 @@ export default function ProfileScreen() {
             <Text style={styles.upgradeBtnText}>Upgrade to Premium</Text>
           </Pressable>
         </View>
+        )}
 
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Settings</Text>

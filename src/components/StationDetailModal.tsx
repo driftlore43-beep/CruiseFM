@@ -28,7 +28,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useMotion } from '@/context/MotionContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { appleMusicAvailable } from '@/utils/appleMusic';
+import { appleMusicAvailable, isApplePlaylist } from '@/utils/appleMusic';
 import { getSavedPlatform } from '@/utils/musicPlatform';
 import {
   getStationPlaylist,
@@ -37,6 +37,7 @@ import {
 } from '@/utils/stationPlaylists';
 
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get('window');
+const APPLE_MUSIC_RED = '#FA243C';
 const SPOTIFY_GREEN = '#1DB954';
 
 /** Darken a hex colour toward black by `amount` (0–1) — used to build a
@@ -197,7 +198,18 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   // can actually play in-app — without MusicKit they're a visual-companion
   // listener like any other, and gating them would block a drive we could
   // have shown them.
-  const needsPlaylist = !linked && (spotifyPlatform || (applePlatform && appleMusicAvailable()));
+  /**
+   * A playlist saved for the OTHER platform is not a linked playlist.
+   *
+   * The station kept showing a Spotify list while the listener was on Apple
+   * Music (owner, 04.08) — it looked linked, Start Drive went ahead, and
+   * playStationMusic then refused it because an Apple player cannot open a
+   * Spotify uri. Judge it the way playback does, so the card and the drive
+   * agree: a link only counts if it belongs to the platform in use.
+   */
+  const appleActive = applePlatform && appleMusicAvailable();
+  const linkUsable = !!linked && (appleActive ? isApplePlaylist(linked.uri) : !isApplePlaylist(linked.uri));
+  const needsPlaylist = !linkUsable && (spotifyPlatform || appleActive);
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={() => handleClose()}>
@@ -312,19 +324,30 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
           <Pressable
             style={({ pressed }) => [styles.playlistBtn, needsPlaylist && styles.playlistBtnHero, pressed && { opacity: 0.85 }]}
             onPress={() => setShowPicker(true)}>
-            <MaterialCommunityIcons name="music" size={20} color={SPOTIFY_GREEN} style={styles.playlistBtnIcon} />
+            {/* Apple's mark is red, Spotify's green — showing the wrong one
+                is half of why a stale link read as usable. */}
+            <MaterialCommunityIcons
+              name="music" size={20}
+              color={appleActive ? APPLE_MUSIC_RED : SPOTIFY_GREEN}
+              style={styles.playlistBtnIcon} />
             <View style={{ flex: 1 }}>
               <Text style={styles.playlistBtnText}>
-                {linked ? linked.name : 'Add your playlist'}
+                {linkUsable ? linked!.name : 'Add your playlist'}
               </Text>
               <Text style={styles.playlistBtnSub}>
-                {linked
+                {linkUsable
                   ? 'Tap to change'
-                  : needsPlaylist
-                    ? 'Give your station its sound'
-                    : applePlatform
-                      ? 'Drop in your own Apple Music playlist'
-                      : 'Drop in your own Spotify playlist'}
+                  : linked
+                    // Saved for the other platform: say so, rather than
+                    // silently showing a name that cannot play.
+                    ? (appleActive
+                        ? `“${linked.name}” is a Spotify playlist — pick an Apple Music one`
+                        : `“${linked.name}” is an Apple Music playlist — pick a Spotify one`)
+                    : needsPlaylist
+                      ? 'Give your station its sound'
+                      : appleActive
+                        ? 'Drop in your own Apple Music playlist'
+                        : 'Drop in your own Spotify playlist'}
               </Text>
             </View>
             <MaterialCommunityIcons name={linked ? 'pencil' : 'plus'} size={18} color={SPOTIFY_GREEN} />

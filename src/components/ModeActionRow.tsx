@@ -9,6 +9,8 @@ import { SongListSheet } from '@/components/SongListSheet';
 import { MODE_CATALOG } from '@/constants/modeCatalog';
 import type { Station } from '@/constants/stations';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { appleMusicAvailable, isApplePlaylist } from '@/utils/appleMusic';
+import { getSavedPlatform } from '@/utils/musicPlatform';
 import { getStationPlaylist } from '@/utils/stationPlaylists';
 import type { NowPlaying } from '@/utils/useMusicPlayback';
 
@@ -86,9 +88,22 @@ export function ModeActionRow({
   // Either platform's playlist can be listed. Apple's ids are not restricted
   // to Spotify's alphabet, so the two patterns are kept separate rather than
   // loosened into one — an Apple id must never be handed to a Spotify call.
+  // A link saved for the other platform is not this drive's playlist — the
+  // pill named a Spotify list on an Apple Music drive (owner, 04.08). Judge
+  // it the way playback does.
+  const [appleActive, setAppleActive] = useState(false);
+  useEffect(() => {
+    getSavedPlatform()
+      .then((pf) => setAppleActive(pf === 'appleMusic' && appleMusicAvailable()))
+      .catch(() => {});
+  }, []);
+  const usableUri = (uri?: string | null) =>
+    !uri ? null : (appleActive ? isApplePlaylist(uri) : !isApplePlaylist(uri)) ? uri : null;
+
   const isPlaylist = (uri?: string | null) =>
     !!/^spotify:playlist:[A-Za-z0-9]+$/.exec(uri ?? '') || !!/^applemusic:playlist:.+$/.exec(uri ?? '');
-  const canList = isPlaylist(contextUri) || isPlaylist(linkedUri);
+  const usableLinked = usableUri(linkedUri);
+  const canList = isPlaylist(usableUri(contextUri)) || isPlaylist(usableLinked);
   // The mode's own name for the card. Read from the session rather than passed
   // in by each mode — one less prop for eight callers to keep in step.
   const modeId = np.session?.mode ?? 'equalizer';
@@ -127,7 +142,7 @@ export function ModeActionRow({
         visible={songs}
         onClose={() => setSongs(false)}
         onChangePlaylist={onPickPlaylist}
-        contextUri={isPlaylist(contextUri) ? (contextUri ?? null) : linkedUri}
+        contextUri={isPlaylist(usableUri(contextUri)) ? (contextUri ?? null) : usableLinked}
         playlistName={playlistLabel}
         currentUri={track?.uri ?? null}
       />

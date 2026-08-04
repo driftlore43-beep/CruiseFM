@@ -1,7 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 
+import { appleMusicAvailable, appleSeekTo } from './appleMusic';
+import { getSavedPlatform } from './musicPlatform';
 import { seekTo } from './spotify';
+
+/**
+ * Seek whichever platform is actually playing.
+ *
+ * This module used to call Spotify's seek directly, so on Apple Music the
+ * record and the disc turned under the finger and the song never moved
+ * (owner, 04.08) — the gesture worked, the seek went to an app that wasn't
+ * playing. The platform is read once and cached: a seek fires on release and
+ * must not wait on storage.
+ */
+let cachedPlatform: string | null = null;
+getSavedPlatform().then((p) => { cachedPlatform = p; }).catch(() => {});
+
+function seekActive(ms: number): void {
+  if (appleMusicAvailable() && cachedPlatform === 'appleMusic') {
+    appleSeekTo(ms).catch(() => {});
+    return;
+  }
+  seekTo(ms).catch(() => {});
+  // Re-read in the background so a platform switch mid-session lands on the
+  // next scrub rather than never.
+  getSavedPlatform().then((p) => { cachedPlatform = p; }).catch(() => {});
+}
 import type { NowPlaying } from './useMusicPlayback';
 
 /** Drag-to-seek hooks a progress bar can call: freeze on grab, follow the
@@ -80,8 +105,9 @@ export function useTrackClock(opts: {
     end: (pct: number) => {
       const p = clamp01(pct);
       const ms = p * durationRef.current;
-      // Real song → actually seek Spotify; demo bar just moves.
-      if (trackRef.current?.durationMs != null) seekTo(ms).catch(() => {});
+      // Real song → actually seek whichever platform is playing; the demo
+      // bar just moves.
+      if (trackRef.current?.durationMs != null) seekActive(ms);
       if (playingRef.current) startFrom(ms);
       else progress.setValue(p);
     },

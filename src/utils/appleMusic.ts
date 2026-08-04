@@ -37,6 +37,11 @@ type Bridge = {
   playPlaylist(id: string): Promise<void>;
   /** The user's own playlists, for linking to stations. */
   userPlaylists(): Promise<{ id: string; name: string }[]>;
+  /** The songs inside a playlist — the thing Spotify's tier refuses. */
+  playlistTracks(id: string): Promise<
+    { id: string; title: string; artist: string; durationMs: number | null }[]>;
+  /** Jump to one song, keeping the rest of the playlist queued behind it. */
+  playTrackInPlaylist(playlistId: string, trackId: string): Promise<void>;
 };
 
 export type AuthStatus = 'authorized' | 'denied' | 'restricted' | 'notDetermined';
@@ -176,3 +181,31 @@ export async function startApplePlaylist(uri?: string): Promise<'playing' | 'err
 }
 
 export type { LinkedPlaylist };
+
+/**
+ * The songs in an Apple Music playlist.
+ *
+ * Shaped like Spotify's `PlaylistTrack` so SongListSheet can render either
+ * without caring which platform it is looking at. The `uri` is the synthetic
+ * `applemusic:track:<id>` form — the sheet only uses it as a key and hands it
+ * straight back to `playAppleTrack`.
+ */
+export async function getApplePlaylistTracks(
+  playlistId: string,
+): Promise<{ uri: string; title: string; artist: string; durationMs: number }[]> {
+  const rows = await safe(() => bridge!.playlistTracks(playlistId), []);
+  return (rows ?? []).map((t) => ({
+    uri: `applemusic:track:${t.id}`,
+    title: t.title ?? '',
+    artist: t.artist ?? '',
+    durationMs: t.durationMs ?? 0,
+  }));
+}
+
+/** Start one song within its playlist, so skip still walks the rest. */
+export async function playAppleTrack(playlistUri: string, trackUri: string): Promise<void> {
+  const pid = applePlaylistId(playlistUri);
+  const tid = trackUri.replace(/^applemusic:track:/, '');
+  if (!pid || !tid) return;
+  await safe(() => bridge!.playTrackInPlaylist(pid, tid), undefined);
+}

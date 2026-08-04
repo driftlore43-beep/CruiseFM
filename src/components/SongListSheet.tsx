@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { useSheetOpen } from '@/context/NowPlayingContext';
+import { getApplePlaylistTracks, isApplePlaylist, playAppleTrack } from '@/utils/appleMusic';
 import { connectSpotify, diagnoseSpotify, getPlaybackQueue, getPlaylistTracks, playTrackInContext, type FailReason, type PlaylistTrack } from '@/utils/spotify';
 
 /**
@@ -117,7 +118,13 @@ export function SongListSheet({
     onPanResponderTerminationRequest: () => false,
   }), []);
 
-  const playlistId = /^spotify:playlist:([A-Za-z0-9]+)$/.exec(contextUri ?? '')?.[1] ?? null;
+  // Apple Music hands its playlists over in full, so there is no queue
+  // fallback and no diagnostic to run — those exist entirely because of
+  // Spotify's development tier.
+  const apple = isApplePlaylist(contextUri ?? '');
+  const playlistId = apple
+    ? (contextUri ?? null)
+    : (/^spotify:playlist:([A-Za-z0-9]+)$/.exec(contextUri ?? '')?.[1] ?? null);
 
   useEffect(() => {
     if (!visible || !playlistId) return;
@@ -127,7 +134,10 @@ export function SongListSheet({
     setDetail(null);
     setChecks(null);
     setQueue(null);
-    getPlaylistTracks(playlistId)
+    (apple
+      ? getApplePlaylistTracks(playlistId).then(
+          (tracks) => ({ ok: true as const, tracks }))
+      : getPlaylistTracks(playlistId))
       .then((r) => {
         if (!live) return;
         if (r.ok) { setTracks(r.tracks); }
@@ -181,7 +191,8 @@ export function SongListSheet({
     if (!contextUri || busy) return;
     setBusy(t.uri);
     try {
-      await playTrackInContext(contextUri, t.uri);
+      if (apple) await playAppleTrack(contextUri, t.uri);
+      else await playTrackInContext(contextUri, t.uri);
       onPlayed?.();
       onClose();
     } finally {

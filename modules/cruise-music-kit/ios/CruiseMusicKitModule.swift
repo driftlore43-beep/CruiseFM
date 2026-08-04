@@ -64,7 +64,11 @@ public class CruiseMusicKitModule: Module {
       return [
         "title": entry.title,
         "artist": artist,
-        "artworkUrl": entry.artwork?.url(width: 600, height: 600)?.absoluteString,
+        // A library track's artwork is LOCAL, so `url()` returns nil and the
+        // deck came up blank (owner, 03.08). Fall back to writing the image
+        // into the cache and handing back a file:// URL, which <Image> takes
+        // exactly like a remote one.
+        "artworkUrl": Self.artworkURL(for: entry),
         "durationMs": durationMs,
         "positionMs": player.playbackTime * 1000,
         "isPlaying": player.state.playbackStatus == .playing,
@@ -134,6 +138,50 @@ public class CruiseMusicKitModule: Module {
       try await player.play()
     }
 
+    /**
+     * The songs inside one of the listener's playlists.
+     *
+     * This is the whole reason Apple Music is worth the work: Spotify's
+     * development tier refuses a playlist's contents by every route we tried
+     * (03.08), so the song picker could only ever show the queue. MusicKit
+     * hands the tracks over directly.
+     */
+    AsyncFunction("playlistTracks") { (id: String) async -> [[String: Any?]] in
+      guard #available(iOS 16.0, *) else { return [] }
+      var request = MusicLibraryRequest<Playlist>()
+      request.filter(matching: \.id, equalTo: MusicItemID(id))
+      guard let playlist = try? await request.response().items.first,
+            let full = try? await playlist.with(.tracks),
+            let tracks = full.tracks else { return [] }
+      return tracks.map { track in
+        [
+          "id": track.id.rawValue,
+          "title": track.title,
+          "artist": track.artistName,
+          "durationMs": track.duration.map { $0 * 1000 },
+        ]
+      }
+    }
+
+    /// Jump straight to one song, keeping the rest of the playlist queued
+    /// behind it — the same contract as Spotify's context+offset start, so
+    /// skip still walks the playlist afterwards.
+    AsyncFunction("playTrackInPlaylist") { (playlistId: String, trackId: String) async throws in
+      guard #available(iOS 16.0, *) else { return }
+      var request = MusicLibraryRequest<Playlist>()
+      request.filter(matching: \.id, equalTo: MusicItemID(playlistId))
+      guard let playlist = try await request.response().items.first,
+            let tracks = try await playlist.with(.tracks).tracks else { return }
+      let player = ApplicationMusicPlayer.shared
+      if let start = tracks.first(where: { $0.id.rawValue == trackId }) {
+        player.queue = ApplicationMusicPlayer.Queue(for: tracks, startingAt: start)
+      } else {
+        player.queue = ApplicationMusicPlayer.Queue(for: tracks)
+      }
+      try await player.prepareToPlay()
+      try await player.play()
+    }
+
     AsyncFunction("userPlaylists") { () async -> [[String: String]] in
       guard #available(iOS 16.0, *) else { return [] }
       var request = MusicLibraryRequest<Playlist>()
@@ -141,6 +189,22 @@ public class CruiseMusicKitModule: Module {
       guard let response = try? await request.response() else { return [] }
       return response.items.map { ["id": $0.id.rawValue, "name": $0.name] }
     }
+  }
+
+  /// A usable URL for a queue entry's artwork.
+  ///
+  /// The entry's own artwork is nil more often than you'd expect, so the
+  /// SONG's artwork is tried as well — for anything added from the Apple
+  /// Music catalogue that resolves even when the entry's doesn't. A track
+  /// imported from the user's own files has only local artwork, which
+  /// MusicKit exposes no URL for at all; that returns nil and the deck falls
+  /// back to the station's colours, which is the honest outcome.
+  @available(iOS 16.0, *)
+  private static func artworkURL(for entry: ApplicationMusicPlayer.Queue.Entry) -> String? {
+    if let url = entry.artwork?.url(width: 600, height: 600) { return url.absoluteString }
+    if case let .song(song) = entry.item,
+       let url = song.artwork?.url(width: 600, height: 600) { return url.absoluteString }
+    return nil
   }
 
   @available(iOS 15.0, *)

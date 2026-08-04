@@ -83,7 +83,11 @@ export function ModeActionRow({
     return () => { live = false; };
   }, [stationId]);
 
-  const isPlaylist = (uri?: string | null) => !!/^spotify:playlist:[A-Za-z0-9]+$/.exec(uri ?? '');
+  // Either platform's playlist can be listed. Apple's ids are not restricted
+  // to Spotify's alphabet, so the two patterns are kept separate rather than
+  // loosened into one — an Apple id must never be handed to a Spotify call.
+  const isPlaylist = (uri?: string | null) =>
+    !!/^spotify:playlist:[A-Za-z0-9]+$/.exec(uri ?? '') || !!/^applemusic:playlist:.+$/.exec(uri ?? '');
   const canList = isPlaylist(contextUri) || isPlaylist(linkedUri);
   // The mode's own name for the card. Read from the session rather than passed
   // in by each mode — one less prop for eight callers to keep in step.

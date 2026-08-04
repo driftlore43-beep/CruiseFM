@@ -288,9 +288,14 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     // dead network can never leave it stuck holding.
     setMusicSwitching(true);
     const unstick = setTimeout(() => setMusicSwitching(false), 8000);
-    isSpotifyConnected()
-      .then((c) => { if (c && !settled) setPlaybackNotice(WAKE_SPOTIFY_NUDGE); })
-      .catch(() => {});
+    // Spotify-only. Apple Music plays on THIS phone with nothing to wake, so
+    // telling an Apple listener to go and open Spotify is both wrong and
+    // alarming — the owner saw it flash on an Apple Music drive (03.08).
+    (async () => {
+      if (appleMusicAvailable() && (await getSavedPlatform()) === 'appleMusic') return;
+      const c = await isSpotifyConnected();
+      if (c && !settled) setPlaybackNotice(WAKE_SPOTIFY_NUDGE);
+    })().catch(() => {});
     const kick = () => {
       playStationMusic(stationId, { resumeAny: opts?.resumeAny }).then((r) => {
         settled = true;

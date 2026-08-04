@@ -45,7 +45,7 @@ export { CARD_W, CARD_H, CARD_RATIO };
 export function ShareCard(props: {
   width: number; station: Station; track: NowPlaying | null; modeLabel: string; modeId: string;
   userName: string | null; styleId: ShareStyleId; format: ShareFormat; uid?: string;
-  snapshotUri?: string | null;
+  snapshot?: { uri: string; w: number; h: number } | null;
 }) {
   const { width, format, uid = 'p', ...body } = props;
   const cardH = FORMAT_H[format];
@@ -72,7 +72,7 @@ export function ShareCard(props: {
  * export a card with an empty cover.
  */
 export function ShareCardSheet({
-  visible, onClose, station, track, modeLabel, modeId, snapshotUri = null,
+  visible, onClose, station, track, modeLabel, modeId, snapshot = null,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -80,10 +80,10 @@ export function ShareCardSheet({
   track: NowPlaying | null;
   modeLabel: string;
   modeId: string;
-  /** A real screenshot of the mode, captured the moment the share pill was
-   *  tapped (see ModeActionRow). Null when capture isn't possible — the sheet
-   *  then behaves exactly as it did before snapshots existed. */
-  snapshotUri?: string | null;
+  /** A real screenshot of the mode plus the screen's point size, captured
+   *  the moment the share pill was tapped (see ModeActionRow). Null when
+   *  capture isn't possible — the sheet then behaves as before snapshots. */
+  snapshot?: { uri: string; w: number; h: number } | null;
 }) {
   const { width: winW, height: winH } = useWindowDimensions();
   const [userName, setUserName] = useState<string | null>(null);
@@ -100,7 +100,7 @@ export function ShareCardSheet({
     getProfileName().then(setUserName).catch(() => {});
     // The real screenshot is the point of the feature, so it leads whenever
     // one exists; without one the chip is hidden and the old default stands.
-    setStyleId(snapshotUri ? 'snapshot' : DEFAULT_SHARE_STYLE);
+    setStyleId(snapshot ? 'snapshot' : DEFAULT_SHARE_STYLE);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
@@ -160,7 +160,7 @@ export function ShareCardSheet({
         <Pressable style={sc.body} onPress={() => {}}>
           <ShareCard width={previewW} station={station} track={track} modeLabel={modeLabel}
             modeId={modeId} userName={userName} styleId={styleId} format={format}
-            snapshotUri={snapshotUri} />
+            snapshot={snapshot} />
 
           {/* Design styles. The row must be given a real width — inside a
               centred column with no width of its own it sizes to its CONTENT,
@@ -168,7 +168,7 @@ export function ShareCardSheet({
               scrolls if a longer set is ever added. */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             contentContainerStyle={sc.chips} style={[sc.chipRow, { width: winW - 32 }]}>
-            {SHARE_STYLES.filter((s) => s.id !== 'snapshot' || !!snapshotUri).map((s) => {
+            {SHARE_STYLES.filter((s) => s.id !== 'snapshot' || !!snapshot).map((s) => {
               const on = s.id === styleId;
               return (
                 <TouchableOpacity key={s.id} onPress={() => setStyleId(s.id)} activeOpacity={0.85}
@@ -232,7 +232,7 @@ export function ShareCardSheet({
         <Svg ref={capRef} width={CARD_W} height={cardH} viewBox={`0 0 ${CARD_W} ${cardH}`}>
           <ShareCardBody station={station} track={track} modeLabel={modeLabel} modeId={modeId}
             userName={userName} styleId={styleId} cardH={cardH} uid="c"
-            snapshotUri={snapshotUri} />
+            snapshot={snapshot} />
         </Svg>
       </View>
     </Modal>

@@ -1,9 +1,9 @@
 import {
-  Circle, ClipPath, Defs, Ellipse, G, Image as SvgImage,
+  Circle, ClipPath, Defs, G, Image as SvgImage,
   LinearGradient as SvgLinearGradient, Path, RadialGradient, Rect, Stop, Text as SvgText,
 } from 'react-native-svg';
 
-import { DotMatrixGroup, dmFit, dmWidth } from '@/components/DotMatrix';
+import { DotMatrixGroup } from '@/components/DotMatrix';
 import {
   CARD_W, CX, ModeHero, STAGE_H, STAGE_TOP, glowCol, mixHex, type Eq,
 } from '@/components/ShareModeArt';
@@ -45,25 +45,19 @@ export const FORMAT_H: Record<ShareFormat, number> = { card: CARD_H_CARD, pin: C
 export const SHARE_STYLES = [
   // Snapshot leads: a REAL capture of the running mode (owner, 27.07: "since
   // this is a more visual app… share this like a screenshot but in a card
-  // form" — she compared the live Mirror Ball against the redrawn one and
-  // rightly preferred the real thing). The chip only appears when a capture
-  // exists; the drawn styles are the standing fallback.
+  // form"). The chip only appears when a capture exists; Ticket is the
+  // standing fallback — and with a capture, its window shows the real mode
+  // too. Sleeve and Receiver were CUT on the owner's call (04.08, after
+  // seeing snapshots on device): "I would actually remove the receiver and
+  // sleeve mode and keep the snapshot and the ticket mode."
   { id: 'snapshot', label: 'Snapshot' },
   { id: 'ticket', label: 'Ticket' },
-  { id: 'sleeve', label: 'Sleeve' },
-  { id: 'receiver', label: 'Receiver' },
 ] as const;
 
 export type ShareStyleId = (typeof SHARE_STYLES)[number]['id'];
 export const DEFAULT_SHARE_STYLE: ShareStyleId = 'ticket';
 
 const INSTALL_HOST = 'cruisefm.app';
-const LAMP_RED = '#FF3B30';
-const AMBER = '#FF9A2E';
-
-/** Where each band starts and ends, so a needle can sit where the station
- *  actually is rather than always dead centre. Matches the Tuner's own dial. */
-const BAND_RANGE: Record<string, [number, number]> = { FM: [87.5, 108.5], AM: [530, 1600] };
 
 /** SVG <Text> does not wrap, so lines are worked out here. `perChar` is the
  *  average glyph width as a fraction of font size — 0.52 is about right for a
@@ -123,38 +117,6 @@ function heroBox(x: number, y: number, w: number, h: number, mode: 'cover' | 'co
   const tx = x + (w - CARD_W * s) / 2;
   const ty = y + (h - STAGE_H * s) / 2 - STAGE_TOP * s;
   return `translate(${tx.toFixed(2)} ${ty.toFixed(2)}) scale(${s.toFixed(4)})`;
-}
-
-/**
- * A window showing THE MODE, as it actually appears: the station's own
- * photograph full-bleed behind, the mode's scrim over it, the object on top.
- * Every mode on screen is exactly that stack.
- */
-function ModeStage({ d, uid, x, y, w, h, rx = 0 }: {
-  d: Derived; uid: string; x: number; y: number; w: number; h: number; rx?: number;
-}) {
-  const id = `ms${uid}`;
-  return (
-    <>
-      <Defs>
-        <ClipPath id={id}><Rect x={x} y={y} width={w} height={h} rx={rx} ry={rx} /></ClipPath>
-        <SvgLinearGradient id={`${id}s`} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#03040e" stopOpacity="0.62" />
-          <Stop offset="0.45" stopColor="#03040e" stopOpacity="0.44" />
-          <Stop offset="1" stopColor="#03040e" stopOpacity="0.66" />
-        </SvgLinearGradient>
-      </Defs>
-      <G clipPath={`url(#${id})`}>
-        <Rect x={x} y={y} width={w} height={h} fill={d.deep} />
-        {!!d.backdrop && (
-          <SvgImage x={x} y={y} width={w} height={h} href={d.backdrop as string}
-            preserveAspectRatio="xMidYMid slice" />
-        )}
-        <Rect x={x} y={y} width={w} height={h} fill={`url(#${id}s)`} />
-        <G transform={heroBox(x, y, w, h)}>{d.hero}</G>
-      </G>
-    </>
-  );
 }
 
 /**
@@ -245,10 +207,10 @@ type StyleProps = {
   userName: string | null;
   uid: string;
   cardH: number;
-  /** A real screenshot of the running mode (react-native-view-shot), or null
-   *  when capture wasn't possible — older builds, web, or a native failure.
-   *  Only the Snapshot style reads it. */
-  snapshotUri?: string | null;
+  /** A real screenshot of the running mode (react-native-view-shot), plus the
+   *  screen's point size for aspect math; null when capture wasn't possible —
+   *  older builds, web, or a native failure. */
+  snapshot?: { uri: string; w: number; h: number } | null;
 };
 
 type Derived = {
@@ -419,9 +381,27 @@ function TicketStyle(p: StyleProps) {
 
       <G clipPath={`url(#tkP${uid})`}>
         <PhotoFill d={d} uid={uid} x={PX} y={PY} w={PW} h={panelBottom - PY} />
-        {/* The mode's object, at the card's full width. Contained, never
-            cropped — the photograph behind it is what fills the corners. */}
-        <G transform={heroBox(HERO_X, HERO_Y, HERO_W, HERO_H, 'contain')}>{d.hero}</G>
+        {/* The mode. With a real capture the window shows THE REAL THING —
+            "the ticket template behind the image, keeping only the image of
+            the mode" (owner, 04.08): `slice` fills the window and trims the
+            capture's top and bottom equally, which is where the status bar
+            and the transport live, so the object band is what survives. The
+            drawn hero remains the fallback for captureless builds. */}
+        {p.snapshot ? (
+          <>
+            <Defs>
+              <ClipPath id={`tkH${uid}`}>
+                <Rect x={HERO_X} y={HERO_Y} width={HERO_W} height={HERO_H} rx={26} ry={26} />
+              </ClipPath>
+            </Defs>
+            <G clipPath={`url(#tkH${uid})`}>
+              <SvgImage x={HERO_X} y={HERO_Y} width={HERO_W} height={HERO_H}
+                href={{ uri: p.snapshot.uri }} preserveAspectRatio="xMidYMid slice" />
+            </G>
+          </>
+        ) : (
+          <G transform={heroBox(HERO_X, HERO_Y, HERO_W, HERO_H, 'contain')}>{d.hero}</G>
+        )}
         {weave}
         <FadeBand uid={`t${uid}`} x={PX} y={PY} w={PW} h={286 + extra * 0.2}
           from={0.92} tint={d.eq[1]} dir="down" />
@@ -486,392 +466,38 @@ function TicketStyle(p: StyleProps) {
   );
 }
 
-// ── 2. Sleeve ─────────────────────────────────────────────────────────────────
-// A record jacket with the disc easing out of one side. Everything is PRINTED
-// on the board — station, song, catalogue number — and the board itself has to
-// look like board: grain, a shrink-wrap sheen, ring wear from the record
-// inside, a bumped corner. Those four are what separate a sleeve from a square.
+// ── 2. Snapshot ───────────────────────────────────────────────────────────────
+// The ENTIRE page as it was on screen, framed — nothing cut off except the
+// phone's own status strip (owner, 04.08: "have it as the entire page but as
+// a card ... except leave out the phone information e.g the time data and
+// battery"). The capture's aspect is known exactly (the screen's point size
+// travels with the uri), so the window is fitted CONTAIN — no slicing — and
+// the status bar is removed by drawing the image slightly taller than the
+// window and letting the clip take the top strip.
 
-function SleeveStyle(p: StyleProps) {
-  const d = derive(p);
-  const { uid, cardH, station, modeLabel } = p;
-  // The jacket is deliberately NOT the full card width: the disc has to have
-  // somewhere to come out to. A sleeve that fills the frame is just a square.
-  const JX = 80, JW = CARD_W - JX - 150;
-  const JH = JW;
-  // Jacket AND catalogue line are centred as one block. Pinning the line to
-  // the card's foot instead left the pin format with the sleeve stranded in
-  // the top half and 370px of nothing under it.
-  const JY = (cardH - (JH + 100)) / 2;
-  const catY = JY + JH + 80;
-  const TYPE_BAND = 236;
-  const board = mixHex(d.eq[1], '#0e1018', 0.74);
-  const print = mixHex(d.eq[0], '#ffffff', 0.10);
-
-  const nameSize = fitSize(station.name, 52, JW - 128, 28);
-  const titleLines = wrapLines(d.title, 32, JW - 128, 2);
-
-  const ART_X = JX + 56, ART_Y = JY + 56, ART_W = JW - 112, ART_H = JH - TYPE_BAND - 56;
-
-  // Disc rings, drawn behind the jacket so only the sliver past its edge shows.
-  const discCx = JX + JW * 0.70, discCy = JY + JH / 2, discR = JH * 0.47;
-  const rings = [];
-  for (let i = 0; i < 7; i++) {
-    rings.push(<Circle key={`sr${i}`} cx={discCx} cy={discCy} r={discR - 14 - i * 22} fill="none"
-      stroke="#ffffff" strokeOpacity={0.16} strokeWidth={1.8} />);
-  }
-
-  // Board grain: fine horizontal lines, barely there. Card stock is not a
-  // gradient, and at this size the difference is the whole material.
-  const grain: React.ReactElement[] = [];
-  for (let i = 0; i < 64; i++) {
-    grain.push(<Rect key={`gg${i}`} x={JX} y={JY + (i * JH) / 64} width={JW} height={1.1}
-      fill="#ffffff" fillOpacity={0.012 + h01(i * 5.7) * 0.022} />);
-  }
-
-  const STICK_R = 84, stickX = JX + JW - 118, stickY = JY + 118;
-
-  return (
-    <>
-      <BaseWash d={d} uid={uid} cardH={cardH} glow={0.26} />
-      <Backdrop d={d} uid={uid} cardH={cardH} stops={[0.78, 0.76, 0.80, 0.90]} />
-
-      <Defs>
-        <ClipPath id={`slJ${uid}`}>
-          <Rect x={JX} y={JY} width={JW} height={JH} rx={4} ry={4} />
-        </ClipPath>
-        <SvgLinearGradient id={`slB${uid}`} x1="0" y1="0" x2="0.7" y2="1">
-          <Stop offset="0" stopColor={mixHex(board, '#ffffff', 0.10)} />
-          <Stop offset="1" stopColor={mixHex(board, '#05060b', 0.30)} />
-        </SvgLinearGradient>
-        <RadialGradient id={`slD${uid}`} cx="38%" cy="30%" r="72%">
-          <Stop offset="0" stopColor="#ffffff" stopOpacity="0.20" />
-          <Stop offset="0.6" stopColor="#ffffff" stopOpacity="0.04" />
-          <Stop offset="1" stopColor="#000000" stopOpacity="0.22" />
-        </RadialGradient>
-        {/* Shrink wrap. One broad diagonal band, nowhere near a hard edge —
-            a stroked highlight would read as a drawn line across the art. */}
-        <SvgLinearGradient id={`slW${uid}`} x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0.16" stopColor="#ffffff" stopOpacity="0" />
-          <Stop offset="0.34" stopColor="#ffffff" stopOpacity="0.085" />
-          <Stop offset="0.46" stopColor="#ffffff" stopOpacity="0" />
-          <Stop offset="0.70" stopColor="#ffffff" stopOpacity="0.045" />
-          <Stop offset="0.84" stopColor="#ffffff" stopOpacity="0" />
-        </SvgLinearGradient>
-      </Defs>
-
-      {/* Disc. Only a sliver of it clears the jacket, so it has to be LIT to
-          register at all — at the record's own near-black it simply vanished
-          into the card and the sleeve read as a plain square. */}
-      <Circle cx={discCx} cy={discCy} r={discR} fill="#16171f" />
-      <Circle cx={discCx} cy={discCy} r={discR} fill={`url(#slD${uid})`} />
-      {rings}
-      <Circle cx={discCx} cy={discCy} r={discR} fill="none" stroke="#ffffff" strokeOpacity={0.28} strokeWidth={2.5} />
-      <Circle cx={discCx} cy={discCy} r={discR * 0.34} fill={mixHex(d.eq[1], '#101322', 0.40)} />
-
-      {/* Jacket */}
-      <Rect x={JX + 6} y={JY + 10} width={JW} height={JH} rx={4} fill="#000000" fillOpacity={0.34} />
-      <Rect x={JX} y={JY} width={JW} height={JH} rx={4} fill={`url(#slB${uid})`} />
-      <G clipPath={`url(#slJ${uid})`}>
-        {/* The board is PRINTED, so it has a picture on it. A flat tint of the
-            station colour was the last thing making the jacket read as a
-            coloured rectangle rather than card that came off a press. */}
-        {!!d.backdrop && (
-          <SvgImage x={JX} y={JY} width={JW} height={JH} href={d.backdrop as string}
-            preserveAspectRatio="xMidYMid slice" opacity={0.30} />
-        )}
-        <Rect x={JX} y={JY} width={JW} height={JH} fill={board} fillOpacity={0.52} />
-        {grain}
-        {/* Ring wear: the record inside presses a circle into the board over
-            the years. Nothing says "this has been owned" faster. */}
-        <Circle cx={JX + JW * 0.48} cy={ART_Y + ART_H * 0.46} r={ART_W * 0.40} fill="none"
-          stroke="#ffffff" strokeOpacity={0.05} strokeWidth={7} />
-        <Circle cx={JX + JW * 0.48} cy={ART_Y + ART_H * 0.46} r={ART_W * 0.40} fill="none"
-          stroke="#000000" strokeOpacity={0.10} strokeWidth={2} />
-      </G>
-
-      {/* Spine down the opening edge — a jacket is a folded sheet, and the fold
-          is the one line that stops this reading as a plain square. */}
-      <Rect x={JX} y={JY} width={38} height={JH} fill="#000000" fillOpacity={0.30} />
-      <Rect x={JX + 38} y={JY} width={2} height={JH} fill="#ffffff" fillOpacity={0.10} />
-      {[0, 1, 2].map((k) => (
-        <Rect key={`sb${k}`} x={JX + 10} y={JY + 60 + k * 34} width={18} height={16}
-          fill={d.eq[k]} fillOpacity={0.75} />
-      ))}
-
-      {/* Printed art — the mode as it really looks, photograph and all */}
-      <ModeStage d={d} uid={`sl${uid}`} x={ART_X} y={ART_Y} w={ART_W} h={ART_H} rx={6} />
-      <Rect x={ART_X} y={ART_Y} width={ART_W} height={ART_H} rx={6}
-        fill="none" stroke="#ffffff" strokeOpacity={0.14} strokeWidth={1.6} />
-
-      {/* Hype sticker: the roundel a shop slaps on the wrap. Carries the dial
-          number, which is the one number this station has. */}
-      <Circle cx={stickX} cy={stickY} r={STICK_R} fill={mixHex(d.eq[1], '#ffffff', 0.16)} />
-      <Circle cx={stickX} cy={stickY} r={STICK_R} fill="none" stroke="#ffffff" strokeOpacity={0.5} strokeWidth={2} />
-      <Circle cx={stickX} cy={stickY} r={STICK_R - 11} fill="none" stroke="#0a0b12" strokeOpacity={0.28} strokeWidth={1.6} />
-      <SvgText x={stickX} y={stickY - 14} fill="#0a0b12" fillOpacity={0.7} fontSize={17} fontWeight="800"
-        letterSpacing={3} textAnchor="middle">
-        TUNE TO
-      </SvgText>
-      <SvgText x={stickX} y={stickY + 22} fill="#0a0b12" fontSize={34} fontWeight="900"
-        letterSpacing={-0.5} textAnchor="middle">
-        {d.dialLabel}
-      </SvgText>
-      <SvgText x={stickX} y={stickY + 50} fill="#0a0b12" fillOpacity={0.72} fontSize={18} fontWeight="800"
-        letterSpacing={4} textAnchor="middle">
-        {d.band}
-      </SvgText>
-
-      {/* The name, the song and the artist each get a line of their own. Set on
-          one baseline with the artist right-aligned, a long station name and a
-          long artist simply printed over each other. */}
-      <SvgText x={JX + 64} y={JY + JH - TYPE_BAND + 72} fill={print} fontSize={nameSize} fontWeight="900" letterSpacing={-1}>
-        {station.name}
-      </SvgText>
-      {titleLines.map((line, i) => (
-        <SvgText key={i} x={JX + 64} y={JY + JH - TYPE_BAND + 124 + i * 40} fill="#ffffff"
-          fillOpacity={0.62} fontSize={32} fontWeight="600">
-          {line}
-        </SvgText>
-      ))}
-      {!!d.artist && (
-        <SvgText x={JX + 64} y={JY + JH - TYPE_BAND + 206} fill="#ffffff" fillOpacity={0.42}
-          fontSize={25} fontWeight="700" letterSpacing={3}>
-          {clip(d.artist.toUpperCase(), 30)}
-        </SvgText>
-      )}
-
-      {/* Wrap sheen over everything printed, and a bumped corner under it */}
-      <Path d={`M ${JX + JW} ${JY + JH - 54} L ${JX + JW} ${JY + JH} L ${JX + JW - 54} ${JY + JH} Z`}
-        fill="#ffffff" fillOpacity={0.07} />
-      <Rect x={JX} y={JY} width={JW} height={JH} rx={4} fill={`url(#slW${uid})`} />
-      <Rect x={JX} y={JY} width={JW} height={JH} rx={4} fill="none" stroke="#ffffff" strokeOpacity={0.18} strokeWidth={2} />
-
-      {/* Catalogue line */}
-      <SvgText x={JX} y={catY} fill="#ffffff" fillOpacity={0.5} fontSize={25} fontWeight="700" letterSpacing={4}>
-        {`CFM-${d.dialLabel.replace('.', '')} · ${modeLabel.toUpperCase()}`}
-      </SvgText>
-      <SvgText x={CARD_W - JX} y={catY} fill="#ffffff" fillOpacity={0.4} fontSize={25}
-        fontWeight="600" textAnchor="end">
-        {INSTALL_HOST}
-      </SvgText>
-    </>
-  );
-}
-
-// ── 3. Receiver ───────────────────────────────────────────────────────────────
-// The card as a head unit, in the same language as the Stations page and the
-// Tuner. The first pass was a flat black rectangle with type on it; a real set
-// has a moulded bezel, a recessed glass display that catches light, a readout
-// that glows onto its own surround, and a dial whose needle is somewhere
-// specific. All five of those are here.
-
-function ReceiverStyle(p: StyleProps) {
-  const d = derive(p);
-  const { uid, cardH, station, modeLabel, modeId } = p;
-  const B = 40;                                        // bezel inset
-  const PAD = 88;
-  const W = CARD_W - PAD * 2;
-  const extra = cardH - CARD_H_CARD;
-
-  // Brushed metal, now laid OVER the photograph rather than over black.
-  const brush = [];
-  for (let i = 0; i < 96; i++) {
-    const x = (i / 96) * CARD_W;
-    brush.push(<Rect key={`br${i}`} x={x} y={0} width={2.6} height={cardH} fill="#ffffff"
-      fillOpacity={0.008 + h01(i * 7.13) * 0.022} />);
-  }
-
-  // Readout
-  const FREQ_DOT = 13.5, FREQ_GAP = 5;
-  const freqText = d.band === 'AM' ? d.dialLabel.replace(' AM', '') : d.dialLabel.replace(' FM', '');
-  const freqW = dmWidth(freqText, FREQ_DOT, FREQ_GAP);
-  const bandDot = 7.6, bandGap = 2.6;
-  const readoutW = freqW + 34 + dmWidth(d.band, bandDot, bandGap);
-  const readoutX = CX - readoutW / 2;
-
-  const GX = B + 34, GW = CARD_W - (B + 34) * 2;
-  // Glass tall enough for its three rows to BREATHE. At 276 the frequency's
-  // 124-tall digits ended 9px above the station name and the whole readout
-  // read as one block (owner, 03.08: "the top station information looks
-  // cramped"). Every row below is positioned off GY, so the spacing is set in
-  // one place — see the y values on the readout group.
-  const GY = B + 34, GH = 330;
-
-  // The mode's object, laid on the card's own background at 0.80 of its width
-  // and never cropped. The framed window it used to sit in was a SECOND screen
-  // inside the set, which is what made the Tuner-inside-a-tuner look absurd.
-  // A taller pin spends its extra height on a bigger object and a lower
-  // fascia, rather than leaving a dead band of metal above the dial.
-  // Slightly smaller than it was: the glass above grew to un-cram the
-  // readout, and that height has to come from somewhere or the song block
-  // below lands on the dial.
-  const HERO_W = Math.round(CARD_W * (0.645 + (extra / CARD_H_CARD) * 0.34));
-  const HERO_H = Math.round((HERO_W * STAGE_H) / CARD_W);
-  const HERO_X = CX - HERO_W / 2;
-  const HERO_Y = 474 + extra * 0.46;   // follows the taller glass
-
-  const lineW = W - 24;
-  const titleText = clip(d.title.toUpperCase(), Math.max(1, dmFit(lineW, 4.6, 1.7)));
-  const artistText = clip(d.artist.toUpperCase(), Math.max(1, dmFit(lineW, 3.4, 1.3)));
-
-  // Dial, with the needle where the station actually sits in its band. The
-  // TUNER mode already draws a dial of its own inside the picture, so the set
-  // prints a plain scale there instead of a second working one.
-  const ownDial = modeId !== 'radio';
-  const dialY = cardH - 172;
-  const [lo, hi] = BAND_RANGE[d.band] ?? BAND_RANGE.FM;
-  const t = Math.max(0.04, Math.min(0.96, (d.dialValue - lo) / (hi - lo)));
-  const needleX = PAD + t * W;
-  const ticks = [];
-  if (ownDial) {
-    for (let i = 0; i <= 40; i++) {
-      const x = PAD + (i / 40) * W;
-      const whole = i % 5 === 0;
-      ticks.push(<Rect key={`tk${i}`} x={x - (whole ? 2 : 1.1)} y={dialY - (whole ? 34 : 19)}
-        width={whole ? 4 : 2.2} height={whole ? 34 : 19} fill={AMBER} fillOpacity={whole ? 0.72 : 0.28} />);
-    }
-  }
-
-  return (
-    <>
-      <Defs>
-        <ClipPath id={`rcC${uid}`}><Rect x={0} y={0} width={CARD_W} height={cardH} /></ClipPath>
-        <SvgLinearGradient id={`rcB${uid}`} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#ffffff" stopOpacity="0.14" />
-          <Stop offset="0.10" stopColor="#ffffff" stopOpacity="0.02" />
-          <Stop offset="0.92" stopColor="#000000" stopOpacity="0.10" />
-          <Stop offset="1" stopColor="#000000" stopOpacity="0.28" />
-        </SvgLinearGradient>
-        <SvgLinearGradient id={`rcGl${uid}`} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#0b0f18" />
-          <Stop offset="1" stopColor="#04050a" />
-        </SvgLinearGradient>
-        {/* The one sweep of light across the glass. Any harder and it reads as
-            a painted stripe rather than a reflection. */}
-        <SvgLinearGradient id={`rcR${uid}`} x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0.20" stopColor="#ffffff" stopOpacity="0" />
-          <Stop offset="0.40" stopColor="#ffffff" stopOpacity="0.055" />
-          <Stop offset="0.56" stopColor="#ffffff" stopOpacity="0" />
-        </SvgLinearGradient>
-        <RadialGradient id={`rcA${uid}`} cx="50%" cy="50%" r="50%">
-          <Stop offset="0" stopColor={AMBER} stopOpacity="0.34" />
-          <Stop offset="1" stopColor={AMBER} stopOpacity="0" />
-        </RadialGradient>
-      </Defs>
-
-      {/* The photograph is the whole card. */}
-      <G clipPath={`url(#rcC${uid})`}>
-        <PhotoFill d={d} uid={uid} x={0} y={0} w={CARD_W} h={cardH} />
-        <G transform={heroBox(HERO_X, HERO_Y, HERO_W, HERO_H, 'contain')}>{d.hero}</G>
-        {brush}
-        <FadeBand uid={`rt${uid}`} x={0} y={0} w={CARD_W} h={470 + extra * 0.2} from={0.92} dir="down" />
-        <FadeBand uid={`rb${uid}`} x={0} y={cardH - 430} w={CARD_W} h={430} from={0.94} dir="up" />
-      </G>
-
-      {/* Moulded bezel — a frame only now, so the picture runs under it */}
-      <Rect x={B} y={B} width={CARD_W - B * 2} height={cardH - B * 2} rx={44} fill={`url(#rcB${uid})`} />
-      <Rect x={B} y={B} width={CARD_W - B * 2} height={cardH - B * 2} rx={44}
-        fill="none" stroke="#ffffff" strokeOpacity={0.14} strokeWidth={2} />
-      {[[B + 30, B + 30], [CARD_W - B - 30, B + 30], [B + 30, cardH - B - 30], [CARD_W - B - 30, cardH - B - 30]].map(([x, y], k) => (
-        <G key={`sw${k}`}>
-          <Circle cx={x} cy={y} r={10} fill="#000000" fillOpacity={0.45} />
-          <Circle cx={x} cy={y} r={10} fill="none" stroke="#ffffff" strokeOpacity={0.16} strokeWidth={1.4} />
-          <Rect x={x - 6} y={y - 1} width={12} height={2} fill="#ffffff" fillOpacity={0.22} />
-        </G>
-      ))}
-
-      {/* Glass display */}
-      <Rect x={GX} y={GY} width={GW} height={GH} rx={20} fill={`url(#rcGl${uid})`}
-        stroke="#000000" strokeOpacity={0.55} strokeWidth={3} />
-      <Rect x={GX} y={GY} width={GW} height={GH} rx={20} fill="none" stroke="#ffffff" strokeOpacity={0.09} strokeWidth={1.4} />
-
-      <Circle cx={GX + 42} cy={GY + 44} r={10} fill={LAMP_RED} />
-      <Circle cx={GX + 42} cy={GY + 44} r={20} fill={LAMP_RED} fillOpacity={0.24} />
-      <DotMatrixGroup text="ON AIR" x={GX + 68} y={GY + 30} dot={3.6} gap={1.4} color="#FF6B5A" opacity={0.95} />
-      <DotMatrixGroup text="STEREO" x={CX - 40} y={GY + 30} dot={3.6} gap={1.4} color="#9FD8FF" opacity={0.5} />
-      <DotMatrixGroup text="TUNED" x={GX + GW - 34} y={GY + 30} dot={3.6} gap={1.4}
-        color="#9FD8FF" anchor="end" opacity={0.5} />
-
-      {/* Frequency, glowing onto its own glass */}
-      <Ellipse cx={CX} cy={GY + 156} rx={readoutW * 0.78} ry={104} fill={`url(#rcA${uid})`} />
-      <DotMatrixGroup text={freqText} x={readoutX} y={GY + 94} dot={FREQ_DOT} gap={FREQ_GAP} color={AMBER} dim opacity={1} />
-      <DotMatrixGroup text={d.band} x={readoutX + freqW + 34} y={GY + 94 + FREQ_DOT * 3} dot={bandDot} gap={bandGap}
-        color={AMBER} dim opacity={0.9} />
-      <DotMatrixGroup text={clip(station.name.toUpperCase(), Math.max(1, dmFit(GW - 80, 4.0, 1.5)))}
-        x={CX} y={GY + 258} dot={4.0} gap={1.5} color="#CFE6FF" anchor="middle" opacity={0.72} />
-      <Rect x={GX} y={GY} width={GW} height={GH} rx={20} fill={`url(#rcR${uid})`} />
-
-      {/* Silk-screened label under the glass */}
-      <SvgText x={CX} y={GY + GH + 56} fill="#ffffff" fillOpacity={0.38} fontSize={23} fontWeight="700"
-        letterSpacing={6} textAnchor="middle">
-        {modeLabel.toUpperCase()}
-      </SvgText>
-
-      {/* Song, in the readout's own type. Anchored UP FROM THE DIAL rather
-          than down from the hero: the dial sits at a fixed height off the
-          card's foot, so hanging the song off the hero meant any change to
-          the hero's size landed the artist on the tick marks. */}
-      <DotMatrixGroup text={titleText} x={PAD + 12} y={dialY - 214} dot={4.6} gap={1.7}
-        color={mixHex(d.eq[1], '#ffffff', 0.40)} dim opacity={1} />
-      {!!artistText && (
-        <DotMatrixGroup text={artistText} x={PAD + 12} y={dialY - 150} dot={3.4} gap={1.3}
-          color={mixHex(d.eq[1], '#ffffff', 0.40)} opacity={0.68} />
-      )}
-
-      {/* Dial */}
-      {ticks}
-      <SvgText x={PAD} y={dialY + 40} fill={AMBER} fillOpacity={0.45} fontSize={20} fontWeight="800" letterSpacing={2}>
-        {String(lo)}
-      </SvgText>
-      <SvgText x={PAD + W} y={dialY + 40} fill={AMBER} fillOpacity={0.45} fontSize={20} fontWeight="800"
-        letterSpacing={2} textAnchor="end">
-        {String(hi)}
-      </SvgText>
-      <Rect x={PAD} y={dialY} width={W} height={3.5} fill={AMBER} fillOpacity={0.45} />
-      {ownDial && (
-        <>
-          <Rect x={needleX - 7} y={dialY - 68} width={14} height={118} rx={7} fill={LAMP_RED} fillOpacity={0.16} />
-          <Rect x={needleX - 2.4} y={dialY - 68} width={4.8} height={118} rx={2.4} fill={LAMP_RED} fillOpacity={0.8} />
-          <Rect x={needleX - 0.9} y={dialY - 68} width={1.8} height={118} fill="#FFD9D4" fillOpacity={0.9} />
-        </>
-      )}
-
-      <DotMatrixGroup text="CRUISE FM" x={PAD} y={cardH - 104} dot={3.8} gap={1.5} color="#ffffff" opacity={0.55} />
-      <SvgText x={CARD_W - PAD} y={cardH - 78} fill="#ffffff" fillOpacity={0.36} fontSize={24}
-        fontWeight="600" textAnchor="end">
-        {INSTALL_HOST}
-      </SvgText>
-    </>
-  );
-}
-
-// ── 4. Snapshot ───────────────────────────────────────────────────────────────
-// The mode AS IT WAS on screen, framed. The capture is the whole point, so the
-// card around it stays quiet: the station's photograph deep under a scrim, a
-// phone-shaped window with the real screenshot, the song underneath, and the
-// footer. No hero drawing — for once the picture isn't a picture OF the app,
-// it IS the app.
+/** Fraction of a portrait screen's height occupied by the status strip —
+ *  clock, signal, battery. Notch phones use ~54-59pt of 800-930pt; slightly
+ *  generous so no phone shows a sliver of clock. */
+const STATUS_FRAC = 0.072;
 
 function SnapshotStyle(p: StyleProps) {
   const d = derive(p);
-  const { uid, cardH, station, modeLabel, snapshotUri } = p;
+  const { uid, cardH, station, modeLabel, snapshot } = p;
+  if (!snapshot) return <TicketStyle {...p} />;
 
-  // The window: phone-shaped, centred, and deliberately WIDER in ratio than
-  // the screen it shows. `slice` then fills the width and trims the excess
-  // height equally at both ends — which is exactly the crop wanted, since the
-  // status bar and eyebrow live at the top of the capture and the transport
-  // and pills at the bottom. The middle band — the object and the title — is
-  // what survives, whatever the phone's exact shape.
-  const WIN_W = 660;
-  const WX = (CARD_W - WIN_W) / 2;
-  const WY = 168;
-  const winH = cardH - WY - 314;          // song block + footer live below
+  const portrait = snapshot.h >= snapshot.w;
+  const cropTop = portrait ? STATUS_FRAC : 0;   // landscape hides its own bar
+  const visW = snapshot.w;
+  const visH = snapshot.h * (1 - cropTop);
+
+  // Fit the visible page whole between the eyebrow and the footer.
+  const TOP = 138, BOT = 128, SIDE = 84;
+  const k = Math.min((CARD_W - SIDE * 2) / visW, (cardH - TOP - BOT) / visH);
+  const winW = visW * k, winH = visH * k;
+  const WX = (CARD_W - winW) / 2;
+  const WY = TOP + (cardH - TOP - BOT - winH) / 2;
   const clipId = `snap${uid}`;
-
-  const title = clip(d.title, 44);
-  const titleSize = fitSize(title, 58, CARD_W - 160, 40);
-  const footY = cardH - 84;
+  const footY = cardH - 64;
 
   return (
     <>
@@ -879,18 +505,18 @@ function SnapshotStyle(p: StyleProps) {
       <Backdrop d={d} uid={uid} cardH={cardH} stops={[0.78, 0.68, 0.78, 0.92]} />
 
       {/* Eyebrow above the window */}
-      <SvgText x={CX} y={WY - 62} fill="#ffffff" fillOpacity={0.5} fontSize={26}
+      <SvgText x={CX} y={WY - 64} fill="#ffffff" fillOpacity={0.5} fontSize={25}
         fontWeight="700" letterSpacing={7} textAnchor="middle">
         {`${modeLabel.toUpperCase()} · ${d.dialLabel} ${d.band}`}
       </SvgText>
-      <SvgText x={CX} y={WY - 26} fill="#ffffff" fillOpacity={0.85} fontSize={30}
+      <SvgText x={CX} y={WY - 28} fill="#ffffff" fillOpacity={0.85} fontSize={29}
         fontWeight="800" letterSpacing={1} textAnchor="middle">
         {clip(station.name, 30)}
       </SvgText>
 
       <Defs>
         <ClipPath id={clipId}>
-          <Rect x={WX} y={WY} width={WIN_W} height={winH} rx={46} ry={46} />
+          <Rect x={WX} y={WY} width={winW} height={winH} rx={42} ry={42} />
         </ClipPath>
         {/* A whisper of station light bleeding out of the window, standing in
             for a drop shadow (no blur filter exists in this renderer). */}
@@ -899,28 +525,22 @@ function SnapshotStyle(p: StyleProps) {
           <Stop offset="1" stopColor={d.wash} stopOpacity="0" />
         </RadialGradient>
       </Defs>
-      <Rect x={WX - 70} y={WY - 60} width={WIN_W + 140} height={winH + 120} fill={`url(#sg${clipId})`} />
+      <Rect x={WX - 70} y={WY - 60} width={winW + 140} height={winH + 120} fill={`url(#sg${clipId})`} />
 
       <G clipPath={`url(#${clipId})`}>
-        <Rect x={WX} y={WY} width={WIN_W} height={winH} fill="#05060f" />
-        {!!snapshotUri && (
-          <SvgImage x={WX} y={WY} width={WIN_W} height={winH} href={{ uri: snapshotUri }}
-            preserveAspectRatio="xMidYMid slice" />
-        )}
+        <Rect x={WX} y={WY} width={winW} height={winH} fill="#05060f" />
+        {/* The full capture at its own aspect, drawn slightly taller than the
+            window so the status strip sits above the clip — everything below
+            it survives untouched. */}
+        <SvgImage x={WX} y={WY - snapshot.h * k * cropTop}
+          width={winW} height={snapshot.h * k}
+          href={{ uri: snapshot.uri }} preserveAspectRatio="xMidYMid meet" />
       </G>
-      <Rect x={WX} y={WY} width={WIN_W} height={winH} rx={46} fill="none"
+      <Rect x={WX} y={WY} width={winW} height={winH} rx={42} fill="none"
         stroke="#ffffff" strokeOpacity={0.30} strokeWidth={3} />
 
-      {/* The song, under the window */}
-      <SvgText x={CX} y={cardH - 226} fill="#ffffff" fontSize={titleSize}
-        fontWeight="800" textAnchor="middle">{title}</SvgText>
-      {!!d.artist && (
-        <SvgText x={CX} y={cardH - 176} fill="#ffffff" fillOpacity={0.62} fontSize={32}
-          fontWeight="600" textAnchor="middle">{clip(d.artist, 48)}</SvgText>
-      )}
-
-      {/* Footer */}
-      <Rect x={CX - 200} y={footY - 34} width={400} height={1.6} fill="#ffffff" fillOpacity={0.16} />
+      {/* Footer. No song block: the page IS the song block. */}
+      <Rect x={CX - 200} y={footY - 32} width={400} height={1.6} fill="#ffffff" fillOpacity={0.16} />
       <SvgText x={CX} y={footY} fill="#ffffff" fillOpacity={0.44} fontSize={24}
         fontWeight="700" letterSpacing={4} textAnchor="middle">
         {`CRUISE FM · ${INSTALL_HOST.toUpperCase()}`}
@@ -936,11 +556,9 @@ function SnapshotStyle(p: StyleProps) {
 export function ShareCardBody(props: StyleProps & { styleId: ShareStyleId }) {
   const { styleId, ...rest } = props;
   switch (styleId) {
-    // With no capture to show, Snapshot quietly becomes the default style —
-    // a chip that renders an empty window would be worse than no chip.
-    case 'snapshot': return rest.snapshotUri ? <SnapshotStyle {...rest} /> : <TicketStyle {...rest} />;
-    case 'sleeve': return <SleeveStyle {...rest} />;
-    case 'receiver': return <ReceiverStyle {...rest} />;
+    // With no capture to show, Snapshot quietly becomes the Ticket — a chip
+    // that renders an empty window would be worse than no chip.
+    case 'snapshot': return <SnapshotStyle {...rest} />;
     case 'ticket':
     default: return <TicketStyle {...rest} />;
   }

@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useDaylight } from '@/context/MotionContext';
 
@@ -47,7 +47,9 @@ const MAX_PLAYLIST_CHARS = 18;
  * drawn styles, exactly as it did before snapshots existed. The race is a
  * seatbelt — a wedged native call must not leave the share pill dead.
  */
-async function grabModeSnapshot(): Promise<string | null> {
+export type ModeSnapshot = { uri: string; w: number; h: number };
+
+async function grabModeSnapshot(): Promise<ModeSnapshot | null> {
   if (Platform.OS === 'web') return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -58,8 +60,15 @@ async function grabModeSnapshot(): Promise<string | null> {
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('capture timed out')), 1500)),
     ]);
     if (!uri) return null;
-    // iOS hands back a bare path; SVG's Image wants a real uri.
-    return uri.startsWith('/') ? `file://${uri}` : uri;
+    // The card needs the capture's aspect to lay the full page out uncropped
+    // (and to slice the status bar off by fraction) — the screen's points are
+    // that aspect exactly.
+    const scr = Dimensions.get('screen');
+    return {
+      // iOS hands back a bare path; SVG's Image wants a real uri.
+      uri: uri.startsWith('/') ? `file://${uri}` : uri,
+      w: scr.width, h: scr.height,
+    };
   } catch {
     return null;
   }
@@ -87,7 +96,7 @@ export function ModeActionRow({
   const np = useNowPlaying();
   const day = useDaylight();
   const [sharing, setSharing] = useState(false);
-  const [snapUri, setSnapUri] = useState<string | null>(null);
+  const [snap, setSnap] = useState<ModeSnapshot | null>(null);
   // Tapping the playlist pill opens the playlist's SONGS, not a picker of
   // other playlists (owner, 03.08 — wanting a particular song meant leaving
   // for Spotify). Changing playlist is one row inside that sheet, so the card
@@ -161,7 +170,7 @@ export function ModeActionRow({
             // Capture BEFORE the sheet renders — once it's up, the screen is
             // the sheet, not the mode. A failed capture opens the sheet
             // anyway, just without the Snapshot style.
-            setSnapUri(await grabModeSnapshot());
+            setSnap(await grabModeSnapshot());
             setSharing(true);
           }}
           style={[ar.pill, day && ar.pillDay, ar.pillIcon]} activeOpacity={0.85}
@@ -193,7 +202,7 @@ export function ModeActionRow({
         track={track}
         modeLabel={modeLabel}
         modeId={modeId}
-        snapshotUri={snapUri}
+        snapshot={snap}
       />
     </View>
   );

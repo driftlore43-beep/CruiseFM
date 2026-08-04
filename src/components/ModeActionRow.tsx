@@ -35,6 +35,36 @@ import type { NowPlaying } from '@/utils/useMusicPlayback';
  *  phone before ellipsising ever kicks in. */
 const MAX_PLAYLIST_CHARS = 18;
 
+/**
+ * Photograph the screen AS IT IS — the running mode, the moment the share
+ * pill is tapped, before the share sheet covers anything. This is the "share
+ * it like a screenshot, in a card form" the owner asked for on 27.07: the
+ * card's Snapshot style frames whatever this returns.
+ *
+ * Everything degrades to null: react-native-view-shot is a NATIVE module that
+ * exists in builds 15+ but not on web or anything older, and this file ships
+ * over the air into all of them. Null simply means the sheet opens with the
+ * drawn styles, exactly as it did before snapshots existed. The race is a
+ * seatbelt — a wedged native call must not leave the share pill dead.
+ */
+async function grabModeSnapshot(): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { captureScreen } = require('react-native-view-shot');
+    if (typeof captureScreen !== 'function') return null;
+    const uri: string = await Promise.race([
+      captureScreen({ format: 'jpg', quality: 0.92, result: 'tmpfile' }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('capture timed out')), 1500)),
+    ]);
+    if (!uri) return null;
+    // iOS hands back a bare path; SVG's Image wants a real uri.
+    return uri.startsWith('/') ? `file://${uri}` : uri;
+  } catch {
+    return null;
+  }
+}
+
 function trim(label: string): string {
   return label.length > MAX_PLAYLIST_CHARS ? `${label.slice(0, MAX_PLAYLIST_CHARS - 1).trimEnd()}…` : label;
 }
@@ -57,6 +87,7 @@ export function ModeActionRow({
   const np = useNowPlaying();
   const day = useDaylight();
   const [sharing, setSharing] = useState(false);
+  const [snapUri, setSnapUri] = useState<string | null>(null);
   // Tapping the playlist pill opens the playlist's SONGS, not a picker of
   // other playlists (owner, 03.08 — wanting a particular song meant leaving
   // for Spotify). Changing playlist is one row inside that sheet, so the card
@@ -125,7 +156,15 @@ export function ModeActionRow({
       </TouchableOpacity>
 
       {!!track && (
-        <TouchableOpacity onPress={() => setSharing(true)} style={[ar.pill, day && ar.pillDay, ar.pillIcon]} activeOpacity={0.85}
+        <TouchableOpacity
+          onPress={async () => {
+            // Capture BEFORE the sheet renders — once it's up, the screen is
+            // the sheet, not the mode. A failed capture opens the sheet
+            // anyway, just without the Snapshot style.
+            setSnapUri(await grabModeSnapshot());
+            setSharing(true);
+          }}
+          style={[ar.pill, day && ar.pillDay, ar.pillIcon]} activeOpacity={0.85}
           accessibilityLabel="Share this song" accessibilityRole="button">
           {/* Ionicons' `share-outline` is the iOS box-with-an-arrow; Android's
               own share glyph is the three-node one, so each platform gets the
@@ -154,6 +193,7 @@ export function ModeActionRow({
         track={track}
         modeLabel={modeLabel}
         modeId={modeId}
+        snapshotUri={snapUri}
       />
     </View>
   );

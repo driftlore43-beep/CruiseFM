@@ -43,6 +43,12 @@ export type ShareFormat = 'card' | 'pin';
 export const FORMAT_H: Record<ShareFormat, number> = { card: CARD_H_CARD, pin: CARD_H_PIN };
 
 export const SHARE_STYLES = [
+  // Snapshot leads: a REAL capture of the running mode (owner, 27.07: "since
+  // this is a more visual app… share this like a screenshot but in a card
+  // form" — she compared the live Mirror Ball against the redrawn one and
+  // rightly preferred the real thing). The chip only appears when a capture
+  // exists; the drawn styles are the standing fallback.
+  { id: 'snapshot', label: 'Snapshot' },
   { id: 'ticket', label: 'Ticket' },
   { id: 'sleeve', label: 'Sleeve' },
   { id: 'receiver', label: 'Receiver' },
@@ -239,6 +245,10 @@ type StyleProps = {
   userName: string | null;
   uid: string;
   cardH: number;
+  /** A real screenshot of the running mode (react-native-view-shot), or null
+   *  when capture wasn't possible — older builds, web, or a native failure.
+   *  Only the Snapshot style reads it. */
+  snapshotUri?: string | null;
 };
 
 type Derived = {
@@ -836,6 +846,89 @@ function ReceiverStyle(p: StyleProps) {
   );
 }
 
+// ── 4. Snapshot ───────────────────────────────────────────────────────────────
+// The mode AS IT WAS on screen, framed. The capture is the whole point, so the
+// card around it stays quiet: the station's photograph deep under a scrim, a
+// phone-shaped window with the real screenshot, the song underneath, and the
+// footer. No hero drawing — for once the picture isn't a picture OF the app,
+// it IS the app.
+
+function SnapshotStyle(p: StyleProps) {
+  const d = derive(p);
+  const { uid, cardH, station, modeLabel, snapshotUri } = p;
+
+  // The window: phone-shaped, centred, and deliberately WIDER in ratio than
+  // the screen it shows. `slice` then fills the width and trims the excess
+  // height equally at both ends — which is exactly the crop wanted, since the
+  // status bar and eyebrow live at the top of the capture and the transport
+  // and pills at the bottom. The middle band — the object and the title — is
+  // what survives, whatever the phone's exact shape.
+  const WIN_W = 660;
+  const WX = (CARD_W - WIN_W) / 2;
+  const WY = 168;
+  const winH = cardH - WY - 314;          // song block + footer live below
+  const clipId = `snap${uid}`;
+
+  const title = clip(d.title, 44);
+  const titleSize = fitSize(title, 58, CARD_W - 160, 40);
+  const footY = cardH - 84;
+
+  return (
+    <>
+      <BaseWash d={d} uid={uid} cardH={cardH} glow={0.30} />
+      <Backdrop d={d} uid={uid} cardH={cardH} stops={[0.78, 0.68, 0.78, 0.92]} />
+
+      {/* Eyebrow above the window */}
+      <SvgText x={CX} y={WY - 62} fill="#ffffff" fillOpacity={0.5} fontSize={26}
+        fontWeight="700" letterSpacing={7} textAnchor="middle">
+        {`${modeLabel.toUpperCase()} · ${d.dialLabel} ${d.band}`}
+      </SvgText>
+      <SvgText x={CX} y={WY - 26} fill="#ffffff" fillOpacity={0.85} fontSize={30}
+        fontWeight="800" letterSpacing={1} textAnchor="middle">
+        {clip(station.name, 30)}
+      </SvgText>
+
+      <Defs>
+        <ClipPath id={clipId}>
+          <Rect x={WX} y={WY} width={WIN_W} height={winH} rx={46} ry={46} />
+        </ClipPath>
+        {/* A whisper of station light bleeding out of the window, standing in
+            for a drop shadow (no blur filter exists in this renderer). */}
+        <RadialGradient id={`sg${clipId}`} cx="50%" cy="50%" r="60%">
+          <Stop offset="0.62" stopColor={d.wash} stopOpacity="0.30" />
+          <Stop offset="1" stopColor={d.wash} stopOpacity="0" />
+        </RadialGradient>
+      </Defs>
+      <Rect x={WX - 70} y={WY - 60} width={WIN_W + 140} height={winH + 120} fill={`url(#sg${clipId})`} />
+
+      <G clipPath={`url(#${clipId})`}>
+        <Rect x={WX} y={WY} width={WIN_W} height={winH} fill="#05060f" />
+        {!!snapshotUri && (
+          <SvgImage x={WX} y={WY} width={WIN_W} height={winH} href={{ uri: snapshotUri }}
+            preserveAspectRatio="xMidYMid slice" />
+        )}
+      </G>
+      <Rect x={WX} y={WY} width={WIN_W} height={winH} rx={46} fill="none"
+        stroke="#ffffff" strokeOpacity={0.30} strokeWidth={3} />
+
+      {/* The song, under the window */}
+      <SvgText x={CX} y={cardH - 226} fill="#ffffff" fontSize={titleSize}
+        fontWeight="800" textAnchor="middle">{title}</SvgText>
+      {!!d.artist && (
+        <SvgText x={CX} y={cardH - 176} fill="#ffffff" fillOpacity={0.62} fontSize={32}
+          fontWeight="600" textAnchor="middle">{clip(d.artist, 48)}</SvgText>
+      )}
+
+      {/* Footer */}
+      <Rect x={CX - 200} y={footY - 34} width={400} height={1.6} fill="#ffffff" fillOpacity={0.16} />
+      <SvgText x={CX} y={footY} fill="#ffffff" fillOpacity={0.44} fontSize={24}
+        fontWeight="700" letterSpacing={4} textAnchor="middle">
+        {`CRUISE FM · ${INSTALL_HOST.toUpperCase()}`}
+      </SvgText>
+    </>
+  );
+}
+
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 
 /** The card's contents, with no <Svg> wrapper — so the same geometry can be
@@ -843,6 +936,9 @@ function ReceiverStyle(p: StyleProps) {
 export function ShareCardBody(props: StyleProps & { styleId: ShareStyleId }) {
   const { styleId, ...rest } = props;
   switch (styleId) {
+    // With no capture to show, Snapshot quietly becomes the default style —
+    // a chip that renders an empty window would be worse than no chip.
+    case 'snapshot': return rest.snapshotUri ? <SnapshotStyle {...rest} /> : <TicketStyle {...rest} />;
     case 'sleeve': return <SleeveStyle {...rest} />;
     case 'receiver': return <ReceiverStyle {...rest} />;
     case 'ticket':

@@ -45,18 +45,6 @@ const V_RAYS = 15;              // static rays fanning from the vanishing point
 
 const DEMO_DURATION_MS = 214000; // 3:34
 
-// Star positions — random-but-stable so they don't twinkle on re-render.
-const STARS = Array.from({ length: 22 }, (_, i) => {
-  const a = Math.sin(i * 127.1) * 43758.5453;
-  const b = Math.sin(i * 311.7) * 12543.8967;
-  return {
-    x: Math.abs(a - Math.floor(a)) * VB_W,
-    y: Math.abs(b - Math.floor(b)) * (HORIZON_Y - SUN_R - 20),
-    r: 0.6 + Math.abs(Math.sin(i * 3.3)) * 1.0,
-    o: 0.18 + Math.abs(Math.sin(i * 7.7)) * 0.4,
-  };
-});
-
 /** Slats through the sun's lower half. See `sunCuts` — this is the count. */
 const SUN_SLATS = 7;
 
@@ -149,151 +137,302 @@ function sunCuts(cy: number, r: number, horizon: number) {
   });
 }
 
-const GEOM_PORTRAIT = makeGeom(VB_W, VB_H);
-const GEOM_WIDE = makeGeom(800, 370);
-
 function formatMs(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-// ── The outrun scene ────────────────────────────────────────────────────────────
-function HorizonScene({ phase, amp, eq, geom = GEOM_PORTRAIT }: { phase: number; amp: number; eq: [string, string, string]; geom?: HzGeom }) {
-  // The canvas is sized in real pixels rather than "100%": a percentage
-  // canvas does not reliably re-resolve when the window changes shape, and
-  // with `slice` cropping that would crop the scene for the OLD screen.
-  const { width: winW, height: winH } = useWindowDimensions();
+/**
+ * ── The outrun scene — REBUILT STATIC + NATIVE-DRIVER OVERLAYS (04.08) ──────
+ *
+ * The old scene re-rendered its entire SVG tree from React state 15 times a
+ * second (a rAF loop calling setPhase). That re-rendered the WHOLE fullscreen
+ * component — controls, action row, everything — through react-native-svg's
+ * reconciler on the JS thread, and the owner felt it as Horizon "slowing down
+ * the entire app": every tap and JS animation anywhere queued behind it. The
+ * 25→15fps throttle (24.07) halved the burn but kept the architecture; this
+ * removes it.
+ *
+ * The observation that makes it cheap: almost nothing in this scene moves.
+ * Sky, sun, slats, spill, horizon line and rays are STATIC — they were being
+ * repainted 15×/s for no reason. Only three things change:
+ *   1. the rolling grid lines   → RollingLines: plain Views on ONE looping
+ *      native Animated.Value, per-line keyframe interpolations
+ *   2. the star twinkle         → TwinkleStars: Views on FIVE shared loops
+ *      (the old math had exactly five distinct rates — i % 5)
+ *   3. the sun's glow dimming while paused → one animated opacity wrapper
+ * Everything else renders once per station/orientation. Zero JS-thread work
+ * per frame, like every other mode.
+ *
+ * GEOMETRY RULE that makes the overlays possible: the Svg is always drawn
+ * with a viewBox EQUAL to the window (`makeGeom(winW, winH)`), so viewBox
+ * units ARE screen pixels and the overlay Views can share the scene's
+ * numbers directly. Never pass a fixed-size geom (the old GEOM_WIDE) here —
+ * `slice` would rescale the Svg but not the overlays, and the lines would
+ * float off the grid.
+ */
+
+/** One looping 0→1 value; each line rides it through its own keyframes.
+ *  A line's journey is fixed — q = frac(offset + t) — so translateY/opacity/
+ *  scaleY are pure functions of the loop, sampled into interpolations. */
+const LINE_H = 3;                 // drawn height; scaleY shrinks it to width
+const ROLL_MS = 3300;             // one full cycle ≈ the old speed at amp=1
+function lineKeyframes(offset: number, g: HzGeom) {
+  const input: number[] = [];
+  const y: number[] = [];
+  const o: number[] = [];
+  const w: number[] = [];
+  const push = (t: number, q: number) => {
+    const near = Math.max(0, (q - 0.34) / 0.66);
+    input.push(t);
+    y.push(g.HORIZON + Math.pow(q, 2.2) * (g.H - g.HORIZON) - LINE_H / 2);
+    o.push(Math.min(1, q * 2.4) * 0.75 * (1 - near * near * 0.86));
+    // scaleY of a 3px bar: 0.6..2.8px. Floor at 0.2 — scaleY 0 is degenerate.
+    w.push(Math.max(0.2, (0.6 + q * 2.2) / LINE_H));
+  };
+  // Sample each continuous stretch of the loop; the wrap (q snapping 1→0)
+  // becomes two samples a hair apart, which interpolate renders as a jump.
+  // Opacity is ~0.1 at the bottom and 0 at the horizon, so the jump is quiet.
+  const wrapT = offset === 0 ? 1 : 1 - offset;
+  const SAMPLES = 11;
+  for (let s = 0; s <= SAMPLES; s++) push((s / SAMPLES) * (wrapT - 0.0002), (offset + (s / SAMPLES) * (wrapT - 0.0002)) % 1);
+  if (wrapT < 1) {
+    for (let s = 0; s <= SAMPLES; s++) {
+      const t = wrapT + (s / SAMPLES) * (1 - wrapT);
+      push(Math.min(t, 1), (offset + t) % 1);
+    }
+  }
+  return { input, y, o, w };
+}
+
+function RollingLines({ playing, color, geom }: { playing: boolean; color: string; geom: HzGeom }) {
+  const roll = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!playing) { roll.stopAnimation(); return; }
+    // Explicit restart, not Animated.loop: this loop RELIES on the value
+    // snapping 1→0 between passes, and Animated.loop's reset was measured
+    // (04.08, web probe) parking the value at 1 after the first pass. Every
+    // proven loop in this app is a sequence that travels back down on its
+    // own; a sawtooth needs its restart written out. No value read-backs —
+    // the Mirror Ball's stall taught that.
+    let alive = true;
+    const run = () => {
+      roll.setValue(0);
+      Animated.timing(roll, { toValue: 1, duration: ROLL_MS, easing: Easing.linear, useNativeDriver: true })
+        .start(({ finished }) => { if (finished && alive) run(); });
+    };
+    run();
+    return () => { alive = false; roll.stopAnimation(); };
+  }, [playing, roll]);
+
+  const lines = useMemo(
+    () => Array.from({ length: H_LINES }, (_, i) => lineKeyframes(i / H_LINES, geom)),
+    [geom],
+  );
+
+  return (
+    <>
+      {lines.map((k, i) => (
+        <Animated.View
+          key={i}
+          pointerEvents="none"
+          style={{
+            position: 'absolute', left: 0, right: 0, top: 0, height: LINE_H,
+            backgroundColor: color,
+            opacity: roll.interpolate({ inputRange: k.input, outputRange: k.o }),
+            transform: [
+              { translateY: roll.interpolate({ inputRange: k.input, outputRange: k.y }) },
+              { scaleY: roll.interpolate({ inputRange: k.input, outputRange: k.w }) },
+            ],
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+/** The five twinkle rates the old per-frame math used (0.7 + (i%5)·0.23
+ *  rad/s), each now one shared native loop; a star picks its bucket and
+ *  reads the loop through its own sine keyframes, so bucket-mates still
+ *  breathe out of step. Five animations however many stars are drawn. */
+const TWINKLE_BUCKETS = 5;
+function TwinkleStars({ playing, geom }: { playing: boolean; geom: HzGeom }) {
+  const loops = useRef(
+    Array.from({ length: TWINKLE_BUCKETS }, () => new Animated.Value(0)),
+  ).current;
+  useEffect(() => {
+    if (!playing) { loops.forEach((v) => v.stopAnimation()); return; }
+    // Explicit sawtooth restarts — same reason as RollingLines above.
+    let alive = true;
+    loops.forEach((v, k) => {
+      const rate = 0.7 + k * 0.23;                       // rad/s, as before
+      const periodMs = (2 * Math.PI * 1000) / rate;
+      const run = () => {
+        v.setValue(0);
+        Animated.timing(v, { toValue: 1, duration: periodMs, easing: Easing.linear, useNativeDriver: true })
+          .start(({ finished }) => { if (finished && alive) run(); });
+      };
+      run();
+    });
+    return () => { alive = false; loops.forEach((v) => v.stopAnimation()); };
+  }, [playing, loops]);
+
+  const stars = useMemo(() => geom.stars.map((s, i) => {
+    const input: number[] = [];
+    const out: number[] = [];
+    const K = 12;
+    for (let k = 0; k <= K; k++) {
+      const t = k / K;
+      input.push(t);
+      out.push(s.o * (0.55 + 0.45 * (0.5 + 0.5 * Math.sin(2 * Math.PI * t + i * 2.4))));
+    }
+    return { ...s, bucket: i % TWINKLE_BUCKETS, input, out };
+  }), [geom]);
+
+  return (
+    <>
+      {stars.map((s, i) => (
+        <Animated.View
+          key={i}
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: s.x - s.r, top: s.y - s.r,
+            width: s.r * 2, height: s.r * 2, borderRadius: s.r,
+            backgroundColor: '#ffffff',
+            opacity: loops[s.bucket].interpolate({ inputRange: s.input, outputRange: s.out }),
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+function HorizonScene({ playing, eq, geom }: { playing: boolean; eq: [string, string, string]; geom: HzGeom }) {
   const g = geom;
   const ramp = useMemo(() => sunRamp(eq), [eq]);
-  // Rolling grid: each line loops from the horizon toward the viewer,
-  // accelerating as it approaches (q^2.2 ≈ perspective).
-  const speed = 0.16 + amp * 0.14;
-  const lines = Array.from({ length: H_LINES }, (_, i) => {
-    const q = ((i / H_LINES + phase * speed) % 1 + 1) % 1;
-    // Fade back out in the near foreground, where the song title and the
-    // transport row sit. The lines are widest there (perspective) so they
-    // read as travelling even at a fraction of the brightness.
-    const near = Math.max(0, (q - 0.34) / 0.66);
-    return {
-      y: g.HORIZON + Math.pow(q, 2.2) * (g.H - g.HORIZON),
-      o: Math.min(1, q * 2.4) * 0.75 * (1 - near * near * 0.86),
-      w: 0.6 + q * 2.2,
-    };
-  });
+
+  // The glow's only motion was dimming while paused (the old `amp` swung
+  // between 1 playing and 0.4 paused, constant in between) — one animated
+  // opacity on the glow layer, nothing per-frame.
+  const glow = useRef(new Animated.Value(playing ? 1 : 0.72)).current;
+  useEffect(() => {
+    Animated.timing(glow, { toValue: playing ? 1 : 0.72, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }).start();
+  }, [playing, glow]);
 
   // Rays fan from the vanishing point, spaced evenly by viewing angle (real
   // perspective): the outermost rays flatten toward the horizon, so the grid
   // reaches the side edges all the way up — no bare corners.
-  const RAY_SPREAD = (85 * Math.PI) / 180;   // ±85° either side of straight down
-  const rays = Array.from({ length: V_RAYS }, (_, i) => {
-    const a = (i / (V_RAYS - 1) - 0.5) * 2 * RAY_SPREAD;
-    return g.SUN_CX + Math.tan(a) * (g.H + 30 - g.HORIZON);
-  });
+  const rays = useMemo(() => {
+    const RAY_SPREAD = (85 * Math.PI) / 180; // ±85° either side of straight down
+    return Array.from({ length: V_RAYS }, (_, i) => {
+      const a = (i / (V_RAYS - 1) - 0.5) * 2 * RAY_SPREAD;
+      return g.SUN_CX + Math.tan(a) * (g.H + 30 - g.HORIZON);
+    });
+  }, [g]);
+
+  // The canvas is sized in real pixels rather than "100%": a percentage
+  // canvas does not reliably re-resolve when the window changes shape.
+  // viewBox === window, so nothing is cropped and overlay pixels line up.
+  const svgProps = { width: g.W, height: g.H, viewBox: `0 0 ${g.W} ${g.H}` } as const;
 
   return (
-    <Svg width={winW} height={winH} viewBox={`0 0 ${g.W} ${g.H}`} preserveAspectRatio="xMidYMid slice">
-      <Defs>
-        <SvgGradient id="hzSun" x1="0" y1="0" x2="0" y2="1">
-          {ramp.map((s) => <Stop key={s.o} offset={s.o} stopColor={s.c} />)}
-        </SvgGradient>
-        {/* Two-stage bloom: a tight hot core plus a wide soft haze. One
-            gradient can't do both — widen it and the core washes out, tighten
-            it and the sun sits on the sky with a hard edge. */}
-        <RadialGradient id="hzSunGlow" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
-          <Stop offset="0" stopColor={ramp[1].c} stopOpacity="0.55" />
-          <Stop offset="0.45" stopColor={eq[1]} stopOpacity="0.22" />
-          <Stop offset="1" stopColor={eq[1]} stopOpacity="0" />
-        </RadialGradient>
-        <RadialGradient id="hzSunHaze" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
-          <Stop offset="0" stopColor={eq[1]} stopOpacity="0.20" />
-          <Stop offset="1" stopColor={eq[1]} stopOpacity="0" />
-        </RadialGradient>
-        {/* The sky warms toward the horizon instead of staying dead black,
-            and the sun's light spills down the grid the way it would on a
-            wet road. Both fade to nothing at their far edge — a band with a
-            visible boundary just reads as a drawn rectangle. */}
-        <SvgGradient id="hzSky" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={eq[2]} stopOpacity="0" />
-          <Stop offset="0.62" stopColor={eq[1]} stopOpacity="0.05" />
-          <Stop offset="1" stopColor={ramp[1].c} stopOpacity="0.16" />
-        </SvgGradient>
-        <RadialGradient id="hzSpill" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
-          <Stop offset="0" stopColor={ramp[1].c} stopOpacity="0.30" />
-          <Stop offset="1" stopColor={eq[1]} stopOpacity="0" />
-        </RadialGradient>
-        {/* The grid fades into the foreground. Without this the lines are at
-            their BRIGHTEST exactly where the song title and the transport sit
-            — `o` grows with `q`, which is right for perspective and wrong for
-            legibility. userSpaceOnUse so one gradient serves every ray. */}
-        <SvgGradient id="hzRay" x1="0" y1={g.HORIZON} x2="0" y2={g.H} gradientUnits="userSpaceOnUse">
-          <Stop offset="0" stopColor={eq[1]} stopOpacity="0.34" />
-          <Stop offset="0.45" stopColor={eq[1]} stopOpacity="0.26" />
-          <Stop offset="1" stopColor={eq[1]} stopOpacity="0.04" />
-        </SvgGradient>
-        <Mask id="hzSunMask">
-          <Rect x="0" y="0" width={g.W} height={g.H} fill="#000" />
-          {/* Visible only above the horizon */}
-          <Rect x="0" y="0" width={g.W} height={g.HORIZON} fill="#fff" />
-          {/* Slat cuts */}
-          {g.cuts.map((c, i) => (
-            <Rect key={i} x="0" y={c.y} width={g.W} height={c.h} fill="#000" />
-          ))}
-        </Mask>
-      </Defs>
-
+    <>
       {/* Sky warming down toward the horizon */}
-      <Rect x="0" y="0" width={g.W} height={g.HORIZON} fill="url(#hzSky)" />
+      <Svg {...svgProps} style={StyleSheet.absoluteFill}>
+        <Defs>
+          <SvgGradient id="hzSky" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={eq[2]} stopOpacity="0" />
+            <Stop offset="0.62" stopColor={eq[1]} stopOpacity="0.05" />
+            <Stop offset="1" stopColor={ramp[1].c} stopOpacity="0.16" />
+          </SvgGradient>
+        </Defs>
+        <Rect x="0" y="0" width={g.W} height={g.HORIZON} fill="url(#hzSky)" />
+      </Svg>
 
-      {/* Stars, twinkling. Each one breathes on its own period driven by the
-          phase the scene already advances every frame, so this costs nothing
-          — and a sky of perfectly steady dots is the one thing that gives a
-          drawn night away. */}
-      {g.stars.map((s, i) => (
-        <Circle
-          key={i}
-          cx={s.x} cy={s.y} r={s.r}
-          fill="#ffffff"
-          opacity={s.o * (0.55 + 0.45 * (0.5 + 0.5 * Math.sin(phase * (0.7 + (i % 5) * 0.23) + i * 2.4)))}
+      {/* Stars — native-driver Views, five shared loops */}
+      <TwinkleStars playing={playing} geom={g} />
+
+      {/* Sun bloom: wide haze + tighter glow, dimming as one while paused.
+          Its own layer because opacity has to animate without touching the
+          rest of the scene. Two-stage on purpose — one gradient can't give
+          both a hot core and a wide soft haze. */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: glow }]} pointerEvents="none">
+        <Svg {...svgProps}>
+          <Defs>
+            <RadialGradient id="hzSunGlow" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
+              <Stop offset="0" stopColor={ramp[1].c} stopOpacity="0.55" />
+              <Stop offset="0.45" stopColor={eq[1]} stopOpacity="0.22" />
+              <Stop offset="1" stopColor={eq[1]} stopOpacity="0" />
+            </RadialGradient>
+            <RadialGradient id="hzSunHaze" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
+              <Stop offset="0" stopColor={eq[1]} stopOpacity="0.20" />
+              <Stop offset="1" stopColor={eq[1]} stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Ellipse cx={g.SUN_CX} cy={g.SUN_CY} rx={g.SUN_R * 3.4} ry={g.SUN_R * 2.6} fill="url(#hzSunHaze)" />
+          <Ellipse cx={g.SUN_CX} cy={g.SUN_CY} rx={g.SUN_R * 1.9} ry={g.SUN_R * 1.55} fill="url(#hzSunGlow)" />
+        </Svg>
+      </Animated.View>
+
+      {/* Everything solid: the slatted sun, its spill, the horizon, the rays */}
+      <Svg {...svgProps} style={StyleSheet.absoluteFill}>
+        <Defs>
+          <SvgGradient id="hzSun" x1="0" y1="0" x2="0" y2="1">
+            {ramp.map((s) => <Stop key={s.o} offset={s.o} stopColor={s.c} />)}
+          </SvgGradient>
+          <RadialGradient id="hzSpill" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
+            <Stop offset="0" stopColor={ramp[1].c} stopOpacity="0.30" />
+            <Stop offset="1" stopColor={eq[1]} stopOpacity="0" />
+          </RadialGradient>
+          {/* The grid fades into the foreground. Without this the lines are
+              at their BRIGHTEST exactly where the song title and transport
+              sit. userSpaceOnUse so one gradient serves every ray. */}
+          <SvgGradient id="hzRay" x1="0" y1={g.HORIZON} x2="0" y2={g.H} gradientUnits="userSpaceOnUse">
+            <Stop offset="0" stopColor={eq[1]} stopOpacity="0.34" />
+            <Stop offset="0.45" stopColor={eq[1]} stopOpacity="0.26" />
+            <Stop offset="1" stopColor={eq[1]} stopOpacity="0.04" />
+          </SvgGradient>
+          <Mask id="hzSunMask">
+            <Rect x="0" y="0" width={g.W} height={g.H} fill="#000" />
+            {/* Visible only above the horizon */}
+            <Rect x="0" y="0" width={g.W} height={g.HORIZON} fill="#fff" />
+            {/* Slat cuts */}
+            {g.cuts.map((c, i) => (
+              <Rect key={i} x="0" y={c.y} width={g.W} height={c.h} fill="#000" />
+            ))}
+          </Mask>
+        </Defs>
+
+        <Circle cx={g.SUN_CX} cy={g.SUN_CY} r={g.SUN_R} fill="url(#hzSun)" mask="url(#hzSunMask)" />
+
+        {/* The sun's light spilling down the grid. An ELLIPSE, not a band: a
+            rectangle of glow has two hard vertical edges and on the first
+            render they showed as seams down the sides of the road. */}
+        <Ellipse
+          cx={g.SUN_CX} cy={g.HORIZON}
+          rx={g.SUN_R * 2.4} ry={(g.H - g.HORIZON) * 0.8}
+          fill="url(#hzSpill)"
         />
-      ))}
 
-      {/* Sun: wide haze, tighter bloom, then the slatted disc */}
-      <Ellipse cx={g.SUN_CX} cy={g.SUN_CY} rx={g.SUN_R * 3.4} ry={g.SUN_R * 2.6} fill="url(#hzSunHaze)" opacity={0.6 + amp * 0.4} />
-      <Ellipse cx={g.SUN_CX} cy={g.SUN_CY} rx={g.SUN_R * 1.9} ry={g.SUN_R * 1.55} fill="url(#hzSunGlow)" opacity={0.5 + amp * 0.5} />
-      <Circle cx={g.SUN_CX} cy={g.SUN_CY} r={g.SUN_R} fill="url(#hzSun)" mask="url(#hzSunMask)" />
+        {/* Horizon line — bright accent edge */}
+        <Rect x="0" y={g.HORIZON - 3} width={g.W} height={6} fill={eq[1]} opacity={0.16} />
+        <Rect x="0" y={g.HORIZON - 0.8} width={g.W} height={1.6} fill={eq[1]} opacity={0.9} />
 
-      {/* The sun's light spilling down the grid. An ELLIPSE, not a band: a
-          rectangle of glow has two hard vertical edges and on the first
-          render they showed as seams down the sides of the road. */}
-      <Ellipse
-        cx={g.SUN_CX} cy={g.HORIZON}
-        rx={g.SUN_R * 2.4} ry={(g.H - g.HORIZON) * 0.8}
-        fill="url(#hzSpill)"
-      />
+        {/* Static rays from the vanishing point */}
+        {rays.map((x, i) => (
+          <Line
+            key={i}
+            x1={g.SUN_CX} y1={g.HORIZON}
+            x2={x} y2={g.H + 30}
+            stroke="url(#hzRay)" strokeWidth={1}
+          />
+        ))}
+      </Svg>
 
-      {/* Horizon line — bright accent edge */}
-      <Rect x="0" y={g.HORIZON - 3} width={g.W} height={6} fill={eq[1]} opacity={0.16} />
-      <Rect x="0" y={g.HORIZON - 0.8} width={g.W} height={1.6} fill={eq[1]} opacity={0.9} />
-
-      {/* Static rays from the vanishing point */}
-      {rays.map((x, i) => (
-        <Line
-          key={i}
-          x1={g.SUN_CX} y1={g.HORIZON}
-          x2={x} y2={g.H + 30}
-          stroke="url(#hzRay)" strokeWidth={1}
-        />
-      ))}
-
-      {/* Rolling horizontal lines */}
-      {lines.map((l, i) => (
-        <Line
-          key={i}
-          x1={0} y1={l.y} x2={g.W} y2={l.y}
-          stroke={eq[1]} strokeWidth={l.w} strokeOpacity={l.o}
-        />
-      ))}
-    </Svg>
+      {/* Rolling grid lines — native-driver Views on one shared loop */}
+      <RollingLines playing={playing} color={eq[1]} geom={g} />
+    </>
   );
 }
 
@@ -302,10 +441,11 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
   const isLandscape = winW > winH;
-  // Portrait geometry derived from the REAL window, the same way the wide
-  // one is — so the drawing never has to be cropped to fit and the sun
-  // stays the size it was designed to be at any screen shape.
-  const geomPortrait = useMemo(() => makeGeom(winW, winH), [winW, winH]);
+  // Geometry derived from the REAL window in BOTH orientations, so the
+  // drawing never has to be cropped to fit, the sun stays the size it was
+  // designed to be at any screen shape, and — since the rebuild — the
+  // native-driver overlays can share the scene's pixel coordinates.
+  const geom = useMemo(() => makeGeom(winW, winH), [winW, winH]);
   const topPad = Math.max(insets.top, 20);
 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
@@ -322,7 +462,6 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
-  const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [showMood, setShowMood] = useState(false);
@@ -344,34 +483,10 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const { progress, elapsedMs, durationMs, scrub } = useTrackClock({
     visible, playing, track: spotify.track, demoDurationMs: DEMO_DURATION_MS,
   });
-  const playingRef = useRef(false);
-  const ampRef = useRef(0.5);
-
-  useEffect(() => { playingRef.current = playing; }, [playing]);
-
-  // Scene animation loop — throttled to ~15fps — each tick re-renders the whole SVG scene on the CPU, and 25fps measured 53-59% sustained CPU (iOS resource reports, 24.07); 15fps looks identical for these slow drifts and halves the burn.
-  useEffect(() => {
-    if (!visible) return;
-    let raf = 0;
-    const start = Date.now();
-    let last = 0;
-    const tick = () => {
-      const now = Date.now();
-      if (now - last >= 66) {
-        last = now;
-        const target = playingRef.current ? 1 : 0.4;
-        ampRef.current += (target - ampRef.current) * 0.08;
-        // Battery: once paused and fully wound down, freeze the scene —
-        // zero re-renders until play flips it live again.
-        if (playingRef.current || Math.abs(ampRef.current - target) > 0.01) {
-          setPhase((now - start) / 1000);
-        }
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [visible]);
+  // NO scene loop here any more. The scene's motion lives entirely on the
+  // native driver inside HorizonScene (see the rebuild note above it) — the
+  // old rAF/setPhase loop re-rendered this whole component 15×/s and was
+  // reported as lagging the entire app (owner, 04.08).
 
   // Progress is driven by useTrackClock — real Spotify position when
   // connected, demo loop otherwise.
@@ -380,7 +495,6 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
     if (!visible) return;
     if (stationId) setActiveId(stationId);
     slideY.setValue(winH);
-    ampRef.current = playingRef.current ? 1 : 0.5;
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
   }, [visible]);
 
@@ -454,11 +568,12 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
 
         {/* Landscape: the scene IS the screen — the outrun sun and grid run
             edge to edge under the chrome, which is what turning this mode
-            sideways is FOR. Its Svg crops to fill (preserveAspectRatio
-            "slice"), so no redrawing needed, just a bigger window. */}
+            sideways is FOR. Same window-derived geometry as portrait (the
+            geometry rule on HorizonScene: viewBox must equal the window or
+            the native-driver overlays drift off the drawing). */}
         {isLandscape && (
           <Animated.View style={[StyleSheet.absoluteFill, deckScene]} pointerEvents="none">
-            <HorizonScene phase={phase} amp={ampRef.current} eq={eq} geom={GEOM_WIDE} />
+            <HorizonScene playing={playing} eq={eq} geom={geom} />
           </Animated.View>
         )}
 
@@ -475,7 +590,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             instead of sitting empty. */}
         {!isLandscape && (
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <HorizonScene phase={phase} amp={ampRef.current} eq={eq} geom={geomPortrait} />
+            <HorizonScene playing={playing} eq={eq} geom={geom} />
           </View>
         )}
 

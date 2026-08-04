@@ -38,7 +38,7 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
   const [contextName, setContextName] = useState<string | null>(null);
 
   const cancelledRef = useRef(false);
-  const artCacheRef = useRef<{ key: string | null; url: string | null }>({ key: null, url: null });
+  const artCacheRef = useRef<{ key: string | null; url: string | null; at: number }>({ key: null, url: null, at: 0 });
   const refreshRef = useRef<() => void>(() => {});
   const lastControlRef = useRef(0);
   const adoptPlay = useAdoptPlayState();
@@ -87,11 +87,15 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
         // lookup exists behind it.
         let url = await getAppleLibraryArtwork();
         if (!url) url = await lookupAppleArtwork(title, artist);
-        if (cancelledRef.current || !url) return;
+        if (!url) return;                        // the claim's timestamp reopens the chase
         // The song may have moved on while we were away — patch only if this
         // is still what's playing, or the deck would wear the last cover.
         if (artCacheRef.current.key !== artKey) return;
-        artCacheRef.current = { key: artKey, url };
+        artCacheRef.current = { key: artKey, url, at: Date.now() };
+        // Deliberately NOT gated on cancelledRef: a completed lookup is valid
+        // whatever the screen did while it ran, and dropping it left the
+        // claim blocking retries with nothing to show. A state update on a
+        // gone instance is a harmless no-op.
         setTrack((t) => (t && t.title === title ? { ...t, albumArt: url } : t));
       };
 
@@ -99,11 +103,11 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
         const entry = await getAppleNowPlaying();
         if (cancelledRef.current) return;
         if (!entry) { setTrack(null); return; }
-        // Library tracks usually carry no MusicKit artwork URL at all — keyed
-        // on title AND artist, since two songs can share either one.
+        // Library tracks usually carry no loadable MusicKit artwork URL —
+        // keyed on title AND artist, since two songs can share either one.
         const artKey = `${entry.title}|${entry.artist}`;
-        const chasing = artCacheRef.current.key === artKey;
-        const art = entry.artworkUrl ?? (chasing ? artCacheRef.current.url : null);
+        const claimed = artCacheRef.current.key === artKey;
+        const art = entry.artworkUrl ?? (claimed ? artCacheRef.current.url : null);
         // Mirror reality: if music stops elsewhere (car Bluetooth drops, the
         // Music app pauses) the drive follows. Recent taps win for 8s.
         if (Date.now() - lastControlRef.current > 8000) adoptRef.current(entry.isPlaying);
@@ -117,8 +121,14 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
           isPlaying: entry.isPlaying,
         });
         if (entry.contextName !== undefined) setContextName(entry.contextName ?? null);
-        if (!entry.artworkUrl && !chasing) {
-          artCacheRef.current = { key: artKey, url: null };
+        // A missing cover is re-chased every ~20s, not claimed once forever:
+        // a chase can die mid-flight (backgrounded app, dropped signal), and
+        // the old one-shot claim left the deck blank for the rest of the
+        // song with all three artwork routes healthy.
+        const staleMiss = claimed && artCacheRef.current.url == null
+          && Date.now() - artCacheRef.current.at > 20000;
+        if (!entry.artworkUrl && (!claimed || staleMiss)) {
+          artCacheRef.current = { key: artKey, url: null, at: Date.now() };
           chaseArtwork(artKey, entry.title, entry.artist);
         }
       };

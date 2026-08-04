@@ -128,18 +128,34 @@ export async function canPlayAppleMusic(): Promise<boolean> {
 
 // ── Reading what's playing ───────────────────────────────────────────────────
 
+/** Schemes React Native's <Image> can actually load. */
+const LOADABLE_URL = /^(https?|file|data):/i;
+
 export async function getAppleNowPlaying(): Promise<RawEntry | null> {
   // Raced against a timeout, not just caught. Build 21's artwork fallback
   // taught the lesson: a native call that HANGS (rather than throws) would
   // otherwise wedge every poll behind it and the whole app shows "no track"
   // — with a timeout the poll degrades to null for one beat and recovers.
-  return safe(
+  const entry = await safe(
     () => Promise.race([
       bridge!.currentEntry(),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
     ]),
     null,
   );
+  /**
+   * THE FOUND-BUT-BLANK BUG (owner screenshot, 04.08): MusicKit hands back
+   * `musicKit://` scheme URLs for library artwork — renderable only by
+   * Apple's own ArtworkImage view, so RN's <Image> silently drew nothing,
+   * while the non-empty URL stopped the fallback chase from ever running.
+   * Every diagnostic said "artwork yes" over a blank deck. An unloadable
+   * URL is worse than none: null here lets the chase fetch a real one
+   * (MediaPlayer file:// or the public catalogue).
+   */
+  if (entry?.artworkUrl && !LOADABLE_URL.test(entry.artworkUrl)) {
+    return { ...entry, artworkUrl: null };
+  }
+  return entry;
 }
 
 /** MediaPlayer artwork for library tracks (build 22+); null anywhere else.
@@ -263,8 +279,12 @@ export async function diagnoseAppleMusic(playlistUri: string | null): Promise<st
   }
   try {
     const entry = await bridge.currentEntry();
+    // The RAW url from the bridge, scheme and all — "artwork yes" is how a
+    // musicKit:// url the deck can't load hid behind a passing check for a
+    // whole round (04.08). An instrument may never summarise the one detail
+    // under investigation.
     out.push(entry
-      ? `Now playing: ${entry.title} — artwork ${entry.artworkUrl ? 'yes' : 'MISSING'}`
+      ? `Now playing: ${entry.title} — artwork ${entry.artworkUrl ? `"${entry.artworkUrl.slice(0, 34)}…"` : 'MISSING'}`
       : 'Now playing: nothing');
     // WHICH route failed. Three builds have now guessed at blank artwork;
     // MusicKit's own url and the MediaPlayer image fail for different

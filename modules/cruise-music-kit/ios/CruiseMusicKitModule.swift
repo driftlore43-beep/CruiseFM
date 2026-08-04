@@ -253,9 +253,16 @@ public class CruiseMusicKitModule: Module {
   /// afford to lose.
   @available(iOS 16.0, *)
   private static func artworkURL(for entry: CruisePlayer.Queue.Entry) -> String? {
-    if let url = entry.artwork?.url(width: 600, height: 600) { return url.absoluteString }
+    // Only http(s) URLs may leave this function. MusicKit hands back
+    // `musicKit://` scheme URLs for library artwork, which only Apple's own
+    // ArtworkImage view can render — React Native's <Image> silently draws
+    // nothing, and because the string was non-empty the JS fallback chase
+    // never ran (the found-but-blank bug, 04.08). JS filters the scheme too,
+    // since this file only reaches phones at the next build.
+    func loadable(_ u: URL) -> Bool { ["http", "https"].contains(u.scheme?.lowercased() ?? "") }
+    if let url = entry.artwork?.url(width: 600, height: 600), loadable(url) { return url.absoluteString }
     if case let .song(song) = entry.item,
-       let url = song.artwork?.url(width: 600, height: 600) { return url.absoluteString }
+       let url = song.artwork?.url(width: 600, height: 600), loadable(url) { return url.absoluteString }
     return nil
   }
 

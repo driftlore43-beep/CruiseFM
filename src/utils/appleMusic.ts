@@ -193,7 +193,13 @@ export type { LinkedPlaylist };
 export async function getApplePlaylistTracks(
   playlistId: string,
 ): Promise<{ uri: string; title: string; artist: string; durationMs: number }[]> {
-  const rows = await safe(() => bridge!.playlistTracks(playlistId), []);
+  // Accept the full `applemusic:playlist:<id>` uri as well as a bare id.
+  // The first version took the uri from the song list RAW and handed it to
+  // MusicKit's id filter, which of course matched nothing — so the sheet said
+  // the playlist had no songs while it played happily (owner, 04.08).
+  // playAppleTrack stripped the prefix; this didn't. One rule now.
+  const id = isApplePlaylist(playlistId) ? applePlaylistId(playlistId) : playlistId;
+  const rows = await safe(() => bridge!.playlistTracks(id), []);
   return (rows ?? []).map((t) => ({
     uri: `applemusic:track:${t.id}`,
     title: t.title ?? '',
@@ -208,4 +214,30 @@ export async function playAppleTrack(playlistUri: string, trackUri: string): Pro
   const tid = trackUri.replace(/^applemusic:track:/, '');
   if (!pid || !tid) return;
   await safe(() => bridge!.playTrackInPlaylist(pid, tid), undefined);
+}
+
+/**
+ * Ask the Apple Music bridge the basic questions and report each answer —
+ * the Apple twin of diagnoseSpotify, and it exists for the same reason: two
+ * of the three Apple Music faults reported on 04.08 were guessed at once
+ * already, and a screenshot of facts ends a fault in one round.
+ */
+export async function diagnoseAppleMusic(playlistUri: string | null): Promise<string[]> {
+  if (!bridge) return ['This build does not carry the Apple Music module.'];
+  const out: string[] = [];
+  try { out.push(`Access: ${await bridge.authorizationStatus()}`); } catch { out.push('Access: no answer'); }
+  try { out.push(`Subscription: ${(await bridge.canPlayCatalog()) ? 'active' : 'not found'}`); } catch { out.push('Subscription: no answer'); }
+  if (playlistUri) {
+    const id = isApplePlaylist(playlistUri) ? applePlaylistId(playlistUri) : playlistUri;
+    out.push(`Playlist id asked: ${id}`);
+    try { out.push(`Songs returned: ${((await bridge.playlistTracks(id)) ?? []).length}`); }
+    catch { out.push('Songs returned: no answer'); }
+  }
+  try {
+    const entry = await bridge.currentEntry();
+    out.push(entry
+      ? `Now playing: ${entry.title} — artwork ${entry.artworkUrl ? 'yes' : 'MISSING'}`
+      : 'Now playing: nothing');
+  } catch { out.push('Now playing: no answer'); }
+  return out;
 }

@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { useSheetOpen } from '@/context/NowPlayingContext';
-import { getApplePlaylistTracks, isApplePlaylist, playAppleTrack } from '@/utils/appleMusic';
+import { diagnoseAppleMusic, getApplePlaylistTracks, isApplePlaylist, playAppleTrack } from '@/utils/appleMusic';
 import { connectSpotify, diagnoseSpotify, getPlaybackQueue, getPlaylistTracks, playTrackInContext, type FailReason, type PlaylistTrack } from '@/utils/spotify';
 
 /**
@@ -327,7 +327,31 @@ export function SongListSheet({
             </View>
           )}
           {playlistId && !trouble && tracks?.length === 0 && (
-            <Text style={s.empty}>There are no playable songs in this playlist.</Text>
+            <View style={s.troubleWrap}>
+              <Text style={s.empty}>There are no playable songs in this playlist.</Text>
+              {/* An empty Apple playlist that is audibly PLAYING is a fault,
+                  not a fact — offer the same instrument the Spotify path has,
+                  so one screenshot settles where it broke. */}
+              {apple && !checks && (
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (checking) return;
+                    setChecking(true);
+                    try { setChecks(await diagnoseAppleMusic(playlistId)); }
+                    catch { setChecks(['The check itself could not run.']); }
+                    finally { setChecking(false); }
+                  }}
+                  style={s.ghostBtn} activeOpacity={0.85}>
+                  <Text style={s.ghostBtnText}>{checking ? 'Checking…' : 'Run a quick check'}</Text>
+                </TouchableOpacity>
+              )}
+              {apple && !!checks && (
+                <View style={s.checks}>
+                  {checks.map((line) => <Text key={line} style={s.checkLine}>{line}</Text>)}
+                  <Text style={s.checkHint}>Screenshot this and send it over.</Text>
+                </View>
+              )}
+            </View>
           )}
           {tracks?.map((t, i) => {
             const now = !!currentUri && t.uri === currentUri;

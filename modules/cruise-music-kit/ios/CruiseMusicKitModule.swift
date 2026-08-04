@@ -1,5 +1,7 @@
 import ExpoModulesCore
+import MediaPlayer
 import MusicKit
+import UIKit
 
 /**
  * CruiseMusicKit — the native half of Apple Music support.
@@ -68,7 +70,7 @@ public class CruiseMusicKitModule: Module {
         // deck came up blank (owner, 03.08). Fall back to writing the image
         // into the cache and handing back a file:// URL, which <Image> takes
         // exactly like a remote one.
-        "artworkUrl": Self.artworkURL(for: entry),
+        "artworkUrl": await Self.artworkURL(for: entry),
         "durationMs": durationMs,
         "positionMs": player.playbackTime * 1000,
         "isPlaying": player.state.playbackStatus == .playing,
@@ -193,18 +195,35 @@ public class CruiseMusicKitModule: Module {
 
   /// A usable URL for a queue entry's artwork.
   ///
-  /// The entry's own artwork is nil more often than you'd expect, so the
-  /// SONG's artwork is tried as well — for anything added from the Apple
-  /// Music catalogue that resolves even when the entry's doesn't. A track
-  /// imported from the user's own files has only local artwork, which
-  /// MusicKit exposes no URL for at all; that returns nil and the deck falls
-  /// back to the station's colours, which is the honest outcome.
+  /// Three sources, in order of how much they can be trusted to exist:
+  /// the entry's own artwork URL, then the song's (catalogue items answer on
+  /// one of those two) — and then MediaPlayer. MEASURED 04.08 on a real
+  /// library playlist: MusicKit returned nil from BOTH of the first two for
+  /// every track, which is a known gap for library items. MusicKit's
+  /// ApplicationMusicPlayer sits on the same system player MediaPlayer
+  /// watches, and MPMediaItemArtwork holds the actual IMAGE rather than a
+  /// URL — so it is rendered to a cache file (keyed on the item, written
+  /// once, not per poll) and handed back as file://, which <Image> loads
+  /// exactly like a remote url.
   @available(iOS 16.0, *)
-  private static func artworkURL(for entry: ApplicationMusicPlayer.Queue.Entry) -> String? {
+  private static func artworkURL(for entry: ApplicationMusicPlayer.Queue.Entry) async -> String? {
     if let url = entry.artwork?.url(width: 600, height: 600) { return url.absoluteString }
     if case let .song(song) = entry.item,
        let url = song.artwork?.url(width: 600, height: 600) { return url.absoluteString }
-    return nil
+    return await MainActor.run {
+      let item = MPMusicPlayerController.applicationQueuePlayer.nowPlayingItem
+      guard let item, let art = item.artwork,
+            let img = art.image(at: CGSize(width: 600, height: 600)) else { return nil }
+      let dir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("cruise-art", isDirectory: true)
+      try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+      let file = dir.appendingPathComponent("\(item.persistentID).jpg")
+      if !FileManager.default.fileExists(atPath: file.path) {
+        guard let data = img.jpegData(compressionQuality: 0.9) else { return nil }
+        try? data.write(to: file)
+      }
+      return file.absoluteString
+    }
   }
 
   @available(iOS 15.0, *)

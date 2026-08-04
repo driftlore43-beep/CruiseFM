@@ -265,6 +265,15 @@ export async function diagnoseAppleMusic(playlistUri: string | null): Promise<st
     out.push(entry
       ? `Now playing: ${entry.title} — artwork ${entry.artworkUrl ? 'yes' : 'MISSING'}`
       : 'Now playing: nothing');
+    // WHICH route failed. Three builds have now guessed at blank artwork;
+    // MusicKit's own url and the MediaPlayer image fail for different
+    // reasons and need opposite fixes, so the check must tell them apart.
+    if (!bridge.libraryArtwork) {
+      out.push('Backup artwork: not in this build');
+    } else {
+      const img = await getAppleLibraryArtwork();
+      out.push(`Backup artwork: ${img ? `found (${img.slice(-22)})` : 'MISSING too'}`);
+    }
   } catch { out.push('Now playing: no answer'); }
   return out;
 }

@@ -6,7 +6,7 @@ export type LegalDoc = { title: string; updated: string; intro: string; sections
 
 export const PRIVACY_POLICY: LegalDoc = {
   title: 'Privacy Policy',
-  updated: '16 July 2026',
+  updated: '4 August 2026',
   intro:
     'Cruise FM is a driving-companion music app. The short version: there is no Cruise FM account, there are no Cruise FM servers, and your data stays on your phone.',
   sections: [
@@ -19,6 +19,11 @@ export const PRIVACY_POLICY: LegalDoc = {
       heading: 'Spotify connection',
       body:
         'If you connect Spotify, you sign in on Spotify’s own page — Cruise FM never sees your password. Spotify gives the app a token, stored only on your device, used to control playback and read your playlists so drives can play your music. You can disconnect at any time in Profile, and you can also revoke access at spotify.com under Apps. Your use of Spotify is governed by Spotify’s own terms and privacy policy.',
+    },
+    {
+      heading: 'Apple Music connection',
+      body:
+        'If you connect Apple Music, you grant access through Apple’s own permission prompt — Cruise FM never sees your Apple ID or password. Playback runs in Apple’s Music app on your phone, which is why the lock screen and CarPlay controls keep working; Cruise FM reads what is playing so the visuals can follow it, and reads your playlist names so you can pick one for a station. To show the album cover, the song title and artist are sent to Apple’s public music catalogue, which returns the artwork — nothing about you is sent with it, and the result is cached on your phone. You can revoke access at any time in iOS Settings under Privacy & Security → Media & Apple Music.',
     },
     {
       heading: 'Microphone',

@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 
 import { useActivityPing, useAdoptPlayState } from '@/context/NowPlayingContext';
 
+import { lookupAppleArtwork } from './appleArtwork';
 import {
   getAppleLibraryArtwork,
   appleMusicAvailable,
@@ -70,23 +71,39 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
       setConnected(conn);
       if (!conn) return;
 
+      /**
+       * Artwork is chased SEPARATELY from the song, and never awaited before
+       * the song is published. Both fallbacks can take seconds — a native
+       * call with its own race, then a network lookup — and build 21 already
+       * proved what happens when artwork sits between the poll and the title:
+       * the whole deck reads "no track" for the entire drive.
+       *
+       * Claimed in the cache BEFORE the work starts so the 5s poll doesn't
+       * launch the same chase over and over while the first one is in flight.
+       */
+      const chaseArtwork = async (artKey: string, title: string, artist: string) => {
+        // Local first: it is exact, instant on the next song, and needs no
+        // signal. Empty for a streamed library, which is why the catalogue
+        // lookup exists behind it.
+        let url = await getAppleLibraryArtwork();
+        if (!url) url = await lookupAppleArtwork(title, artist);
+        if (cancelledRef.current || !url) return;
+        // The song may have moved on while we were away — patch only if this
+        // is still what's playing, or the deck would wear the last cover.
+        if (artCacheRef.current.key !== artKey) return;
+        artCacheRef.current = { key: artKey, url };
+        setTrack((t) => (t && t.title === title ? { ...t, albumArt: url } : t));
+      };
+
       const refresh = async () => {
         const entry = await getAppleNowPlaying();
         if (cancelledRef.current) return;
         if (!entry) { setTrack(null); return; }
-        // Library tracks often carry no MusicKit artwork URL — build 22+
-        // exposes the MediaPlayer image separately, and losing this call
-        // costs a blank label, never the song. Cached per title so it runs
-        // once per song, not once per poll.
-        let art = entry.artworkUrl;
-        if (!art) {
-          if (artCacheRef.current.key === entry.title) {
-            art = artCacheRef.current.url;
-          } else {
-            art = await getAppleLibraryArtwork();
-            artCacheRef.current = { key: entry.title, url: art };
-          }
-        }
+        // Library tracks usually carry no MusicKit artwork URL at all — keyed
+        // on title AND artist, since two songs can share either one.
+        const artKey = `${entry.title}|${entry.artist}`;
+        const chasing = artCacheRef.current.key === artKey;
+        const art = entry.artworkUrl ?? (chasing ? artCacheRef.current.url : null);
         // Mirror reality: if music stops elsewhere (car Bluetooth drops, the
         // Music app pauses) the drive follows. Recent taps win for 8s.
         if (Date.now() - lastControlRef.current > 8000) adoptRef.current(entry.isPlaying);
@@ -100,6 +117,10 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
           isPlaying: entry.isPlaying,
         });
         if (entry.contextName !== undefined) setContextName(entry.contextName ?? null);
+        if (!entry.artworkUrl && !chasing) {
+          artCacheRef.current = { key: artKey, url: null };
+          chaseArtwork(artKey, entry.title, entry.artist);
+        }
       };
       refreshRef.current = refresh;
       refresh();

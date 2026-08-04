@@ -20,6 +20,32 @@ import UIKit
  * treats a missing module as "unavailable", and a thrown promise inside a
  * drive would surface as a dead transport with no explanation.
  */
+/**
+ * WHICH PLAYER, and why it is the SYSTEM one (owner, 04.08: "when i swipe
+ * Cruise FM to close, it closes the music also").
+ *
+ * `ApplicationMusicPlayer` owns its queue inside OUR process — force-quit the
+ * app and the music dies with it, which is what she saw. Worse for a DRIVING
+ * app: anything iOS does to us in the background takes the music with it, and
+ * switching to Maps mid-drive is not an edge case, it is the normal case.
+ *
+ * `SystemMusicPlayer` hands the queue to the Music app, which then owns
+ * playback: it survives force-quit, it survives backgrounding, and it needs
+ * no background-audio capability — the one Apple rejected build 7 over. It
+ * also matches the arrangement Cruise FM already has with Spotify, where
+ * their app plays and we are the visual layer.
+ *
+ * THE TRADE, stated plainly: the listener's Music app now shows what Cruise
+ * FM started, because it genuinely is playing it. That is the honest
+ * representation, and it is what makes the lock screen and CarPlay controls
+ * work during a drive.
+ *
+ * One alias so the choice lives in a single place. If it is ever reverted,
+ * `nowPlayingItem` below must go back to `applicationQueuePlayer` — the two
+ * must always name the same player or artwork reads from the wrong queue.
+ */
+private typealias CruisePlayer = SystemMusicPlayer
+
 public class CruiseMusicKitModule: Module {
   public func definition() -> ModuleDefinition {
     Name("CruiseMusicKit")
@@ -51,7 +77,7 @@ public class CruiseMusicKitModule: Module {
     // ── What's playing ──────────────────────────────────────────────────
     AsyncFunction("currentEntry") { () async -> [String: Any?]? in
       guard #available(iOS 16.0, *) else { return nil }
-      let player = ApplicationMusicPlayer.shared
+      let player = CruisePlayer.shared
       guard let entry = player.queue.currentEntry else { return nil }
 
       var artist = ""
@@ -84,40 +110,40 @@ public class CruiseMusicKitModule: Module {
     // ── Transport ───────────────────────────────────────────────────────
     AsyncFunction("play") { () async in
       guard #available(iOS 16.0, *) else { return }
-      try? await ApplicationMusicPlayer.shared.play()
+      try? await CruisePlayer.shared.play()
     }
 
     AsyncFunction("pause") {
       guard #available(iOS 16.0, *) else { return }
-      ApplicationMusicPlayer.shared.pause()
+      CruisePlayer.shared.pause()
     }
 
     AsyncFunction("next") { () async in
       guard #available(iOS 16.0, *) else { return }
-      try? await ApplicationMusicPlayer.shared.skipToNextEntry()
+      try? await CruisePlayer.shared.skipToNextEntry()
     }
 
     AsyncFunction("previous") { () async in
       guard #available(iOS 16.0, *) else { return }
-      try? await ApplicationMusicPlayer.shared.skipToPreviousEntry()
+      try? await CruisePlayer.shared.skipToPreviousEntry()
     }
 
     AsyncFunction("seekTo") { (positionMs: Double) in
       guard #available(iOS 16.0, *) else { return }
-      ApplicationMusicPlayer.shared.playbackTime = max(0, positionMs / 1000)
+      CruisePlayer.shared.playbackTime = max(0, positionMs / 1000)
     }
 
     AsyncFunction("setShuffle") { (on: Bool) in
       guard #available(iOS 16.0, *) else { return }
-      ApplicationMusicPlayer.shared.state.shuffleMode = on ? .songs : .off
+      CruisePlayer.shared.state.shuffleMode = on ? .songs : .off
     }
 
     AsyncFunction("setRepeat") { (mode: String) in
       guard #available(iOS 16.0, *) else { return }
       switch mode {
-      case "track":   ApplicationMusicPlayer.shared.state.repeatMode = .one
-      case "context": ApplicationMusicPlayer.shared.state.repeatMode = .all
-      default:        ApplicationMusicPlayer.shared.state.repeatMode = MusicPlayer.RepeatMode.none
+      case "track":   CruisePlayer.shared.state.repeatMode = .one
+      case "context": CruisePlayer.shared.state.repeatMode = .all
+      default:        CruisePlayer.shared.state.repeatMode = MusicPlayer.RepeatMode.none
       }
     }
 
@@ -134,8 +160,8 @@ public class CruiseMusicKitModule: Module {
       // `with(.tracks)` is required: a library playlist arrives without its
       // songs, and queueing it bare starts nothing at all.
       let full = try await playlist.with(.tracks)
-      let player = ApplicationMusicPlayer.shared
-      player.queue = ApplicationMusicPlayer.Queue(for: full.tracks ?? [])
+      let player = CruisePlayer.shared
+      player.queue = CruisePlayer.Queue(for: full.tracks ?? [])
       try await player.prepareToPlay()
       try await player.play()
     }
@@ -174,11 +200,11 @@ public class CruiseMusicKitModule: Module {
       request.filter(matching: \.id, equalTo: MusicItemID(playlistId))
       guard let playlist = try await request.response().items.first,
             let tracks = try await playlist.with(.tracks).tracks else { return }
-      let player = ApplicationMusicPlayer.shared
+      let player = CruisePlayer.shared
       if let start = tracks.first(where: { $0.id.rawValue == trackId }) {
-        player.queue = ApplicationMusicPlayer.Queue(for: tracks, startingAt: start)
+        player.queue = CruisePlayer.Queue(for: tracks, startingAt: start)
       } else {
-        player.queue = ApplicationMusicPlayer.Queue(for: tracks)
+        player.queue = CruisePlayer.Queue(for: tracks)
       }
       try await player.prepareToPlay()
       try await player.play()
@@ -194,7 +220,7 @@ public class CruiseMusicKitModule: Module {
     AsyncFunction("libraryArtwork") { () async -> String? in
       guard #available(iOS 16.0, *) else { return nil }
       return await MainActor.run {
-        guard let item = MPMusicPlayerController.applicationQueuePlayer.nowPlayingItem,
+        guard let item = MPMusicPlayerController.systemMusicPlayer.nowPlayingItem,
               let art = item.artwork,
               let img = art.image(at: CGSize(width: 600, height: 600)) else { return nil }
         let dir = FileManager.default.temporaryDirectory
@@ -226,7 +252,7 @@ public class CruiseMusicKitModule: Module {
   /// it lives in `libraryArtwork` below, which JS calls separately and can
   /// afford to lose.
   @available(iOS 16.0, *)
-  private static func artworkURL(for entry: ApplicationMusicPlayer.Queue.Entry) -> String? {
+  private static func artworkURL(for entry: CruisePlayer.Queue.Entry) -> String? {
     if let url = entry.artwork?.url(width: 600, height: 600) { return url.absoluteString }
     if case let .song(song) = entry.item,
        let url = song.artwork?.url(width: 600, height: 600) { return url.absoluteString }

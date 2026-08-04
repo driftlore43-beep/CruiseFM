@@ -73,7 +73,9 @@ const VINYL_TRACKS = [
 // Explicit vinyl accent per station — the disc rim, grooves and tonearm take
 // this colour. Stations not listed fall back to their mid eq stop.
 const VINYL_ACCENTS: Record<string, string> = {
-  'sunset':         '#FFA24B', // golden-hour amber (owner, 04.08 — the pink rim fought the station)
+  // NO sunset entry (owner, 04.08): the amber override read as mustard on
+  // device — the ring now falls through to eqColors[1], the same peachy
+  // accent slot every other mode wears for Sunset.
   'mountain-pass':  '#FFFFFF', // crisp white
   'cars-coffee':    '#8B5A2B', // coffee brown
   'night-run':      '#2B4CFF', // deep blue
@@ -223,23 +225,26 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
 // MATCHING tangents put that inflection exactly where it belongs; a single
 // cubic bends wherever its control points happen to fall, which is how the old
 // arm ended up a straight stick with one kink at the bottom.
-// STRAIGHTENED 04.08 (owner: "straighten up the tonearm and stylus, it has a
-// small curve to the right, with the stylus pointed to the left. But keep the
-// bend"). The old spine bulged 0.114·armLen right of the pivot→stylus chord at
-// its widest and the headshell sat at −26°; the tube now hugs that chord
-// (bulge ≈ 0.05) and the shell eased to −20°, so the cartridge reads closer
-// to straight down while the S survives. THE STYLUS DID NOT MOVE: these
-// numbers were solved so S still lands at (−0.158, 1.025) of armLen exactly —
-// change any of them and re-solve the pair below or the needle walks off the
-// groove area (scratchpad/arm/shape.mjs prints where it lands).
-const ARM_A = { x:  0.000, y: 0.075, a:  -2 };  // leaves the bearing, near-vertical
-const ARM_J = { x: -0.020, y: 0.450, a: -12 };  // inflection
-const ARM_B = { x: -0.092, y: 0.845, a: -14 };  // collar, where the shell bolts on
-/** Headshell axis — a cartridge's real offset angle, gentler than before. */
-const ARM_HEAD_A = -20;
+// RESHAPED TO THE OWNER'S REFERENCE PHOTO 04.08 ("the bend for the tone arm
+// sit closer to the stylus but not too close — there is a replica image to
+// follow"). On the reference the tube is dead STRAIGHT from the bearing for
+// about two thirds of its length, leaning a few degrees outward, and makes
+// ONE smooth sweep near the bottom that flows into the headshell. So the
+// first cubic is now literally a straight line — A and J share the chord's
+// own angle (+7°), which degenerates the curve to a rule — and all of the
+// bend lives in the second segment (y 0.66→0.84 of the arm, just above the
+// shell). Spreading curvature along the whole tube is what read as
+// "jaggered". THE STYLUS DID NOT MOVE: solved so S still lands at
+// (−0.158, 1.025)·armLen exactly — change anything here and re-solve
+// (scratchpad/arm/shape.mjs prints where the needle lands).
+const ARM_A = { x:  0.000, y: 0.075, a:   7 };  // leaves the bearing
+const ARM_J = { x:  0.072, y: 0.660, a:   7 };  // end of the straight tube
+const ARM_B = { x: -0.077, y: 0.842, a: -26 };  // collar, where the shell bolts on
+/** Headshell axis — the tube's sweep flows into it (tangents 2° apart). */
+const ARM_HEAD_A = -24;
 /** Collar → stylus, so the needle lands at ~1.03 armLen from the pivot and
  *  ~0.158 of it toward the spindle. Change these and it walks off the record. */
-const ARM_HEAD_L = 0.192;
+const ARM_HEAD_L = 0.20;
 
 /** Unit vector for a lean angle. +y runs down the arm, +x away from the spindle.
  *  NOTE: SVG `rotate(a)` turns a downward vector toward −x, so a group that

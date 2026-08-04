@@ -483,7 +483,7 @@ const CROP_BOT_FRAC = 0.118;
 
 function SnapshotStyle(p: StyleProps) {
   const d = derive(p);
-  const { uid, cardH, station, modeLabel, snapshot } = p;
+  const { uid, cardH, snapshot } = p;
   if (!snapshot) return <TicketStyle {...p} />;
 
   const portrait = snapshot.h >= snapshot.w;
@@ -492,29 +492,22 @@ function SnapshotStyle(p: StyleProps) {
   const visW = snapshot.w;
   const visH = snapshot.h * (1 - cropTop - cropBot);
 
-  // Fit the visible page whole between the eyebrow and the footer.
-  const TOP = 138, BOT = 128, SIDE = 84;
+  // No header of any kind (owner, 04.08: "remove 'tuner · station number',
+  // station mode, that sits at the top of the card") — the page already
+  // names its own station, and printing it twice was clutter. Just the
+  // picture, a thin accent frame, and cruisefm.app underneath.
+  const TOP = 76, BOT = 112, SIDE = 84;
   const k = Math.min((CARD_W - SIDE * 2) / visW, (cardH - TOP - BOT) / visH);
   const winW = visW * k, winH = visH * k;
   const WX = (CARD_W - winW) / 2;
   const WY = TOP + (cardH - TOP - BOT - winH) / 2;
   const clipId = `snap${uid}`;
-  const footY = cardH - 64;
+  const footY = cardH - 58;
 
   return (
     <>
       <BaseWash d={d} uid={uid} cardH={cardH} glow={0.30} />
       <Backdrop d={d} uid={uid} cardH={cardH} stops={[0.78, 0.68, 0.78, 0.92]} />
-
-      {/* Eyebrow above the window */}
-      <SvgText x={CX} y={WY - 64} fill="#ffffff" fillOpacity={0.5} fontSize={25}
-        fontWeight="700" letterSpacing={7} textAnchor="middle">
-        {`${modeLabel.toUpperCase()} · ${d.dialLabel} ${d.band}`}
-      </SvgText>
-      <SvgText x={CX} y={WY - 28} fill="#ffffff" fillOpacity={0.85} fontSize={29}
-        fontWeight="800" letterSpacing={1} textAnchor="middle">
-        {clip(station.name, 30)}
-      </SvgText>
 
       <Defs>
         <ClipPath id={clipId}>
@@ -534,14 +527,15 @@ function SnapshotStyle(p: StyleProps) {
           width={winW} height={snapshot.h * k}
           href={{ uri: snapshot.uri }} preserveAspectRatio="xMidYMid meet" />
       </G>
+      {/* A thin frame in the station's own accent (owner: "a thin border,
+          theme colour") — the one place the card still carries the mood. */}
       <Rect x={WX} y={WY} width={winW} height={winH} rx={42} fill="none"
-        stroke="#ffffff" strokeOpacity={0.30} strokeWidth={3} />
+        stroke={d.eq[1]} strokeOpacity={0.9} strokeWidth={3} />
 
-      {/* Footer. No song block: the page IS the song block. */}
-      <Rect x={CX - 200} y={footY - 32} width={400} height={1.6} fill="#ffffff" fillOpacity={0.16} />
-      <SvgText x={CX} y={footY} fill="#ffffff" fillOpacity={0.44} fontSize={24}
+      {/* Footer — just the address. The page carries everything else. */}
+      <SvgText x={CX} y={footY} fill="#ffffff" fillOpacity={0.5} fontSize={26}
         fontWeight="700" letterSpacing={4} textAnchor="middle">
-        {`CRUISE FM · ${INSTALL_HOST.toUpperCase()}`}
+        {INSTALL_HOST}
       </SvgText>
     </>
   );

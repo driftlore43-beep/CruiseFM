@@ -73,7 +73,7 @@ const VINYL_TRACKS = [
 // Explicit vinyl accent per station — the disc rim, grooves and tonearm take
 // this colour. Stations not listed fall back to their mid eq stop.
 const VINYL_ACCENTS: Record<string, string> = {
-  'sunset':         '#D84C8A', // dusk pink
+  'sunset':         '#FFA24B', // golden-hour amber (owner, 04.08 — the pink rim fought the station)
   'mountain-pass':  '#FFFFFF', // crisp white
   'cars-coffee':    '#8B5A2B', // coffee brown
   'night-run':      '#2B4CFF', // deep blue
@@ -223,15 +223,23 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
 // MATCHING tangents put that inflection exactly where it belongs; a single
 // cubic bends wherever its control points happen to fall, which is how the old
 // arm ended up a straight stick with one kink at the bottom.
-const ARM_A = { x:  0.000, y: 0.075, a:  10 };  // leaves the bearing
-const ARM_J = { x:  0.045, y: 0.450, a: -18 };  // inflection
-const ARM_B = { x: -0.070, y: 0.845, a:  -8 };  // collar, where the shell bolts on
-/** Headshell axis. ~18° off the tube's tangent at the collar — a cartridge's
- *  real offset angle, which is what finishes the S instead of fighting it. */
-const ARM_HEAD_A = -26;
+// STRAIGHTENED 04.08 (owner: "straighten up the tonearm and stylus, it has a
+// small curve to the right, with the stylus pointed to the left. But keep the
+// bend"). The old spine bulged 0.114·armLen right of the pivot→stylus chord at
+// its widest and the headshell sat at −26°; the tube now hugs that chord
+// (bulge ≈ 0.05) and the shell eased to −20°, so the cartridge reads closer
+// to straight down while the S survives. THE STYLUS DID NOT MOVE: these
+// numbers were solved so S still lands at (−0.158, 1.025) of armLen exactly —
+// change any of them and re-solve the pair below or the needle walks off the
+// groove area (scratchpad/arm/shape.mjs prints where it lands).
+const ARM_A = { x:  0.000, y: 0.075, a:  -2 };  // leaves the bearing, near-vertical
+const ARM_J = { x: -0.020, y: 0.450, a: -12 };  // inflection
+const ARM_B = { x: -0.092, y: 0.845, a: -14 };  // collar, where the shell bolts on
+/** Headshell axis — a cartridge's real offset angle, gentler than before. */
+const ARM_HEAD_A = -20;
 /** Collar → stylus, so the needle lands at ~1.03 armLen from the pivot and
  *  ~0.158 of it toward the spindle. Change these and it walks off the record. */
-const ARM_HEAD_L = 0.20;
+const ARM_HEAD_L = 0.192;
 
 /** Unit vector for a lean angle. +y runs down the arm, +x away from the spindle.
  *  NOTE: SVG `rotate(a)` turns a downward vector toward −x, so a group that

@@ -774,29 +774,36 @@ function GlitterField({ eq, lit, winW, winH }: {
  */
 const FIREFLY_COUNT = 14;
 const FIREFLY_PHASES = 5;
+/**
+ * SOFTENED 04.08 (owner: "float over more softly… it has a pattern they
+ * follow, but has this bounce back motion, can we ease the animation"). The
+ * bounce was structural: the old path was FOUR STRAIGHT LINES between random
+ * waypoints, so every firefly snapped direction at each corner and again at
+ * the loop's return home. The flight is now two sine harmonics per axis,
+ * sampled densely into keyframes — position AND velocity are continuous
+ * everywhere, including across the loop seam (whole periods wrap by
+ * construction), so there is no corner left to bounce off. Brightness rides
+ * the same curve family. Loops are explicit-restart sawtooths, not
+ * Animated.loop — see the Horizon rebuild note for why.
+ */
+const FF_SAMPLES = 18;
 
-function Firefly({ x, y, r, color, drift, path, glow }: {
+function Firefly({ x, y, r, color, drift, input, px, py, op }: {
   x: number; y: number; r: number; color: string;
-  drift: Animated.Value; path: number[]; glow: number;
+  drift: Animated.Value; input: number[]; px: number[]; py: number[]; op: number[];
 }) {
   const box = r * 7;
   const c = box / 2;
   const gid = `dbFf${Math.round(x)}x${Math.round(y)}`;
-  const stops = [0, 0.25, 0.5, 0.75, 1];
   return (
     <Animated.View
       pointerEvents="none"
       style={{
         position: 'absolute', left: x - c, top: y - c, width: box, height: box,
-        opacity: drift.interpolate({
-          inputRange: stops,
-          // Peaks at a different point for each firefly, and never quite goes
-          // out — a blink, not a strobe.
-          outputRange: [0.10, glow * 0.55, glow, glow * 0.42, 0.10],
-        }),
+        opacity: drift.interpolate({ inputRange: input, outputRange: op }),
         transform: [
-          { translateX: drift.interpolate({ inputRange: stops, outputRange: [0, path[0], path[1], path[2], 0] }) },
-          { translateY: drift.interpolate({ inputRange: stops, outputRange: [0, path[3], path[4], path[5], 0] }) },
+          { translateX: drift.interpolate({ inputRange: input, outputRange: px }) },
+          { translateY: drift.interpolate({ inputRange: input, outputRange: py }) },
         ],
       }}>
       <Svg width={box} height={box}>
@@ -818,30 +825,61 @@ function Fireflies({ eq, live, winW, winH }: {
 }) {
   const phases = useRef(Array.from({ length: FIREFLY_PHASES }, () => new Animated.Value(0))).current;
   useEffect(() => {
-    const loops = phases.map((v, i) => {
-      // Linear, because the path itself carries the easing — a sine here
-      // would make every firefly pause at the same two points.
-      const loop = Animated.loop(
-        Animated.timing(v, { toValue: 1, duration: 9000 + hash01(i * 4.4) * 7000, easing: Easing.linear, useNativeDriver: true }),
-      );
-      const start = setTimeout(() => loop.start(), i * 900);
-      return { loop, start };
+    // Explicit sawtooth restarts (the Horizon lesson: Animated.loop's reset
+    // parked a bare timing at 1 after one pass). Linear timing — the easing
+    // lives in the sampled path, never in the clock.
+    let alive = true;
+    const timers = phases.map((v, i) => {
+      const dur = 15000 + hash01(i * 4.4) * 9000;
+      const run = () => {
+        v.setValue(0);
+        Animated.timing(v, { toValue: 1, duration: dur, easing: Easing.linear, useNativeDriver: true })
+          .start(({ finished }) => { if (finished && alive) run(); });
+      };
+      return setTimeout(run, i * 700);
     });
-    return () => { loops.forEach(({ loop, start }) => { clearTimeout(start); loop.stop(); }); };
+    return () => { alive = false; timers.forEach(clearTimeout); phases.forEach((v) => v.stopAnimation()); };
   }, [phases]);
 
   const flies = useMemo(() => {
-    const pal = ['#fff6e0', mixHex(eq[0], '#ffffff', 0.5), mixHex(eq[1], '#ffffff', 0.45), '#ffffff'];
+    // About half the flies carry the station's colour nearly neat (owner,
+    // 04.08: "enhance the stations' accent colour on some of the fireflies");
+    // the rest stay warm-white so the swarm still reads as light, not confetti.
+    const pal = [
+      '#fff6e0',
+      mixHex(eq[0], '#ffffff', 0.18),
+      mixHex(eq[1], '#ffffff', 0.16),
+      '#ffffff',
+      mixHex(eq[2], '#ffffff', 0.30),
+      mixHex(eq[1], '#ffffff', 0.45),
+    ];
+    const TAU = Math.PI * 2;
     return Array.from({ length: FIREFLY_COUNT }, (_, i) => {
-      const amp = 26 + hash01(i * 5.9) * 54;
-      const wander = (k: number) => (hash01(i * 3.3 + k) - 0.5) * 2 * amp;
+      const amp = 24 + hash01(i * 5.9) * 50;
+      // Two harmonics per axis: one slow circuit plus a smaller second-order
+      // wobble, different phases per axis so the path is a wandering loop
+      // rather than a circle. Whole periods, so t=1 rejoins t=0 seamlessly.
+      const a1x = amp, a2x = amp * (0.25 + hash01(i * 1.7) * 0.3);
+      const a1y = amp * (0.6 + hash01(i * 2.9) * 0.5), a2y = amp * 0.28;
+      const q1 = hash01(i * 3.3) * TAU, q2 = hash01(i * 4.1) * TAU;
+      const q3 = hash01(i * 6.2) * TAU, q4 = hash01(i * 7.5) * TAU;
+      const glow = 0.5 + hash01(i * 9.4) * 0.35;
+      const blink = 1 + (i % 2);              // 1 or 2 gentle breaths per circuit
+      const qb = hash01(i * 8.8) * TAU;
+      const input: number[] = [], px: number[] = [], py: number[] = [], op: number[] = [];
+      for (let k = 0; k <= FF_SAMPLES; k++) {
+        const t = k / FF_SAMPLES;
+        input.push(t);
+        px.push(a1x * Math.sin(TAU * t + q1) + a2x * Math.sin(2 * TAU * t + q2));
+        py.push(a1y * Math.sin(TAU * t + q3) + a2y * Math.sin(2 * TAU * t + q4));
+        op.push(0.14 + (glow - 0.14) * (0.5 + 0.5 * Math.sin(TAU * blink * t + qb)));
+      }
       return {
         x: winW * (0.06 + hash01(i * 2.1) * 0.88),
         y: winH * (0.10 + hash01(i * 6.7 + 1.4) * 0.76),
         r: 2.4 + hash01(i * 8.2) * 2.6,
         color: pal[i % pal.length],
-        glow: 0.5 + hash01(i * 9.4) * 0.35,
-        path: [wander(0.2), wander(0.9), wander(1.6), wander(2.3), wander(3.1), wander(4.0)],
+        input, px, py, op,
         phase: i % FIREFLY_PHASES,
       };
     });
@@ -850,8 +888,8 @@ function Fireflies({ eq, live, winW, winH }: {
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: live }]}>
       {flies.map((f, i) => (
-        <Firefly key={i} x={f.x} y={f.y} r={f.r} color={f.color} glow={f.glow}
-          path={f.path} drift={phases[f.phase]} />
+        <Firefly key={i} x={f.x} y={f.y} r={f.r} color={f.color}
+          input={f.input} px={f.px} py={f.py} op={f.op} drift={phases[f.phase]} />
       ))}
     </Animated.View>
   );

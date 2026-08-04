@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import { useActivityPing, useAdoptPlayState } from '@/context/NowPlayingContext';
 
 import {
+  getAppleLibraryArtwork,
   appleMusicAvailable,
   appleNext,
   applePause,
@@ -36,6 +37,7 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
   const [contextName, setContextName] = useState<string | null>(null);
 
   const cancelledRef = useRef(false);
+  const artCacheRef = useRef<{ key: string | null; url: string | null }>({ key: null, url: null });
   const refreshRef = useRef<() => void>(() => {});
   const lastControlRef = useRef(0);
   const adoptPlay = useAdoptPlayState();
@@ -72,13 +74,26 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
         const entry = await getAppleNowPlaying();
         if (cancelledRef.current) return;
         if (!entry) { setTrack(null); return; }
+        // Library tracks often carry no MusicKit artwork URL — build 22+
+        // exposes the MediaPlayer image separately, and losing this call
+        // costs a blank label, never the song. Cached per title so it runs
+        // once per song, not once per poll.
+        let art = entry.artworkUrl;
+        if (!art) {
+          if (artCacheRef.current.key === entry.title) {
+            art = artCacheRef.current.url;
+          } else {
+            art = await getAppleLibraryArtwork();
+            artCacheRef.current = { key: entry.title, url: art };
+          }
+        }
         // Mirror reality: if music stops elsewhere (car Bluetooth drops, the
         // Music app pauses) the drive follows. Recent taps win for 8s.
         if (Date.now() - lastControlRef.current > 8000) adoptRef.current(entry.isPlaying);
         setTrack({
           title: entry.title,
           artist: entry.artist,
-          albumArt: entry.artworkUrl,
+          albumArt: art,
           durationMs: entry.durationMs,
           progressMs: entry.positionMs,
           syncedAt: Date.now(),

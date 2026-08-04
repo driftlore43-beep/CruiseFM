@@ -70,7 +70,7 @@ public class CruiseMusicKitModule: Module {
         // deck came up blank (owner, 03.08). Fall back to writing the image
         // into the cache and handing back a file:// URL, which <Image> takes
         // exactly like a remote one.
-        "artworkUrl": await Self.artworkURL(for: entry),
+        "artworkUrl": Self.artworkURL(for: entry),
         "durationMs": durationMs,
         "positionMs": player.playbackTime * 1000,
         "isPlaying": player.state.playbackStatus == .playing,
@@ -184,6 +184,31 @@ public class CruiseMusicKitModule: Module {
       try await player.play()
     }
 
+    /**
+     * Artwork for the CURRENT song via MediaPlayer, for library tracks whose
+     * MusicKit artwork has no URL (a known gap). MPMediaItemArtwork holds the
+     * actual image; it is rendered once per item to a cache file and handed
+     * back as file://. Separate from currentEntry ON PURPOSE — see the note
+     * on artworkURL: this call is allowed to fail or dawdle, the poll is not.
+     */
+    AsyncFunction("libraryArtwork") { () async -> String? in
+      guard #available(iOS 16.0, *) else { return nil }
+      return await MainActor.run {
+        guard let item = MPMusicPlayerController.applicationQueuePlayer.nowPlayingItem,
+              let art = item.artwork,
+              let img = art.image(at: CGSize(width: 600, height: 600)) else { return nil }
+        let dir = FileManager.default.temporaryDirectory
+          .appendingPathComponent("cruise-art", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let file = dir.appendingPathComponent("\(item.persistentID).jpg")
+        if !FileManager.default.fileExists(atPath: file.path) {
+          guard let data = img.jpegData(compressionQuality: 0.9) else { return nil }
+          try? data.write(to: file)
+        }
+        return file.absoluteString
+      }
+    }
+
     AsyncFunction("userPlaylists") { () async -> [[String: String]] in
       guard #available(iOS 16.0, *) else { return [] }
       var request = MusicLibraryRequest<Playlist>()
@@ -193,37 +218,19 @@ public class CruiseMusicKitModule: Module {
     }
   }
 
-  /// A usable URL for a queue entry's artwork.
-  ///
-  /// Three sources, in order of how much they can be trusted to exist:
-  /// the entry's own artwork URL, then the song's (catalogue items answer on
-  /// one of those two) — and then MediaPlayer. MEASURED 04.08 on a real
-  /// library playlist: MusicKit returned nil from BOTH of the first two for
-  /// every track, which is a known gap for library items. MusicKit's
-  /// ApplicationMusicPlayer sits on the same system player MediaPlayer
-  /// watches, and MPMediaItemArtwork holds the actual IMAGE rather than a
-  /// URL — so it is rendered to a cache file (keyed on the item, written
-  /// once, not per poll) and handed back as file://, which <Image> loads
-  /// exactly like a remote url.
+  /// A usable URL for a queue entry's artwork — MusicKit sources only, and
+  /// deliberately SYNCHRONOUS. Build 21 put the MediaPlayer fallback inline
+  /// here and the whole of currentEntry stopped answering: no title, no
+  /// artist, and the app read as "no track" for the entire drive. Whatever
+  /// the fallback does, it may never sit between the poll and the song —
+  /// it lives in `libraryArtwork` below, which JS calls separately and can
+  /// afford to lose.
   @available(iOS 16.0, *)
-  private static func artworkURL(for entry: ApplicationMusicPlayer.Queue.Entry) async -> String? {
+  private static func artworkURL(for entry: ApplicationMusicPlayer.Queue.Entry) -> String? {
     if let url = entry.artwork?.url(width: 600, height: 600) { return url.absoluteString }
     if case let .song(song) = entry.item,
        let url = song.artwork?.url(width: 600, height: 600) { return url.absoluteString }
-    return await MainActor.run {
-      let item = MPMusicPlayerController.applicationQueuePlayer.nowPlayingItem
-      guard let item, let art = item.artwork,
-            let img = art.image(at: CGSize(width: 600, height: 600)) else { return nil }
-      let dir = FileManager.default.temporaryDirectory
-        .appendingPathComponent("cruise-art", isDirectory: true)
-      try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-      let file = dir.appendingPathComponent("\(item.persistentID).jpg")
-      if !FileManager.default.fileExists(atPath: file.path) {
-        guard let data = img.jpegData(compressionQuality: 0.9) else { return nil }
-        try? data.write(to: file)
-      }
-      return file.absoluteString
-    }
+    return nil
   }
 
   @available(iOS 15.0, *)

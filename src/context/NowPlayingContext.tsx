@@ -363,6 +363,11 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     setHandoff(false);
     // The ✕ ends the whole drive — music included. Leaving Spotify running
     // after the player is gone made every next station start confusing.
+    // BOTH platforms: this only ever paused Spotify, so an Apple Music drive
+    // played on after the player was gone (owner, 04.08) — on every build
+    // since Apple Music landed. Pause is fire-and-forget on whichever side
+    // is live; applePause is already a safe no-op without the module.
+    applePause().catch(() => {});
     isSpotifyConnected()
       .then((c) => { if (c) pauseSpotify().catch(() => {}); })
       .catch(() => {});

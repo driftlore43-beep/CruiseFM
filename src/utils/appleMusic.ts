@@ -42,6 +42,10 @@ type Bridge = {
     { id: string; title: string; artist: string; durationMs: number | null }[]>;
   /** Jump to one song, keeping the rest of the playlist queued behind it. */
   playTrackInPlaylist(playlistId: string, trackId: string): Promise<void>;
+  /** Build 22+: MediaPlayer artwork for the current song. OPTIONAL — older
+   *  builds lack it, and this file ships OTA into them, so every call site
+   *  must guard. */
+  libraryArtwork?(): Promise<string | null>;
 };
 
 export type AuthStatus = 'authorized' | 'denied' | 'restricted' | 'notDetermined';
@@ -124,7 +128,30 @@ export async function canPlayAppleMusic(): Promise<boolean> {
 // ── Reading what's playing ───────────────────────────────────────────────────
 
 export async function getAppleNowPlaying(): Promise<RawEntry | null> {
-  return safe(() => bridge!.currentEntry(), null);
+  // Raced against a timeout, not just caught. Build 21's artwork fallback
+  // taught the lesson: a native call that HANGS (rather than throws) would
+  // otherwise wedge every poll behind it and the whole app shows "no track"
+  // — with a timeout the poll degrades to null for one beat and recovers.
+  return safe(
+    () => Promise.race([
+      bridge!.currentEntry(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+    ]),
+    null,
+  );
+}
+
+/** MediaPlayer artwork for library tracks (build 22+); null anywhere else.
+ *  Its own short race — this call is allowed to be lost, the poll is not. */
+export async function getAppleLibraryArtwork(): Promise<string | null> {
+  if (!bridge?.libraryArtwork) return null;
+  return safe(
+    () => Promise.race([
+      bridge!.libraryArtwork!(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+    ]),
+    null,
+  );
 }
 
 // ── Controls ─────────────────────────────────────────────────────────────────

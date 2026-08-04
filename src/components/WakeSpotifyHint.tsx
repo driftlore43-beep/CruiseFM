@@ -4,6 +4,8 @@ import { Animated, StyleSheet, Text, useWindowDimensions, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DECK_FRAC } from '@/components/LandscapeChrome';
+import { appleMusicAvailable } from '@/utils/appleMusic';
+import { getSavedPlatform } from '@/utils/musicPlatform';
 
 const SPOTIFY_GREEN = '#1DB954';
 
@@ -19,6 +21,18 @@ const SPOTIFY_GREEN = '#1DB954';
  */
 export function WakeSpotifyHint({ show, connected = true }: { show: boolean; connected?: boolean }) {
   const insets = useSafeAreaInsets();
+  // Apple Music listeners never see this card. Its advice — "open Spotify,
+  // play a song" — is an errand from the wrong platform (owner saw exactly
+  // that on an Apple drive, 04.08). Apple playback is local: if there is
+  // music, it is audible; if the poll has no track, that is our fault to fix,
+  // not the listener's to work around. Self-checked here so all eight
+  // call sites are covered without threading another prop through them.
+  const [applePlatform, setApplePlatform] = useState(false);
+  useEffect(() => {
+    getSavedPlatform()
+      .then((pf) => setApplePlatform(pf === 'appleMusic' && appleMusicAvailable()))
+      .catch(() => {});
+  }, []);
   const { width: winW, height: winH } = useWindowDimensions();
   const isLandscape = winW > winH;
   const [visible, setVisible] = useState(false);
@@ -45,7 +59,7 @@ export function WakeSpotifyHint({ show, connected = true }: { show: boolean; con
     return () => { clearTimeout(t); if (out) clearTimeout(out); };
   }, [show, connected]);
 
-  if (!visible) return null;
+  if (!visible || applePlatform) return null;
 
   return (
     <Animated.View

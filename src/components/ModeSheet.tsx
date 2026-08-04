@@ -10,6 +10,7 @@ import { MODE_CATALOG } from '@/constants/modeCatalog';
 import { Fonts } from '@/constants/theme';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { useSheetOpen } from '@/context/NowPlayingContext';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -42,6 +43,8 @@ const MODE_LOOK: Record<string, { icon: string | null }> = {
 const SHELF = [...MODE_CATALOG].sort((a, b) => Number(a.pro) - Number(b.pro));
 
 export function ModeSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  // While this sheet is up, the card's dismiss gesture stands down (04.08).
+  useSheetOpen(visible);
   const insets = useSafeAreaInsets();
   const { isPro } = useEntitlements();
   const np = useNowPlaying();

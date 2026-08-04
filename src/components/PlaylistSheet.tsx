@@ -12,6 +12,7 @@ import { getSavedPlatform } from '@/utils/musicPlatform';
 import { getUserPlaylists, isSpotifyConnected } from '@/utils/spotify';
 import { parseSpotifyPlaylistLink } from '@/utils/spotifyHandoff';
 import { type LinkedPlaylist } from '@/utils/stationPlaylists';
+import { useSheetOpen } from '@/context/NowPlayingContext';
 
 const SPOTIFY_GREEN = '#1DB954';
 const APPLE_MUSIC_RED = '#FA243C';
@@ -71,6 +72,9 @@ export function PlaylistSheet({
   onClose: () => void;
   onPick: (pl: LinkedPlaylist) => void;
 }) {
+  // Mounted means open: while this sheet is up, the card's dismiss gesture
+  // stands down (see the mode dismissPan guards, 04.08).
+  useSheetOpen(true);
   const insets = useSafeAreaInsets();
 
   // Gesture trap. The sheet is drawn INSIDE screens that have their own

@@ -518,9 +518,21 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
     else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
   };
 
+  /**
+   * A sheet above the card owns every gesture. Without this, a FAST flick
+   * that the song list declined bubbled down here (the sheet's React tree
+   * lives inside the mode's), the card dismissed UNDER the open sheet, and
+   * tearing down both iOS windows at once froze the whole screen (owner,
+   * 04.08: "the card collapses to the bottom and then whole screen
+   * freezes"). While any sheet is up, the dismiss gesture stands down.
+   */
+  const npSheetCount = useNowPlaying().sheetCount;
+  const sheetUpRef = useRef(false);
+  sheetUpRef.current = npSheetCount > 0;
+
   const dismissPan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.4,
+    onMoveShouldSetPanResponder: (_, g) => !sheetUpRef.current && g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.4,
     onPanResponderMove: (_, g) => { if (g.dy > 0) slideY.setValue(g.dy); },
     onPanResponderRelease: (_, g) => settleDismiss(g),
     /**

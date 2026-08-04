@@ -380,27 +380,22 @@ function TicketStyle(p: StyleProps) {
       </Defs>
 
       <G clipPath={`url(#tkP${uid})`}>
-        <PhotoFill d={d} uid={uid} x={PX} y={PY} w={PW} h={panelBottom - PY} />
-        {/* The mode. With a real capture the window shows THE REAL THING —
-            "the ticket template behind the image, keeping only the image of
-            the mode" (owner, 04.08): `slice` fills the window and trims the
-            capture's top and bottom equally, which is where the status bar
-            and the transport live, so the object band is what survives. The
-            drawn hero remains the fallback for captureless builds. */}
+        {/* With a real capture, THE MODE IS THE TICKET'S WHOLE BACKGROUND —
+            "as if the ticket template just sits over the mode playing"
+            (owner, 04.08, replacing the framed window that cut the mode
+            off). `slice` covers the panel edge to edge; the trim it takes
+            from the capture's top and bottom is where the status bar and
+            the pills live, so the object band is what fills the card. The
+            header, tear, counterfoil and barcode print over it, under the
+            same fades that made the station photograph readable. */}
         {p.snapshot ? (
-          <>
-            <Defs>
-              <ClipPath id={`tkH${uid}`}>
-                <Rect x={HERO_X} y={HERO_Y} width={HERO_W} height={HERO_H} rx={26} ry={26} />
-              </ClipPath>
-            </Defs>
-            <G clipPath={`url(#tkH${uid})`}>
-              <SvgImage x={HERO_X} y={HERO_Y} width={HERO_W} height={HERO_H}
-                href={{ uri: p.snapshot.uri }} preserveAspectRatio="xMidYMid slice" />
-            </G>
-          </>
+          <SvgImage x={PX} y={PY} width={PW} height={panelBottom - PY}
+            href={{ uri: p.snapshot.uri }} preserveAspectRatio="xMidYMid slice" />
         ) : (
-          <G transform={heroBox(HERO_X, HERO_Y, HERO_W, HERO_H, 'contain')}>{d.hero}</G>
+          <>
+            <PhotoFill d={d} uid={uid} x={PX} y={PY} w={PW} h={panelBottom - PY} />
+            <G transform={heroBox(HERO_X, HERO_Y, HERO_W, HERO_H, 'contain')}>{d.hero}</G>
+          </>
         )}
         {weave}
         <FadeBand uid={`t${uid}`} x={PX} y={PY} w={PW} h={286 + extra * 0.2}
@@ -475,10 +470,16 @@ function TicketStyle(p: StyleProps) {
 // the status bar is removed by drawing the image slightly taller than the
 // window and letting the clip take the top strip.
 
-/** Fraction of a portrait screen's height occupied by the status strip —
- *  clock, signal, battery. Notch phones use ~54-59pt of 800-930pt; slightly
- *  generous so no phone shows a sliver of clock. */
-const STATUS_FRAC = 0.072;
+/**
+ * How much of a portrait capture is trimmed, as fractions of screen height —
+ * set from the owner's own cropped reference (04.08): the top cut takes the
+ * status strip, the mode label and the chevron, starting the picture at the
+ * "YOU'RE LISTENING TO" line; the bottom cut takes the pill row and the home
+ * indicator, keeping the transport. On a 926pt phone the top lands at 111pt,
+ * exactly where the identity block begins.
+ */
+const CROP_TOP_FRAC = 0.120;
+const CROP_BOT_FRAC = 0.118;
 
 function SnapshotStyle(p: StyleProps) {
   const d = derive(p);
@@ -486,9 +487,10 @@ function SnapshotStyle(p: StyleProps) {
   if (!snapshot) return <TicketStyle {...p} />;
 
   const portrait = snapshot.h >= snapshot.w;
-  const cropTop = portrait ? STATUS_FRAC : 0;   // landscape hides its own bar
+  const cropTop = portrait ? CROP_TOP_FRAC : 0;  // landscape has its own chrome
+  const cropBot = portrait ? CROP_BOT_FRAC : 0;
   const visW = snapshot.w;
-  const visH = snapshot.h * (1 - cropTop);
+  const visH = snapshot.h * (1 - cropTop - cropBot);
 
   // Fit the visible page whole between the eyebrow and the footer.
   const TOP = 138, BOT = 128, SIDE = 84;
@@ -518,14 +520,10 @@ function SnapshotStyle(p: StyleProps) {
         <ClipPath id={clipId}>
           <Rect x={WX} y={WY} width={winW} height={winH} rx={42} ry={42} />
         </ClipPath>
-        {/* A whisper of station light bleeding out of the window, standing in
-            for a drop shadow (no blur filter exists in this renderer). */}
-        <RadialGradient id={`sg${clipId}`} cx="50%" cy="50%" r="60%">
-          <Stop offset="0.62" stopColor={d.wash} stopOpacity="0.30" />
-          <Stop offset="1" stopColor={d.wash} stopOpacity="0" />
-        </RadialGradient>
       </Defs>
-      <Rect x={WX - 70} y={WY - 60} width={winW + 140} height={winH + 120} fill={`url(#sg${clipId})`} />
+      {/* NO glow outside the window (owner, 04.08: "make sure the atmosphere
+          stops at the edge of the screenshot border") — the halo that stood
+          in for a drop shadow read as the app's haze leaking past the edge. */}
 
       <G clipPath={`url(#${clipId})`}>
         <Rect x={WX} y={WY} width={winW} height={winH} fill="#05060f" />

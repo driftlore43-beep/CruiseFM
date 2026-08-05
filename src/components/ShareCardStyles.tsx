@@ -208,9 +208,10 @@ type StyleProps = {
   uid: string;
   cardH: number;
   /** A real screenshot of the running mode (react-native-view-shot), plus the
-   *  screen's point size for aspect math; null when capture wasn't possible —
-   *  older builds, web, or a native failure. */
-  snapshot?: { uri: string; w: number; h: number } | null;
+   *  screen's point size for aspect math and the trim lines computed from the
+   *  live layout (see ModeActionRow.grabModeSnapshot); null when capture
+   *  wasn't possible — older builds, web, or a native failure. */
+  snapshot?: { uri: string; w: number; h: number; cropTopPt?: number; cropBotPt?: number } | null;
 };
 
 type Derived = {
@@ -505,14 +506,7 @@ function TicketStyle(p: StyleProps) {
 // the status bar is removed by drawing the image slightly taller than the
 // window and letting the clip take the top strip.
 
-/**
- * How much of a portrait capture is trimmed, as fractions of screen height —
- * set from the owner's own cropped reference (04.08): the top cut takes the
- * status strip, the mode label and the chevron, starting the picture at the
- * "YOU'RE LISTENING TO" line; the bottom cut takes the pill row and the home
- * indicator, keeping the transport. On a 926pt phone the top lands at 111pt,
- * exactly where the identity block begins.
- */
+/** Fraction fallbacks for captures that arrived without point crops. */
 const CROP_TOP_FRAC = 0.120;
 const CROP_BOT_FRAC = 0.118;
 
@@ -521,9 +515,18 @@ function SnapshotStyle(p: StyleProps) {
   const { uid, cardH, snapshot } = p;
   if (!snapshot) return <TicketStyle {...p} />;
 
+  // The trim lines come from the capture itself, computed at capture time
+  // from the modes' real layout: just above "YOU'RE LISTENING TO" at the
+  // top, 6pt above the pill row at the bottom. A fixed fraction cut close
+  // to the Tuner's play button while giving Vinyl a comfortable gap (owner,
+  // 05.08) — points are the same distance on every mode and every phone.
   const portrait = snapshot.h >= snapshot.w;
-  const cropTop = portrait ? CROP_TOP_FRAC : 0;  // landscape has its own chrome
-  const cropBot = portrait ? CROP_BOT_FRAC : 0;
+  const cropTop = portrait
+    ? (snapshot.cropTopPt ?? snapshot.h * CROP_TOP_FRAC) / snapshot.h
+    : 0;                                        // landscape has its own chrome
+  const cropBot = portrait
+    ? (snapshot.cropBotPt ?? snapshot.h * CROP_BOT_FRAC) / snapshot.h
+    : 0;
   const visW = snapshot.w;
   const visH = snapshot.h * (1 - cropTop - cropBot);
 

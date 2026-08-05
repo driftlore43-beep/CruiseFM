@@ -1,6 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets, type EdgeInsets } from 'react-native-safe-area-context';
 
 import { useDaylight } from '@/context/MotionContext';
 
@@ -47,9 +48,17 @@ const MAX_PLAYLIST_CHARS = 18;
  * drawn styles, exactly as it did before snapshots existed. The race is a
  * seatbelt — a wedged native call must not leave the share pill dead.
  */
-export type ModeSnapshot = { uri: string; w: number; h: number };
+export type ModeSnapshot = {
+  uri: string; w: number; h: number;
+  /** Where the card should trim the capture, in POINTS from each edge —
+   *  computed here, where the safe-area insets are known, from the modes'
+   *  own layout numbers rather than guessed fractions. A fixed fraction cut
+   *  close to the Tuner's play button while giving Vinyl a comfortable gap
+   *  (owner, 05.08: "make sure the cut off is consistent"). */
+  cropTopPt: number; cropBotPt: number;
+};
 
-async function grabModeSnapshot(): Promise<ModeSnapshot | null> {
+async function grabModeSnapshot(insets: EdgeInsets): Promise<ModeSnapshot | null> {
   if (Platform.OS === 'web') return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -60,14 +69,22 @@ async function grabModeSnapshot(): Promise<ModeSnapshot | null> {
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('capture timed out')), 1500)),
     ]);
     if (!uri) return null;
-    // The card needs the capture's aspect to lay the full page out uncropped
-    // (and to slice the status bar off by fraction) — the screen's points are
-    // that aspect exactly.
+    // The card needs the capture's aspect to lay the full page out uncropped;
+    // the screen's points are that aspect exactly.
     const scr = Dimensions.get('screen');
     return {
       // iOS hands back a bare path; SVG's Image wants a real uri.
       uri: uri.startsWith('/') ? `file://${uri}` : uri,
       w: scr.width, h: scr.height,
+      // TOP: the chevron's circle ends at max(insetTop,18)+42 and the
+      // identity block ("YOU'RE LISTENING TO" — owner wants it IN the
+      // picture) begins at max(insetTop,20)+52, so +46 clears one and
+      // keeps the other with headroom.
+      cropTopPt: Math.max(insets.top, 20) + 46,
+      // BOTTOM: every mode's content ends with the pill row — height ~40
+      // over paddingBottom max(insetBottom,24)+16 — so this cut lands 6pt
+      // above the pills on any phone, whatever the mode.
+      cropBotPt: Math.max(insets.bottom, 24) + 62,
     };
   } catch {
     return null;
@@ -95,6 +112,7 @@ export function ModeActionRow({
 }) {
   const np = useNowPlaying();
   const day = useDaylight();
+  const insets = useSafeAreaInsets();
   const [sharing, setSharing] = useState(false);
   const [snap, setSnap] = useState<ModeSnapshot | null>(null);
   // Tapping the playlist pill opens the playlist's SONGS, not a picker of
@@ -170,7 +188,7 @@ export function ModeActionRow({
             // Capture BEFORE the sheet renders — once it's up, the screen is
             // the sheet, not the mode. A failed capture opens the sheet
             // anyway, just without the Snapshot style.
-            setSnap(await grabModeSnapshot());
+            setSnap(await grabModeSnapshot(insets));
             setSharing(true);
           }}
           style={[ar.pill, day && ar.pillDay, ar.pillIcon]} activeOpacity={0.85}

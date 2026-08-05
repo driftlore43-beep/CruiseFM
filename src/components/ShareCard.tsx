@@ -11,8 +11,8 @@ import Svg from 'react-native-svg';
 import type { Station } from '@/constants/stations';
 import { CARD_H, CARD_RATIO, CARD_W } from '@/components/ShareModeArt';
 import {
-  DEFAULT_SHARE_STYLE, FORMAT_H, SHARE_STYLES, ShareCardBody,
-  type ShareFormat, type ShareStyleId,
+  cardHeightFor, DEFAULT_SHARE_STYLE, SHARE_STYLES, ShareCardBody,
+  type ShareFormat, type ShareStyleId, type SnapshotInfo,
 } from '@/components/ShareCardStyles';
 import { useSheetOpen } from '@/context/NowPlayingContext';
 import { getProfileName } from '@/utils/spotify';
@@ -45,10 +45,13 @@ export { CARD_W, CARD_H, CARD_RATIO };
 export function ShareCard(props: {
   width: number; station: Station; track: NowPlaying | null; modeLabel: string; modeId: string;
   userName: string | null; styleId: ShareStyleId; format: ShareFormat; uid?: string;
-  snapshot?: { uri: string; w: number; h: number } | null;
+  snapshot?: SnapshotInfo | null;
 }) {
   const { width, format, uid = 'p', ...body } = props;
-  const cardH = FORMAT_H[format];
+  // With a portrait capture the card's height comes from the capture itself
+  // — the Snapshot hugs the picture and the Ticket sizes its band — so the
+  // fixed 4:5/2:3 heights only apply to the drawn, captureless cards.
+  const cardH = cardHeightFor(props.styleId, format, props.snapshot);
   return (
     <Svg width={width} height={(width * cardH) / CARD_W} viewBox={`0 0 ${CARD_W} ${cardH}`}>
       <ShareCardBody {...body} cardH={cardH} uid={uid} />
@@ -83,7 +86,7 @@ export function ShareCardSheet({
   /** A real screenshot of the mode plus the screen's point size, captured
    *  the moment the share pill was tapped (see ModeActionRow). Null when
    *  capture isn't possible — the sheet then behaves as before snapshots. */
-  snapshot?: { uri: string; w: number; h: number } | null;
+  snapshot?: SnapshotInfo | null;
 }) {
   const { width: winW, height: winH } = useWindowDimensions();
   const [userName, setUserName] = useState<string | null>(null);
@@ -104,10 +107,10 @@ export function ShareCardSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
-  const cardH = FORMAT_H[format];
-  // The preview is sized off the SHORTER of the two limits so a 2:3 pin and a
-  // 4:5 card both clear the chips and buttons on a small phone — otherwise
-  // switching format pushes the actions off the bottom of the screen.
+  const cardH = cardHeightFor(styleId, format, snapshot);
+  // The preview is sized off the SHORTER of the two limits so a tall card and
+  // a 4:5 card both clear the chips and buttons on a small phone — otherwise
+  // switching style pushes the actions off the bottom of the screen.
   const previewW = Math.min(winW * 0.7, 300, ((winH - 330) * CARD_W) / cardH);
   const isPin = format === 'pin';
 
@@ -180,25 +183,29 @@ export function ShareCardSheet({
             })}
           </ScrollView>
 
-          {/* Shape */}
-          <View style={sc.formats}>
-            {(['card', 'pin'] as ShareFormat[]).map((f) => {
-              const on = f === format;
-              return (
-                <TouchableOpacity key={f} onPress={() => setFormat(f)} activeOpacity={0.85}
-                  style={[sc.fmt, on && sc.fmtOn]}
-                  accessibilityRole="button" accessibilityState={{ selected: on }}>
-                  <Ionicons name={f === 'pin' ? 'bookmark-outline' : 'chatbubble-outline'} size={14}
-                    color={on ? '#0a0a12' : 'rgba(255,255,255,0.7)'} />
-                  <Text style={[sc.fmtText, on && sc.fmtTextOn]}>
-                    {f === 'pin' ? 'Pin 2:3' : 'Card 4:5'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          {/* Shape — only for the drawn, captureless cards. With a capture,
+              both styles take their shape from the phone itself, so a
+              4:5/2:3 toggle would have nothing to change. */}
+          {!snapshot && (
+            <View style={sc.formats}>
+              {(['card', 'pin'] as ShareFormat[]).map((f) => {
+                const on = f === format;
+                return (
+                  <TouchableOpacity key={f} onPress={() => setFormat(f)} activeOpacity={0.85}
+                    style={[sc.fmt, on && sc.fmtOn]}
+                    accessibilityRole="button" accessibilityState={{ selected: on }}>
+                    <Ionicons name={f === 'pin' ? 'bookmark-outline' : 'chatbubble-outline'} size={14}
+                      color={on ? '#0a0a12' : 'rgba(255,255,255,0.7)'} />
+                    <Text style={[sc.fmtText, on && sc.fmtTextOn]}>
+                      {f === 'pin' ? 'Pin 2:3' : 'Card 4:5'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
-          {isPin && (
+          {isPin && !snapshot && (
             <Text style={sc.hint}>
               {Platform.OS === 'ios'
                 ? 'Pinterest’s shape. Tap Share card, then Save Image to pin it.'

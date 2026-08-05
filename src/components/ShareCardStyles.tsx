@@ -59,6 +59,77 @@ export const DEFAULT_SHARE_STYLE: ShareStyleId = 'ticket';
 
 const INSTALL_HOST = 'cruisefm.app';
 
+/** A real screenshot of the running mode plus the trim lines computed at
+ *  capture time from the live layout (see ModeActionRow.grabModeSnapshot).
+ *  Structurally identical to ModeActionRow's ModeSnapshot — defined here too
+ *  so ShareCard doesn't have to import from the file that imports it. */
+export type SnapshotInfo = {
+  uri: string; w: number; h: number;
+  cropTopPt?: number; cropBotPt?: number;
+  identBotPt?: number; songTopPt?: number;
+};
+
+// ── Snapshot-derived card geometry ───────────────────────────────────────────
+// With a portrait capture, neither style uses the fixed 4:5/2:3 heights any
+// more: the SNAPSHOT card hugs the picture (owner, 05.08: "only share the part
+// that is snapshotted", with room at the bottom for cruisefm.app), and the
+// TICKET derives its height from its picture band so the mode is never
+// compressed ("get the ticket template as the same dimensions as the snapshot
+// mode"). Everything here must agree between cardHeightFor() and the styles'
+// own layout code — the height is computed once in the sheet and again when
+// drawing, and the two must land on the same number.
+
+/** Fraction fallbacks for captures that arrived without point crops. */
+const CROP_TOP_FRAC = 0.120;
+const CROP_BOT_FRAC = 0.118;
+
+// Snapshot card: slim strips only. TOP is the air the eyebrow needed; BOT
+// carries cruisefm.app; SIDE keeps the rounded frame reading as a frame.
+const SNAP_SIDE = 20;
+const SNAP_TOP = 40;
+const SNAP_BOT = 108;
+
+// Ticket card: header zone below the panel's own 44 margin, tear gap under
+// the picture, and the counterfoil's fixed foot. The foot must hold the
+// barcode (ends at tear+98) clear of the NOW PLAYING baseline (foot−208+…):
+// at 330 the two nearly touched on the render.
+const TK_HEAD = 214;
+const TK_TEAR = 34;
+const TK_FOOT = 352;
+
+/** The capture band the SNAPSHOT shows: everything between the status strip
+ *  and the pill row — transport included, that is the point of the style. */
+function snapBand(snap: SnapshotInfo) {
+  const portrait = snap.h >= snap.w;
+  const cropTop = portrait ? (snap.cropTopPt ?? snap.h * CROP_TOP_FRAC) / snap.h : 0;
+  const cropBot = portrait ? (snap.cropBotPt ?? snap.h * CROP_BOT_FRAC) / snap.h : 0;
+  return { cropTop, cropBot, visW: snap.w, visH: snap.h * (1 - cropTop - cropBot) };
+}
+
+/** The capture band the TICKET shows: the mode's OBJECT only — below the
+ *  station identity (the header prints the station) and above the song block
+ *  (the counterfoil prints the song; the scrub stays out, owner 05.08). */
+function ticketBand(snap: SnapshotInfo) {
+  const identBot = snap.identBotPt ?? snap.h * 0.148;
+  const songTop = snap.songTopPt ?? snap.h * 0.36;
+  return { identBot, bandH: Math.max(140, snap.h - identBot - songTop) };
+}
+
+/** The card's height for a given style/format/capture. The sheet sizes the
+ *  preview and the export copy with this; the styles lay out against it. */
+export function cardHeightFor(styleId: ShareStyleId, format: ShareFormat, snap?: SnapshotInfo | null): number {
+  if (snap && snap.h >= snap.w) {
+    if (styleId === 'snapshot') {
+      const band = snapBand(snap);
+      return Math.round(SNAP_TOP + ((CARD_W - SNAP_SIDE * 2) * band.visH) / band.visW + SNAP_BOT);
+    }
+    const { bandH } = ticketBand(snap);
+    const PW = CARD_W - 88;
+    return Math.round(44 + TK_HEAD + (PW * bandH) / snap.w + TK_TEAR + TK_FOOT + 44);
+  }
+  return FORMAT_H[format];
+}
+
 /** SVG <Text> does not wrap, so lines are worked out here. `perChar` is the
  *  average glyph width as a fraction of font size — 0.52 is about right for a
  *  bold sans face and errs on the safe side, since overflowing the card looks
@@ -207,11 +278,9 @@ type StyleProps = {
   userName: string | null;
   uid: string;
   cardH: number;
-  /** A real screenshot of the running mode (react-native-view-shot), plus the
-   *  screen's point size for aspect math and the trim lines computed from the
-   *  live layout (see ModeActionRow.grabModeSnapshot); null when capture
-   *  wasn't possible — older builds, web, or a native failure. */
-  snapshot?: { uri: string; w: number; h: number; cropTopPt?: number; cropBotPt?: number } | null;
+  /** A real screenshot of the running mode (react-native-view-shot); null
+   *  when capture wasn't possible — older builds, web, or a native failure. */
+  snapshot?: SnapshotInfo | null;
 };
 
 type Derived = {
@@ -323,18 +392,32 @@ function TicketStyle(p: StyleProps) {
   const STUB_X = PX + 46, STUB_W = PW - 92;
   const extra = cardH - CARD_H_CARD;
 
-  // The owner's running order (02.08): header and text / the mode, covering
-  // the whole card / tear / NOW PLAYING · song · album cover / barcode.
-  // The photograph is the card's background end to end; the mode's object sits
-  // on it at full width, so it is never cropped, and the type reads because
-  // the top and bottom are faded rather than boxed off.
-  // A shade under the panel's full width: at 100% the counterfoil lost the
-  // room its artist line needs and ran into the barcode.
+  // A PORTRAIT capture gets the STRUCTURED ticket (owner, 05.08: "get the
+  // ticket template as the same dimensions as the snapshot mode — the ticket
+  // mode is a bit compressed for the different mode sizes"): header zone,
+  // then the mode's object band at the SAME proportions the Snapshot shows
+  // it — contain at the panel's full width, so no mode is ever squeezed or
+  // cropped — then tear and counterfoil. The band starts below the capture's
+  // own station identity and ends above its own song block, so the ticket's
+  // printed station and printed song are the ONLY ones on the card: this is
+  // also what ended the header ghosting ("Daylight AM" printing over the
+  // capture's own "1240 Daylight AM"). The card's height is derived in
+  // cardHeightFor so the band always fits exactly.
+  const snap = p.snapshot && p.snapshot.h >= p.snapshot.w ? p.snapshot : null;
+  const band = snap ? ticketBand(snap) : null;
+  const picY = PY + TK_HEAD;
+  const sk = snap ? PW / snap.w : 1;
+  const picH = snap && band ? band.bandH * sk : 0;
+
+  // Captureless (custom stations, web, old builds — and landscape captures,
+  // which the Snapshot style handles better): the drawn hero, exactly as
+  // before. A shade under the panel's full width: at 100% the counterfoil
+  // lost the room its artist line needs and ran into the barcode.
   const HERO_W = Math.round(PW * 0.95);
   const HERO_H = Math.round((HERO_W * STAGE_H) / CARD_W);
   const HERO_X = CX - HERO_W / 2;
   const HERO_Y = PY + 190 + extra * 0.36;
-  const perfY = HERO_Y + HERO_H + 32;
+  const perfY = snap ? picY + picH + TK_TEAR : HERO_Y + HERO_H + 32;
   const barcodeY = panelBottom - 120;
 
   const COVER = 156;
@@ -343,34 +426,8 @@ function TicketStyle(p: StyleProps) {
   const stubContentH = 56 + titleLines.length * 50 + (d.artist ? 34 : 0);
   const stubY = perfY + Math.max(56, ((barcodeY - perfY) - stubContentH) / 2);
   const nameSize = fitSize(station.name, 58, PW - 92, 28);
-
-  /**
-   * Snapshot placement (owner, 04.08, off her Circular EQ ticket): cover the
-   * panel, but BIASED DOWNWARD rather than centred — centring hid the mode's
-   * top under the header ("the mode is still cut off, can this be dragged
-   * down"). TK_TOP_FRAC starts the picture just below the capture's own
-   * chrome, which drops the object's crown into the clear zone and lands the
-   * capture's own title and seek bar in the counterfoil area — visible now,
-   * because the ticket's duplicate song text is gone (her "Holiday" was
-   * ghost-layering under the ticket's own "Holiday").
-   */
-  const snap = p.snapshot;
-  const panelH = panelBottom - PY;
-  const sk = snap ? Math.max(PW / snap.w, panelH / snap.h) : 1;
-  const simgW = snap ? snap.w * sk : 0;
-  const simgH = snap ? snap.h * sk : 0;
-  // 0.163 → 0.05 (owner, 05.08: "drag down the mode's position… leaving out
-  // the music scrub"): the lower start pushes the capture's own song block
-  // and seek bar off the panel's foot for the modes that carry them low, so
-  // the printed title below can't ghost against them again.
-  const TK_TOP_FRAC = 0.05;
-  const sTopF = snap
-    ? (snap.h >= snap.w
-        ? Math.min(TK_TOP_FRAC, Math.max(0, (simgH - panelH) / simgH))
-        : ((simgH - panelH) / 2) / simgH)
-    : 0;
-  // With a capture, the barcode and cover tuck up under the tear so the
-  // capture's own song block and scrub stay in the open.
+  // With a capture, the barcode and cover tuck up under the tear and the
+  // song block anchors to the ticket's foot.
   const barY = snap ? perfY + 42 : barcodeY;
 
   // Guilloche. Real tickets carry a fine engraved pattern that a photocopier
@@ -407,39 +464,49 @@ function TicketStyle(p: StyleProps) {
         <ClipPath id={`tkP${uid}`}>
           <Rect x={PX} y={PY} width={PW} height={panelBottom - PY} rx={40} ry={40} />
         </ClipPath>
+        {!!snap && (
+          <ClipPath id={`tkB${uid}`}>
+            <Rect x={PX} y={picY} width={PW} height={picH} />
+          </ClipPath>
+        )}
       </Defs>
 
       <G clipPath={`url(#tkP${uid})`}>
-        {/* With a real capture, THE MODE IS THE TICKET'S WHOLE BACKGROUND —
-            "as if the ticket template just sits over the mode playing"
-            (owner, 04.08, replacing the framed window that cut the mode
-            off). `slice` covers the panel edge to edge; the trim it takes
-            from the capture's top and bottom is where the status bar and
-            the pills live, so the object band is what fills the card. The
-            header, tear, counterfoil and barcode print over it, under the
-            same fades that made the station photograph readable. */}
-        {snap ? (
-          <SvgImage x={PX - (simgW - PW) / 2} y={PY - simgH * sTopF}
-            width={simgW} height={simgH}
-            href={{ uri: snap.uri }} preserveAspectRatio="xMidYMid meet" />
+        {snap && band ? (
+          // The picture band: the same slice of the phone the Snapshot
+          // frames, minus the capture's own station identity and song block
+          // (the ticket prints both itself), at the panel's full width —
+          // contain, never cover, so no mode is squeezed or trimmed. And NO
+          // fades over it: the header and counterfoil sit on the ticket's
+          // own paper now, so the picture carries no shading at all (owner,
+          // 05.08: "a lot of vignette around the ticket's edges — remove
+          // that").
+          <>
+            {weave}
+            <G clipPath={`url(#tkB${uid})`}>
+              <SvgImage x={PX} y={picY - band.identBot * sk}
+                width={PW} height={snap.h * sk}
+                href={{ uri: snap.uri }} preserveAspectRatio="xMidYMid meet" />
+            </G>
+          </>
         ) : (
           <>
             <PhotoFill d={d} uid={uid} x={PX} y={PY} w={PW} h={panelBottom - PY} />
             <G transform={heroBox(HERO_X, HERO_Y, HERO_W, HERO_H, 'contain')}>{d.hero}</G>
+            {weave}
+            <FadeBand uid={`t${uid}`} x={PX} y={PY} w={PW} h={286 + extra * 0.2}
+              from={0.92} tint={d.eq[1]} dir="down" />
+            <FadeBand uid={`b${uid}`} x={PX} y={perfY - 150}
+              w={PW} h={panelBottom - (perfY - 150)}
+              from={0.94} dir="up" />
           </>
         )}
-        {weave}
-        {/* Fades tightened to the type they serve (owner, 05.08: "a lot of
-            vignette around the ticket's edges — remove that"): the header
-            band is shorter and lighter, and with a capture the bottom fade
-            is bottom-anchored so the picture zone above the tear carries no
-            shading at all. */}
-        <FadeBand uid={`t${uid}`} x={PX} y={PY} w={PW} h={snap ? 232 : 286 + extra * 0.2}
-          from={snap ? 0.74 : 0.92} tint={d.eq[1]} dir="down" />
-        <FadeBand uid={`b${uid}`} x={PX} y={snap ? panelBottom - 310 : perfY - 150}
-          w={PW} h={snap ? 310 : panelBottom - (perfY - 150)}
-          from={snap ? 0.90 : 0.94} dir="up" />
       </G>
+      {/* A hairline seats the picture into the ticket like a printed photo. */}
+      {!!snap && (
+        <Rect x={PX} y={picY} width={PW} height={picH} fill="none"
+          stroke="#ffffff" strokeOpacity={0.12} strokeWidth={2} />
+      )}
       <Rect x={PX} y={PY} width={PW} height={panelBottom - PY} rx={40} fill="none"
         stroke="#ffffff" strokeOpacity={0.26} strokeWidth={3} />
 
@@ -518,10 +585,6 @@ function TicketStyle(p: StyleProps) {
 // the status bar is removed by drawing the image slightly taller than the
 // window and letting the clip take the top strip.
 
-/** Fraction fallbacks for captures that arrived without point crops. */
-const CROP_TOP_FRAC = 0.120;
-const CROP_BOT_FRAC = 0.118;
-
 function SnapshotStyle(p: StyleProps) {
   const d = derive(p);
   const { uid, cardH, snapshot } = p;
@@ -532,36 +595,32 @@ function SnapshotStyle(p: StyleProps) {
   // top, 6pt above the pill row at the bottom. A fixed fraction cut close
   // to the Tuner's play button while giving Vinyl a comfortable gap (owner,
   // 05.08) — points are the same distance on every mode and every phone.
+  const band = snapBand(snapshot);
   const portrait = snapshot.h >= snapshot.w;
-  const cropTop = portrait
-    ? (snapshot.cropTopPt ?? snapshot.h * CROP_TOP_FRAC) / snapshot.h
-    : 0;                                        // landscape has its own chrome
-  const cropBot = portrait
-    ? (snapshot.cropBotPt ?? snapshot.h * CROP_BOT_FRAC) / snapshot.h
-    : 0;
-  const visW = snapshot.w;
-  const visH = snapshot.h * (1 - cropTop - cropBot);
 
-  // No header of any kind (owner, 04.08: "remove 'tuner · station number',
-  // station mode, that sits at the top of the card") — the page already
-  // names its own station, and printing it twice was clutter. Just the
-  // picture, a thin accent frame, and cruisefm.app underneath.
-  const TOP = 76, BOT = 112, SIDE = 84;
-  const k = Math.min((CARD_W - SIDE * 2) / visW, (cardH - TOP - BOT) / visH);
-  const winW = visW * k, winH = visH * k;
-  const WX = (CARD_W - winW) / 2;
-  const WY = TOP + (cardH - TOP - BOT - winH) / 2;
+  // THE CARD IS THE PICTURE now (owner, 05.08: "remove the outer border so
+  // the share option only shares the part that is snapshotted") — for a
+  // portrait capture the card's height is derived in cardHeightFor, so the
+  // picture runs edge to edge over slim strips: air above the eyebrow at
+  // the top, cruisefm.app on the bottom one. A landscape capture still
+  // letterboxes into the fixed card — its own chrome travels with it.
+  const winW = CARD_W - SNAP_SIDE * 2;
+  const k = portrait
+    ? winW / band.visW
+    : Math.min(winW / band.visW, (cardH - SNAP_TOP - SNAP_BOT) / band.visH);
+  const drawW = band.visW * k, winH = band.visH * k;
+  const WX = (CARD_W - drawW) / 2;
+  const WY = portrait ? SNAP_TOP : SNAP_TOP + (cardH - SNAP_TOP - SNAP_BOT - winH) / 2;
   const clipId = `snap${uid}`;
-  const footY = cardH - 58;
+  const footY = cardH - 42;
 
   return (
     <>
-      <BaseWash d={d} uid={uid} cardH={cardH} glow={0.30} />
-      <Backdrop d={d} uid={uid} cardH={cardH} stops={[0.78, 0.68, 0.78, 0.92]} />
+      <BaseWash d={d} uid={uid} cardH={cardH} glow={0.24} />
 
       <Defs>
         <ClipPath id={clipId}>
-          <Rect x={WX} y={WY} width={winW} height={winH} rx={42} ry={42} />
+          <Rect x={WX} y={WY} width={drawW} height={winH} rx={42} ry={42} />
         </ClipPath>
       </Defs>
       {/* NO glow outside the window (owner, 04.08: "make sure the atmosphere
@@ -569,18 +628,18 @@ function SnapshotStyle(p: StyleProps) {
           in for a drop shadow read as the app's haze leaking past the edge. */}
 
       <G clipPath={`url(#${clipId})`}>
-        <Rect x={WX} y={WY} width={winW} height={winH} fill="#05060f" />
+        <Rect x={WX} y={WY} width={drawW} height={winH} fill="#05060f" />
         {/* The full capture at its own aspect, drawn slightly taller than the
             window so the status strip sits above the clip — everything below
             it survives untouched. */}
-        <SvgImage x={WX} y={WY - snapshot.h * k * cropTop}
-          width={winW} height={snapshot.h * k}
+        <SvgImage x={WX} y={WY - snapshot.h * k * band.cropTop}
+          width={drawW} height={snapshot.h * k}
           href={{ uri: snapshot.uri }} preserveAspectRatio="xMidYMid meet" />
       </G>
       {/* Thin translucent white frame — the accent-coloured one was tried
           and rolled back the same night (owner: "change the border back to
           the white/transparent border"). */}
-      <Rect x={WX} y={WY} width={winW} height={winH} rx={42} fill="none"
+      <Rect x={WX} y={WY} width={drawW} height={winH} rx={42} fill="none"
         stroke="#ffffff" strokeOpacity={0.30} strokeWidth={3} />
 
       {/* Footer — just the address. The page carries everything else. */}

@@ -56,6 +56,12 @@ export type ModeSnapshot = {
    *  close to the Tuner's play button while giving Vinyl a comfortable gap
    *  (owner, 05.08: "make sure the cut off is consistent"). */
   cropTopPt: number; cropBotPt: number;
+  /** Two more lines for the TICKET's picture band, which shows only the
+   *  mode's object: the bottom of the station identity block (the ticket's
+   *  header already names the station, so the capture's own must not ghost
+   *  under it) and the top of the song block (the counterfoil prints the
+   *  song, and the owner asked the scrub left out). */
+  identBotPt: number; songTopPt: number;
 };
 
 async function grabModeSnapshot(insets: EdgeInsets): Promise<ModeSnapshot | null> {
@@ -78,13 +84,25 @@ async function grabModeSnapshot(insets: EdgeInsets): Promise<ModeSnapshot | null
       w: scr.width, h: scr.height,
       // TOP: the chevron's circle ends at max(insetTop,18)+42 and the
       // identity block ("YOU'RE LISTENING TO" — owner wants it IN the
-      // picture) begins at max(insetTop,20)+52, so +46 clears one and
-      // keeps the other with headroom.
-      cropTopPt: Math.max(insets.top, 20) + 46,
+      // picture) begins at max(insetTop,20)+52. +44 clears the chevron by
+      // 2pt and gives the eyebrow 8pt of air — she read the old +46 as
+      // "really close to the border" (05.08). Do not go below +44: the
+      // chevron's ring starts to peek into the top-right corner.
+      cropTopPt: Math.max(insets.top, 20) + 44,
       // BOTTOM: every mode's content ends with the pill row — height ~40
       // over paddingBottom max(insetBottom,24)+16 — so this cut lands 6pt
       // above the pills on any phone, whatever the mode.
       cropBotPt: Math.max(insets.bottom, 24) + 62,
+      // TICKET BAND — the object only. Identity text ends at
+      // max(insetTop,20)+86 (eyebrow 12 + gap 3 + name row 19 below +52);
+      // +92 is that plus a whisker. The song block's TOP sits 252pt above
+      // the pill row (pills marginTop 26 + controls 96 + its marginTop
+      // 10-14 + seek ~26+22 + title block 72), i.e. max(insetBottom,24)
+      // +56+252 from the bottom edge; +300 cuts inside the title block's
+      // own 18pt top padding — glyphs hidden, the visual untouched — and
+      // absorbs the 4pt of per-mode transport-margin variance.
+      identBotPt: Math.max(insets.top, 20) + 92,
+      songTopPt: Math.max(insets.bottom, 24) + 300,
     };
   } catch {
     return null;

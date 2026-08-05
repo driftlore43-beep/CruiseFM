@@ -908,11 +908,15 @@ const fs = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     overflow: 'hidden',
-    // Floats the meter a step above the song title so the share ticket's
-    // picture band (which cuts just above the title) keeps a strip of
-    // backdrop under the bars — flush against the tear they read as cut
-    // off (owner, 05.08). The gap is welcome breathing room in-app too.
-    marginBottom: 12,
+    // Floats the meter above the song title. Two owner rounds live in this
+    // number (05.08): 12 gave the share ticket's picture band a strip of
+    // backdrop under the bars (flush against the tear they read as cut
+    // off), then 52 lifted the meter into the band's middle — on quiet
+    // songs the bars are short and the composition read as empty sky over
+    // a meter glued to the bottom edge. Taller bars were considered and
+    // rejected by the owner ("might look a bit awkward") — lift, don't
+    // stretch.
+    marginBottom: 52,
   },
   vizBloomBottom: {
     position: 'absolute', bottom: -12, alignSelf: 'center',

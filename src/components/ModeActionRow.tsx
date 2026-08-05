@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Platform, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets, type EdgeInsets } from 'react-native-safe-area-context';
 
 import { useDaylight } from '@/context/MotionContext';
@@ -95,14 +95,16 @@ async function grabModeSnapshot(insets: EdgeInsets): Promise<ModeSnapshot | null
       cropBotPt: Math.max(insets.bottom, 24) + 62,
       // TICKET BAND — the object only. Identity text ends at
       // max(insetTop,20)+86 (eyebrow 12 + gap 3 + name row 19 below +52);
-      // +92 is that plus a whisker. The song block's TOP sits 252pt above
-      // the pill row (pills marginTop 26 + controls 96 + its marginTop
-      // 10-14 + seek ~26+22 + title block 72), i.e. max(insetBottom,24)
-      // +56+252 from the bottom edge; +300 cuts inside the title block's
-      // own 18pt top padding — glyphs hidden, the visual untouched — and
-      // absorbs the 4pt of per-mode transport-margin variance.
+      // +92 is that plus a whisker. The song block's cut line was MEASURED
+      // off the owner's device tickets, not derived from the style sheets:
+      // +300 (the styles' arithmetic) left ~13pt of title crown poking
+      // above the tear on Vinyl/Equalizer/Cassette — the real stack runs
+      // taller than its declared numbers (seek-bar touch padding, marquee)
+      // — putting the title's glyph top at ~+313. +330 hides it with 17pt
+      // to spare while staying at the title block's own top edge, so the
+      // mode's visual above it is untouched.
       identBotPt: Math.max(insets.top, 20) + 92,
-      songTopPt: Math.max(insets.bottom, 24) + 300,
+      songTopPt: Math.max(insets.bottom, 24) + 330,
     };
   } catch {
     return null;
@@ -131,6 +133,12 @@ export function ModeActionRow({
   const np = useNowPlaying();
   const day = useDaylight();
   const insets = useSafeAreaInsets();
+  // The share pill is PORTRAIT-ONLY: the cards are built around a portrait
+  // capture, and a landscape ticket needs its own design round first
+  // (owner, 05.08: "the share option is available in the landscape mode —
+  // I would remove this option").
+  const { width: winW, height: winH } = useWindowDimensions();
+  const isLandscape = winW > winH;
   const [sharing, setSharing] = useState(false);
   const [snap, setSnap] = useState<ModeSnapshot | null>(null);
   // Tapping the playlist pill opens the playlist's SONGS, not a picker of
@@ -200,7 +208,7 @@ export function ModeActionRow({
         <Text style={[ar.pillText, day && ar.pillTextDay]} numberOfLines={1}>{trim(playlistLabel)}</Text>
       </TouchableOpacity>
 
-      {!!track && (
+      {!!track && !isLandscape && (
         <TouchableOpacity
           onPress={async () => {
             // Capture BEFORE the sheet renders — once it's up, the screen is

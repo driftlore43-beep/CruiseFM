@@ -343,6 +343,31 @@ function TicketStyle(p: StyleProps) {
   const stubY = perfY + Math.max(56, ((barcodeY - perfY) - stubContentH) / 2);
   const nameSize = fitSize(station.name, 58, PW - 92, 28);
 
+  /**
+   * Snapshot placement (owner, 04.08, off her Circular EQ ticket): cover the
+   * panel, but BIASED DOWNWARD rather than centred — centring hid the mode's
+   * top under the header ("the mode is still cut off, can this be dragged
+   * down"). TK_TOP_FRAC starts the picture just below the capture's own
+   * chrome, which drops the object's crown into the clear zone and lands the
+   * capture's own title and seek bar in the counterfoil area — visible now,
+   * because the ticket's duplicate song text is gone (her "Holiday" was
+   * ghost-layering under the ticket's own "Holiday").
+   */
+  const snap = p.snapshot;
+  const panelH = panelBottom - PY;
+  const sk = snap ? Math.max(PW / snap.w, panelH / snap.h) : 1;
+  const simgW = snap ? snap.w * sk : 0;
+  const simgH = snap ? snap.h * sk : 0;
+  const TK_TOP_FRAC = 0.163;
+  const sTopF = snap
+    ? (snap.h >= snap.w
+        ? Math.min(TK_TOP_FRAC, Math.max(0, (simgH - panelH) / simgH))
+        : ((simgH - panelH) / 2) / simgH)
+    : 0;
+  // With a capture, the barcode and cover tuck up under the tear so the
+  // capture's own song block and scrub stay in the open.
+  const barY = snap ? perfY + 42 : barcodeY;
+
   // Guilloche. Real tickets carry a fine engraved pattern that a photocopier
   // can't hold, and it is what stops the panel reading as a flat rectangle.
   const weave: React.ReactElement[] = [];
@@ -364,7 +389,7 @@ function TicketStyle(p: StyleProps) {
   let bx = STUB_X;
   for (let i = 0; bx < STUB_X + 330; i++) {
     const w = 3 + Math.round(h01(i * 3.7) * 3) * 2;
-    bars.push(<Rect key={`bc${i}`} x={bx} y={barcodeY} width={w} height={56} fill="#ffffff" fillOpacity={0.5} />);
+    bars.push(<Rect key={`bc${i}`} x={bx} y={barY} width={w} height={56} fill="#ffffff" fillOpacity={0.5} />);
     bx += w + 6;
   }
 
@@ -388,9 +413,10 @@ function TicketStyle(p: StyleProps) {
             the pills live, so the object band is what fills the card. The
             header, tear, counterfoil and barcode print over it, under the
             same fades that made the station photograph readable. */}
-        {p.snapshot ? (
-          <SvgImage x={PX} y={PY} width={PW} height={panelBottom - PY}
-            href={{ uri: p.snapshot.uri }} preserveAspectRatio="xMidYMid slice" />
+        {snap ? (
+          <SvgImage x={PX - (simgW - PW) / 2} y={PY - simgH * sTopF}
+            width={simgW} height={simgH}
+            href={{ uri: snap.uri }} preserveAspectRatio="xMidYMid meet" />
         ) : (
           <>
             <PhotoFill d={d} uid={uid} x={PX} y={PY} w={PW} h={panelBottom - PY} />
@@ -400,8 +426,9 @@ function TicketStyle(p: StyleProps) {
         {weave}
         <FadeBand uid={`t${uid}`} x={PX} y={PY} w={PW} h={286 + extra * 0.2}
           from={0.92} tint={d.eq[1]} dir="down" />
-        <FadeBand uid={`b${uid}`} x={PX} y={perfY - 150} w={PW} h={panelBottom - (perfY - 150)}
-          from={0.94} dir="up" />
+        <FadeBand uid={`b${uid}`} x={PX} y={snap ? perfY - 90 : perfY - 150}
+          w={PW} h={panelBottom - (snap ? perfY - 90 : perfY - 150)}
+          from={snap ? 0.78 : 0.94} dir="up" />
       </G>
       <Rect x={PX} y={PY} width={PW} height={panelBottom - PY} rx={40} fill="none"
         stroke="#ffffff" strokeOpacity={0.26} strokeWidth={3} />
@@ -432,28 +459,36 @@ function TicketStyle(p: StyleProps) {
       <Circle cx={CARD_W - PX} cy={perfY} r={28} fill="#07080f" />
       {holes}
 
-      {/* Counterfoil: the song on the left, the album cover on the right. */}
-      <SvgText x={STUB_X} y={stubY} fill="#ffffff" fillOpacity={0.45} fontSize={21} fontWeight="700" letterSpacing={5}>
-        NOW PLAYING
-      </SvgText>
-      {titleLines.map((line, i) => (
-        <SvgText key={i} x={STUB_X} y={stubY + 56 + i * 50} fill="#ffffff" fontSize={40} fontWeight="800" letterSpacing={-0.5}>
-          {line}
-        </SvgText>
-      ))}
-      {!!d.artist && (
-        <SvgText x={STUB_X} y={stubY + 56 + titleLines.length * 50 + 4} fill="#ffffff"
-          fillOpacity={0.6} fontSize={27} fontWeight="600">
-          {clip(d.artist, 30)}
-        </SvgText>
+      {/* Counterfoil. With a capture, the ticket's own song text is GONE —
+          the screenshot already carries the title and the seek bar, and the
+          duplicate was ghost-layering right under them (owner, 04.08) — so
+          only the cover, the barcode and the address remain, tucked high. */}
+      {!snap && (
+        <>
+          <SvgText x={STUB_X} y={stubY} fill="#ffffff" fillOpacity={0.45} fontSize={21} fontWeight="700" letterSpacing={5}>
+            NOW PLAYING
+          </SvgText>
+          {titleLines.map((line, i) => (
+            <SvgText key={i} x={STUB_X} y={stubY + 56 + i * 50} fill="#ffffff" fontSize={40} fontWeight="800" letterSpacing={-0.5}>
+              {line}
+            </SvgText>
+          ))}
+          {!!d.artist && (
+            <SvgText x={STUB_X} y={stubY + 56 + titleLines.length * 50 + 4} fill="#ffffff"
+              fillOpacity={0.6} fontSize={27} fontWeight="600">
+              {clip(d.artist, 30)}
+            </SvgText>
+          )}
+        </>
       )}
       {!!d.art && (
-        <CoverTile art={d.art} x={coverX} y={stubY - 40} size={COVER} uid={`tk${uid}`}
+        <CoverTile art={d.art} x={coverX} y={snap ? perfY + 30 : stubY - 40} size={COVER} uid={`tk${uid}`}
           tint={mixHex(d.eq[1], '#101322', 0.45)} />
       )}
 
       {bars}
-      <SvgText x={CARD_W - STUB_X} y={barcodeY + 46} fill="#ffffff" fillOpacity={0.5} fontSize={25}
+      <SvgText x={CARD_W - STUB_X} y={snap ? panelBottom - 24 : barcodeY + 46}
+        fill="#ffffff" fillOpacity={0.5} fontSize={25}
         fontWeight="600" textAnchor="end">
         {INSTALL_HOST}
       </SvgText>
@@ -527,10 +562,11 @@ function SnapshotStyle(p: StyleProps) {
           width={winW} height={snapshot.h * k}
           href={{ uri: snapshot.uri }} preserveAspectRatio="xMidYMid meet" />
       </G>
-      {/* A thin frame in the station's own accent (owner: "a thin border,
-          theme colour") — the one place the card still carries the mood. */}
+      {/* Thin translucent white frame — the accent-coloured one was tried
+          and rolled back the same night (owner: "change the border back to
+          the white/transparent border"). */}
       <Rect x={WX} y={WY} width={winW} height={winH} rx={42} fill="none"
-        stroke={d.eq[1]} strokeOpacity={0.9} strokeWidth={3} />
+        stroke="#ffffff" strokeOpacity={0.30} strokeWidth={3} />
 
       {/* Footer — just the address. The page carries everything else. */}
       <SvgText x={CX} y={footY} fill="#ffffff" fillOpacity={0.5} fontSize={26}

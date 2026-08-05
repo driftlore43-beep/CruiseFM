@@ -359,7 +359,11 @@ function TicketStyle(p: StyleProps) {
   const sk = snap ? Math.max(PW / snap.w, panelH / snap.h) : 1;
   const simgW = snap ? snap.w * sk : 0;
   const simgH = snap ? snap.h * sk : 0;
-  const TK_TOP_FRAC = 0.163;
+  // 0.163 → 0.05 (owner, 05.08: "drag down the mode's position… leaving out
+  // the music scrub"): the lower start pushes the capture's own song block
+  // and seek bar off the panel's foot for the modes that carry them low, so
+  // the printed title below can't ghost against them again.
+  const TK_TOP_FRAC = 0.05;
   const sTopF = snap
     ? (snap.h >= snap.w
         ? Math.min(TK_TOP_FRAC, Math.max(0, (simgH - panelH) / simgH))
@@ -425,11 +429,16 @@ function TicketStyle(p: StyleProps) {
           </>
         )}
         {weave}
-        <FadeBand uid={`t${uid}`} x={PX} y={PY} w={PW} h={286 + extra * 0.2}
-          from={0.92} tint={d.eq[1]} dir="down" />
-        <FadeBand uid={`b${uid}`} x={PX} y={snap ? perfY - 90 : perfY - 150}
-          w={PW} h={panelBottom - (snap ? perfY - 90 : perfY - 150)}
-          from={snap ? 0.78 : 0.94} dir="up" />
+        {/* Fades tightened to the type they serve (owner, 05.08: "a lot of
+            vignette around the ticket's edges — remove that"): the header
+            band is shorter and lighter, and with a capture the bottom fade
+            is bottom-anchored so the picture zone above the tear carries no
+            shading at all. */}
+        <FadeBand uid={`t${uid}`} x={PX} y={PY} w={PW} h={snap ? 232 : 286 + extra * 0.2}
+          from={snap ? 0.74 : 0.92} tint={d.eq[1]} dir="down" />
+        <FadeBand uid={`b${uid}`} x={PX} y={snap ? panelBottom - 310 : perfY - 150}
+          w={PW} h={snap ? 310 : panelBottom - (perfY - 150)}
+          from={snap ? 0.90 : 0.94} dir="up" />
       </G>
       <Rect x={PX} y={PY} width={PW} height={panelBottom - PY} rx={40} fill="none"
         stroke="#ffffff" strokeOpacity={0.26} strokeWidth={3} />
@@ -460,28 +469,31 @@ function TicketStyle(p: StyleProps) {
       <Circle cx={CARD_W - PX} cy={perfY} r={28} fill="#07080f" />
       {holes}
 
-      {/* Counterfoil. With a capture, the ticket's own song text is GONE —
-          the screenshot already carries the title and the seek bar, and the
-          duplicate was ghost-layering right under them (owner, 04.08) — so
-          only the cover, the barcode and the address remain, tucked high. */}
-      {!snap && (
-        <>
-          <SvgText x={STUB_X} y={stubY} fill="#ffffff" fillOpacity={0.45} fontSize={21} fontWeight="700" letterSpacing={5}>
-            NOW PLAYING
-          </SvgText>
-          {titleLines.map((line, i) => (
-            <SvgText key={i} x={STUB_X} y={stubY + 56 + i * 50} fill="#ffffff" fontSize={40} fontWeight="800" letterSpacing={-0.5}>
-              {line}
+      {/* Counterfoil. With a capture the song block is PRINTED AGAIN — but
+          pulled to the ticket's foot (owner, 05.08: "pulling the music title
+          and song artists' name down"), while the capture's own song block
+          now falls off the panel's bottom edge, so the two can't layer. */}
+      {(() => {
+        const npY = snap ? panelBottom - 208 : stubY;
+        return (
+          <>
+            <SvgText x={STUB_X} y={npY} fill="#ffffff" fillOpacity={0.45} fontSize={21} fontWeight="700" letterSpacing={5}>
+              NOW PLAYING
             </SvgText>
-          ))}
-          {!!d.artist && (
-            <SvgText x={STUB_X} y={stubY + 56 + titleLines.length * 50 + 4} fill="#ffffff"
-              fillOpacity={0.6} fontSize={27} fontWeight="600">
-              {clip(d.artist, 30)}
-            </SvgText>
-          )}
-        </>
-      )}
+            {titleLines.map((line, i) => (
+              <SvgText key={i} x={STUB_X} y={npY + 48 + i * 50} fill="#ffffff" fontSize={40} fontWeight="800" letterSpacing={-0.5}>
+                {line}
+              </SvgText>
+            ))}
+            {!!d.artist && (
+              <SvgText x={STUB_X} y={npY + 48 + titleLines.length * 50 + (snap ? 36 : 4)} fill="#ffffff"
+                fillOpacity={0.6} fontSize={27} fontWeight="600">
+                {clip(d.artist, 30)}
+              </SvgText>
+            )}
+          </>
+        );
+      })()}
       {!!d.art && (
         <CoverTile art={d.art} x={coverX} y={snap ? perfY + 30 : stubY - 40} size={COVER} uid={`tk${uid}`}
           tint={mixHex(d.eq[1], '#101322', 0.45)} />

@@ -362,7 +362,9 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   };
 
   const topPad    = Math.max(insets.top, 20);
-  const bottomPad = Math.max(insets.bottom, 24) + 20;
+  // +16 is THE shared bottom pad across the modes — the share capture's crop
+  // lines assume it (see grabModeSnapshot).
+  const bottomPad = Math.max(insets.bottom, 24) + 16;
 
   // The landscape rest-and-wake cycle (L3). Inactive in portrait, where the
   // controls stay put — only the sideways scene earns the fade.

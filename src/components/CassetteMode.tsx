@@ -955,7 +955,11 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   // Glow: 0.3 → 0.6 range, gentle amber pulse
 
   const topPad    = Math.max(insets.top, 20);
-  const bottomPad = Math.max(insets.bottom, 24) + 24;
+  // +16 is THE shared bottom pad — five of the eight modes already use it and
+  // the share capture's crop lines are computed against it. Cassette's old
+  // +24 lifted its whole bottom stack 8pt, so the pill tops and the song
+  // title's crown poked into the shared snapshot (owner, 05.08).
+  const bottomPad = Math.max(insets.bottom, 24) + 16;
   // Landscape: the shell is the whole show — winH*0.72 was the OLD branch's
   // side-column size and reads small alone on a full screen.
   // Landscape had room left over: the deck docks at 0.86 scale beside the

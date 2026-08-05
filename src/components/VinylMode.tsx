@@ -1193,7 +1193,10 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   })).current;
 
   const topPad       = Math.max(insets.top, 20);
-  const bottomPad    = Math.max(insets.bottom, 24) + 24;
+  // +16 is THE shared bottom pad across the modes — the share capture's crop
+  // lines assume it (see grabModeSnapshot). The old +24 left a 2pt sliver of
+  // the pills inside the snapshot.
+  const bottomPad    = Math.max(insets.bottom, 24) + 16;
 
   const _restartProgressFrom = (posMs: number, trackMs: number) => {
     const remaining = trackMs - posMs;

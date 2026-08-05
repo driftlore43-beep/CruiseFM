@@ -92,8 +92,10 @@ const SNAP_BOT = 108;
 // Ticket card: header zone below the panel's own 44 margin, tear gap under
 // the picture, and the counterfoil's fixed foot. The foot must hold the
 // barcode (ends at tear+98) clear of the NOW PLAYING baseline (foot−208+…):
-// at 330 the two nearly touched on the render.
-const TK_HEAD = 214;
+// at 330 the two nearly touched on the render. The header must hold the
+// dial's dot-matrix (ends ~256) clear of the picture: at 214 the picture
+// sat "just touching the bottom of the text" (owner, 05.08).
+const TK_HEAD = 246;
 const TK_TEAR = 34;
 const TK_FOOT = 352;
 
@@ -440,11 +442,14 @@ function TicketStyle(p: StyleProps) {
   }
 
   // Perforation, punched rather than drawn. A dashed stroke reads as a border
-  // style; a row of holes in the card's own dark reads as a tear line.
+  // style; a row of holes in the card's own dark reads as a tear line — so
+  // the holes must match whatever the card around the panel actually is:
+  // plain black with a capture, the old near-black otherwise.
+  const holeFill = snap ? '#000000' : '#07080f';
   const holes: React.ReactElement[] = [];
   const hn = Math.floor((PW - 88) / 26);
   for (let i = 0; i <= hn; i++) {
-    holes.push(<Circle key={`ph${i}`} cx={PX + 44 + (i * (PW - 88)) / hn} cy={perfY} r={5} fill="#07080f" />);
+    holes.push(<Circle key={`ph${i}`} cx={PX + 44 + (i * (PW - 88)) / hn} cy={perfY} r={5} fill={holeFill} />);
   }
 
   const bars: React.ReactElement[] = [];
@@ -457,8 +462,16 @@ function TicketStyle(p: StyleProps) {
 
   return (
     <>
-      <BaseWash d={d} uid={uid} cardH={cardH} glow={0.30} />
-      <Backdrop d={d} uid={uid} cardH={cardH} stops={[0.86, 0.84, 0.86, 0.92]} />
+      {snap ? (
+        // The card around the ticket is PLAIN BLACK (owner, 05.08: "make
+        // the border just black so the snapshot and ticket stand out").
+        <Rect x={0} y={0} width={CARD_W} height={cardH} fill="#000000" />
+      ) : (
+        <>
+          <BaseWash d={d} uid={uid} cardH={cardH} glow={0.30} />
+          <Backdrop d={d} uid={uid} cardH={cardH} stops={[0.86, 0.84, 0.86, 0.92]} />
+        </>
+      )}
 
       <Defs>
         <ClipPath id={`tkP${uid}`}>
@@ -482,6 +495,21 @@ function TicketStyle(p: StyleProps) {
           // 05.08: "a lot of vignette around the ticket's edges — remove
           // that").
           <>
+            {/* Ticket paper: the station's own colour under the etched
+                weave. The counterfoil used to sit on near-black, which
+                would vanish against the new black card (owner, 05.08:
+                "etch the bottom area like the top of the ticket and change
+                the background to the theme colour"). ONE gradient serves
+                header and foot so the ticket's two ends match; the picture
+                covers the middle of it. */}
+            <Defs>
+              <SvgLinearGradient id={`tkpp${uid}`} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={mixHex(d.wash, '#12131f', 0.30)} />
+                <Stop offset="0.5" stopColor={mixHex(d.wash, '#0c0d17', 0.52)} />
+                <Stop offset="1" stopColor={mixHex(d.wash, '#12131f', 0.26)} />
+              </SvgLinearGradient>
+            </Defs>
+            <Rect x={PX} y={PY} width={PW} height={panelBottom - PY} fill={`url(#tkpp${uid})`} />
             {weave}
             <G clipPath={`url(#tkB${uid})`}>
               <SvgImage x={PX} y={picY - band.identBot * sk}
@@ -532,8 +560,8 @@ function TicketStyle(p: StyleProps) {
       </SvgText>
 
       {/* Tear line */}
-      <Circle cx={PX} cy={perfY} r={28} fill="#07080f" />
-      <Circle cx={CARD_W - PX} cy={perfY} r={28} fill="#07080f" />
+      <Circle cx={PX} cy={perfY} r={28} fill={holeFill} />
+      <Circle cx={CARD_W - PX} cy={perfY} r={28} fill={holeFill} />
       {holes}
 
       {/* Counterfoil. With a capture the song block is PRINTED AGAIN — but
@@ -586,7 +614,6 @@ function TicketStyle(p: StyleProps) {
 // window and letting the clip take the top strip.
 
 function SnapshotStyle(p: StyleProps) {
-  const d = derive(p);
   const { uid, cardH, snapshot } = p;
   if (!snapshot) return <TicketStyle {...p} />;
 
@@ -616,7 +643,10 @@ function SnapshotStyle(p: StyleProps) {
 
   return (
     <>
-      <BaseWash d={d} uid={uid} cardH={cardH} glow={0.24} />
+      {/* Plain black around the picture (owner, 05.08: "make the border just
+          black so the snapshot stands out") — the station wash was muddying
+          the strips. */}
+      <Rect x={0} y={0} width={CARD_W} height={cardH} fill="#000000" />
 
       <Defs>
         <ClipPath id={clipId}>

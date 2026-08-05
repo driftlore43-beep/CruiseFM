@@ -908,6 +908,11 @@ const fs = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     overflow: 'hidden',
+    // Floats the meter a step above the song title so the share ticket's
+    // picture band (which cuts just above the title) keeps a strip of
+    // backdrop under the bars — flush against the tear they read as cut
+    // off (owner, 05.08). The gap is welcome breathing room in-app too.
+    marginBottom: 12,
   },
   vizBloomBottom: {
     position: 'absolute', bottom: -12, alignSelf: 'center',

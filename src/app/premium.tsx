@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -98,8 +98,39 @@ function TickCell({ on, amber }: { on: boolean; amber?: boolean }) {
 
 export default function PremiumScreen() {
   const insets = useSafeAreaInsets();
-  const { refreshSubscription } = useEntitlements();
+  const { refreshSubscription, isPro } = useEntitlements();
   const [busy, setBusy] = useState(false);
+
+  /**
+   * NOTHING may reach a purchase offer while the app is free.
+   *
+   * Build 18 was rejected under Guideline 2.1(b) (06.08) after a reviewer
+   * reached this screen: the Profile upgrade card was still shown to
+   * everyone, and it advertised "£1.99 / month · Unlock Premium" in a
+   * submission that declares no in-app purchases. Hiding the entry point
+   * (62cf67d) was the right fix and landed 19 minutes AFTER build 18 was
+   * cut — which is precisely why the entry point must not be the ONLY
+   * defence. This screen now refuses to render an offer whenever the user
+   * already has everything, whatever route reached it (a stale card, a
+   * deep link, a future button someone forgets to gate).
+   *
+   * It comes back on its own when payments ship, because isPro will then
+   * mean what it says.
+   */
+  useEffect(() => {
+    if (!isPro) return;
+    // Deferred, and only when there IS somewhere to go back to: a deep link
+    // straight at this route mounts it as the first screen, and navigating
+    // during that first render throws ("Attempted to navigate before
+    // mounting the Root Layout"). The render guard below is what actually
+    // withholds the offer; this only tidies up the navigation after it.
+    const t = setTimeout(() => {
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
+    }, 0);
+    return () => clearTimeout(t);
+  }, [isPro]);
+  if (isPro) return <View style={styles.root} />;
 
   async function handleUnlock() {
     if (busy) return;

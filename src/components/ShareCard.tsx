@@ -133,7 +133,15 @@ export function ShareCardSheet({
       const path = `${FileSystem.cacheDirectory}cruise-fm-${styleId}-${format}.png`;
       await FileSystem.writeAsStringAsync(path, clean, { encoding: FileSystem.EncodingType.Base64 });
       if (Platform.OS === 'ios') {
-        await Share.share({ url: path, message: text });
+        // THE PICTURE ALONE — deliberately no `message`. iOS builds the share
+        // sheet from the items it is given (RN adds the message string AND
+        // the file url as separate activity items, see
+        // RCTActionSheetManager.mm), and "Save Image" cannot accept a text
+        // item, so passing a caption silently removes the one action people
+        // want in order to keep the card (owner, 06.08: "is there a way to
+        // download the card?"). Nothing is lost by dropping it: the card
+        // prints cruisefm.app itself, and the caption has its own button.
+        await Share.share({ url: path });
       } else if (await Sharing.isAvailableAsync()) {
         // React Native's own Share cannot attach a file on Android — it needs
         // a content:// provider — which is why Android sent text only until
@@ -205,12 +213,18 @@ export function ShareCardSheet({
             </View>
           )}
 
-          {isPin && !snapshot && (
+          {/* Saving is the quiet half of sharing — the card is a keepsake as
+              much as a message — so the route to Photos is named every time,
+              not only in the Pinterest shape. */}
+          {Platform.OS === 'ios' && (
             <Text style={sc.hint}>
-              {Platform.OS === 'ios'
+              {isPin
                 ? 'Pinterest’s shape. Tap Share card, then Save Image to pin it.'
-                : 'Pinterest’s shape. Saving the image needs the next app update.'}
+                : 'Tap Share card, then Save Image to keep it in Photos.'}
             </Text>
+          )}
+          {Platform.OS !== 'ios' && isPin && !snapshot && (
+            <Text style={sc.hint}>Pinterest’s shape — share it straight to Pinterest.</Text>
           )}
 
           <View style={sc.actions}>

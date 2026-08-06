@@ -1,9 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { GlossSheen } from '@/components/GlossSheen';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { resumeDriveClock, suspendDriveClock } from '@/utils/driveStats';
 
@@ -102,14 +100,8 @@ export function DriveCheckCard() {
     <Modal supportedOrientations={['portrait', 'landscape']} visible transparent animationType="fade" statusBarTranslucent onRequestClose={stillCruising}>
       <View style={dc.scrim}>
         <View style={dc.card}>
-          <LinearGradient
-            colors={['rgba(123,56,224,0.30)', 'rgba(58,26,110,0.22)', 'rgba(10,6,24,0.35)']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <GlossSheen radius={24} />
           <View style={dc.iconRing}>
-            <MaterialCommunityIcons name="steering" size={30} color="#C9A6FF" />
+            <MaterialCommunityIcons name="steering" size={28} color="#ffffff" />
           </View>
           <Text style={dc.title}>Are you driving?</Text>
           <Text style={dc.sub}>
@@ -117,16 +109,11 @@ export function DriveCheckCard() {
             this drive keeps counting — otherwise your drive time takes a break
             while the music plays on.
           </Text>
-          <TouchableOpacity onPress={stillCruising} activeOpacity={0.9} style={dc.cta}>
-            <LinearGradient
-              colors={['#9B5FFF', '#7B38E0']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFill}
-            />
+          <TouchableOpacity onPress={stillCruising} activeOpacity={0.85} style={dc.cta}>
             <Text style={dc.ctaText}>Still cruising</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={parkedUp} hitSlop={{ top: 10, bottom: 10, left: 20, right: 20 }}>
-            <Text style={dc.later}>I've parked up — end drive</Text>
+            <Text style={dc.later}>I&apos;ve parked up — end drive</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -134,10 +121,18 @@ export function DriveCheckCard() {
   );
 }
 
+/**
+ * Dark glass, white hairline, one solid-white primary pill — the language the
+ * rest of the app settled on (the platform picker caught up to it on 03.08,
+ * the Profile page and settings cards before that). This card had been left
+ * on the pre-July violet: a purple-rimmed slab with a violet gradient button,
+ * which is why the owner recognised it as old the moment it appeared (06.08).
+ * Violet survives in the app only on Switch accents now.
+ */
 const dc = StyleSheet.create({
   scrim: {
     flex: 1,
-    backgroundColor: 'rgba(2,2,10,0.72)',
+    backgroundColor: 'rgba(4,4,10,0.86)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 28,
@@ -149,28 +144,30 @@ const dc = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 28,
-    gap: 10,
-    backgroundColor: 'rgba(12,8,24,0.94)',
+    paddingVertical: 30,
+    gap: 12,
+    backgroundColor: '#0a0a10',
     borderWidth: 1,
-    borderColor: 'rgba(123,56,224,0.45)',
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   iconRing: {
     width: 58, height: 58, borderRadius: 29,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(123,56,224,0.18)',
-    borderWidth: 1, borderColor: 'rgba(155,95,255,0.4)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    marginBottom: 2,
   },
   title: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
-  sub: { color: 'rgba(255,255,255,0.72)', fontSize: 13.5, lineHeight: 20, textAlign: 'center' },
+  sub: { color: 'rgba(255,255,255,0.6)', fontSize: 13.5, lineHeight: 20, textAlign: 'center' },
+  // The app's standard primary: solid white, dark type.
   cta: {
     alignSelf: 'stretch',
-    borderRadius: 14,
-    overflow: 'hidden',
+    borderRadius: 26,
     alignItems: 'center',
-    paddingVertical: 14,
-    marginTop: 8,
+    paddingVertical: 15,
+    marginTop: 10,
+    backgroundColor: '#ffffff',
   },
-  ctaText: { color: '#fff', fontSize: 15.5, fontWeight: '800', letterSpacing: 0.2 },
-  later: { color: 'rgba(255,255,255,0.45)', fontSize: 13.5, fontWeight: '600', paddingTop: 6 },
+  ctaText: { color: '#0a0a12', fontSize: 15.5, fontWeight: '800', letterSpacing: 0.2 },
+  later: { color: 'rgba(255,255,255,0.5)', fontSize: 13.5, fontWeight: '600', paddingTop: 8 },
 });

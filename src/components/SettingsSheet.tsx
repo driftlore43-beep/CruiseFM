@@ -152,8 +152,19 @@ function DeleteDataRow() {
 
 // ── Notifications ────────────────────────────────────────────────────────────
 const PREFS_KEY = 'cruisefm_notification_prefs';
-type Prefs = { newStations: boolean; weeklyRecap: boolean; premiumOffers: boolean };
-const DEFAULT_PREFS: Prefs = { newStations: true, weeklyRecap: true, premiumOffers: false };
+/**
+ * No marketing switch here, deliberately (owner, 07.08). A "Premium Offers"
+ * toggle sat in this sheet doing nothing, in an app that is free and sells
+ * nothing — and a marketing category is the fastest way to lose someone's
+ * trust in the whole notification system. Everything Cruise FM sends is about
+ * the driving. Any stored value from the old toggle is simply ignored.
+ *
+ * `newStations` covers new stations, moods and visual modes, and stays ON by
+ * default: it is capped at one per release, and it is the only way someone
+ * learns the app grew.
+ */
+type Prefs = { newStations: boolean; weeklyRecap: boolean };
+const DEFAULT_PREFS: Prefs = { newStations: true, weeklyRecap: true };
 
 function ToggleRow({
   label, sub, value, onChange, last,
@@ -196,15 +207,17 @@ function NotificationsBody() {
   return (
     <>
       <SettingsSection label="DRIVE ALERTS">
-        <ToggleRow label="New Stations" sub="Get notified when a new mood station launches"
+        <ToggleRow label="New Stations & Modes" sub="When a new mood station or visual mode launches — at most one per update"
           value={prefs.newStations} onChange={(v) => update({ newStations: v })} />
         <ToggleRow label="Weekly Drive Recap" sub="A Sunday summary of your week's drives"
           value={prefs.weeklyRecap} onChange={(v) => update({ weeklyRecap: v })} last />
       </SettingsSection>
-      <SettingsSection label="OFFERS">
-        <ToggleRow label="Premium Offers" sub="Occasional deals on Cruise FM Premium"
-          value={prefs.premiumOffers} onChange={(v) => update({ premiumOffers: v })} last />
-      </SettingsSection>
+      <View style={styles.para}>
+        <Text style={styles.paraText}>
+          Cruise FM sends at most two notifications a week, and fewer if you don&apos;t use
+          them. Nothing is ever sent to sell you something.
+        </Text>
+      </View>
     </>
   );
 }

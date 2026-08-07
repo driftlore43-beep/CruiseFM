@@ -122,10 +122,39 @@ The app already maps hours to stations; the notification simply announces it.
 | The world's asleep | After Hours FM. The road belongs to you. |
 | Still up? | Night Run AM's on. Blue-lit dashboards. |
 
-### B. Weather — phase two
+### B. Weather — phase two, and the only one with a privacy cost
 
-The most delightful ones, and the only ones needing a lookup. Rain Drive FM
-exists precisely for this.
+**Decision (owner asked 07.08: "would we allow the app to collect data about
+the weather?"). Short answer: it can't be done without knowing roughly where
+the phone is, so it ships later, strictly opt-in, and never by default.**
+
+Everything else in this document happens entirely on the phone — the schedule,
+the drive history, the back-off counters. Nothing is sent anywhere, which is
+what keeps the Privacy page's "no Cruise FM server" claim literally true.
+Weather is the one exception: to know it's raining, the app has to ask a
+weather service, and that service has to be told approximately where to look.
+
+Four ways to do it, in order of how much they cost the user:
+
+| Approach | Permission needed | Honest verdict |
+|---|---|---|
+| **Ask for their town once**, store it on the phone | none | Most private. Goes stale if they move. |
+| **Coarse location** (iOS "reduced accuracy", ~1–20 km) | one prompt | Plenty precise for rain. Recommended. |
+| Precise location | one prompt | Overkill. Invites App Review scrutiny for no gain. |
+| Look it up from their internet address | none | Frequently wrong on mobile networks, and still leaks. Not worth it. |
+
+**Recommended:** when — and only when — someone switches Weather on, offer
+both of the top two ("Use my rough location" or "Set my town"). Never ask
+otherwise. The lookup sends a rough position and nothing else: no identity, no
+history, no account. There is precedent already — the album-artwork lookup
+calls Apple's public catalogue and is disclosed in the privacy policy; the same
+disclosure would be added for weather.
+
+**Sequencing:** ship the time-based nudges first. They need no permission and
+leak nothing, so they can go out with confidence. Weather follows as its own
+opt-in, with the privacy copy updated in the same change.
+
+Copy, once it exists — Rain Drive FM exists precisely for this:
 
 | Title | Body |
 |---|---|
@@ -188,16 +217,33 @@ The current page offers three toggles that do nothing. Replace with what
 actually sends:
 
 **DRIVE NUDGES**
-- **When a station comes on air** — *A couple a week, at the times you drive*
-- **Late night** — *After Hours and Night Run, for 1am drives* (default OFF)
-- **Weather** — *When it's raining, Rain Drive FM* (phase two)
+- **When a station comes on air** — *A couple a week, at the times you drive* — default **ON**
+- **Late night** — *After Hours and Night Run, for 1am drives* — default **OFF**
+- **Weather** — *When it's raining, Rain Drive FM* — default **OFF**, phase two,
+  and the only row that asks for anything (see section B)
 
 **YOUR DRIVING**
-- **Badges** — *When you earn one*
-- **Sunday recap** — *Your week on the road*
+- **Badges** — *When you earn one* — default **ON**
+- **Sunday recap** — *Your week on the road* — default **ON**
 
 **WHAT'S NEW**
-- **New stations and modes** — *At most one per update*
+- **New Stations & Modes** — *When a new mood station or visual mode launches —
+  at most one per update* — default **ON** (owner, 07.08: "when new themes come
+  out, would notifications also send through? … at least ensure that is left
+  turned on"). This is the only way someone finds out the app grew, it is
+  capped at one per release, and it never carries an offer.
+
+**DONE 07.08 (OTA):** the old **Premium Offers** toggle is deleted — component,
+preference key and all. It sat in a free app that sells nothing, it sent
+nothing, and a marketing category is the fastest way to lose trust in every
+other notification. Any stored value from it is ignored. The sheet now carries
+the ceiling in plain sight: *"Cruise FM sends at most two notifications a week,
+and fewer if you don't use them. Nothing is ever sent to sell you something."*
+
+**Still inert until the next build.** The two toggles that remain save a
+preference that nothing reads yet — `expo-notifications` isn't installed, so
+build 23 sends nothing at all. They become real in the same build that brings
+Save to Photos.
 
 Plus, at the foot, an honest line stating the ceiling — something like
 *"Cruise FM sends at most two notifications a week, and fewer if you don't use

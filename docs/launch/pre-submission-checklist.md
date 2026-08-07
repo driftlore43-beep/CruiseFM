@@ -1,0 +1,151 @@
+# Pre-submission checklist — run this before every App Store build
+
+Cruise FM has been rejected twice, and **both rejections were avoidable from
+the repo alone** — nothing about them needed a reviewer to find:
+
+| Date | Guideline | What Apple saw | What would have caught it |
+|---|---|---|---|
+| 29.07 (build 7) | 2.5.4 Performance | The app claimed it plays audio in the background. It doesn't — Spotify does. | Reading the resolved iOS config: an `expo-audio` plugin we'd forgotten was adding the claim. |
+| 06.08 (build 18) | 2.1(b) Completeness | A £1.99 "Unlock Premium" screen in a submission with no purchase products. | Checking the paywall was unreachable — the fix existed, but landed 19 minutes *after* the build was cut. |
+
+Each cost roughly a week. This checklist exists so a third one doesn't.
+
+Work top to bottom. Nothing here takes more than a few minutes.
+
+---
+
+## A. Automated checks
+
+Run from the repo root. Every line should read PASS; INFO lines are for eyeballing.
+
+```bash
+npx expo config --type introspect --json > /tmp/pf.json
+python3 - <<'PY'
+import json
+ip = json.load(open('/tmp/pf.json'))['ios']['infoPlist']
+bg = ip.get('UIBackgroundModes')
+print('PASS  no UIBackgroundModes claim' if not bg else f'FAIL  UIBackgroundModes present: {bg}')
+usage = {k: v for k, v in ip.items() if k.endswith('UsageDescription')}
+print(f'INFO  permission strings Apple will see ({len(usage)}):')
+for k in sorted(usage): print('        ', k)
+PY
+
+grep -q 'OWNER_MODE = false'  src/constants/config.ts && echo 'PASS  OWNER_MODE false'      || echo 'FAIL  OWNER_MODE not false'
+grep -q 'LAUNCH_FREE = true'  src/constants/config.ts && echo 'PASS  LAUNCH_FREE true'      || echo 'FAIL  LAUNCH_FREE not true'
+grep -q 'if (isPro) return'   src/app/premium.tsx     && echo 'PASS  paywall self-guards'   || echo 'FAIL  paywall does NOT self-guard'
+grep -q '{!isPro && ('        'src/app/(tabs)/profile.tsx' && echo 'PASS  upgrade card gated' || echo 'FAIL  upgrade card NOT gated'
+
+npx tsc --noEmit && echo 'PASS  typecheck clean'
+python3 -c "import json;d=json.load(open('app.json'))['expo'];print('INFO  version',d['version'],'| runtimeVersion',d['runtimeVersion'])"
+```
+
+**Reading the results**
+
+- **UIBackgroundModes must be absent.** This is rejection #1 exactly. An Expo
+  plugin can add Info.plist keys you never wrote, so the only trustworthy
+  source is the *resolved* config above — never app.json alone.
+- **The permission list must be explainable.** Every string there appears on
+  the store listing, and Apple asks why. Today the expected set is:
+  - `NSAppleMusicUsageDescription` — real, MusicKit playback.
+  - `NSPhotoLibraryAddUsageDescription` — real, saving the share card.
+  - `NSLocalNetworkUsageDescription` — comes from `expo-dev-client`, which is
+    only bundled when a profile sets `developmentClient: true`. The
+    `production` profile doesn't, so it will not ship. If it ever appears in a
+    production build's own config, stop and investigate.
+  - Anything else: find the feature it belongs to, or delete the plugin adding
+    it. An unexplained permission is both a rejection risk and a install-time
+    deterrent.
+- **The purchase checks matter only while `LAUNCH_FREE` is true.** They assert
+  that nothing can reach an offer the app cannot honour. When real payments
+  ship, these two lines stop applying — replace them with a check that the
+  products exist in App Store Connect.
+
+Then the harnesses (the web build must be running on :8081):
+
+```bash
+node scratchpad/store/health.mjs     # 15-step walk over every page and flow
+node scratchpad/dismiss8.mjs         # all 8 modes dismiss cleanly, nothing left behind
+node scratchpad/landscape/sweep.mjs  # rotation, all 8 modes
+```
+
+All three must report zero errors.
+
+---
+
+## B. Checks only a human can make
+
+**In App Store Connect**
+
+- [ ] **Monetization → Subscriptions / In-App Purchases is empty** (while the
+      app is free). A product sitting in "Ready to Submit" is what turns a
+      stray button into rejection #2.
+- [ ] **Screenshots show what the app actually is today.** They went stale once
+      already — a 23.07 set was still advertising Sound Waves, a mode deleted
+      on 25.07. Re-shoot with `scratchpad/store/shot.mjs` whenever the modes or
+      the station names change.
+- [ ] **Notes for Review** explain anything a reviewer can't discover alone:
+      that no sign-in is required, that music playback needs the user's own
+      Spotify or Apple Music, and — since build 7 — that the app deliberately
+      does not play background audio.
+- [ ] **The build selected is the one you think it is.** Check its number, and
+      have Claude confirm which commit it was cut from (`Actions → Ship OTA
+      update → mode: diagnose` prints the commit beside every build). Build 18
+      was rejected because it was cut 19 minutes before the fix landed, and
+      nothing on Apple's side would ever have told us.
+
+**On the phone**
+
+- [ ] Install nothing from TestFlight that was built on the `production`
+      profile. The store build listens on the production channel; installing it
+      replaces the testflight build and silently cuts the phone off from
+      preview updates (this happened on 02.08 and cost a day of "the fixes
+      aren't arriving").
+
+---
+
+## C. Cutting and submitting
+
+```bash
+git pull                                                   # never build from a stale checkout
+npx eas-cli build  -p ios --profile production
+npx eas-cli submit -p ios --profile production --latest
+```
+
+- **`production` profile for the store. Always.** The owner's phone stays on
+  `testflight` builds.
+- **Bump `version` and `runtimeVersion` together** if — and only if — this
+  build changes native code (a new native module, a new plugin, a new
+  permission). If the change is JavaScript only, leave both alone: bumping
+  strands the test phone with no over-the-air updates until it installs a
+  second build.
+- The **build number** increments itself server-side; you never set it.
+
+---
+
+## D. While the review is open
+
+- [ ] **No `production`-channel publishes.** That changes the app Apple is
+      looking at. Preview publishes are safe — they only reach the test phone.
+- [ ] If it's still *Waiting for Review* after ~2 working days, request an
+      expedited review at
+      <https://developer.apple.com/contact/app-store/?topic=expedite>. Don't
+      cancel and resubmit; that loses your place.
+- [ ] When it's approved, check whether anything shipped to preview since the
+      build was cut. If so, publish it to production **before** pressing
+      Release, so day-one users start on the fixed code.
+
+---
+
+## E. If it's rejected anyway
+
+1. **Read what Apple actually said, and find the exact screen or key they
+   mean.** Both rejections so far were precise and correct.
+2. **Prove which code the build carried** before theorising — the diagnose mode
+   above prints each build's commit. Assuming "that was fixed the same day"
+   is what made rejection #2 a surprise.
+3. **Fix the cause, not the entry point.** #2 was "hidden" by removing the
+   button that reached the paywall; the screen itself still worked. The screen
+   now refuses to render an offer at all, so a forgotten button can't
+   resurrect it.
+4. Reply in the Resolution Center *and* upload a new build. A reply alone
+   leaves the same binary in front of them.

@@ -43,6 +43,7 @@ on:
           - publish
           - diagnose
           - build
+          - submit
       build_profile:
         description: 'build mode only — testflight goes to your phone, production goes to the store'
         type: choice
@@ -124,6 +125,14 @@ jobs:
           echo "════════ the iOS builds people actually have ════════"
           eas build:list --platform ios --limit 6 --non-interactive 2>&1 \
             | grep -E "Build number|Runtime Version|Channel|Profile|Commit|Status|Version" || true
+          # A build that ERRORED is invisible in TestFlight and looks exactly
+          # like one that was never started, so always print WHY — the status
+          # word alone sent us hunting for a missing submit step (08.08).
+          echo "════════ how the newest iOS build ended, and why ════════"
+          # One-line python on purpose: a multi-line -c string starting at
+          # column 0 breaks this step's YAML block scalar.
+          eas build:list --platform ios --limit 1 --json --non-interactive 2>/dev/null \
+            | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print("build", b.get("appBuildVersion"), b.get("status")); print("url  ", b.get("buildUrl") or b.get("id")); print("error", json.dumps(b.get("error"), indent=2))' || true
           echo "════════ runtime version this code publishes as ════════"
           npx expo config --type public --json 2>/dev/null \
             | python3 -c "import sys,json; print(json.load(sys.stdin).get('runtimeVersion'))" || true
@@ -163,14 +172,37 @@ jobs:
       # A production-profile build must never be installed on the test phone
       # from TestFlight: it silently moves that phone off the preview channel
       # and it stops receiving over-the-air updates (02.08, cost a day).
+      #
+      # A FINISHED BUILD IS NOT A TESTFLIGHT BUILD. EAS builds the binary and
+      # stops; App Store Connect never hears about it until something submits
+      # it, and TestFlight only lists what App Store Connect has. That gap is
+      # what made the 1.2.0 build look like it had never happened (08.08).
+      # `--auto-submit` closes it: EAS submits the moment the build finishes,
+      # server-side, so this run can still return in a minute. Apple then
+      # takes another 5-15 minutes to process before TestFlight shows it.
       - name: Start an EAS build
         if: inputs.mode == 'build'
         run: |
           set -euo pipefail
           echo "Starting a ${{ inputs.build_profile }} build for iOS from $(git rev-parse --short HEAD)."
           eas build --platform ios --profile ${{ inputs.build_profile }} \
+            --auto-submit-with-profile ${{ inputs.build_profile }} \
             --non-interactive --no-wait
-          echo "::notice::Build queued. Watch it at https://expo.dev/accounts/driftlore/projects/CruiseFM/builds"
+          echo "::notice::Build queued, and it will submit itself to App Store Connect when it finishes."
+          echo "::notice::Watch it at https://expo.dev/accounts/driftlore/projects/CruiseFM/builds"
+
+      # ── Submit ──────────────────────────────────────────────────────────
+      # For a build that already finished without being submitted — which is
+      # every build cut before --auto-submit was added above. Takes the newest
+      # finished iOS build on that profile and sends it to App Store Connect.
+      - name: Submit the newest build to App Store Connect
+        if: inputs.mode == 'submit'
+        run: |
+          set -euo pipefail
+          echo "Submitting the newest ${{ inputs.build_profile }} iOS build."
+          eas submit --platform ios --profile ${{ inputs.build_profile }} \
+            --latest --non-interactive
+          echo "::notice::Submitted. Apple takes 5-15 minutes to process before TestFlight lists it."
 
       - name: Check the Spotify keys are present AND readable
         if: inputs.mode == 'publish'

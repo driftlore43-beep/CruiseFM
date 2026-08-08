@@ -499,9 +499,14 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     visible, playing, track: spotify.track, demoDurationMs: DEMO_DURATION_MS,
   });
 
-  // Noise flicker clock (~30fps) — only really matters while off-station.
+  // Noise flicker clock. GATED ON BEING OFF-STATION, which is the whole point:
+  // the only thing `phase` drives is StaticNoise, drawn at `offAir` opacity, so
+  // once the dial locks on there is nothing to animate — yet this used to keep
+  // re-rendering the entire fullscreen Tuner 25 times a second for the whole
+  // drive, dial and dot-matrix and all. Tuned in, it now stops dead.
+  const noisy = lock < 0.98;
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !noisy) return;
     let raf = 0;
     const start = Date.now();
     let last = 0;
@@ -512,7 +517,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [visible]);
+  }, [visible, noisy]);
 
   // ── Drag-to-tune ─────────────────────────────────────────────────────────────
   const startFreqRef = useRef(0);

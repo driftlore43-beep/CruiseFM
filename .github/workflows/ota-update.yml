@@ -180,6 +180,15 @@ jobs:
       # `--auto-submit` closes it: EAS submits the moment the build finishes,
       # server-side, so this run can still return in a minute. Apple then
       # takes another 5-15 minutes to process before TestFlight shows it.
+      # THE GATE. Runs before anything is spent — a build costs 25 minutes and
+      # a slot, and a bad one costs a day. It checks the app's RESOLVED native
+      # configuration and the native module versions against the last build
+      # that was seen to launch; see scripts/preflight.mjs for what each check
+      # is protecting against and which build taught it.
+      - name: Preflight
+        if: inputs.mode == 'build' || inputs.mode == 'publish'
+        run: node scripts/preflight.mjs
+
       - name: Start an EAS build
         if: inputs.mode == 'build'
         run: |

@@ -1,0 +1,18 @@
+{
+  "_comment": "Deliberate exceptions for scripts/preflight.mjs. Every entry needs a reason, and the reason has to be evidence — the whole point of the check is that this class of fault looks fine right up until the phone refuses to launch.",
+
+  "_provenCommit": "The last commit whose build was INSTALLED AND OPENED on a real phone. Native versions unchanged since here are trusted, because a launching build is the only proof that a module's symbols resolve against this SDK's core. MOVE THIS FORWARD only after a build from the new commit has actually been opened — never because it merely built.",
+  "provenCommit": "108c7e7",
+
+  "_newerThanSdk": "Packages deliberately newer than the version this Expo SDK ships. Only needed for packages that ALSO changed since provenCommit.",
+  "newerThanSdk": {},
+
+  "_entitlements": "iOS entitlements the provisioning profile genuinely carries. Empty is correct today: build 15 died on com.apple.developer.applemusic and build 24 on aps-environment, both because the profile has no matching capability.",
+  "entitlements": [],
+
+  "_permissions": "Info.plist *UsageDescription keys beyond the two the app needs for Apple Music and saving a share card.",
+  "permissions": [
+    "NSLocalNetworkUsageDescription"
+  ],
+  "_permissionsNote": "NSLocalNetworkUsageDescription is added by expo-dev-client's config plugin, not by us. It shipped in build 23, which Apple approved, so it is not a blocker — but expo-dev-client has no business in a store binary and dropping it from dependencies is worth doing at a quiet moment, not mid-release."
+}

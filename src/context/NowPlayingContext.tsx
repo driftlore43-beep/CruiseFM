@@ -15,7 +15,6 @@ import {
   startApplePlaylist,
 } from '@/utils/appleMusic';
 import { getPlaybackState, isRestrictedAccount, isSpotifyConnected, pause as pauseSpotify, startPlayback, type StartResult } from '@/utils/spotify';
-import { markSpotifyWoken, shouldWakeSpotify } from '@/utils/spotifyWake';
 import { openInSpotify } from '@/utils/spotifyHandoff';
 import { getStationPlaylist } from '@/utils/stationPlaylists';
 
@@ -75,20 +74,23 @@ async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean 
 
     const restricted = connected && (await isRestrictedAccount());
 
-    // First play of a fresh app session (or after a long spell in the
-    // background): open the playlist in Spotify rather than discovering it is
-    // asleep the slow way. Owner's call, 03.08 — "I only want the redirect
-    // for the first play. Like a new opened app or even after a time limit."
-    // Deliberately NOT a handoff: the music is still ours to control the
-    // moment Spotify is awake, so the transport stays live and the next poll
-    // picks the track up.
-    if (connected && !restricted && shouldWakeSpotify()) {
-      markSpotifyWoken();
-      if (await openInSpotify(linked.uri)) return 'waking';
-    }
-
+    // TRY BEFORE BOUNCING. Until 08.08 the first play of every app session
+    // opened Spotify pre-emptively, on the theory that it had probably dozed
+    // off and discovering that the slow way looks broken (owner, 03.08).
+    // A tester on the allowlist — i.e. someone with full in-app control —
+    // reported the consequence: "you always have to open back to Spotify…
+    // you might as well just use Spotify". And she was right, because a drive
+    // normally starts from a freshly opened app, so "first play of a session"
+    // is very nearly EVERY play, and the app read as a launcher for Spotify.
+    //
+    // What made it unnecessary is that startPlayback already knows how to
+    // wake a sleeping device on its own: play → list devices → play by id →
+    // transfer with play:true → nudge onto the playlist. That sequence is
+    // silent and usually about a second, and we were skipping it entirely.
+    // So it runs first now, and Spotify is only opened when the API genuinely
+    // reports there is no device to play on. The "waking Spotify" notice
+    // still appears immediately, so the wait is explained rather than blank.
     if (connected && !restricted) {
-      markSpotifyWoken();
       const r = await startPlayback(linked.uri);
       // Allowlist rejection discovered mid-drive falls through to handoff —
       // and so does a dead/slow network ('error'): opening the playlist in

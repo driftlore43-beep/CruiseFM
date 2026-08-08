@@ -427,7 +427,7 @@ export async function getDevices(): Promise<Device[]> {
 }
 
 export type StartResult =
-  /** Spotify was opened to wake it before playing — see spotifyWake.ts. */
+  /** Spotify was opened to wake it before playing. */
   | 'waking'
   | 'playing'
   | 'no-device'

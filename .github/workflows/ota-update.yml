@@ -81,7 +81,13 @@ jobs:
           echo "::warning::Publishing to PRODUCTION. Never do this while the app"
           echo "::warning::is sitting in App Review — it changes the build Apple is looking at."
 
+      # Full history: preflight compares native module versions against the
+      # last build that was seen to LAUNCH, and reads that commit's lockfile.
+      # A default shallow clone has no such commit and every check downstream
+      # of it reports a false failure.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:

@@ -136,6 +136,37 @@ npx eas-cli submit -p ios --profile production --latest
 
 ---
 
+## D2. Release day — "approved and released, but the page 404s"
+
+Hit on the real launch (08.08). The version said **Ready for Distribution**,
+the release had been pressed, and `apps.apple.com/app/id…` still returned
+*"The page you're looking for can't be found."*
+
+**Cause:** the app was set to *removed from sale* — approved, released, and
+available in zero territories, so there is no public page to serve. App Store
+Connect shows this only as a quiet blue banner on the Product Page tab:
+*"This app was removed from sale from the App Store. Go to Pricing and
+Availability to add it back."*
+
+**Fix:** App Store Connect → the app → **Pricing and Availability** →
+Availability → select the territories (All countries and regions) → confirm
+price **Free** → Save. Allow a few hours to propagate.
+
+**Check before release, not after:**
+
+- [ ] **Pricing and Availability** — the app is available in at least one
+      territory, at the intended price.
+- [ ] **Agreements, Tax, and Banking** — the **Free Apps** agreement is
+      **Active**. A pending agreement blocks distribution no matter what the
+      version status says, and nothing surfaces it as an error.
+
+The general lesson, again: *Ready for Distribution* describes the **review**,
+not the **listing**. Three separate switches must all be right — approved,
+released, and available — and only the first two are visible from the version
+page.
+
+---
+
 ## E. If it's rejected anyway
 
 1. **Read what Apple actually said, and find the exact screen or key they

@@ -54,6 +54,15 @@
           "organization": "cruise-fm",
           "project": "react-native"
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": false,
+          "savePhotosPermission": "Cruise FM saves the share card you make of your drive to your photo library, so you can post it wherever you like.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": []
+        }
       ]
     ],
     "experiments": {

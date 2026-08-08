@@ -8,8 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { useSheetOpen } from '@/context/NowPlayingContext';
-import { diagnoseAppleMusic, getApplePlaylistTracks, isApplePlaylist, playAppleTrack } from '@/utils/appleMusic';
-import { connectSpotify, diagnoseSpotify, getPlaybackQueue, getPlaylistTracks, playTrackInContext, type FailReason, type PlaylistTrack } from '@/utils/spotify';
+import { getApplePlaylistTracks, isApplePlaylist, playAppleTrack } from '@/utils/appleMusic';
+import { connectSpotify, getPlaybackQueue, getPlaylistTracks, playTrackInContext, type FailReason, type PlaylistTrack } from '@/utils/spotify';
 
 /**
  * Plain words for each way the read can fail, and — the part that matters —
@@ -86,14 +86,12 @@ export function SongListSheet({
   const [tracks, setTracks] = useState<PlaylistTrack[] | null>(null);
   const [trouble, setTrouble] = useState<FailReason | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
-  const [checks, setChecks] = useState<string[] | null>(null);
   // Spotify will not give a development-tier app a playlist's contents (03.08,
   // measured every way there is). The player's QUEUE is a different thing and
   // still answers, so when the playlist is closed to us the sheet shows what
   // is coming up instead — clearly labelled as that, not passed off as the
   // playlist.
   const [queue, setQueue] = useState<PlaylistTrack[] | null>(null);
-  const [checking, setChecking] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
@@ -132,7 +130,6 @@ export function SongListSheet({
     setTracks(null);
     setTrouble(null);
     setDetail(null);
-    setChecks(null);
     setQueue(null);
     (apple
       ? getApplePlaylistTracks(playlistId).then(
@@ -284,32 +281,6 @@ export function SongListSheet({
               {!queue?.length && <Text style={s.empty}>{TROUBLE[trouble].text}</Text>}
               {!!detail && !queue?.length && <Text style={s.detail}>Spotify said: “{detail}”</Text>}
 
-              {/* The refusal alone doesn't say WHY, and "Forbidden" says even
-                  less. This asks Spotify the same question four ways and
-                  prints each answer, so one screenshot settles it. */}
-              {!checks && (
-                <TouchableOpacity
-                  onPress={async () => {
-                    if (checking) return;
-                    setChecking(true);
-                    try { setChecks(await diagnoseSpotify(playlistId)); }
-                    catch { setChecks(['The check itself could not run.']); }
-                    finally { setChecking(false); }
-                  }}
-                  style={s.ghostBtn} activeOpacity={0.85}>
-                  <Text style={s.ghostBtnText}>
-                    {checking ? 'Checking…' : 'Run a quick check'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {!!checks && (
-                <View style={s.checks}>
-                  {checks.map((line) => (
-                    <Text key={line} style={s.checkLine}>{line}</Text>
-                  ))}
-                  <Text style={s.checkHint}>Screenshot this and send it over.</Text>
-                </View>
-              )}
               {TROUBLE[trouble].retry && (
                 <TouchableOpacity onPress={() => setAttempt((a) => a + 1)} style={s.retry} activeOpacity={0.8}>
                   <Ionicons name="refresh" size={14} color="#0a0a10" />
@@ -332,25 +303,6 @@ export function SongListSheet({
               {/* An empty Apple playlist that is audibly PLAYING is a fault,
                   not a fact — offer the same instrument the Spotify path has,
                   so one screenshot settles where it broke. */}
-              {apple && !checks && (
-                <TouchableOpacity
-                  onPress={async () => {
-                    if (checking) return;
-                    setChecking(true);
-                    try { setChecks(await diagnoseAppleMusic(playlistId)); }
-                    catch { setChecks(['The check itself could not run.']); }
-                    finally { setChecking(false); }
-                  }}
-                  style={s.ghostBtn} activeOpacity={0.85}>
-                  <Text style={s.ghostBtnText}>{checking ? 'Checking…' : 'Run a quick check'}</Text>
-                </TouchableOpacity>
-              )}
-              {apple && !!checks && (
-                <View style={s.checks}>
-                  {checks.map((line) => <Text key={line} style={s.checkLine}>{line}</Text>)}
-                  <Text style={s.checkHint}>Screenshot this and send it over.</Text>
-                </View>
-              )}
             </View>
           )}
           {tracks?.map((t, i) => {
@@ -376,29 +328,6 @@ export function SongListSheet({
               </TouchableOpacity>
             );
           })}
-          {/* The Apple check must be reachable even when the list is healthy —
-              on 04.08 the songs listed fine while the now-playing poll was
-              returning nothing, and the only copy of the instrument lived in
-              the empty state, where it could not be reached. */}
-          {apple && !!tracks?.length && !checks && (
-            <TouchableOpacity
-              onPress={async () => {
-                if (checking) return;
-                setChecking(true);
-                try { setChecks(await diagnoseAppleMusic(playlistId)); }
-                catch { setChecks(['The check itself could not run.']); }
-                finally { setChecking(false); }
-              }}
-              style={s.checkRow} activeOpacity={0.7}>
-              <Text style={s.checkRowText}>{checking ? 'Checking…' : 'Something wrong? Run a quick check'}</Text>
-            </TouchableOpacity>
-          )}
-          {apple && !!tracks?.length && !!checks && (
-            <View style={s.checks}>
-              {checks.map((line) => <Text key={line} style={s.checkLine}>{line}</Text>)}
-              <Text style={s.checkHint}>Screenshot this and send it over.</Text>
-            </View>
-          )}
         </ScrollView>
       </Animated.View>
     </Modal>
@@ -446,21 +375,6 @@ const s = StyleSheet.create({
   queueHead: { paddingHorizontal: 6, paddingTop: 2, paddingBottom: 12 },
   queueTitle: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
   queueNote: { color: 'rgba(255,255,255,0.45)', fontSize: 12, lineHeight: 17, paddingTop: 4 },
-  checkRow: { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 20 },
-  checkRowText: { color: 'rgba(255,255,255,0.35)', fontSize: 12.5, fontWeight: '600' },
-  ghostBtn: {
-    alignSelf: 'flex-start', marginTop: 4, marginBottom: 14,
-    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)',
-  },
-  ghostBtnText: { color: 'rgba(255,255,255,0.82)', fontSize: 13.5, fontWeight: '700' },
-  checks: {
-    alignSelf: 'stretch', marginBottom: 14, padding: 14, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
-  },
-  checkLine: { color: 'rgba(255,255,255,0.78)', fontSize: 12, lineHeight: 19, fontFamily: Fonts.mono },
-  checkHint: { color: 'rgba(255,255,255,0.38)', fontSize: 11.5, paddingTop: 8, fontStyle: 'italic' },
   detail: {
     color: 'rgba(255,255,255,0.34)', fontSize: 11.5, lineHeight: 16,
     paddingHorizontal: 6, paddingBottom: 14, fontStyle: 'italic',

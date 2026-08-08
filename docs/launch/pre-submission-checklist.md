@@ -95,6 +95,20 @@ All three must report zero errors.
 
 **On the phone**
 
+- [ ] **If this build adds or changes ANY native module, open the equivalent
+      `testflight` build on a real phone first, and watch it get past the
+      splash screen.** Not "the build succeeded" — actually launched. Build 25
+      compiled cleanly, uploaded cleanly, passed App Store processing, and
+      then died 40 ms into launch on every open, because `expo-media-library`
+      56.0.10 called an ExpoModulesCore method that SDK 56's core (56.0.15)
+      does not have — `Record.from(dictionary:appContext:)`. Nothing before
+      launch can see that: the linker is happy, and dyld only fails on the
+      device. Note a version check would NOT have caught it either, since
+      56.0.10 sits inside the `~56.0.6` range Expo publishes for this SDK —
+      which is exactly why this step is a launch and not a lint.
+- [ ] Native module versions are **pinned exactly** in package.json (no `~`).
+      The drift that caused the above came from `npm install` quietly taking
+      the newest patch inside the range.
 - [ ] Install nothing from TestFlight that was built on the `production`
       profile. The store build listens on the production channel; installing it
       replaces the testflight build and silently cuts the phone off from

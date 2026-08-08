@@ -93,6 +93,17 @@ All three must report zero errors.
       was rejected because it was cut 19 minutes before the fix landed, and
       nothing on Apple's side would ever have told us.
 
+**One command does the desk checks**
+
+```bash
+node scripts/preflight.mjs
+```
+
+It reads the app's resolved native configuration and the native module
+versions, and the build button refuses to run without it. Everything below in
+this section is what it checks, kept here so the reasoning is readable; if the
+two ever disagree, the script is the one that runs.
+
 **On the phone**
 
 - [ ] **If this build adds or changes ANY native module, open the equivalent

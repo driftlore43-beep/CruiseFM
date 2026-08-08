@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -15,6 +16,7 @@ import {
   type ShareFormat, type ShareStyleId, type SnapshotInfo,
 } from '@/components/ShareCardStyles';
 import { useSheetOpen } from '@/context/NowPlayingContext';
+import { saveImageToPhotos } from '@/utils/saveToPhotos';
 import { getProfileName } from '@/utils/spotify';
 import type { NowPlaying } from '@/utils/useMusicPlayback';
 
@@ -93,6 +95,7 @@ export function ShareCardSheet({
   const [busy, setBusy] = useState(false);
   const [styleId, setStyleId] = useState<ShareStyleId>(DEFAULT_SHARE_STYLE);
   const [format, setFormat] = useState<ShareFormat>('card');
+  const [saved, setSaved] = useState<'idle' | 'done' | 'denied' | 'failed'>('idle');
   const capRef = useRef<Svg>(null);
   // Declare ourselves so auto-dim doesn't try to be a third modal window over
   // the mode and this sheet — see useSheetOpen.
@@ -104,6 +107,7 @@ export function ShareCardSheet({
     // The real screenshot is the point of the feature, so it leads whenever
     // one exists; without one the chip is hidden and the old default stands.
     setStyleId(snapshot ? 'snapshot' : DEFAULT_SHARE_STYLE);
+    setSaved('idle');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
@@ -118,20 +122,27 @@ export function ShareCardSheet({
   const who = userName ? `${userName} is listening on ${station.name}` : `Now playing on ${station.name}`;
   const text = `${line}\n${who} · Cruise FM\n${INSTALL_URL}`;
 
+  /** Rasterise the off-screen full-size copy and write it to a file. Shared
+   *  by Share card and Save to Photos, so both hand out the same picture. */
+  async function renderCardToFile(): Promise<string> {
+    const node = capRef.current as unknown as { toDataURL?: (cb: (d: string) => void) => void } | null;
+    if (!node?.toDataURL) throw new Error('capture unavailable');
+    const base64 = await new Promise<string>((resolve, reject) => {
+      // Never let a silent native failure leave the button spinning forever.
+      const timer = setTimeout(() => reject(new Error('capture timed out')), 4000);
+      node.toDataURL!((d) => { clearTimeout(timer); resolve(d); });
+    });
+    const clean = base64.replace(/^data:image\/\w+;base64,/, '');
+    const path = `${FileSystem.cacheDirectory}cruise-fm-${styleId}-${format}.png`;
+    await FileSystem.writeAsStringAsync(path, clean, { encoding: FileSystem.EncodingType.Base64 });
+    return path;
+  }
+
   async function shareCard() {
     if (busy) return;
     setBusy(true);
     try {
-      const node = capRef.current as unknown as { toDataURL?: (cb: (d: string) => void) => void } | null;
-      if (!node?.toDataURL) throw new Error('capture unavailable');
-      const base64 = await new Promise<string>((resolve, reject) => {
-        // Never let a silent native failure leave the button spinning forever.
-        const timer = setTimeout(() => reject(new Error('capture timed out')), 4000);
-        node.toDataURL!((d) => { clearTimeout(timer); resolve(d); });
-      });
-      const clean = base64.replace(/^data:image\/\w+;base64,/, '');
-      const path = `${FileSystem.cacheDirectory}cruise-fm-${styleId}-${format}.png`;
-      await FileSystem.writeAsStringAsync(path, clean, { encoding: FileSystem.EncodingType.Base64 });
+      const path = await renderCardToFile();
       if (Platform.OS === 'ios') {
         // THE PICTURE ALONE — deliberately no `message`. iOS builds the share
         // sheet from the items it is given (RN adds the message string AND
@@ -162,6 +173,33 @@ export function ShareCardSheet({
 
   async function shareLink() {
     try { await Share.share({ message: text }); onClose(); } catch { /* cancelled */ }
+  }
+
+  /**
+   * Straight to the camera roll — one tap, no share sheet.
+   *
+   * This is what the owner actually wanted when she asked "is there a way to
+   * download the card?" (06.08). The share sheet's own Save Image needs
+   * NSPhotoLibraryAddUsageDescription, which is why it was missing before
+   * 1.2.0; this button needs the same key plus expo-media-library, so the two
+   * shipped together. The share route stays, because it is the path to
+   * Pinterest and Messages.
+   */
+  async function saveToPhotos() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const path = await renderCardToFile();
+      const res = await saveImageToPhotos(path);
+      setSaved(res === 'saved' ? 'done' : res === 'denied' ? 'denied' : 'failed');
+      if (res === 'saved' && Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch {
+      setSaved('failed');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -216,12 +254,8 @@ export function ShareCardSheet({
           {/* Saving is the quiet half of sharing — the card is a keepsake as
               much as a message — so the route to Photos is named every time,
               not only in the Pinterest shape. */}
-          {Platform.OS === 'ios' && (
-            <Text style={sc.hint}>
-              {isPin
-                ? 'Pinterest’s shape. Tap Share card, then Save Image to pin it.'
-                : 'Tap Share card, then Save Image to keep it in Photos.'}
-            </Text>
+          {isPin && (
+            <Text style={sc.hint}>Pinterest’s shape — save it, then pin from Photos.</Text>
           )}
           {Platform.OS !== 'ios' && isPin && !snapshot && (
             <Text style={sc.hint}>Pinterest’s shape — share it straight to Pinterest.</Text>
@@ -236,11 +270,25 @@ export function ShareCardSheet({
                     <Text style={sc.btnPrimaryText}>{isPin ? 'Share pin' : 'Share card'}</Text>
                   </>}
             </TouchableOpacity>
-            <TouchableOpacity style={sc.btn} onPress={shareLink} activeOpacity={0.85}>
-              <Ionicons name="link-outline" size={17} color="#fff" />
-              <Text style={sc.btnText}>Share as text</Text>
+            <TouchableOpacity style={sc.btn} onPress={saveToPhotos} activeOpacity={0.85} disabled={busy}
+              accessibilityRole="button" accessibilityLabel="Save the card to Photos">
+              <Ionicons
+                name={saved === 'done' ? 'checkmark' : 'arrow-down-circle-outline'}
+                size={17} color="#fff" />
+              <Text style={sc.btnText}>{saved === 'done' ? 'Saved' : 'Save to Photos'}</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity onPress={shareLink} hitSlop={10} style={{ paddingVertical: 2 }}>
+            <Text style={sc.textLink}>Share as text instead</Text>
+          </TouchableOpacity>
+
+          {saved === 'denied' && (
+            <Text style={sc.hint}>Photos access is off — turn it on in Settings, or use Share card.</Text>
+          )}
+          {saved === 'failed' && (
+            <Text style={sc.hint}>Couldn&apos;t save that one. Share card still works.</Text>
+          )}
 
           <TouchableOpacity onPress={onClose} hitSlop={12} style={{ paddingVertical: 8 }}>
             <Text style={sc.cancel}>Cancel</Text>
@@ -295,6 +343,7 @@ const sc = StyleSheet.create({
   btnPrimaryText: { color: '#0a0a12', fontSize: 14, fontWeight: '800' },
   btnText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
   cancel: { color: 'rgba(255,255,255,0.55)', fontSize: 14, fontWeight: '600' },
+  textLink: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '600' },
   // Off-screen, not display:none — a hidden view may not rasterise.
   offscreen: { position: 'absolute', left: -CARD_W * 2, top: 0, width: CARD_W, opacity: 0 },
 });

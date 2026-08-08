@@ -11,6 +11,7 @@ import { PRIVACY_POLICY, TERMS_OF_SERVICE, type LegalDoc } from '@/constants/leg
 import { sendTestCrash } from '@/utils/crashReports';
 import { DEFAULT_DRIVER_NAME, getDriverName, setDriverName } from '@/utils/driverName';
 import { disconnectSpotify } from '@/utils/spotify';
+import { DEFAULT_NOTIF_PREFS, getNotifPrefs, setNotifPrefs, type NotifPrefs } from '@/utils/notifications';
 
 export type SettingsPage =
   | 'account' | 'notifications' | 'privacy' | 'about' | 'refer'
@@ -151,20 +152,6 @@ function DeleteDataRow() {
 }
 
 // ── Notifications ────────────────────────────────────────────────────────────
-const PREFS_KEY = 'cruisefm_notification_prefs';
-/**
- * No marketing switch here, deliberately (owner, 07.08). A "Premium Offers"
- * toggle sat in this sheet doing nothing, in an app that is free and sells
- * nothing — and a marketing category is the fastest way to lose someone's
- * trust in the whole notification system. Everything Cruise FM sends is about
- * the driving. Any stored value from the old toggle is simply ignored.
- *
- * `newStations` covers new stations, moods and visual modes, and stays ON by
- * default: it is capped at one per release, and it is the only way someone
- * learns the app grew.
- */
-type Prefs = { newStations: boolean; weeklyRecap: boolean };
-const DEFAULT_PREFS: Prefs = { newStations: true, weeklyRecap: true };
 
 function ToggleRow({
   label, sub, value, onChange, last,
@@ -190,32 +177,41 @@ function ToggleRow({
 }
 
 function NotificationsBody() {
-  const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
+  const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_NOTIF_PREFS);
 
-  useEffect(() => {
-    AsyncStorage.getItem(PREFS_KEY).then((raw) => {
-      if (raw) setPrefs({ ...DEFAULT_PREFS, ...JSON.parse(raw) });
-    });
-  }, []);
+  useEffect(() => { getNotifPrefs().then(setPrefs).catch(() => {}); }, []);
 
-  const update = (patch: Partial<Prefs>) => {
-    const next = { ...prefs, ...patch };
-    setPrefs(next);
-    AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next));
+  const update = (patch: Partial<NotifPrefs>) => {
+    setPrefs((p) => ({ ...p, ...patch }));
+    // Saving re-plans the schedule, so a toggle takes effect immediately.
+    void setNotifPrefs(patch);
   };
 
   return (
     <>
-      <SettingsSection label="DRIVE ALERTS">
+      <SettingsSection label="DRIVE NUDGES">
+        <ToggleRow label="When a station comes on air" sub="A couple a week, around the times you drive"
+          value={prefs.onAir} onChange={(v) => update({ onAir: v })} />
+        <ToggleRow label="Late night" sub="After Hours and Night Run, for 1am drives"
+          value={prefs.lateNight} onChange={(v) => update({ lateNight: v })} last />
+      </SettingsSection>
+      <SettingsSection label="YOUR DRIVING">
+        <ToggleRow label="Badges" sub="When you earn one"
+          value={prefs.badges} onChange={(v) => update({ badges: v })} />
+        <ToggleRow label="Sunday recap" sub="Your week on the road — nothing sent on an empty week"
+          value={prefs.recap} onChange={(v) => update({ recap: v })} last />
+      </SettingsSection>
+      <SettingsSection label="WHAT'S NEW">
         <ToggleRow label="New Stations & Modes" sub="When a new mood station or visual mode launches — at most one per update"
-          value={prefs.newStations} onChange={(v) => update({ newStations: v })} />
-        <ToggleRow label="Weekly Drive Recap" sub="A Sunday summary of your week's drives"
-          value={prefs.weeklyRecap} onChange={(v) => update({ weeklyRecap: v })} last />
+          value={prefs.newStations} onChange={(v) => update({ newStations: v })} last />
       </SettingsSection>
       <View style={styles.para}>
         <Text style={styles.paraText}>
-          Cruise FM sends at most two notifications a week, and fewer if you don&apos;t use
-          them. Nothing is ever sent to sell you something.
+          Cruise FM sends at most two notifications a week, never two in a day, and
+          fewer if you don&apos;t use them — if they go unopened it backs off, and
+          eventually stops until you come back. Everything is scheduled on your
+          phone; nothing is sent to a server, and nothing is ever sent to sell you
+          something.
         </Text>
       </View>
     </>
@@ -230,8 +226,9 @@ function PrivacyBody({ onOpen }: { onOpen: (p: SettingsPage) => void }) {
         <View style={styles.para}>
           <Text style={styles.paraText}>
             Cruise FM keeps everything on your device. Your Spotify connection, chosen theme,
-            linked playlists, and drive history never leave your phone — there's no Cruise FM
-            server collecting or selling your data.
+            linked playlists, and drive history never leave your phone — there&apos;s no Cruise FM
+            server collecting or selling your data. Notifications are scheduled on this phone
+            too: nothing is sent to us, and there is nothing to send.
           </Text>
         </View>
       </SettingsSection>

@@ -19,6 +19,8 @@ import { EntitlementsProvider } from '@/context/EntitlementsContext';
 import { PlatformSelector, usePlatformSelector } from '@/components/PlatformSelector';
 import { setPlatformSkipped } from '@/utils/musicPlatform';
 import { claimFounderIfEligible } from '@/utils/founder';
+import { NotificationHost } from '@/components/NotificationHost';
+import { NotifyPrompt } from '@/components/NotifyPrompt';
 
 // Stamp launch-week devices as Founders (fire-and-forget, idempotent).
 claimFounderIfEligible();
@@ -48,6 +50,11 @@ function AppShell() {
         visible={introDone && platformSelector.visible}
         onDismiss={handleDismiss}
       />
+      {/* Local notifications: schedules them, and turns a tap into a drive.
+          Renders nothing. The prompt asks only after the third drive, and
+          only when the app is otherwise quiet. */}
+      <NotificationHost />
+      <NotifyPrompt />
       {/* Last child, so it covers everything including the platform sheet. */}
       <BrandIntro onDone={() => setIntroDone(true)} />
     </View>

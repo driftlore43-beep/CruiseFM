@@ -36,17 +36,26 @@ on:
         type: string
         default: 'Update from GitHub'
       mode:
-        description: 'publish an update, or just ask Expo what state things are in'
+        description: 'publish an update, ask Expo what state things are in, or cut a new build'
         type: choice
         default: publish
         options:
           - publish
           - diagnose
+          - build
+      build_profile:
+        description: 'build mode only — testflight goes to your phone, production goes to the store'
+        type: choice
+        default: testflight
+        options:
+          - testflight
+          - production
 
-# Everything below runs on Expo's servers via eas-cli. The one thing this
-# workflow CANNOT do is make a new build — that needs `eas build`, which is
-# fine to trigger from here in principle but takes 20+ minutes and costs a
-# build slot, so it stays a deliberate action on a computer.
+# Everything below runs on Expo's servers via eas-cli, including `build` mode
+# (added 08.08) — which starts a real EAS build and returns immediately with a
+# link to watch. It takes 20+ minutes and costs a build slot, so it is behind
+# its own mode rather than being the default, but it means a build no longer
+# needs a Mac: the phone can start one.
 
 jobs:
   update:
@@ -66,7 +75,7 @@ jobs:
           exit 1
 
       - name: Refuse production without a good reason
-        if: inputs.channel == 'production'
+        if: inputs.mode == 'publish' && inputs.channel == 'production'
         run: |
           echo "::warning::Publishing to PRODUCTION. Never do this while the app"
           echo "::warning::is sitting in App Review — it changes the build Apple is looking at."
@@ -142,6 +151,26 @@ jobs:
             echo "  could not read them; eas said:"
             echo "$vars" | head -20
           fi
+
+      # ── Build ───────────────────────────────────────────────────────────
+      # Starts an EAS build and returns as soon as it is queued, so the run
+      # finishes in a minute or two and the build carries on at Expo. Watch it
+      # at expo.dev, or in the emails EAS sends.
+      #
+      # PROFILE MATTERS AND IS EASY TO GET WRONG. `testflight` builds on the
+      # PREVIEW channel — that is the owner's phone and the TestFlight
+      # testers. `production` builds on the PRODUCTION channel, for the store.
+      # A production-profile build must never be installed on the test phone
+      # from TestFlight: it silently moves that phone off the preview channel
+      # and it stops receiving over-the-air updates (02.08, cost a day).
+      - name: Start an EAS build
+        if: inputs.mode == 'build'
+        run: |
+          set -euo pipefail
+          echo "Starting a ${{ inputs.build_profile }} build for iOS from $(git rev-parse --short HEAD)."
+          eas build --platform ios --profile ${{ inputs.build_profile }} \
+            --non-interactive --no-wait
+          echo "::notice::Build queued. Watch it at https://expo.dev/accounts/driftlore/projects/CruiseFM/builds"
 
       - name: Check the Spotify keys are present AND readable
         if: inputs.mode == 'publish'

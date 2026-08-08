@@ -195,6 +195,33 @@ jobs:
         if: inputs.mode == 'build' || inputs.mode == 'publish'
         run: node scripts/preflight.mjs
 
+      # A BUILD READS ITS KEYS FROM THE PROFILE'S `environment`, NOT THE
+      # CHANNEL — the production profile builds against the `production`
+      # environment. If the Spotify keys are missing or unreadable there, the
+      # store binary ships with empty credentials, nobody can sign in, and it
+      # costs a whole review cycle to fix. The publish-path check below looks
+      # at the channel, which is the wrong question for a build.
+      - name: Check the Spotify keys for the environment this build will use
+        if: inputs.mode == 'build'
+        run: |
+          set -euo pipefail
+          ENV=$([ "${{ inputs.build_profile }}" = "production" ] && echo production || echo preview)
+          echo "The ${{ inputs.build_profile }} profile builds against the '$ENV' environment."
+          if ! vars=$(eas env:list --environment "$ENV" --include-sensitive --format short 2>&1); then
+            echo "::error::Could not read EAS environment '$ENV'. eas said:"; echo "$vars"; exit 1
+          fi
+          for key in EXPO_PUBLIC_SPOTIFY_CLIENT_ID EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET; do
+            line=$(echo "$vars" | grep -E "^${key}=" || true)
+            value=${line#*=}
+            if [ -z "$line" ]; then
+              echo "::error::$key is not set in the '$ENV' environment — this build would ship with no Spotify credentials."; exit 1
+            fi
+            case "$value" in ''|'*****'*)
+              echo "::error::$key exists in '$ENV' but is stored as a secret, so the build inlines it empty. Change its visibility to Sensitive."; exit 1 ;;
+            esac
+            echo "  $key: present and readable (${#value} chars)"
+          done
+
       - name: Start an EAS build
         if: inputs.mode == 'build'
         run: |

@@ -83,7 +83,31 @@ export function StationBackdrop({
         cachePolicy="memory-disk"
         style={StyleSheet.absoluteFill}
       />
+      <UserPhotoVeil station={station} />
       <DaylightVeil />
     </>
+  );
+}
+
+/**
+ * An extra knock-back for a photo of the user's own.
+ *
+ * The ten built-in stations are photographed dark on purpose — dusk, tunnels,
+ * night roads — and every white label in the app leans on that. Someone's own
+ * photo has no such discipline: a bright beach shot swallows the song title
+ * whole. A file path means a user photo (the built-ins are bundled assets, so
+ * numbers), which makes the check free and needs no extra field.
+ *
+ * Deliberately gentle. It has to rescue the worst case without flattening a
+ * good photo into grey — the point of letting someone use their own picture is
+ * that they can still see it.
+ */
+function UserPhotoVeil({ station }: { station: Station }) {
+  if (typeof station.image !== 'string') return null;
+  return (
+    <View
+      style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,6,14,0.30)' }]}
+      pointerEvents="none"
+    />
   );
 }

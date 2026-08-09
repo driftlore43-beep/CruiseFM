@@ -64,6 +64,14 @@
           "granularPermissions": []
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cruise FM lets you choose one photo of your own as the background for a station you create. It is copied into the app and never leaves your phone.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
       "./plugins/withoutPushEntitlement"
     ],
     "experiments": {

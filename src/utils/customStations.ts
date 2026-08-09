@@ -1,10 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STATIONS, type Station } from '@/constants/stations';
+import { deleteStationPhoto } from '@/utils/stationPhoto';
 
 const KEY = 'cruise_custom_stations';
 
-export type CustomStation = Omit<Station, 'image' | 'iconName' | 'bestTime' | 'duration' | 'trackCount' | 'spotifyUrl' | 'appleMusicUrl'> & {
-  image: null;
+export type CustomStation = Omit<Station, 'image' | 'imageBlur' | 'iconName' | 'bestTime' | 'duration' | 'trackCount' | 'spotifyUrl' | 'appleMusicUrl'> & {
+  /** A photo of the owner's own, saved by utils/stationPhoto. Null until they
+   *  pick one — which is every station made before that shipped, so every
+   *  reader has to cope with its absence. */
+  image: string | null;
+  imageBlur?: string | null;
   color: string;
   bestTime: string;
   duration: string;
@@ -45,6 +50,9 @@ export async function updateCustomStation(station: CustomStation): Promise<void>
 export async function deleteCustomStation(id: string): Promise<void> {
   const existing = await loadCustomStations();
   await persist(existing.filter((s) => s.id !== id));
+  // Take its photo with it — otherwise a deleted station leaves a file on the
+  // phone forever, and nothing would ever go looking for it again.
+  await deleteStationPhoto(id).catch(() => {});
 }
 
 /** Blend two hex colours — used to spread one chosen colour into a mood ramp. */
@@ -69,7 +77,11 @@ export function rampFromColor(color: string): [string, string, string] {
 export function customToStation(c: CustomStation): Station {
   return {
     ...c,
-    image: null as unknown as Station['image'],
+    // A user photo is a file path; the ten built-in stations are bundled
+    // assets (numbers). Everything downstream — expo-image, the hero, the
+    // card — takes either, so nothing else needs to know the difference.
+    image: (c.image ?? null) as unknown as Station['image'],
+    imageBlur: (c.imageBlur ?? null) as unknown as Station['imageBlur'],
     iconName: /^[a-z]/.test(c.icon) ? c.icon : 'star-four-points',
     eqColors: c.eqColors ?? rampFromColor(c.color),
   } as Station;

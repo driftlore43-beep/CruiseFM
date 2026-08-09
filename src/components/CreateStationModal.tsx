@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import { useDsegFont } from '@/components/StationIdentity';
 import { stationDial } from '@/constants/stations';
 import { Cruise, Fonts } from '@/constants/theme';
 import { saveCustomStation, updateCustomStation, type CustomStation } from '@/utils/customStations';
+import { pickStationPhoto, stationPhotoAvailable, type StationPhoto } from '@/utils/stationPhoto';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -87,6 +89,10 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
   const [selectedPalette, setSelectedPalette] = useState(PALETTES[0]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // A photo of their own, behind the station. Null keeps today's behaviour —
+  // the chosen colour — which is what every station made before this had.
+  const [photo, setPhoto] = useState<StationPhoto | null>(null);
+  const [picking, setPicking] = useState(false);
   // Once the slide-in settles we drop the transform entirely — a lingering
   // transform on the sheet stops iOS Safari from focusing the text inputs.
   const [settled, setSettled] = useState(false);
@@ -99,6 +105,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
       setTagline(editing.tagline === 'My custom station' ? '' : editing.tagline);
       setSelectedIcon(editing.icon);
       setSelectedPalette(PALETTES.find((pal) => pal.color === editing.color) ?? PALETTES[0]);
+      setPhoto(editing.image ? { image: editing.image, imageBlur: editing.imageBlur ?? editing.image } : null);
     }
     setSettled(false);
     Animated.spring(slideY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start(
@@ -120,6 +127,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
     setSelectedIcon(ICONS[0]);
     setSelectedPalette(PALETTES[0]);
     setError('');
+    setPhoto(null);
   }
 
   // The dial number is a hash of the station's id, so the id is settled the
@@ -147,7 +155,8 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
       iconBg: selectedPalette.iconBg,
       color: selectedPalette.color,
       icon: selectedIcon,
-      image: null,
+      image: photo?.image ?? null,
+      imageBlur: photo?.imageBlur ?? null,
       bestTime: 'Any time',
       duration: 'Your playlist',
       trackCount: 0,
@@ -235,6 +244,49 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
                 </Pressable>
               ))}
             </View>
+
+            {/* A photo of their own. Only offered on a build that carries the
+                picker — before that the row would be a dead button, and the
+                colour below is a perfectly good station either way. */}
+            {stationPhotoAvailable() && (
+              <>
+                <Text style={styles.label}>Photo</Text>
+                <View style={styles.photoRow}>
+                  <Pressable
+                    disabled={atLimit || picking}
+                    onPress={async () => {
+                      if (picking) return;
+                      setPicking(true);
+                      const r = await pickStationPhoto(previewId);
+                      setPicking(false);
+                      if (r.kind === 'photo') { setPhoto(r.photo); setError(''); }
+                      else if (r.kind === 'failed') setError("That photo couldn't be used. Try another one.");
+                    }}
+                    style={[styles.photoBtn, !!photo && styles.photoBtnSet]}>
+                    {photo
+                      ? <ExpoImage source={photo.image} contentFit="cover" style={StyleSheet.absoluteFill} />
+                      : null}
+                    <View style={styles.photoBtnInner}>
+                      <MaterialCommunityIcons
+                        name={picking ? 'progress-clock' : photo ? 'image-edit-outline' : 'image-plus'}
+                        size={20} color="#fff"
+                      />
+                      <Text style={styles.photoBtnText}>
+                        {picking ? 'Opening…' : photo ? 'Change photo' : 'Add a photo'}
+                      </Text>
+                    </View>
+                  </Pressable>
+                  {!!photo && (
+                    <Pressable onPress={() => setPhoto(null)} style={styles.photoClear}>
+                      <Text style={styles.photoClearText}>Remove</Text>
+                    </Pressable>
+                  )}
+                </View>
+                <Text style={styles.photoHint}>
+                  Sits behind every mode when you drive this station.
+                </Text>
+              </>
+            )}
 
             <Text style={styles.label}>Colour</Text>
             <View style={styles.paletteRow}>
@@ -371,6 +423,25 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.12)',
   },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  photoBtn: {
+    flex: 1, height: 62, borderRadius: 14, overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    justifyContent: 'center',
+  },
+  photoBtnSet: { borderColor: 'rgba(255,255,255,0.30)' },
+  // Sits over the photo once there is one, so the label stays readable
+  // whatever they picked — the same problem the modes solve with a scrim.
+  photoBtnInner: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: 'rgba(6,8,18,0.42)',
+  },
+  photoBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  photoClear: { paddingHorizontal: 14, paddingVertical: 12 },
+  photoClearText: { color: 'rgba(255,255,255,0.55)', fontSize: 14, fontWeight: '600' },
+  photoHint: { color: 'rgba(255,255,255,0.42)', fontSize: 12, marginTop: 8, marginBottom: 2 },
   paletteRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

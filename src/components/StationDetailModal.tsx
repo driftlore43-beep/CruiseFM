@@ -216,7 +216,10 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
     ?? (station as CustomStation).color
     ?? theme.accentColor;
 
-  const topPad = insets.top + 12;
+  // Floored, like every mode's header. Identical on any notched phone; it only
+  // bites if the inset ever reads zero inside the Modal, which is exactly how
+  // the settings header ended up alongside the clock (09.08).
+  const topPad = Math.max(insets.top, 20) + 12;
   const isCustom = !station.image;
   const custom = isCustom ? (station as CustomStation) : null;
   // Every station — built-in or custom — needs its own playlist before a

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRef } from 'react';
 import { Animated, Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -24,7 +24,15 @@ export function SettingsPageShell({
   const slideX = useRef(new Animated.Value(0)).current;
   const onBackRef = useRef(onBack);
   onBackRef.current = onBack;
-  const EDGE = 44;
+  // How far in from the left a swipe may START and still be claimed outright.
+  // It was 44 — about a thumb's width — and a swipe beginning even slightly
+  // further in fell through to the move-based rule below, which loses the
+  // negotiation to the native ScrollView on iOS, so the gesture simply did
+  // nothing (owner, 09.08: "fix the swipe"). 96 is a much more forgiving
+  // target and still unambiguous: these pages scroll only vertically, and the
+  // one control that reacts to a horizontal drag — a Switch — sits hard
+  // against the RIGHT edge of its row, nowhere near this zone.
+  const EDGE = 96;
   const backPan = useRef(
     PanResponder.create({
       // Claim in the CAPTURE phase — but only once a rightward drag from the
@@ -59,10 +67,19 @@ export function SettingsPageShell({
     // navy-violet gradient made every settings page the last purple corner
     // of an app that had gone black everywhere else (owner, 30.07).
     <Animated.View style={[styles.root, { transform: [{ translateX: slideX }] }]} {...backPan.panHandlers}>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/* Explicit top padding, NOT <SafeAreaView edges={['top']}>. These pages
+          live inside a Modal, which on iOS is its own window, and SafeAreaView
+          derives its padding from its own measured frame — inside that window
+          it measures zero, so the header landed at the very top of the screen
+          with the chevron sitting alongside the clock (owner, 09.08). Every
+          fullscreen mode already reads the inset directly with the same
+          `Math.max(insets.top, 20)` floor and sits correctly, so this is the
+          arrangement that demonstrably works here. The floor is load-bearing:
+          it guarantees clearance even if the inset ever reads zero again. */}
+      <View style={{ flex: 1, paddingTop: Math.max(insets.top, 20) }}>
         <View style={styles.header}>
-          <Pressable style={styles.backBtn} onPress={onBack} hitSlop={12}>
-            <Ionicons name="chevron-back" size={20} color="#fff" />
+          <Pressable style={[styles.backBtn, styles.backBtnRing]} onPress={onBack} hitSlop={14}>
+            <Ionicons name="chevron-back" size={22} color="#fff" />
           </Pressable>
           <Text style={styles.title} numberOfLines={1}>{title}</Text>
           <View style={styles.backBtn} />
@@ -73,7 +90,7 @@ export function SettingsPageShell({
           showsVerticalScrollIndicator={false}>
           {children}
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </Animated.View>
   );
 }
@@ -107,9 +124,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 12, paddingTop: 4, paddingBottom: 10,
   },
+  // 44 is Apple's minimum tap target and this was 36. The faint ring is there
+  // so it reads as a control rather than a stray chevron on black — the same
+  // treatment the modes' close button wears.
   backBtn: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 44, height: 44, borderRadius: 22,
     alignItems: 'center', justifyContent: 'center',
+  },
+  backBtnRing: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)',
   },
   title: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
   content: { paddingHorizontal: 20, paddingTop: 8 },

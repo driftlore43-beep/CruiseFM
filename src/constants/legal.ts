@@ -6,7 +6,7 @@ export type LegalDoc = { title: string; updated: string; intro: string; sections
 
 export const PRIVACY_POLICY: LegalDoc = {
   title: 'Privacy Policy',
-  updated: '4 August 2026',
+  updated: '9 August 2026',
   intro:
     'Cruise FM is a driving-companion music app. The short version: there is no Cruise FM account, there are no Cruise FM servers, and your data stays on your phone.',
   sections: [
@@ -58,6 +58,11 @@ export const PRIVACY_POLICY: LegalDoc = {
         'If Cruise FM ever changes how it handles data — for example if optional accounts are added — this policy will be updated and the change highlighted in the app before it applies to you.',
     },
     {
+      heading: 'Who makes Cruise FM',
+      body:
+        'Cruise FM is made by Veyra. Veyra is the studio behind the app; Cruise FM is its product. Nothing in this policy changes because of that — there is still no Cruise FM account and no Cruise FM server, and Veyra receives none of your data, because none of it ever leaves your phone.',
+    },
+    {
       heading: 'Contact',
       body: 'Questions about privacy: cruisefmservice@gmail.com.',
     },
@@ -66,10 +71,15 @@ export const PRIVACY_POLICY: LegalDoc = {
 
 export const TERMS_OF_SERVICE: LegalDoc = {
   title: 'Terms of Service',
-  updated: '16 July 2026',
+  updated: '9 August 2026',
   intro:
     'These terms cover your use of the Cruise FM app. Using the app means you accept them.',
   sections: [
+    {
+      heading: 'Who you are agreeing with',
+      body:
+        'Cruise FM is made by Veyra, and these terms are between you and Veyra. “We” below means Veyra.',
+    },
     {
       heading: 'What Cruise FM is',
       body:

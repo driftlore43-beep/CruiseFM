@@ -431,6 +431,9 @@ export default function ProfileScreen() {
         </View>
 
         <Text style={styles.versionText}>{appVersionLabel()}</Text>
+        {/* The one place in the app that says who made it. Deliberately quiet
+            and deliberately last: it is attribution, not a banner. */}
+        <Text style={styles.byline}>A Veyra app</Text>
 
       </ScrollView>
 
@@ -638,5 +641,9 @@ const styles = StyleSheet.create({
   versionText: {
     color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '600',
     textAlign: 'center', letterSpacing: 0.3, marginTop: 4,
+  },
+  byline: {
+    color: 'rgba(255,255,255,0.22)', fontSize: 11, fontWeight: '600',
+    textAlign: 'center', letterSpacing: 1.6, marginTop: 6, textTransform: 'uppercase',
   },
 });

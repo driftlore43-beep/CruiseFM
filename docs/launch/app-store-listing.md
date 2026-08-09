@@ -82,21 +82,36 @@ time with no review at all.
 >
 > Please don't watch the screen while you're driving. That's what passengers
 > are for.
+>
+> Cruise FM is made by Veyra.
 
 ---
 
-## The developer name shown on the listing
+## Veyra, and the one line that cannot say it
 
-The **Developer** line reads *JESSICA ARROYO* because the Apple Developer
-account is an **Individual** account, where that field is the account holder's
-legal name and cannot be set to something else. The app's own name on the
-store is unaffected — that stays "Cruise FM".
+Cruise FM is presented as a **Veyra** product. As of 09.08 that name appears in
+the app (the Profile footer), in the Privacy Policy and Terms, on the website
+footer, and in the store **description** — everywhere the product speaks for
+itself.
 
-To show a brand there instead, the account has to become an **Organization**
-account, which requires a legally registered business plus a free D-U-N-S
-number, and takes days to weeks. Apple has in some cases allowed individuals
-to display a registered trading name with documentation — worth asking Apple
-Developer Support before going the whole company route.
+The one place it CANNOT appear is the App Store's own **Developer** line, which
+still reads *JESSICA ARROYO*. That field is not metadata we write: on an
+**Individual** developer account it is the account holder's legal name, and
+Apple does not allow it to be set to anything else. The app's name on the store
+is unaffected — that stays "Cruise FM".
+
+Two routes to changing it, and neither is a quick edit:
+
+- **Convert to an Organization account.** Needs a legally registered business
+  plus a free D-U-N-S number. Days to weeks, and the D-U-N-S lookup alone can
+  take a fortnight.
+- **Ask Apple about a trading name.** Apple has in some cases let individuals
+  display a registered trading name with documentation. Worth a support ticket
+  before committing to the company route, because it is far cheaper if granted.
+
+Until then the honest position is that the listing credits a person and the
+product credits Veyra, which is a normal state of affairs for a small studio
+and confuses nobody who reads the app itself.
 
 Worth weighing rather than rushing: a registered entity is likely wanted
 anyway before charging for anything (payments, business banking, and EU trader

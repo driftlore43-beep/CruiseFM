@@ -60,7 +60,7 @@ export const PRIVACY_POLICY: LegalDoc = {
     {
       heading: 'Who makes Cruise FM',
       body:
-        'Cruise FM is made by Veyra. Veyra is the studio behind the app; Cruise FM is its product. Nothing in this policy changes because of that — there is still no Cruise FM account and no Cruise FM server, and Veyra receives none of your data, because none of it ever leaves your phone.',
+        'Cruise FM is made by Northing. Northing is the studio behind the app; Cruise FM is its product. Nothing in this policy changes because of that — there is still no Cruise FM account and no Cruise FM server, and Northing receives none of your data, because none of it ever leaves your phone.',
     },
     {
       heading: 'Contact',
@@ -78,7 +78,7 @@ export const TERMS_OF_SERVICE: LegalDoc = {
     {
       heading: 'Who you are agreeing with',
       body:
-        'Cruise FM is made by Veyra, and these terms are between you and Veyra. “We” below means Veyra.',
+        'Cruise FM is made by Northing, and these terms are between you and Northing. “We” below means Northing.',
     },
     {
       heading: 'What Cruise FM is',

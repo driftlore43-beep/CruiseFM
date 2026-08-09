@@ -83,16 +83,24 @@ time with no review at all.
 > Please don't watch the screen while you're driving. That's what passengers
 > are for.
 >
-> Cruise FM is made by Veyra.
+> Cruise FM is made by Northing.
 
 ---
 
-## Veyra, and the one line that cannot say it
+## Northing, and the one line that cannot say it
 
-Cruise FM is presented as a **Veyra** product. As of 09.08 that name appears in
-the app (the Profile footer), in the Privacy Policy and Terms, on the website
+Cruise FM is presented as a **Northing** product. As of 09.08 that name appears
+in the app (the Profile footer), in the Privacy Policy and Terms, on the website
 footer, and in the store **description** — everywhere the product speaks for
 itself.
+
+The name was **Veyra** for a few hours on 09.08 and was dropped before anything
+shipped: too many other companies use it. Northing is a surveying term — how far
+north a point sits on a grid — chosen because it is a real, uncommon word rather
+than another coinage in the crowded Veyra/Vayra/Lumina family. Note there IS an
+unrelated iPhone compass app called Northing (by Sævar Geir Omarsson); that is
+an app name, not a developer name, so the two can coexist, but it is a reason to
+take advice before ever trying to register the mark.
 
 The one place it CANNOT appear is the App Store's own **Developer** line, which
 still reads *JESSICA ARROYO*. That field is not metadata we write: on an
@@ -110,7 +118,7 @@ Two routes to changing it, and neither is a quick edit:
   before committing to the company route, because it is far cheaper if granted.
 
 Until then the honest position is that the listing credits a person and the
-product credits Veyra, which is a normal state of affairs for a small studio
+product credits Northing, which is a normal state of affairs for a small studio
 and confuses nobody who reads the app itself.
 
 Worth weighing rather than rushing: a registered entity is likely wanted

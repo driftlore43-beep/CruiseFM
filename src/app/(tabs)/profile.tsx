@@ -433,7 +433,7 @@ export default function ProfileScreen() {
         <Text style={styles.versionText}>{appVersionLabel()}</Text>
         {/* The one place in the app that says who made it. Deliberately quiet
             and deliberately last: it is attribution, not a banner. */}
-        <Text style={styles.byline}>A Veyra app</Text>
+        <Text style={styles.byline}>A Northing app</Text>
 
       </ScrollView>
 

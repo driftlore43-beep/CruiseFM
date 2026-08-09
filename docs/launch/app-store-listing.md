@@ -83,24 +83,33 @@ time with no review at all.
 > Please don't watch the screen while you're driving. That's what passengers
 > are for.
 >
-> Cruise FM is made by Northing.
+> Cruise FM is made by Strofi Technologies.
 
 ---
 
-## Northing, and the one line that cannot say it
+## Strofi Technologies, and the one line that cannot say it
 
-Cruise FM is presented as a **Northing** product. As of 09.08 that name appears
-in the app (the Profile footer), in the Privacy Policy and Terms, on the website
-footer, and in the store **description** — everywhere the product speaks for
-itself.
+Cruise FM is presented as a **Strofi Technologies** product. As of 09.08 that
+name appears in the app (the Profile footer), in the Privacy Policy and Terms, on
+the website footer, and in the store **description** — everywhere the product
+speaks for itself.
 
-The name was **Veyra** for a few hours on 09.08 and was dropped before anything
-shipped: too many other companies use it. Northing is a surveying term — how far
-north a point sits on a grid — chosen because it is a real, uncommon word rather
-than another coinage in the crowded Veyra/Vayra/Lumina family. Note there IS an
-unrelated iPhone compass app called Northing (by Sævar Geir Omarsson); that is
-an app name, not a developer name, so the two can coexist, but it is a reason to
-take advice before ever trying to register the mark.
+**Why the parent carries the second app's name.** Strofi — the social driving and
+route-discovery platform — is the bigger bet (see `docs/strategy.md`), and Cruise
+FM is deliberately its front door. Naming the company Strofi Technologies makes
+that literal: every Cruise FM user reads the word *Strofi* before Strofi exists,
+which is free groundwork for the app that has the harder cold-start problem. It
+trades portability for concentration, and concentration is the right trade when
+one product is clearly the main event.
+
+Two earlier names, recorded so nobody re-proposes them. **Veyra** lasted a few
+hours on 09.08 — pretty, vowel-heavy coinages (Veyra, Vayra, Lumina, Nova, Aura)
+are the most contested naming space there is, because every founder reaches for
+them first. **Northing** replaced it and was chosen for portability, before the
+decision to lead with Strofi made portability the wrong goal. Also checked and
+rejected along the way: Skywave, Longwave, Catseye, Faro, Rumbo, Sereno, Estela,
+Bruma, Madrugada, Ocaso, Glovebox, Highbeam — all had software or App Store
+namesakes. Nothing in software uses Strofi.
 
 The one place it CANNOT appear is the App Store's own **Developer** line, which
 still reads *JESSICA ARROYO*. That field is not metadata we write: on an
@@ -118,7 +127,7 @@ Two routes to changing it, and neither is a quick edit:
   before committing to the company route, because it is far cheaper if granted.
 
 Until then the honest position is that the listing credits a person and the
-product credits Northing, which is a normal state of affairs for a small studio
+product credits Strofi Technologies, which is a normal state of affairs for a small studio
 and confuses nobody who reads the app itself.
 
 Worth weighing rather than rushing: a registered entity is likely wanted

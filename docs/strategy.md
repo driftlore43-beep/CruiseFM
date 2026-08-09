@@ -158,7 +158,13 @@ apps as sequential (*finish Cruise FM, then start Strofi*).
   a structural problem for any log-your-drives product on its own. Cruise FM
   covers the **commute**, which is daily. Together they cover the everyday and
   the occasion; separately, neither does.
-- The studio name **Northing** was chosen to be portable enough to front both
+- **The parent company is named after Strofi, not after Cruise FM** — Strofi
+  Technologies, decided 09.08. That is this section made literal: every Cruise FM
+  user reads the word *Strofi* before Strofi exists, which is free groundwork for
+  the app with the harder cold start. It replaced Northing, which had been chosen
+  for portability — the right goal while neither app had a claim on the name, and
+  the wrong one once Strofi became the declared main event. The risk it accepts:
+  if Strofi ever pivots or dies, the company carries its name anyway
   (see AGENTS.md, 09.08). A name about roads would have been fine for one app and
   awkward for the other.
 

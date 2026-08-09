@@ -138,7 +138,7 @@ jobs:
           # One-line python on purpose: a multi-line -c string starting at
           # column 0 breaks this step's YAML block scalar.
           eas build:list --platform ios --limit 1 --json --non-interactive 2>/dev/null \
-            | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print("build", b.get("appBuildVersion"), b.get("status")); print("url  ", b.get("buildUrl") or b.get("id")); print("error", json.dumps(b.get("error"), indent=2))' || true
+            | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print("build", b.get("appBuildVersion"), b.get("status"), "| profile", b.get("buildProfile"), "| channel", b.get("channel")); print("url  ", b.get("buildUrl") or b.get("id")); print("error", json.dumps(b.get("error"), indent=2)); subs=b.get("submissions") or []; print("submitted to App Store Connect:", [(x.get("status"), x.get("submittedBuildId") and "y") for x in subs] or "no submission recorded against this build")' || true
           echo "════════ runtime version this code publishes as ════════"
           npx expo config --type public --json 2>/dev/null \
             | python3 -c "import sys,json; print(json.load(sys.stdin).get('runtimeVersion'))" || true

@@ -118,13 +118,19 @@ two ever disagree, the script is the one that runs.
       56.0.10 sits inside the `~56.0.6` range Expo publishes for this SDK —
       which is exactly why this step is a launch and not a lint.
 - [ ] **Your own photo on a station works** (first build carrying
-      expo-image-picker only). Pick a photo in Create Station, save, drive it,
-      and check the picker opens WITHOUT crashing. The resolved config
-      deliberately carries no `NSPhotoLibraryUsageDescription`: modern iOS
-      hands the library picker to a separate system process, so the app never
-      gains access to anyone's photos and needs no permission string. If the
-      picker crashes on that first build, that assumption was wrong — add
-      `photosPermission` back through the expo-image-picker plugin.
+      expo-image-picker only). Pick a photo in Create Station, save, and drive
+      it. Check the picker opens without crashing, and that the photo shows on
+      the card, on the station page and blurred behind the mode.
+      **A trap found on 09.08, recorded because it will recur with any two
+      plugins that touch the same key:** `expo-media-library`'s
+      `photosPermission: false` *deletes* `NSPhotoLibraryUsageDescription`, and
+      it was silently deleting the one `expo-image-picker` sets — so the
+      resolved config had no read permission at all while app.json plainly
+      appeared to configure one. An earlier version of this checklist recorded
+      that absence as a deliberate choice. It was not; it was plugin ordering.
+      The `false` is now removed and the string is present. The general rule:
+      when two plugins configure the same Info.plist key, only the *resolved*
+      config tells you who won.
 - [ ] Native module versions are **pinned exactly** in package.json (no `~`).
       The drift that caused the above came from `npm install` quietly taking
       the newest patch inside the range.

@@ -13,7 +13,9 @@
 
   "_permissions": "Info.plist *UsageDescription keys beyond the two the app needs for Apple Music and saving a share card.",
   "permissions": [
-    "NSLocalNetworkUsageDescription"
+    "NSLocalNetworkUsageDescription",
+    "NSPhotoLibraryUsageDescription"
   ],
-  "_permissionsNote": "NSLocalNetworkUsageDescription is added by expo-dev-client's config plugin, not by us. It shipped in build 23, which Apple approved, so it is not a blocker — but expo-dev-client has no business in a store binary and dropping it from dependencies is worth doing at a quiet moment, not mid-release."
+  "_permissionsNote": "NSLocalNetworkUsageDescription is added by expo-dev-client's config plugin, not by us. It shipped in build 23, which Apple approved, so it is not a blocker — but expo-dev-client has no business in a store binary and dropping it from dependencies is worth doing at a quiet moment, not mid-release.",
+  "_permissionsNote2": "NSPhotoLibraryUsageDescription arrives with 1.3.0, for choosing your own photo as a custom station's background (expo-image-picker). Kept deliberately even though PHPicker on modern iOS runs out of process and probably does not require it: a missing string means a crash the first time someone taps Add a photo plus another build cycle, while a needless one costs a listing line that a visible button explains. Note it was ABSENT until 09.08 because expo-media-library's photosPermission:false was deleting the key expo-image-picker sets — see the checklist. If the first 1.3.0 build proves the picker works without it, removing it is a one-line change and this entry goes with it."
 }

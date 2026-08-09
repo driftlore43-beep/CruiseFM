@@ -21,7 +21,7 @@ import { useDsegFont } from '@/components/StationIdentity';
 import { stationDial } from '@/constants/stations';
 import { Cruise, Fonts } from '@/constants/theme';
 import { saveCustomStation, updateCustomStation, type CustomStation } from '@/utils/customStations';
-import { pickStationPhoto, stationPhotoAvailable, type StationPhoto } from '@/utils/stationPhoto';
+import { deleteStationPhoto, pickStationPhoto, stationPhotoAvailable, type StationPhoto } from '@/utils/stationPhoto';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -165,6 +165,12 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
     };
     if (editing) {
       await updateCustomStation(station);
+      // Tidy up a picture they took off the station. This has to happen on
+      // SAVE, not on the Remove tap — someone can hit Remove and then close
+      // the sheet without saving, and deleting there would destroy the photo
+      // of a station they never actually changed. Replacing a photo already
+      // cleans up after itself inside pickStationPhoto.
+      if (editing.image && !photo) await deleteStationPhoto(station.id).catch(() => {});
       setSaving(false);
       onUpdated?.(station);
     } else {

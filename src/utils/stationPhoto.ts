@@ -39,6 +39,13 @@ type Picker = typeof import('expo-image-picker');
 type Manipulator = typeof import('expo-image-manipulator');
 
 function modules(): { picker: Picker; manip: Manipulator } | null {
+  // documentDirectory is null on web, and both picker and manipulator ship web
+  // implementations — so without this the "Add a photo" button appears in the
+  // web build, opens a file dialog, and then fails at the point of saving,
+  // because there is nowhere to save to. Checking the destination as well as
+  // the tools keeps the unavailable path honest: the button only exists where
+  // the whole journey works.
+  if (!FileSystem.documentDirectory) return null;
   try {
     /* eslint-disable @typescript-eslint/no-require-imports */
     const picker = require('expo-image-picker') as Picker;
@@ -79,11 +86,16 @@ export async function pickStationPhoto(stationId: string): Promise<PickResult> {
   const m = modules();
   if (!m) return { kind: 'unavailable' };
   try {
+    // DELIBERATELY NO `allowsEditing`. It sounds like the right thing — let
+    // them frame it — but on iOS it forces a SQUARE crop and ignores `aspect`
+    // entirely (expo-image-picker's own types say so). That would make someone
+    // crop a landscape photo of their car into a square for something that
+    // ends up as a tall full-screen backdrop, losing most of it twice over.
+    // Taking the whole photo is better: every place it appears already fits it
+    // with `contentFit="cover"`, which crops correctly for that box — the
+    // backdrop, the card and the hero each want a different shape anyway.
     const picked = await m.picker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      // The backdrop fills a phone screen, so crop to roughly that shape.
-      aspect: [9, 16],
       quality: 1,
     });
     if (picked.canceled || !picked.assets?.length) return { kind: 'cancelled' };

@@ -742,3 +742,64 @@ export async function playTrackInContext(contextUri: string, trackUri: string): 
 export async function getUserPlaylists() {
   return spotifyFetch('/me/playlists?limit=50');
 }
+
+/**
+ * CAN WE HAVE THE SONG'S BEAT MAP?
+ *
+ * A tester asked the question that matters — "are these visuals even following
+ * the music?" — and the honest answer is no: the Circular EQ runs a hardcoded
+ * ~100 BPM pattern and the Equalizer a timed loop. iOS lets no app hear
+ * another app's audio, so the only way to make the visuals genuinely follow a
+ * track is to ask the service what the track DOES: Spotify publishes a real
+ * tempo, and a map of every beat, bar and section with timestamps. Combined
+ * with the playback position we already poll, the bars could hit on the actual
+ * snare of the actual song, and it would all ship over the air.
+ *
+ * The catch is that Spotify restricted these endpoints for apps registered
+ * after November 2024, so ours may simply be refused — and there is no way to
+ * know from here, because it depends on our app's registration date, not on
+ * scopes or the account. Hence an instrument rather than an argument: run it
+ * once on a real drive, read the statuses, and the question is settled.
+ *
+ * A 403 here means the route is closed and the fallback is a narrow, opt-in
+ * microphone mode. A 200 means real beat-locked visuals are available.
+ */
+export async function probeBeatMap(): Promise<string[]> {
+  const out: string[] = [];
+  const token = await getAccessToken();
+  if (!token) return ['No Spotify connection at all.'];
+
+  const state = await spotifyFetch('/me/player');
+  const id: string | undefined = state?.item?.id;
+  const name: string | undefined = state?.item?.name;
+  if (!id) return ['Nothing is playing — start a song and try again.'];
+  out.push(`Track: ${name ?? id}`);
+
+  const ask = async (label: string, path: string, describe?: (j: unknown) => string) => {
+    try {
+      const res = await fetch(`https://api.spotify.com/v1${path}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        let note = '';
+        try { note = ` — ${JSON.parse(await res.text())?.error?.message ?? ''}`; } catch { /* body not json */ }
+        out.push(`${label}: ${res.status}${note}`);
+        return;
+      }
+      const json: unknown = await res.json();
+      out.push(`${label}: 200${describe ? ` — ${describe(json)}` : ''}`);
+    } catch {
+      out.push(`${label}: no answer`);
+    }
+  };
+
+  await ask('Tempo & energy', `/audio-features/${id}`, (j) => {
+    const f = j as { tempo?: number; time_signature?: number; energy?: number };
+    return `${f.tempo ? Math.round(f.tempo) : '?'} BPM, ${f.time_signature ?? '?'}/4, energy ${f.energy?.toFixed(2) ?? '?'}`;
+  });
+  await ask('Beat map', `/audio-analysis/${id}`, (j) => {
+    const a = j as { beats?: unknown[]; bars?: unknown[]; sections?: unknown[]; segments?: unknown[] };
+    return `${a.beats?.length ?? 0} beats, ${a.bars?.length ?? 0} bars, `
+      + `${a.sections?.length ?? 0} sections, ${a.segments?.length ?? 0} segments`;
+  });
+
+  return out;
+}

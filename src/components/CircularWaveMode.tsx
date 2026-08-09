@@ -5,7 +5,7 @@ import {
   Animated, Dimensions, Easing, Modal, PanResponder, ScrollView,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
-import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
@@ -69,10 +69,9 @@ function burstAt(a: number, phase: number): number {
 function ringBars(phase: number, amp: number): string {
   let d = '';
   for (let i = 0; i < NBARS; i++) {
-    const a = (i / NBARS) * Math.PI * 2;
-    const tip = Math.min(R0 + MINLEN + MAXLEN * amp * burstAt(a, phase), R_MAX - 5);
-    const c = Math.cos(a), s = Math.sin(a);
-    d += `M${(CX + R0 * c).toFixed(1)} ${(CY + R0 * s).toFixed(1)}L${(CX + tip * c).toFixed(1)} ${(CY + tip * s).toFixed(1)}`;
+    const c = BAR_COS[i], s = BAR_SIN[i];
+    const tip = Math.min(R0 + MINLEN + MAXLEN * amp * burstAt(BAR_ANG[i], phase), R_MAX - 5);
+    d += `M${d1(CX + R0 * c)} ${d1(CY + R0 * s)}L${d1(CX + tip * c)} ${d1(CY + tip * s)}`;
   }
   return d;
 }
@@ -86,10 +85,9 @@ function ringBars(phase: number, amp: number): string {
 function ringInner(phase: number, amp: number): string {
   let d = '';
   for (let i = 0; i < NBARS; i++) {
-    const a = (i / NBARS) * Math.PI * 2;
-    const len = MINLEN * 0.6 + MAXLEN * INNER_FRAC * amp * burstAt(a, phase);
-    const c = Math.cos(a), s = Math.sin(a);
-    d += `M${(CX + R0 * c).toFixed(1)} ${(CY + R0 * s).toFixed(1)}L${(CX + (R0 - len) * c).toFixed(1)} ${(CY + (R0 - len) * s).toFixed(1)}`;
+    const c = BAR_COS[i], s = BAR_SIN[i];
+    const len = MINLEN * 0.6 + MAXLEN * INNER_FRAC * amp * burstAt(BAR_ANG[i], phase);
+    d += `M${d1(CX + R0 * c)} ${d1(CY + R0 * s)}L${d1(CX + (R0 - len) * c)} ${d1(CY + (R0 - len) * s)}`;
   }
   return d;
 }
@@ -107,14 +105,102 @@ function ringInner(phase: number, amp: number): string {
 function ringPeaks(phase: number, amp: number): string {
   let d = '';
   for (let i = 0; i < NBARS; i++) {
-    const a = (i / NBARS) * Math.PI * 2;
+    const a = BAR_ANG[i], c = BAR_COS[i], s = BAR_SIN[i];
     const b = Math.max(burstAt(a, phase), burstAt(a, phase - 0.30), burstAt(a, phase - 0.62));
     const r = Math.min(R0 + MINLEN + MAXLEN * amp * b + 3.4, R_MAX);
-    const c = Math.cos(a), s = Math.sin(a);
     // A zero-length dash with a round cap IS a dot — one path for all 64.
-    d += `M${(CX + r * c).toFixed(1)} ${(CY + r * s).toFixed(1)}l0.01 0`;
+    d += `M${d1(CX + r * c)} ${d1(CY + r * s)}l0.01 0`;
   }
   return d;
+}
+
+/**
+ * THE RING, AND ONLY THE RING, RE-RENDERS.
+ *
+ * This mode animates by recomputing 64 bars from a wave function every frame,
+ * which — unlike the Tuner's flicker or the floating notes — is genuinely
+ * per-frame data and cannot simply be gated off. What it does NOT need is to
+ * drag the whole fullscreen mode with it: `phase` used to live in the parent,
+ * so 15 times a second React re-rendered the header, the station identity, the
+ * song block, the seek bar, the transport, the action row and the backdrop, to
+ * move some bars. Owning the clock here confines the work to this subtree.
+ *
+ * Still the heaviest mode in the app, and honestly so: the remaining cost is
+ * three path strings and one SVG diff per frame. If it needs to go further,
+ * the answer is the Horizon treatment — bars as native-driver views sampled
+ * into keyframes — which is a much larger change than it looks, because the
+ * wave only repeats every ~42 s (phase coefficients 1, 1.3 and 0.6 share a
+ * period of 20π), so every bar would need a long keyframe table.
+ */
+const BAR_COS = new Float64Array(NBARS);
+const BAR_SIN = new Float64Array(NBARS);
+const BAR_ANG = new Float64Array(NBARS);
+for (let i = 0; i < NBARS; i++) {
+  const a = (i / NBARS) * Math.PI * 2;
+  BAR_ANG[i] = a;
+  BAR_COS[i] = Math.cos(a);
+  BAR_SIN[i] = Math.sin(a);
+}
+
+/** One decimal place, without toFixed — which is startlingly slow when it is
+ *  called 400-odd times a frame. */
+function d1(v: number): number {
+  return Math.round(v * 10) / 10;
+}
+
+function WaveRing({ eq, playing, beating }: {
+  eq: readonly string[]; playing: boolean; beating: boolean;
+}) {
+  const [phase, setPhase] = useState(0);
+  const playingRef = useRef(playing);
+  const ampRef = useRef(playing ? 1 : 0.55);
+  playingRef.current = playing;
+
+  useEffect(() => {
+    let raf = 0;
+    const start = Date.now();
+    let last = 0;
+    const tick = () => {
+      const now = Date.now();
+      if (now - last >= 66) {
+        last = now;
+        const target = playingRef.current ? 1 : 0.55;
+        ampRef.current += (target - ampRef.current) * 0.08;
+        // Battery: once paused and fully wound down, freeze the scene —
+        // zero re-renders until play flips it live again.
+        if (playingRef.current || Math.abs(ampRef.current - target) > 0.01) {
+          setPhase(((now - start) / 1000) * 1.5);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Beat-synced feel: on top of the flowing sweep, the whole ring KICKS on a
+  // steady ~100 BPM pattern — sharp jump, quick decay, with the downbeat of
+  // every bar of four hitting hardest. Reads like the ring is dancing to the
+  // music instead of drifting.
+  const tSec = phase / 1.5;
+  const BEAT_S = 0.6;
+  const beatPos = (tSec % BEAT_S) / BEAT_S;
+  const accent = Math.floor(tSec / BEAT_S) % 4 === 0 ? 1 : 0.6;
+  const kick = beating ? Math.pow(1 - beatPos, 2.5) * accent : 0;
+  const amp = ampRef.current * (0.68 + 0.6 * kick);
+
+  return (
+    <G>
+      <Circle cx={CX} cy={CY} r={CX} fill="url(#cwBloom)" opacity={0.45 + amp * 0.55} />
+      {/* The rail the bars stand on. Without it they float, which is what
+          made this mode read as a pattern rather than a meter. */}
+      <Circle cx={CX} cy={CY} r={R0} fill="none" stroke={eq[1]} strokeOpacity={0.22} strokeWidth={1.1} />
+      <Path d={ringInner(phase, amp)} stroke="url(#cwStroke)" strokeWidth={4} strokeOpacity={0.55} fill="none" strokeLinecap="round" />
+      {/* Chunky EQ dashes — resting dots with bursts sweeping the ring */}
+      <Path d={ringBars(phase, amp)} stroke="url(#cwStroke)" strokeWidth={5} strokeOpacity={0.97} fill="none" strokeLinecap="round" />
+      <Path d={ringPeaks(phase, amp)} stroke="#FFFFFF" strokeWidth={2.6} strokeOpacity={0.78} fill="none" strokeLinecap="round" />
+    </G>
+  );
 }
 
 /** How far in the mirrored half reaches, as a fraction of the outward bar. */
@@ -145,7 +231,6 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   const eq = station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF'];
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
-  const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [showMood, setShowMood] = useState(false);
@@ -166,29 +251,6 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   });
   const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
 
-  // Orb animation loop — throttled to ~15fps — each tick re-renders the whole SVG scene on the CPU, and 25fps measured 53-59% sustained CPU (iOS resource reports, 24.07); 15fps looks identical for these slow drifts and halves the burn.
-  useEffect(() => {
-    if (!visible) return;
-    let raf = 0;
-    const start = Date.now();
-    let last = 0;
-    const tick = () => {
-      const now = Date.now();
-      if (now - last >= 66) {
-        last = now;
-        const target = playingRef.current ? 1 : 0.55;
-        ampRef.current += (target - ampRef.current) * 0.08;
-        // Battery: once paused and fully wound down, freeze the scene —
-        // zero re-renders until play flips it live again.
-        if (playingRef.current || Math.abs(ampRef.current - target) > 0.01) {
-          setPhase(((now - start) / 1000) * 1.5);
-        }
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [visible]);
 
   // Progress is driven by useTrackClock — real Spotify position when
   // connected, demo loop otherwise.
@@ -281,12 +343,6 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   // every bar of four hitting hardest. Reads like the ring is dancing to the
   // music instead of drifting. Only while music actually plays (the scene
   // freezes when paused, so the kick dies with it).
-  const tSec = phase / 1.5;
-  const BEAT_S = 0.6;
-  const beatPos = (tSec % BEAT_S) / BEAT_S;
-  const accent = Math.floor(tSec / BEAT_S) % 4 === 0 ? 1 : 0.6;
-  const kick = playing && !musicSwitching && !kickHold ? Math.pow(1 - beatPos, 2.5) * accent : 0;
-  const amp = ampRef.current * (0.68 + 0.6 * kick);
   // Landscape sizes off HEIGHT alone — the portrait formula shrinks a
   // sideways orb to a bangle (the "squish", owner 30.07).
   const orbSize = isLandscape
@@ -369,14 +425,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
 
               {/* Soft halo so the ring reads over the scene — centre stays hollow */}
               <Circle cx={CX} cy={CY} r={R0 + MAXLEN} fill="url(#cwCore)" />
-              <Circle cx={CX} cy={CY} r={CX} fill="url(#cwBloom)" opacity={0.45 + amp * 0.55} />
-              {/* The rail the bars stand on. Without it they float, which is
-                  what made this mode read as a pattern rather than a meter. */}
-              <Circle cx={CX} cy={CY} r={R0} fill="none" stroke={eq[1]} strokeOpacity={0.22} strokeWidth={1.1} />
-              <Path d={ringInner(phase, amp)} stroke="url(#cwStroke)" strokeWidth={4} strokeOpacity={0.55} fill="none" strokeLinecap="round" />
-              {/* Chunky EQ dashes — resting dots with bursts sweeping the ring */}
-              <Path d={ringBars(phase, amp)} stroke="url(#cwStroke)" strokeWidth={5} strokeOpacity={0.97} fill="none" strokeLinecap="round" />
-              <Path d={ringPeaks(phase, amp)} stroke="#FFFFFF" strokeWidth={2.6} strokeOpacity={0.78} fill="none" strokeLinecap="round" />
+              <WaveRing eq={eq} playing={playing} beating={playing && !musicSwitching && !kickHold} />
             </Svg>
             <FloatingNotes playing={playing} emitter="ring" color={eq[0]} />
             </Animated.View>

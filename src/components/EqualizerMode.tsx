@@ -21,6 +21,7 @@ import { Cruise, Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { ModeScrim } from '@/components/ModeScrim';
 import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { ModeSheet } from '@/components/ModeSheet';
@@ -440,18 +441,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           most of its weight; the top two thirds — which carry nothing but the
           station's own picture — give theirs up. Paired with a lighter blur
           on the assets themselves (radius ~8 -> 3.5). */}
-      <LinearGradient
-        colors={[
-          'rgba(2,2,12,0.10)',
-          'rgba(2,2,12,0.06)',
-          'rgba(2,2,12,0.18)',
-          'rgba(2,2,12,0.32)',
-          'rgba(2,2,12,0.46)',
-        ]}
-        locations={[0, 0.4, 0.65, 0.85, 1]}
-        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+      <ModeScrim station={currentStation} />
     </>
   );
 

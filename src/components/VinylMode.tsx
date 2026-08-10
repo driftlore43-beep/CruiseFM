@@ -13,6 +13,7 @@ import { STATIONS } from '@/constants/stations';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { ModeScrim } from '@/components/ModeScrim';
 import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
@@ -1260,18 +1261,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         {...dismissPan.panHandlers}
         onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
         <StationBackdrop station={station} blurRadius={2.5} />
-        <LinearGradient
-          colors={[
-            'rgba(2,2,12,0.10)',
-            'rgba(2,2,12,0.06)',
-            'rgba(2,2,12,0.18)',
-            'rgba(2,2,12,0.32)',
-            'rgba(2,2,12,0.46)',
-          ]}
-          locations={[0, 0.4, 0.65, 0.85, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+        <ModeScrim station={station} />
         <LinearGradient
           colors={['transparent', (station.eqColors?.[1] ?? V.gold) + '26', 'transparent']}
           locations={[0, 0.5, 1]}

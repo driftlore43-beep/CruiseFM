@@ -18,6 +18,7 @@ import { ModeSheet } from '@/components/ModeSheet';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { ModeScrim } from '@/components/ModeScrim';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
@@ -684,12 +685,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
         onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
 
         <StationBackdrop station={station} blurRadius={3} />
-        <LinearGradient
-          colors={['rgba(3,3,10,0.58)', 'rgba(3,3,10,0.44)', 'rgba(3,3,10,0.6)', 'rgba(3,3,10,0.72)', 'rgba(3,3,10,0.82)']}
-          locations={[0, 0.4, 0.65, 0.85, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+        <ModeScrim station={station} />
 
         {!isLandscape && (
         <View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">

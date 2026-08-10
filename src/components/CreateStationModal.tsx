@@ -73,7 +73,31 @@ const PALETTES: { label: string; color: string; gradientColors: [string, string,
   { label: 'Coral',    color: '#FF6F61', gradientColors: ['#2a0c08', '#7a2a20', '#000000'], glowColor: '#7a2a20', iconBg: '#4a1710' },
   { label: 'Mint',     color: '#4ADE80', gradientColors: ['#03200f', '#15683a', '#000000'], glowColor: '#15683a', iconBg: '#0e4425' },
   { label: 'Ice',      color: '#9AD6FF', gradientColors: ['#0e1a26', '#2e5a7a', '#000000'], glowColor: '#2e5a7a', iconBg: '#1c3a52' },
+  // Added 10.08 (owner: "browns and a wider colour selection... include a
+  // pearl white also that would look good in many images"). Earths and muted
+  // tones — the original set was all saturated, which left nothing that sits
+  // quietly under a photograph.
+  { label: 'Pearl',    color: '#EFE8DC', gradientColors: ['#15141a', '#3a3630', '#000000'], glowColor: '#3a3630', iconBg: '#272420' },
+  { label: 'Espresso', color: '#6B4A38', gradientColors: ['#1a0f0a', '#4a2f20', '#000000'], glowColor: '#4a2f20', iconBg: '#2e1d14' },
+  { label: 'Camel',    color: '#C08B5C', gradientColors: ['#241708', '#6b4522', '#000000'], glowColor: '#6b4522', iconBg: '#40290f' },
+  { label: 'Copper',   color: '#B87333', gradientColors: ['#210f02', '#63380f', '#000000'], glowColor: '#63380f', iconBg: '#3b2109' },
+  { label: 'Olive',    color: '#8A9A5B', gradientColors: ['#141705', '#3f4a1c', '#000000'], glowColor: '#3f4a1c', iconBg: '#252c10' },
+  { label: 'Sage',     color: '#A8BFA0', gradientColors: ['#101a10', '#33482f', '#000000'], glowColor: '#33482f', iconBg: '#1d2a1b' },
+  { label: 'Plum',     color: '#8E4B6E', gradientColors: ['#1c0716', '#54203f', '#000000'], glowColor: '#54203f', iconBg: '#331226' },
+  { label: 'Midnight', color: '#35508F', gradientColors: ['#070b1a', '#1e2c56', '#000000'], glowColor: '#1e2c56', iconBg: '#121a33' },
 ];
+
+/**
+ * The ring that marks the selected swatch is white, which is invisible on a
+ * pale colour — Pearl, Ice, Sage. So it flips to near-black on light swatches.
+ * Perceived brightness, not a plain average: the eye weights green far more
+ * than blue, and a plain mean calls #33C5FF light when it plainly isn't.
+ */
+function ringOn(hex: string): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.slice(0, 2), 16), g = parseInt(c.slice(2, 4), 16), b = parseInt(c.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? '#0a0a10' : '#fff';
+}
 
 /**
  * The default for a NEW station. Explicit, not PALETTES[0] — 'None' sits first
@@ -314,7 +338,12 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
               {PALETTES.map((p) => (
                 <Pressable
                   key={p.label}
-                  style={[styles.paletteBtn, { backgroundColor: p.color }, selectedPalette.label === p.label && styles.paletteBtnActive]}
+                  style={[
+                    styles.paletteBtn,
+                    { backgroundColor: p.color },
+                    selectedPalette.label === p.label && styles.paletteBtnActive,
+                    selectedPalette.label === p.label && { borderColor: ringOn(p.color) },
+                  ]}
                   onPress={() => !atLimit && setSelectedPalette(p)}
                 />
               ))}

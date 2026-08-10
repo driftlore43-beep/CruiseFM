@@ -30,7 +30,7 @@ export const BADGES: Badge[] = [
   { id: 'veteran',      name: 'Veteran',       desc: 'Fifty drives with Cruise FM.',              icon: 'medal-outline' },
   { id: 'local-legend', name: 'Local Legend',  desc: 'Ten drives on a single station.',           icon: 'star-circle-outline' },
   { id: 'dial-surfer',  name: 'Dial Surfer',   desc: 'Drive with every mood.',                    icon: 'radio' },
-  { id: 'founder',      name: 'Founder',       desc: 'Here for launch week. Never offered again.', icon: 'flag-checkered', reserved: true },
+  { id: 'founder',      name: 'Founder',       desc: 'Here at the start. Never offered again.', icon: 'flag-checkered', reserved: true },
 ];
 
 function streakDays(log: DriveEvent[]): number {
@@ -66,7 +66,7 @@ export function judgeBadges(log: DriveEvent[], opts?: { founder?: boolean }): Ju
     'veteran':      totalDrives >= 50,
     'local-legend': maxOnOne >= 10,
     'dial-surfer':  allEight,
-    'founder':      !!opts?.founder, // granted to launch-week devices, never earned by driving
+    'founder':      !!opts?.founder, // granted by install date, never earned by driving
   };
 
   return BADGES.map((b) => ({ ...b, earned: earned[b.id] ?? false }));

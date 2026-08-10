@@ -5,7 +5,7 @@ import { useActivityPing, useAdoptPlayState, useStartResultReporter, useWakeNudg
 
 import {
   isSpotifyConnected,
-  getPlaybackState,
+  probePlaybackState,
   getPlaylistName,
   pause as spotifyPause,
   startPlayback,
@@ -62,6 +62,8 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
   // When the user last pressed a control — recent presses win over the poll
   // so an optimistic tap isn't fought by slightly-stale server state.
   const lastControlRef = useRef(0);
+  // Consecutive polls where Spotify said nothing is playing. See refresh().
+  const idleStreakRef = useRef(0);
   const adoptPlay = useAdoptPlayState();
   const adoptRef = useRef(adoptPlay);
   adoptRef.current = adoptPlay;
@@ -91,8 +93,31 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
       if (!conn) return;
 
       const refresh = async () => {
-        const data = await getPlaybackState();
+        const probe = await probePlaybackState();
         if (cancelledRef.current) return;
+
+        // Spotify answered and has nothing playing — it was force-quit, or the
+        // device dropped off Connect. Stop the drive rather than animating over
+        // silence. TWO IN A ROW is required because Spotify briefly returns
+        // this during ordinary handovers (a track change, moving between
+        // devices), and one blip must not pause a working drive. At a 5s poll
+        // that settles within about ten seconds.
+        if (probe.kind === 'idle') {
+          idleStreakRef.current += 1;
+          if (idleStreakRef.current >= 2 && Date.now() - lastControlRef.current > 8000) {
+            isPlayingRef.current = false;
+            adoptRef.current(false);
+            setTrack((t) => (t ? { ...t, isPlaying: false } : t));
+          }
+          return;
+        }
+        idleStreakRef.current = 0;
+        // 'unknown' means no usable answer — a timeout, offline, a 403. Say
+        // nothing and let the drive carry on, which is what the old code did
+        // for every outcome including this one.
+        if (probe.kind !== 'state') return;
+
+        const data = probe.data;
         const item = data?.item;
         if (data) isPlayingRef.current = data.is_playing ?? null;
         // Mirror reality: if Spotify pauses on its own (car Bluetooth off,

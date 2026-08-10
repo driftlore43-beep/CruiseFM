@@ -384,6 +384,56 @@ export async function getPlaybackState() {
   return spotifyFetch('/me/player');
 }
 
+/**
+ * The same call, but able to tell SILENCE from NO ANSWER.
+ *
+ * `spotifyFetch` folds a 204 (Spotify is running and nothing is playing, or
+ * there is no active device at all) into the same null as a timeout, a dropped
+ * connection and an auth failure. That is deliberate for polling — a drive
+ * must not stop because one request missed — but it means a genuinely stopped
+ * Spotify is indistinguishable from a flaky signal, so the visuals and the
+ * scrub carried on over silence. Owner, 10.08, after force-quitting Spotify:
+ * "the animations and scrub kept moving on its own."
+ *
+ * Apple Music never had this problem because playback is local: the queue is
+ * handed to the Music app on the same phone and its state is always readable.
+ *
+ *   'state'   — Spotify answered with playback. Trust it.
+ *   'idle'    — Spotify answered, and nothing is playing. Stop.
+ *   'unknown' — no usable answer. Change nothing; the drive continues.
+ */
+export type PlaybackProbe =
+  | { kind: 'state'; data: any }
+  | { kind: 'idle' }
+  | { kind: 'unknown' };
+
+export async function probePlaybackState(): Promise<PlaybackProbe> {
+  const token = await getAccessToken();
+  if (!token) return { kind: 'unknown' };
+  let res: Response;
+  try {
+    res = await timedFetch('https://api.spotify.com/v1/me/player', {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+  } catch {
+    return { kind: 'unknown' };   // offline or timed out — say nothing
+  }
+  if (res.ok && restrictedCache) setRestricted(false);
+  if (res.status === 403) { classify403(res); return { kind: 'unknown' }; }
+  // THE ONE THAT MATTERS: a 204 is Spotify telling us it has nothing playing.
+  if (res.status === 204 || res.status === 202) return { kind: 'idle' };
+  if (!res.ok) return { kind: 'unknown' };
+  try {
+    const data = await res.json();
+    // A body with no device is the other way Spotify reports "gone".
+    if (!data || !data.device) return { kind: 'idle' };
+    return { kind: 'state', data };
+  } catch {
+    return { kind: 'unknown' };
+  }
+}
+
 // Playlist names by id — tiny session cache so the "playing from" pill can
 // name the playlist actually feeding the music without a fetch per poll.
 const playlistNameCache: Record<string, string> = {};

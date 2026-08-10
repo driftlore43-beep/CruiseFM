@@ -14,7 +14,7 @@ import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, Fonts, TAB_SAFE_INSET, PAGE_GUTTER } from '@/constants/theme';
 import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
 import { useEntitlements } from '@/context/EntitlementsContext';
-import { deleteCustomStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
+import { deleteCustomStation, isCustomStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
 import { recordDriveStart } from '@/utils/driveStats';
 import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
 
@@ -219,7 +219,9 @@ function StationRow({
   onPress?: () => void;
 }) {
   const day = useDaylight();
-  const custom = (station as CustomStation).image === null ? (station as CustomStation) : null;
+  // Same trap as the detail page: this used to read `.image === null`, which
+  // stopped identifying a custom station the moment one could carry a photo.
+  const custom = isCustomStation(station) ? (station as CustomStation) : null;
   const mine = !!custom;
   const accent = station.eqColors?.[1] ?? (custom?.color ?? Cruise.amber);
   // Icon: built-ins store an MCI glyph name; custom stations store either an

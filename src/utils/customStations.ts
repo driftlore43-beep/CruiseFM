@@ -37,6 +37,24 @@ export async function loadCustomStations(): Promise<CustomStation[]> {
   }
 }
 
+/**
+ * Is this one of the user's own stations?
+ *
+ * ASK THIS, never `!station.image`. That shortcut was true for the whole of
+ * the app's history — a custom station was the one with no photograph — and it
+ * stopped being true the moment custom stations could HAVE a photograph
+ * (10.08). The immediate symptom was the ⋯ menu vanishing from a station's own
+ * page the instant its owner gave it a picture, so there was no way left to
+ * edit or delete it.
+ *
+ * Membership rather than an id prefix: ids happen to be minted as
+ * `custom-<timestamp>`, but the built-in list is the thing that actually
+ * defines what is and isn't ours, and it cannot drift.
+ */
+export function isCustomStation(station: { id: string }): boolean {
+  return !STATIONS.some((s) => s.id === station.id);
+}
+
 export async function saveCustomStation(station: CustomStation): Promise<void> {
   const existing = await loadCustomStations();
   await persist([...existing, station]);

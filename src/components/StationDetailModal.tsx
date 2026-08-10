@@ -20,7 +20,7 @@ import * as Haptics from 'expo-haptics';
 
 import { stationDial, type Station } from '@/constants/stations';
 import { useDsegFonts } from '@/components/StationIdentity';
-import { type CustomStation } from '@/utils/customStations';
+import { isCustomStation, type CustomStation } from '@/utils/customStations';
 import { Cruise } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
 import { StationBackdrop } from '@/components/StationBackdrop';
@@ -220,7 +220,9 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   // bites if the inset ever reads zero inside the Modal, which is exactly how
   // the settings header ended up alongside the clock (09.08).
   const topPad = Math.max(insets.top, 20) + 12;
-  const isCustom = !station.image;
+  // NOT `!station.image` — see isCustomStation. Custom stations can have a
+  // photo since 10.08, and that shortcut hid the ⋯ menu the moment one did.
+  const isCustom = isCustomStation(station);
   const custom = isCustom ? (station as CustomStation) : null;
   // Every station — built-in or custom — needs its own playlist before a
   // drive makes sound. The glowing playlist button + quiet Start Drive make

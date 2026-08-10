@@ -12,7 +12,8 @@ import { ModeSheet } from '@/components/ModeSheet';
 import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { STATIONS, stationDial, type Band } from '@/constants/stations';
+import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
+import { cachedCustomStations, customToStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
@@ -54,11 +55,47 @@ const BAND_CFG: Record<Band, {
   AM: { min: 530, max: 1600, px: 1.45, tick: 10, lock: 38, label: (v) => String(Math.round(v)) },
 };
 
+/**
+ * How long a flick keeps coasting, in milliseconds of its release velocity.
+ * 180 puts a brisk flick (~2 points/ms) about 360px down the dial, which is
+ * two or three FM stations — enough that throwing the dial feels like throwing
+ * something, while a slow drag is unaffected because its velocity is ~0.
+ */
+const GLIDE_MS = 180;
+
 /** Every tenth tick is a labelled major in both bands — 1 MHz, 100 kHz. */
 const MAJOR_EVERY = 10;
 
-/** Each station's band and dial position, worked out once. */
+/**
+ * Every station's band and dial position.
+ *
+ * THIS USED TO BE THE TEN BUILT-INS ONLY, and the fallbacks below are why that
+ * was a real bug rather than a cosmetic gap: a station the map had never heard
+ * of came back 'FM' at 92.1, which is After Hours FM. So opening the Tuner
+ * from one of your OWN stations silently tuned you to somebody else's (owner,
+ * 10.08). `stationDial` already gives any id a stable place — it hashes an
+ * unknown one into the AM band — so the only thing missing was telling the
+ * dial they exist.
+ *
+ * The earlier decision to leave custom stations off the dial (26.07) was
+ * justified by the mood sheet not listing them either. That sheet was replaced
+ * on 03.08 by one that DOES list them, under YOUR STATIONS, so the reasoning
+ * expired with it.
+ */
 const DIAL = new Map(STATIONS.map((s) => [s.id, stationDial(s.id, s.premium)]));
+
+/** Everything the needle can find. Extended once custom stations load. */
+let DIAL_STATIONS: Station[] = [...STATIONS];
+
+/** Fold the user's own stations into the dial. Idempotent; safe to re-run. */
+function registerCustomOnDial(list: CustomStation[]): void {
+  DIAL_STATIONS = [...STATIONS];
+  for (const c of list) {
+    const st = customToStation(c);
+    DIAL.set(st.id, stationDial(st.id, false));
+    DIAL_STATIONS.push(st);
+  }
+}
 
 function bandOf(id: string): Band {
   return DIAL.get(id)?.band ?? 'FM';
@@ -90,23 +127,23 @@ function clamp(v: number, lo: number, hi: number): number {
  *  means on a real receiver. */
 function nearestStation(band: Band, freq: number) {
   const cfg = BAND_CFG[band];
-  let best: (typeof STATIONS)[number] | null = null;
+  let best: Station | null = null;
   let bestDist = Infinity;
-  for (const s of STATIONS) {
+  for (const s of DIAL_STATIONS) {
     const d = DIAL.get(s.id);
     if (!d || d.band !== band) continue;
     const dist = Math.abs(d.value - freq);
     if (dist < bestDist) { bestDist = dist; best = s; }
   }
-  if (!best) return { station: STATIONS[0], lock: 0 };
+  if (!best) return { station: DIAL_STATIONS[0], lock: 0 };
   return { station: best, lock: clamp(1 - bestDist / cfg.lock, 0, 1) };
 }
 
 /** The first station on a band, for when the listener flips over to it. */
 function firstOnBand(band: Band) {
-  const list = STATIONS.filter((s) => DIAL.get(s.id)?.band === band)
+  const list = DIAL_STATIONS.filter((s) => DIAL.get(s.id)?.band === band)
     .sort((a, b) => dialValue(a.id) - dialValue(b.id));
-  return list[0] ?? STATIONS[0];
+  return list[0] ?? DIAL_STATIONS[0];
 }
 
 /** The printed band plates at the left end of the scale. */
@@ -224,7 +261,7 @@ function DialRuler({ band, freq, width, color, lock }: {
       <DotMatrixGroup text={other} x={8} y={baseY + 22} dot={1.7} gap={0.62} color="#9FD8FF" opacity={0.6} />
 
       {/* Station markers — only this band's, in each station's own colour */}
-      {STATIONS.map((st) => {
+      {DIAL_STATIONS.map((st) => {
         const d = DIAL.get(st.id);
         if (!d || d.band !== band) return null;
         const x = midX + (d.value - freq) * cfg.px;
@@ -523,6 +560,9 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const startFreqRef = useRef(0);
   const snapRaf = useRef(0);
   const lastTickRef = useRef(0);
+  // Bumped when custom stations join the dial, so the scale redraws with
+  // their markers on it.
+  const [, setDialVersion] = useState(0);
 
   const cancelSnap = () => { if (snapRaf.current) cancelAnimationFrame(snapRaf.current); snapRaf.current = 0; };
 
@@ -538,9 +578,15 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     setFreq(v);
   };
 
-  const snapToNearest = () => {
+  /**
+   * Settle onto a station. `projected` is where a flick would have carried the
+   * needle if it kept going — the snap picks its station from THERE, but the
+   * animation still starts from where the finger actually left off, so a throw
+   * reads as one continuous sweep rather than a jump.
+   */
+  const snapToNearest = (projected?: number) => {
     cancelSnap();
-    const { station } = nearestStation(bandRef.current, freqRef.current);
+    const { station } = nearestStation(bandRef.current, projected ?? freqRef.current);
     const target = dialValue(station.id);
     const from = freqRef.current;
     const t0 = Date.now();
@@ -633,7 +679,21 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
           else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
           return;
         }
-        snapToNearest();
+        // MOMENTUM. Without this the release velocity was thrown away and the
+        // needle snapped back to whichever station was nearest at the instant
+        // the finger lifted — so unless one drag crossed the halfway point to
+        // the next station, the dial pulled straight back. FM stations sit
+        // 1.6-2.6 MHz apart, which is 115-187px at this rate, so that was most
+        // drags. Owner, 10.08: "it feels like an elastic band where I have to
+        // keep pulling to change stations."
+        //
+        // vx is points per millisecond, so carrying it for GLIDE_MS is the
+        // distance a real dial would coast. A gentle drag has almost no
+        // velocity and still lands on the nearest station, which keeps fine
+        // tuning intact; a flick now travels several stations, as it should.
+        const cfg = BAND_CFG[bandRef.current];
+        const glided = freqRef.current - (g.vx * GLIDE_MS) / cfg.px;
+        snapToNearest(clamp(glided, cfg.min, cfg.max));
       },
       onPanResponderTerminate: () => { gestureModeRef.current = null; snapToNearest(); },
     })
@@ -646,10 +706,24 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     if (!visible) return;
     const id = stationId ?? 'night-run';
     setActiveId(id);
+    // Fold the user's own stations in BEFORE reading the dial position — the
+    // cache is usually already warm (the stations page and the mini-player
+    // both fill it), so this is normally synchronous in effect. The async
+    // reload below covers a cold start, where the dial would otherwise place
+    // a custom station at the 92.1 fallback for a frame.
+    registerCustomOnDial(cachedCustomStations());
     const b = bandOf(id);
     setBand(b);
     bandRef.current = b;
     setFreq(dialValue(id));
+    loadCustomStations().then((list) => {
+      registerCustomOnDial(list);
+      // Re-seat the needle in case this station only became known just now.
+      setBand(bandOf(id));
+      bandRef.current = bandOf(id);
+      setFreq(dialValue(id));
+      setDialVersion((v) => v + 1);
+    }).catch(() => {});
     slideY.setValue(winH);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
     return () => cancelSnap();

@@ -27,6 +27,12 @@ async function persist(list: CustomStation[]): Promise<void> {
   await AsyncStorage.setItem(KEY, JSON.stringify(list));
 }
 
+/** The sync cache, for callers that must not wait — e.g. the Tuner placing its
+ *  needle on the frame it opens. May be empty before the first load. */
+export function cachedCustomStations(): CustomStation[] {
+  return cache;
+}
+
 export async function loadCustomStations(): Promise<CustomStation[]> {
   try {
     const raw = await AsyncStorage.getItem(KEY);

@@ -64,6 +64,8 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
   const lastControlRef = useRef(0);
   // Consecutive polls where Spotify said nothing is playing. See refresh().
   const idleStreakRef = useRef(0);
+  // Mirror of `track`, readable inside callbacks without re-creating them.
+  const trackRef = useRef<NowPlaying | null>(null);
   const adoptPlay = useAdoptPlayState();
   const adoptRef = useRef(adoptPlay);
   adoptRef.current = adoptPlay;
@@ -108,6 +110,15 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
             isPlayingRef.current = false;
             adoptRef.current(false);
             setTrack((t) => (t ? { ...t, isPlaying: false } : t));
+            clearChase();
+          } else if (idleStreakRef.current === 1) {
+            // Confirm QUICKLY rather than waiting for the next 5s poll. Two
+            // answers are still required — one blip must not pause a working
+            // drive — but the second is asked 900ms later, so a closed Spotify
+            // settles in about a second instead of ten (owner, 10.08: "response
+            // is a bit slow to pause").
+            clearChase();
+            chaseRef.current = [setTimeout(() => refreshRef.current(), 900)];
           }
           return;
         }
@@ -127,6 +138,21 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
           adoptRef.current(data.is_playing);
         }
         if (item?.name) {
+          // The chase is over the moment the track actually changes — usually
+          // the first or second check, so the later ones are rarely spent.
+          if (chaseFromRef.current !== null && (item.uri ?? null) !== chaseFromRef.current) {
+            clearChase();
+          }
+          trackRef.current = {
+            title: item.name,
+            artist: item.artists?.map((a: any) => a.name).join(', ') ?? '',
+            uri: item.uri ?? null,
+            albumArt: item.album?.images?.[1]?.url ?? item.album?.images?.[0]?.url ?? null,
+            durationMs: item.duration_ms ?? null,
+            progressMs: data.progress_ms ?? null,
+            syncedAt: Date.now(),
+            isPlaying: data.is_playing ?? true,
+          };
           setTrack({
             title: item.name,
             artist: item.artists?.map((a: any) => a.name).join(', ') ?? '',
@@ -166,6 +192,7 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
     return () => {
       cancelledRef.current = true;
       stopPoll();
+      clearChase();
     };
   }, [visible]);
 
@@ -202,7 +229,35 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
   const ping = useActivityPing();
   const report = useStartResultReporter();
   const wakeNudge = useWakeNudge();
-  const after = () => setTimeout(() => refreshRef.current(), 700);
+  /**
+   * Chase the truth after a transport command.
+   *
+   * This used to be a SINGLE refresh at 700ms, and that is why skip felt slow.
+   * Spotify's API is eventually consistent: ask it what is playing right after
+   * a skip and it very often still reports the previous track. Miss that one
+   * chance and nothing corrects the screen until the ordinary 5s poll comes
+   * round — so the title and artwork could sit wrong for five seconds after a
+   * press that had already worked (owner, 10.08).
+   *
+   * So it is a short burst instead, front-loaded because most commands land
+   * almost immediately, and it STOPS EARLY the moment the thing we were
+   * waiting for actually changes — which is usually after the first or second
+   * check, so the extra requests are rarely spent.
+   */
+  const CHASE_MS = [220, 600, 1300, 2400, 3600];
+  const chaseRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  /** What was playing when the command was sent; the chase ends when it moves. */
+  const chaseFromRef = useRef<string | null>(null);
+  const clearChase = () => {
+    chaseRef.current.forEach(clearTimeout);
+    chaseRef.current = [];
+    chaseFromRef.current = null;
+  };
+  const after = (watchTrack = false) => {
+    clearChase();
+    chaseFromRef.current = watchTrack ? (trackRef.current?.uri ?? null) : null;
+    chaseRef.current = CHASE_MS.map((ms) => setTimeout(() => refreshRef.current(), ms));
+  };
 
   return {
     connected,
@@ -233,8 +288,8 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
       after();
     },
     pause: () => { ping(); lastControlRef.current = Date.now(); isPlayingRef.current = false; spotifyPause().catch(() => {}); after(); },
-    next: () => { ping(); lastControlRef.current = Date.now(); skipNext().catch(() => {}); after(); },
-    prev: () => { ping(); lastControlRef.current = Date.now(); skipPrev().catch(() => {}); after(); },
+    next: () => { ping(); lastControlRef.current = Date.now(); skipNext().catch(() => {}); after(true); },
+    prev: () => { ping(); lastControlRef.current = Date.now(); skipPrev().catch(() => {}); after(true); },
     // Optimistic local flip; the API call + next poll settle the truth.
     shuffle: (state: boolean) => { ping(); setShuffleOn(state); spotifySetShuffle(state).catch(() => {}); after(); },
     repeat: (mode: RepeatMode) => { ping(); setRepeatMode(mode); spotifySetRepeat(mode).catch(() => {}); after(); },

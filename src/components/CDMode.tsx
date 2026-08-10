@@ -1,5 +1,4 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -16,6 +15,7 @@ import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
+import { createScrubHaptics } from '@/utils/scrubHaptics';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { Fonts } from '@/constants/theme';
@@ -374,7 +374,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   const centerRef = useRef({ x: 0, y: 0 });
   const lastAngleRef = useRef<number | null>(null);
   const tapStartRef = useRef(0);
-  const hapticAccumRef = useRef(0);
+  const scrubHaptics = useRef(createScrubHaptics()).current;
   const durMsRef = useRef(1);
   durMsRef.current = Math.max(1, durationMs);
   // togglePlay is defined further down; the responder is built once, so it
@@ -458,7 +458,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
           if (lastAngleRef.current !== null) lastAngleRef.current = angleAt(pageX, pageY);
         });
         tapStartRef.current = Date.now();
-        hapticAccumRef.current = 0;
+        scrubHaptics.reset();
         dragRef.current = null;
         progressBaseRef.current = readAnim(progress);
         scrubPctRef.current = progressBaseRef.current;
@@ -506,12 +506,8 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
         scrubPctRef.current = pct;
         scrub.move(pct);
         setScrubDeltaSec(Math.round(((pct - progressBaseRef.current) * durMsRef.current) / 1000));
-        // A soft tick every five wound seconds — the record's habit.
-        hapticAccumRef.current += Math.abs((diff / 360) * 5000);
-        if (hapticAccumRef.current >= 5000) {
-          hapticAccumRef.current = 0;
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-        }
+        // Grain under the thumb — the record's habit, shared code.
+        scrubHaptics.turn(diff);
       },
       onPanResponderRelease: (_evt, g) => {
         lastAngleRef.current = null;

@@ -1,5 +1,4 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Svg, { Circle as SvgCircle, G, Path, Rect as SvgRect } from 'react-native-svg';
@@ -11,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OWNER_MODE } from '@/constants/config';
 import { Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
+import { createScrubHaptics } from '@/utils/scrubHaptics';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
@@ -759,7 +759,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const activeTrackRef    = useRef(activeTrack);
   const playingRef        = useRef(false);
   const scrubStartPosRef  = useRef(0);
-  const lastHapticAccumRef = useRef(0);
+  // Grain under the thumb, shared with the CD so the two can't drift apart.
+  const scrubHaptics = useRef(createScrubHaptics()).current;
   const progressBarWidthRef = useRef(300);
   const spinCurrentRef    = useRef(0);
   const pbHandlerRef      = useRef({ onGrant: (_x: number) => {}, onMove: (_x: number) => {}, onRelease: () => {} });
@@ -832,7 +833,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         stopSpin();
         accumulatedRotation.current = spinCurrentRef.current * 360;
         lastAngle.current = _getAngleFromCenter(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
-        lastHapticAccumRef.current = 0;
+        scrubHaptics.reset();
         // The scrub does NOT begin here — until the drag is judged this might
         // be a tap or a pull-down, and neither should wind the record.
       },
@@ -874,11 +875,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
         spinValue.setValue(((accumulatedRotation.current % 360) + 360) % 360 / 360);
 
-        lastHapticAccumRef.current += Math.abs(deltaMs);
-        if (lastHapticAccumRef.current >= 5000) {
-          lastHapticAccumRef.current = 0;
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
+        scrubHaptics.turn(diff);
       },
       onPanResponderRelease: (_evt, g) => {
         lastAngle.current = null;

@@ -525,7 +525,10 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 18, elevation: 16,
   },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  menuRowText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  // 15/700, not 14/600 — owner, 10.08: the menu "should slightly have bolder
+  // lettering, it's not as clear as I like". It sits on a small dark panel
+  // over a photograph, which is the least forgiving place for thin type.
+  menuRowText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 },
   menuDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: 10 },
   playlistBtnHero: {
     paddingVertical: 20,

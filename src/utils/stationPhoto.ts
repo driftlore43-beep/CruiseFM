@@ -14,25 +14,26 @@ import * as FileSystem from 'expo-file-system/legacy';
  * re-display runs on the main thread and iOS killed the app for it once (see
  * the note in StationBackdrop).
  *
- * HOW THE SOFT COPY IS MADE, and the first attempt got this wrong (owner,
- * 10.08: "really blurry and pixelated"). There is no blur filter in
- * expo-image-manipulator, so the original plan was to save a ~56px thumbnail
- * and let it stretch to fill the screen — on the theory that enlarging a tiny
- * image IS a blur. It is not. Enlarging keeps the hard edges between the
- * original pixels and simply makes them bigger, so a 7x stretch on a phone
- * (nearer 19x on the station page) reads as blocky, which a real blur never
- * does.
+ * HOW THE SOFT COPY IS MADE, and this took three goes (owner: "really blurry
+ * and pixelated", twice). BOTH EARLIER ATTEMPTS TRIED TO BAKE THE BLUR IN AT
+ * IMPORT, and there is no blur filter in expo-image-manipulator, so both
+ * faked it with resampling — first a 56px thumbnail left to stretch, then a
+ * down-then-back-up round trip. The second looked perfect offline and still
+ * came out blocky on the phone, which is the tell: the device's own resizer is
+ * not the one the offline test used, and ENLARGING an image can only ever put
+ * back hard edges, whatever filter does it.
  *
- * What actually works is a genuine low-pass, done by RESAMPLING TWICE in one
- * pass: down to BLUR_W, which really does average the detail away, then back
- * up to FULL_W so the file is stored at the resolution it will be displayed
- * at and nothing has to be enlarged at draw time. `manipulateAsync` applies
- * its actions in order, so the two resizes chain.
+ * So this no longer bakes anything in. The soft copy is a plain DOWNSCALE —
+ * never an enlargement, so it cannot introduce blocks — and the blur itself is
+ * done by the image pipeline at display time, where it is a real gaussian.
+ * StationBackdrop already takes a blurRadius from every caller and was simply
+ * ignoring it whenever a pre-blurred file existed; for a user's photo it now
+ * uses it.
  *
- * BLUR_W is not a taste number: the ten built-in backdrops are 1080-wide
- * images blurred at radius 3.5, and a gaussian of that radius erases detail
- * below roughly 7px — which is the same as resampling 1080 down to about 150.
- * So a user's photo lands at the same softness as the curated ones.
+ * SOFT_W is the reason that is affordable. The warning about live blurRadius
+ * (iOS killed the app for re-blurring full-size images on the main thread) is
+ * about 1080x1900 photographs; blurring a 540-wide one is a quarter of the
+ * work, and it is one image rather than ten.
  *
  * NATIVE, so everything here degrades to "unavailable" until a build carries
  * the two modules — the same shape as saveToPhotos. Written ahead of that
@@ -48,18 +49,13 @@ const DIR = `${FileSystem.documentDirectory}station-photos/`;
 /** Big enough to hold up as a hero, small enough to stay well inside the
  *  ~600KB-a-photo rule the built-in stations follow. */
 const FULL_W = 1400;
-/** Matches the built-in backdrops: 1080 wide, so nothing is enlarged on screen. */
-const BLUR_FULL_W = 1080;
+
 /**
- * The rung the detail is thrown away at. MEASURED, not reasoned: the first
- * attempt derived 150 from the built-ins' blur radius on paper, and the render
- * showed it far too sharp — you could still read windows on a building, which
- * would fight the mode's object and swallow the white type. Comparing edge
- * energy against the four built-in backdrops puts the true match at 90-120.
- * 100 sits at the soft end of that on purpose: the curated photographs are
- * shot dark and a stranger's photo has no such discipline.
+ * The soft copy's width. Small enough that blurring it live costs little, big
+ * enough that any phone photo reaches it by DOWNSCALING — which is the whole
+ * point, since enlarging is what produced the blocks twice.
  */
-const BLUR_W = 100;
+const SOFT_W = 540;
 
 type Picker = typeof import('expo-image-picker');
 type Manipulator = typeof import('expo-image-manipulator');
@@ -133,14 +129,11 @@ export async function pickStationPhoto(stationId: string): Promise<PickResult> {
     const full = await m.manip.manipulateAsync(src, [{ resize: { width: FULL_W } }], {
       compress: 0.82, format: m.manip.SaveFormat.JPEG,
     });
-    // Down to throw the detail away, then back up so it is stored at display
-    // size. Heavy compression is free here — there is almost nothing left to
-    // preserve, and the built-in blurs sit around 34KB for the same reason.
-    const tiny = await m.manip.manipulateAsync(
-      src,
-      [{ resize: { width: BLUR_W } }, { resize: { width: BLUR_FULL_W } }],
-      { compress: 0.6, format: m.manip.SaveFormat.JPEG },
-    );
+    // Downscale only. Quality stays high because this is NOT pre-blurred —
+    // the softening happens on screen, so there is real detail worth keeping.
+    const tiny = await m.manip.manipulateAsync(src, [{ resize: { width: SOFT_W } }], {
+      compress: 0.8, format: m.manip.SaveFormat.JPEG,
+    });
 
     const image = `${DIR}${stationId}-${stamp}.jpg`;
     const imageBlur = `${DIR}${stationId}-${stamp}-blur.jpg`;

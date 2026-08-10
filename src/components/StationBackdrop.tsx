@@ -74,12 +74,28 @@ export function StationBackdrop({
   // window is exactly the case that exposed it. contentFit covers correctly
   // on every platform and orientation with no override needed, and
   // expo-image is already in the build for the motion clips.
+  // A user's own photo is a file path; the built-ins are bundled assets, so
+  // numbers. That free discrimination decides how the softening happens.
+  //
+  // The ten built-ins ship a PRE-BLURRED file, so they want no live blur at
+  // all. A user's photo does the opposite: its companion file is a plain
+  // downscale, never pre-blurred, because two attempts at baking a blur in
+  // with resampling both came back blocky on the phone (see stationPhoto.ts —
+  // enlarging can only ever put hard edges back). So the blur happens here,
+  // where it is a real gaussian and cannot block.
+  //
+  // The multiplier is because that companion file is 540 wide against a
+  // built-in's 1080, so the same radius reads as half the softening. If it
+  // ever needs tuning this is the one number to move.
+  const userPhoto = typeof station.image === 'string';
+  const liveBlur = userPhoto ? blurRadius * 3 : station.imageBlur ? 0 : blurRadius;
+
   return (
     <>
       <ExpoImage
         source={station.imageBlur ?? station.image}
         contentFit="cover"
-        blurRadius={station.imageBlur ? 0 : blurRadius}
+        blurRadius={liveBlur}
         cachePolicy="memory-disk"
         style={StyleSheet.absoluteFill}
       />

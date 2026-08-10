@@ -49,6 +49,14 @@ function CardWash({ radius }: { radius: number }) {
 }
 
 const PALETTES: { label: string; color: string; gradientColors: [string, string, string]; glowColor: string; iconBg: string }[] = [
+  // First on purpose. Owner, 10.08: "they should include a transparent option,
+  // for users who prefer to have the same colour as the background". Not truly
+  // transparent — a station's colour is used for gradients, glows, the EQ ramp
+  // and the mode chips, and a see-through value would leave all of those with
+  // nothing to draw. This is the app's own near-black instead, which is what
+  // "same as the background" actually looks like, and it stays a real colour
+  // everything downstream can use.
+  { label: 'None',     color: '#2A2E3D', gradientColors: ['#0a0a10', '#181c28', '#000000'], glowColor: '#181c28', iconBg: '#14171f' },
   { label: 'Violet',   color: '#7B38E0', gradientColors: ['#1a0533', '#4a1a7a', '#000000'], glowColor: '#4a1a7a', iconBg: '#2d1060' },
   { label: 'Blue',     color: '#1a6bb5', gradientColors: ['#051530', '#0a3a5c', '#000000'], glowColor: '#0a3a5c', iconBg: '#0c2b45' },
   { label: 'Teal',     color: '#1D9E75', gradientColors: ['#032830', '#1a6b50', '#000000'], glowColor: '#1a6b50', iconBg: '#1a4030' },
@@ -66,6 +74,13 @@ const PALETTES: { label: string; color: string; gradientColors: [string, string,
   { label: 'Mint',     color: '#4ADE80', gradientColors: ['#03200f', '#15683a', '#000000'], glowColor: '#15683a', iconBg: '#0e4425' },
   { label: 'Ice',      color: '#9AD6FF', gradientColors: ['#0e1a26', '#2e5a7a', '#000000'], glowColor: '#2e5a7a', iconBg: '#1c3a52' },
 ];
+
+/**
+ * The default for a NEW station. Explicit, not PALETTES[0] — 'None' sits first
+ * in the list so it is easy to find, and indexing the default off position
+ * would silently make every new station grey.
+ */
+const DEFAULT_PALETTE = PALETTES.find((p) => p.label === 'Violet') ?? PALETTES[0];
 
 type Props = {
   visible: boolean;
@@ -86,7 +101,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
   const [selectedIcon, setSelectedIcon] = useState<string>(ICONS[0]);
-  const [selectedPalette, setSelectedPalette] = useState(PALETTES[0]);
+  const [selectedPalette, setSelectedPalette] = useState(DEFAULT_PALETTE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   // A photo of their own, behind the station. Null keeps today's behaviour —
@@ -104,7 +119,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
       setName(editing.name);
       setTagline(editing.tagline === 'My custom station' ? '' : editing.tagline);
       setSelectedIcon(editing.icon);
-      setSelectedPalette(PALETTES.find((pal) => pal.color === editing.color) ?? PALETTES[0]);
+      setSelectedPalette(PALETTES.find((pal) => pal.color === editing.color) ?? DEFAULT_PALETTE);
       setPhoto(editing.image ? { image: editing.image, imageBlur: editing.imageBlur ?? editing.image } : null);
     }
     setSettled(false);
@@ -125,7 +140,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
     setName('');
     setTagline('');
     setSelectedIcon(ICONS[0]);
-    setSelectedPalette(PALETTES[0]);
+    setSelectedPalette(DEFAULT_PALETTE);
     setError('');
     setPhoto(null);
   }

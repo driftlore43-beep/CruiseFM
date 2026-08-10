@@ -114,15 +114,21 @@ export function StationBackdrop({
  * whole. A file path means a user photo (the built-ins are bundled assets, so
  * numbers), which makes the check free and needs no extra field.
  *
- * Deliberately gentle. It has to rescue the worst case without flattening a
- * good photo into grey — the point of letting someone use their own picture is
- * that they can still see it.
+ * 0.30 -> 0.14 on 10.08 (owner: "reduce the darkness layer that goes on top of
+ * the custom image"). It was doing too much of the work and doing it in the
+ * wrong shape: this veil is FLAT, so it dims the whole picture evenly, while
+ * the station page and the modes already lay GRADIENTS over the photograph
+ * that deepen exactly where white type sits. Legibility was never this layer's
+ * job alone — it only has to stop the brightest photos blowing out, and the
+ * shaped scrims underneath handle the rest.
+ *
+ * This is the one number to move if a pale photo ever proves unreadable.
  */
 function UserPhotoVeil({ station }: { station: Station }) {
   if (typeof station.image !== 'string') return null;
   return (
     <View
-      style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,6,14,0.30)' }]}
+      style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,6,14,0.14)' }]}
       pointerEvents="none"
     />
   );

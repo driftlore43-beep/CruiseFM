@@ -30,9 +30,48 @@ time with no review at all.
 
 ## Keywords (100 characters, comma-separated, no spaces after commas)
 
-> driving,drive,road trip,visualizer,mood,commute,night drive,cassette,vinyl,car,radio,music player
+> driving,road,trip,visualizer,equalizer,mood,commute,night,cassette,vinyl,car,radio,retro,aesthetic
 
-(97 characters.)
+(98 characters. Revised 10.08 — the previous list wasted about a tenth of the
+field.)
+
+**The two rules this field runs on, both easy to get wrong:**
+
+1. **Never repeat a word that already appears in the app name or the subtitle.**
+   Apple indexes those fields separately and combines them with this one, so a
+   repeat buys nothing. The old list carried `drive` and `music`, both of which
+   the subtitle already covers ("Music for how a drive feels").
+2. **Never write phrases.** Apple splits on commas *and* spaces and forms the
+   combinations itself, so `road trip` and `night drive` were spending
+   characters on words already present. Single words only.
+
+Those two changes freed enough room for `equalizer`, `retro` and `aesthetic` —
+all terms people genuinely search and none of which the listing previously
+claimed anywhere.
+
+Kept `driving` alongside the subtitle's `drive` on purpose: Apple handles
+plurals but is unreliable about derived forms, so the two are worth holding
+separately.
+
+## App name (30 characters) — the biggest untouched lever
+
+The name field is the **highest-weighted** thing in App Store search, and ours
+spends all of it on the brand: "Cruise FM" is nine characters carrying no search
+terms at all.
+
+The standard move is a keyword suffix, e.g.:
+
+> Cruise FM: Driving Visuals
+
+(26 characters — adds *driving* and *visuals* to the strongest field.)
+
+**This is a real trade and it is the owner's call, not a technical one.** A bare
+name reads more confident and looks better in a screenshot; a suffixed one is
+found by people who don't know it exists. With no marketing budget, being
+findable is worth more than looking pure — but it is her brand.
+
+Note the name belongs to an app *version*, so changing it means a new version
+submission. Batch it with the next build rather than doing it alone.
 
 ## Description (max 4000 characters)
 

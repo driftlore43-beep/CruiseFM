@@ -53,25 +53,25 @@ Kept `driving` alongside the subtitle's `drive` on purpose: Apple handles
 plurals but is unreliable about derived forms, so the two are worth holding
 separately.
 
-## App name (30 characters) — the biggest untouched lever
-
-The name field is the **highest-weighted** thing in App Store search, and ours
-spends all of it on the brand: "Cruise FM" is nine characters carrying no search
-terms at all.
-
-The standard move is a keyword suffix, e.g.:
+## App name (30 characters) — DECIDED 10.08
 
 > Cruise FM: Driving Visuals
 
-(26 characters — adds *driving* and *visuals* to the strongest field.)
+(26 characters.) The name field is the **highest-weighted** thing in App Store
+search, and the old name spent all of it on the brand — "Cruise FM" is nine
+characters carrying no search terms at all. The suffix puts *driving* and
+*visuals* into the strongest field there is.
 
-**This is a real trade and it is the owner's call, not a technical one.** A bare
-name reads more confident and looks better in a screenshot; a suffixed one is
-found by people who don't know it exists. With no marketing budget, being
-findable is worth more than looking pure — but it is her brand.
+**THIS IS THE STORE LISTING NAME ONLY. Do not change `expo.name` in app.json.**
+That field is what appears under the icon on the home screen, where iOS
+truncates at roughly twelve characters — "Cruise FM: Dri…" would be the result.
+The two names are set in different places and are meant to differ: the listing
+name is for being found, the home-screen name is for being recognised. No code
+change is involved in this at all.
 
-Note the name belongs to an app *version*, so changing it means a new version
-submission. Batch it with the next build rather than doing it alone.
+Set it in App Store Connect on the next version. The name belongs to an app
+*version*, so it needs a version submission — batch it with the 1.3.0 build
+rather than submitting for it alone.
 
 ## Description (max 4000 characters)
 

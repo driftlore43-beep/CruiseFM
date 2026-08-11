@@ -4,12 +4,12 @@ import {
 } from 'react-native-svg';
 
 import { DotMatrixGroup } from '@/components/DotMatrix';
-import { useDsegFonts } from '@/components/StationIdentity';
 import {
   CARD_W, CX, ModeHero, STAGE_H, STAGE_TOP, glowCol, mixHex, type Eq,
 } from '@/components/ShareModeArt';
 import type { Station } from '@/constants/stations';
 import { stationDial, stationFrequency } from '@/constants/stations';
+import { usePixelFont } from '@/utils/pixelFont';
 import type { NowPlaying } from '@/utils/useMusicPlayback';
 
 /**
@@ -42,6 +42,11 @@ export const CARD_H_PIN = 1620;
 
 export type ShareFormat = 'card' | 'pin';
 export const FORMAT_H: Record<ShareFormat, number> = { card: CARD_H_CARD, pin: CARD_H_PIN };
+
+/** The Y2K card's own near-square height. 1080x1150 sits between a square and
+ *  4:5 — it frames the window without a dead band of wallpaper, and iMessage
+ *  and WhatsApp still show it uncropped. */
+export const Y2K_H = 1150;
 
 export const SHARE_STYLES = [
   // Snapshot leads: a REAL capture of the running mode (owner, 27.07: "since
@@ -126,8 +131,12 @@ function ticketBand(snap: SnapshotInfo) {
 /** The card's height for a given style/format/capture. The sheet sizes the
  *  preview and the export copy with this; the styles lay out against it. */
 export function cardHeightFor(styleId: ShareStyleId, format: ShareFormat, snap?: SnapshotInfo | null): number {
-  // Y2K draws no capture, so its shape is always the chosen format.
-  if (styleId === 'y2k') return FORMAT_H[format];
+  // Y2K draws no capture, so its shape is always the chosen format — except
+  // that the 4:5 card is deliberately squarer (owner, 11.08: "cut off the top
+  // area to make it look more square and centralized"). A dialog on a desktop
+  // wants a frame close to its own proportions; 4:5 left a band of empty
+  // wallpaper above the window.
+  if (styleId === 'y2k') return format === 'pin' ? FORMAT_H.pin : Y2K_H;
   if (snap && snap.h >= snap.w) {
     if (styleId === 'snapshot') {
       const band = snapBand(snap);
@@ -762,10 +771,6 @@ function arcPath(cx: number, cy: number, r: number, a0: number, a1: number): str
 const CD_SHEEN = ['#efe0ac', '#e6e6a8', '#c8dfb4', '#bcdcc9', '#c9d9e6', '#dcccdf',
                   '#e8cdd2', '#f0dcb4', '#f2e8c0', '#d8e2bc', '#c4dbd2', '#dfd2e2'];
 
-/** Unlit segments behind the lit ones — the single strongest cue that a
- *  readout is a real display. Same trick as the stations page's dial. */
-function ghostOf(t: string): string { return t.replace(/\d/g, '8'); }
-
 function mmss(ms: number): string {
   const t = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
@@ -773,20 +778,21 @@ function mmss(ms: number): string {
 
 /** One labelled dialog field: grey label outside, sunken white well, and the
  *  combo-box button that every such field had whether or not it did anything. */
-function Field({ label, value, y, labelRight, boxX, boxW, h }: {
-  label: string; value: string; y: number; labelRight: number; boxX: number; boxW: number; h: number;
+function Field({ label, value, y, labelRight, boxX, boxW, h, px }: {
+  label: string; value: string; y: number; labelRight: number;
+  boxX: number; boxW: number; h: number; px: string;
 }) {
   const btn = h - 12;
   return (
     <>
-      <SvgText x={labelRight} y={y + h * 0.66} fill="#0a0a0a" fontSize={34}
-        fontFamily="monospace" textAnchor="end">{label}</SvgText>
+      <SvgText x={labelRight} y={y + h * 0.68} fill="#0a0a0a" fontSize={32}
+        fontFamily={px} textAnchor="end">{label}</SvgText>
       <Bevel x={boxX} y={y} w={boxW} h={h} sunken face="#ffffff" e={3} />
-      <SvgText x={boxX + 20} y={y + h * 0.68} fill="#0a0a0a" fontSize={36} fontFamily="monospace">
-        {clip(value, Math.floor((boxW - btn - 46) / 21))}
+      <SvgText x={boxX + 18} y={y + h * 0.70} fill="#0a0a0a" fontSize={34} fontFamily={px}>
+        {clip(value, Math.floor((boxW - btn - 42) / 19))}
       </SvgText>
       <Bevel x={boxX + boxW - btn - 6} y={y + 6} w={btn} h={btn} e={3} />
-      <Path d={`M${boxX + boxW - btn / 2 - 6 - 11} ${y + h / 2 - 5} l22 0 l-11 13 Z`} fill="#0a0a0a" />
+      <Path d={`M${boxX + boxW - btn / 2 - 6 - 10} ${y + h / 2 - 5} l20 0 l-10 12 Z`} fill="#0a0a0a" />
     </>
   );
 }
@@ -794,9 +800,9 @@ function Field({ label, value, y, labelRight, boxX, boxW, h }: {
 function Y2KStyle(p: StyleProps) {
   const { station, track, modeLabel, cardH } = p;
   const d = derive(p);
-  // Falls back to the mono face until expo-font has the ttf, so a card
-  // captured early degrades to plain digits rather than to nothing.
-  const { seg7 } = useDsegFonts();
+  // Every word on this card is set in the Windows-era bitmap face — see
+  // utils/pixelFont for why it is DotGothic16 and not a segment font.
+  const px = usePixelFont();
 
   // The desktop behind the window. The station's hue, taken well down toward a
   // period wallpaper grey-lilac: it keeps a trace of the mood WITHOUT showing
@@ -812,22 +818,25 @@ function Y2KStyle(p: StyleProps) {
   // The window is sized from its CONTENTS and then centred, rather than
   // stretched to the taskbar — a dialog that ends where its controls end is
   // most of what makes this read as a real window instead of a panel.
-  const TASK_H = 92, PAD = 34, TITLE_H = 70;
-  const ART = 400, TOP_H = 420, FH = 68, FGAP = 14, PROG_H = 68;
+  const TASK_H = 92, PAD = 30, TITLE_H = 66;
+  const ART = 360, TOP_H = 386, FH = 64, FGAP = 12, PROG_H = 60;
   const WX = 74, WW = CARD_W - WX * 2;
-  const WH = TITLE_H + PAD + TOP_H + 44 + (FH + FGAP) * 4 + 26 + PROG_H + PAD;
-  const WY = Math.round(cardH - TASK_H - 44 - WH);
+  const WH = TITLE_H + PAD + TOP_H + 40 + (FH + FGAP) * 4 + 24 + PROG_H + PAD;
+  // CENTRED in the wallpaper above the taskbar, not hung off its bottom edge
+  // (owner, 11.08). With the squarer card the two margins come out equal, and
+  // a dialog sitting centred is what you actually see on a desktop.
+  const WY = Math.max(28, Math.round((cardH - TASK_H - WH) / 2));
 
   const artX = WX + 52, artY = WY + TITLE_H + PAD;
   const panelX = artX + ART + 46;
   const panelR = WX + WW - 52;
 
-  const fieldsY = artY + TOP_H + 44;
+  const fieldsY = artY + TOP_H + 40;
   const labelRight = WX + 262, boxX = WX + 282, boxW = WW - 282 - 52;
-  const prog = fieldsY + (FH + FGAP) * 4 + 26;
+  const prog = fieldsY + (FH + FGAP) * 4 + 24;
   // The two seven-segment wells are 168 wide with a 52 margin, so the
   // trough starts clear of them on both sides.
-  const barX = WX + 240, barW = WW - 240 - 240;
+  const barX = WX + 196, barW = WW - 196 - 196;
   const pct = track?.durationMs ? Math.min(1, (track.progressMs ?? 0) / track.durationMs) : 0.42;
 
   const btn = (i: number) => panelX + i * 76;
@@ -839,8 +848,8 @@ function Y2KStyle(p: StyleProps) {
       {/* ── the window ── */}
       <Bevel x={WX} y={WY} w={WW} h={WH} />
       <Rect x={WX + 8} y={WY + 8} width={WW - 16} height={TITLE_H} fill={bar} />
-      <SvgText x={WX + 28} y={WY + 8 + TITLE_H * 0.72} fill={barInk} fontSize={44}
-        fontWeight="700" fontFamily="monospace" letterSpacing={1}>Cruise FM</SvgText>
+      <SvgText x={WX + 26} y={WY + 8 + TITLE_H * 0.72} fill={barInk} fontSize={38}
+        fontFamily={px}>Cruise FM</SvgText>
       {[0, 1, 2].map((i) => {
         const bw = 52, bx = WX + WW - 28 - (3 - i) * (bw + 6);
         const by = WY + 8 + (TITLE_H - bw) / 2;
@@ -958,49 +967,37 @@ function Y2KStyle(p: StyleProps) {
       {/* ── THE POINT: station and mode as plain dialog fields (owner, 11.08:
              "just write the stations and the mode as a text") ── */}
       <Field label="Artist:"  value={d.artist || 'Cruise FM'} y={fieldsY}
-        labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} />
+        labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} px={px} />
       <Field label="Title:"   value={d.title} y={fieldsY + (FH + FGAP)}
-        labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} />
+        labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} px={px} />
       <Field label="Station:" value={station.name} y={fieldsY + (FH + FGAP) * 2}
-        labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} />
+        labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} px={px} />
       <Field label="Mode:"    value={modeLabel} y={fieldsY + (FH + FGAP) * 3}
-        labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} />
+        labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} px={px} />
 
-      {/* ── scrub, with the counter as a real seven-segment display (owner,
-             11.08: "can we push the 7 seg display font?"). DSEG already ships
-             with the app for the station dials, so this costs no new asset and
-             no build. Only digits and a colon go through it — DSEG7 genuinely
-             cannot draw letters, which is how "94.7 FM" once came out "FN". ── */}
-      {[0, 1].map((side) => {
-        const t = side === 0
-          ? (track?.progressMs != null ? mmss(track.progressMs) : '0:00')
-          : (track?.durationMs ? mmss(track.durationMs) : '0:00');
-        const wDisp = 168, xDisp = side === 0 ? WX + 52 : WX + WW - 52 - wDisp;
-        return (
-          <G key={side}>
-            <Bevel x={xDisp} y={prog + 4} w={wDisp} h={60} sunken face="#767d74" e={3} />
-            {/* unlit segments behind the lit ones — the strongest cue that a
-                readout is a display rather than printed text */}
-            <SvgText x={xDisp + wDisp - 16} y={prog + 48} fill="#000000" fillOpacity={0.13}
-              fontSize={38} fontFamily={seg7} textAnchor="end">{ghostOf(t)}</SvgText>
-            <SvgText x={xDisp + wDisp - 16} y={prog + 48} fill="#12160f"
-              fontSize={38} fontFamily={seg7} textAnchor="end">{t}</SvgText>
-          </G>
-        );
-      })}
-      <Bevel x={barX} y={prog + 12} w={barW} h={44} sunken face="#a9adb3" e={3} />
-      <Rect x={barX + 8} y={prog + 20} width={Math.max(0, (barW - 16) * pct)} height={28} fill="#6f757c" />
-      <Bevel x={barX + (barW - 34) * pct} y={prog + 2} w={34} h={64} e={3} />
+      {/* ── scrub. Times sit straight on the grey, as they do on the owner's
+             own reference; the sunken LCD wells belonged to the segment-font
+             round and went with it. ── */}
+      <SvgText x={WX + 46} y={prog + 42} fill="#0a0a0a" fontSize={34} fontFamily={px}>
+        {track?.progressMs != null ? mmss(track.progressMs) : '0:00'}
+      </SvgText>
+      <Bevel x={barX} y={prog + 12} w={barW} h={42} sunken face="#a9adb3" e={3} />
+      <Rect x={barX + 8} y={prog + 19} width={Math.max(0, (barW - 16) * pct)} height={28} fill="#6f757c" />
+      <Bevel x={barX + (barW - 32) * pct} y={prog + 2} w={32} h={62} e={3} />
+      <SvgText x={WX + WW - 46} y={prog + 42} fill="#0a0a0a" fontSize={34}
+        fontFamily={px} textAnchor="end">
+        {track?.durationMs ? mmss(track.durationMs) : '0:00'}
+      </SvgText>
 
       {/* ── taskbar: the natural home for the address ── */}
       <Bevel x={0} y={cardH - TASK_H} w={CARD_W} h={TASK_H} e={4} />
       <Bevel x={16} y={cardH - TASK_H + 16} w={196} h={TASK_H - 32} e={3} />
       <Circle cx={62} cy={cardH - TASK_H / 2} r={17} fill={bar} stroke="#6c7078" strokeWidth={3} />
-      <SvgText x={92} y={cardH - TASK_H / 2 + 13} fill="#0a0a0a" fontSize={36}
-        fontWeight="700" fontFamily="monospace">Start</SvgText>
+      <SvgText x={92} y={cardH - TASK_H / 2 + 12} fill="#0a0a0a" fontSize={34}
+        fontFamily={px}>Start</SvgText>
       <Bevel x={CARD_W - 442} y={cardH - TASK_H + 16} w={426} h={TASK_H - 32} sunken e={3} />
-      <SvgText x={CARD_W - 229} y={cardH - TASK_H / 2 + 13} fill="#0a0a0a" fontSize={34}
-        fontFamily="monospace" textAnchor="middle">{INSTALL_HOST}</SvgText>
+      <SvgText x={CARD_W - 229} y={cardH - TASK_H / 2 + 12} fill="#0a0a0a" fontSize={30}
+        fontFamily={px} textAnchor="middle">{INSTALL_HOST}</SvgText>
     </>
   );
 }

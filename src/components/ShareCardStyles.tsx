@@ -4,6 +4,7 @@ import {
 } from 'react-native-svg';
 
 import { DotMatrixGroup } from '@/components/DotMatrix';
+import { useDsegFonts } from '@/components/StationIdentity';
 import {
   CARD_W, CX, ModeHero, STAGE_H, STAGE_TOP, glowCol, mixHex, type Eq,
 } from '@/components/ShareModeArt';
@@ -746,6 +747,25 @@ function lum(hex: string): number {
 }
 function inkOn(hex: string): string { return lum(hex) > 0.62 ? '#0a0a0a' : '#ffffff'; }
 
+/** An arc of a circle, for the disc's iridescence. Angles in degrees, 0 = east. */
+function arcPath(cx: number, cy: number, r: number, a0: number, a1: number): string {
+  const pt = (a: number) => [cx + r * Math.cos((a * Math.PI) / 180), cy + r * Math.sin((a * Math.PI) / 180)];
+  const [x0, y0] = pt(a0), [x1, y1] = pt(a1);
+  return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+}
+
+/** A CD's sheen is not one rainbow but a lot of overlapping ones, and on the
+ *  owner's reference it is champagne rather than primary — gold with green and
+ *  pink only glancing through. Fixed, NOT the station's colours: this is
+ *  hardware, and the same rule the mirror ball settled on applies (material
+ *  carries no mood; mood arrives as light). */
+const CD_SHEEN = ['#efe0ac', '#e6e6a8', '#c8dfb4', '#bcdcc9', '#c9d9e6', '#dcccdf',
+                  '#e8cdd2', '#f0dcb4', '#f2e8c0', '#d8e2bc', '#c4dbd2', '#dfd2e2'];
+
+/** Unlit segments behind the lit ones — the single strongest cue that a
+ *  readout is a real display. Same trick as the stations page's dial. */
+function ghostOf(t: string): string { return t.replace(/\d/g, '8'); }
+
 function mmss(ms: number): string {
   const t = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
@@ -774,6 +794,9 @@ function Field({ label, value, y, labelRight, boxX, boxW, h }: {
 function Y2KStyle(p: StyleProps) {
   const { station, track, modeLabel, cardH } = p;
   const d = derive(p);
+  // Falls back to the mono face until expo-font has the ttf, so a card
+  // captured early degrades to plain digits rather than to nothing.
+  const { seg7 } = useDsegFonts();
 
   // The desktop behind the window. The station's hue, taken well down toward a
   // period wallpaper grey-lilac: it keeps a trace of the mood WITHOUT showing
@@ -802,6 +825,8 @@ function Y2KStyle(p: StyleProps) {
   const fieldsY = artY + TOP_H + 44;
   const labelRight = WX + 262, boxX = WX + 282, boxW = WW - 282 - 52;
   const prog = fieldsY + (FH + FGAP) * 4 + 26;
+  // The two seven-segment wells are 168 wide with a 52 margin, so the
+  // trough starts clear of them on both sides.
   const barX = WX + 240, barW = WW - 240 - 240;
   const pct = track?.durationMs ? Math.min(1, (track.progressMs ?? 0) / track.durationMs) : 0.42;
 
@@ -835,17 +860,63 @@ function Y2KStyle(p: StyleProps) {
         ? <SvgImage x={artX} y={artY} width={ART} height={ART} href={{ uri: d.art }} preserveAspectRatio="xMidYMid slice" />
         : <Rect x={artX} y={artY} width={ART} height={ART} fill={mixHex(d.eq[1], '#20202a', 0.55)} />}
 
-      {/* ── the little hardware, straight off the owner's reference ── */}
-      <Circle cx={panelX + 58} cy={artY + 58} r={54} fill="#d8dade" stroke="#8b8f96" strokeWidth={3} />
-      <Circle cx={panelX + 58} cy={artY + 58} r={37} fill="#eceef1" />
-      <Circle cx={panelX + 58} cy={artY + 58} r={15} fill={W_FACE} stroke="#8b8f96" strokeWidth={3} />
-      <Path d={`M${panelX + 24} ${artY + 38} a54 54 0 0 1 42 -21`} stroke="#ffffff" strokeWidth={7} fill="none" />
-      <Bevel x={panelX} y={artY + 140} w={172} h={94} e={3} />
-      <Rect x={panelX + 18} y={artY + 160} width={136} height={30} fill="#8f949b" />
-      <Rect x={panelX + 24} y={artY + 166} width={26} height={18} fill="#c8302c" />
-      {Array.from({ length: 11 }).map((_, i) => (
-        <Rect key={i} x={panelX + 20 + i * 13} y={artY + 202} width={8} height={14} fill="#7d828a" />
-      ))}
+      {/* ── the disc ── */}
+      {(() => {
+        const cx = panelX + 60, cy = artY + 60, R = 58;
+        return (
+          <G>
+            <Circle cx={cx} cy={cy} r={R} fill="#cdd0d5" stroke="#82868d" strokeWidth={3} />
+            {/* Twelve overlapping arcs across the data area. Overlap is what
+                turns separate bands into a sheen — drawn apart they read as a
+                pie chart, the same failure the CD mode's diffraction fan hit. */}
+            {CD_SHEEN.map((c, i) => (
+              <Path key={i} d={arcPath(cx, cy, R * 0.70, i * 30 - 8, i * 30 + 38)}
+                stroke={c} strokeOpacity={0.62} strokeWidth={R * 0.52} fill="none" strokeLinecap="butt" />
+            ))}
+            <Circle cx={cx} cy={cy} r={R * 0.44} fill="#e7e9ec" stroke="#9aa0a8" strokeWidth={2} />
+            <Circle cx={cx} cy={cy} r={R * 0.33} fill="none" stroke="#b9bfc6" strokeWidth={3} />
+            <Circle cx={cx} cy={cy} r={R * 0.17} fill={W_FACE} stroke="#7f848b" strokeWidth={3} />
+            {/* one soft catch at the top-left, where the room's light is */}
+            <Path d={arcPath(cx, cy, R * 0.83, 196, 250)} stroke="#ffffff" strokeOpacity={0.9}
+              strokeWidth={9} fill="none" strokeLinecap="round" />
+            <Path d={arcPath(cx, cy, R * 0.83, 20, 52)} stroke="#ffffff" strokeOpacity={0.45}
+              strokeWidth={6} fill="none" strokeLinecap="round" />
+          </G>
+        );
+      })()}
+
+      {/* ── the tape deck: a rack component seen slightly from above, which is
+             what the reference shows — the lit top and the darker right side
+             are most of why it reads as an object rather than a rectangle ── */}
+      {(() => {
+        const x = panelX, y = artY + 152, w = 182, h = 100, dx = 13, dy = 11;
+        return (
+          <G>
+            <Path d={`M${x} ${y} l${dx} ${-dy} h${w} l${-dx} ${dy} Z`} fill="#e4e7ea" stroke="#8f949b" strokeWidth={2} />
+            <Path d={`M${x + w} ${y} l${dx} ${-dy} v${h} l${-dx} ${dy} Z`} fill="#9ba0a7" stroke="#8f949b" strokeWidth={2} />
+            <Bevel x={x} y={y} w={w} h={h} e={3} />
+            {/* power lamp */}
+            <Rect x={x + 14} y={y + 16} width={22} height={16} fill="#7c1f1c" />
+            <Rect x={x + 17} y={y + 19} width={16} height={10} fill="#e5433c" />
+            {/* the cassette window — sunken, dark, with the two hubs showing */}
+            <Bevel x={x + 46} y={y + 12} w={w - 60} h={38} sunken face="#3b4046" e={3} />
+            <Rect x={x + 52} y={y + 18} width={w - 72} height={26} fill="#5a6067" />
+            <Circle cx={x + 74} cy={y + 31} r={7} fill="#2c3035" />
+            <Circle cx={x + w - 40} cy={y + 31} r={7} fill="#2c3035" />
+            {/* transport keys along the foot */}
+            {Array.from({ length: 9 }).map((_, i) => (
+              <G key={i}>
+                <Rect x={x + 16 + i * 17} y={y + 62} width={13} height={20} fill="#aeb3ba" />
+                <Rect x={x + 16 + i * 17} y={y + 62} width={13} height={4} fill="#eceef1" />
+                <Rect x={x + 16 + i * 17} y={y + 78} width={13} height={4} fill="#7d828a" />
+              </G>
+            ))}
+            {/* the little printed lines every one of these carried */}
+            <Rect x={x + w - 52} y={y + 66} width={36} height={4} fill="#8f949b" />
+            <Rect x={x + w - 52} y={y + 76} width={24} height={4} fill="#8f949b" />
+          </G>
+        );
+      })()}
 
       {/* ── volume ── */}
       <Bevel x={panelR - 162} y={artY} w={78} h={72} e={3} />
@@ -895,17 +966,31 @@ function Y2KStyle(p: StyleProps) {
       <Field label="Mode:"    value={modeLabel} y={fieldsY + (FH + FGAP) * 3}
         labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} />
 
-      {/* ── scrub ── */}
-      <SvgText x={WX + 52} y={prog + 44} fill="#0a0a0a" fontSize={34} fontFamily="monospace">
-        {track?.progressMs != null ? mmss(track.progressMs) : '0:00'}
-      </SvgText>
+      {/* ── scrub, with the counter as a real seven-segment display (owner,
+             11.08: "can we push the 7 seg display font?"). DSEG already ships
+             with the app for the station dials, so this costs no new asset and
+             no build. Only digits and a colon go through it — DSEG7 genuinely
+             cannot draw letters, which is how "94.7 FM" once came out "FN". ── */}
+      {[0, 1].map((side) => {
+        const t = side === 0
+          ? (track?.progressMs != null ? mmss(track.progressMs) : '0:00')
+          : (track?.durationMs ? mmss(track.durationMs) : '0:00');
+        const wDisp = 168, xDisp = side === 0 ? WX + 52 : WX + WW - 52 - wDisp;
+        return (
+          <G key={side}>
+            <Bevel x={xDisp} y={prog + 4} w={wDisp} h={60} sunken face="#767d74" e={3} />
+            {/* unlit segments behind the lit ones — the strongest cue that a
+                readout is a display rather than printed text */}
+            <SvgText x={xDisp + wDisp - 16} y={prog + 48} fill="#000000" fillOpacity={0.13}
+              fontSize={38} fontFamily={seg7} textAnchor="end">{ghostOf(t)}</SvgText>
+            <SvgText x={xDisp + wDisp - 16} y={prog + 48} fill="#12160f"
+              fontSize={38} fontFamily={seg7} textAnchor="end">{t}</SvgText>
+          </G>
+        );
+      })}
       <Bevel x={barX} y={prog + 12} w={barW} h={44} sunken face="#a9adb3" e={3} />
-      <Rect x={barX + 8} y={prog + 20} width={Math.max(0, (barW - 16) * pct)} height={28} fill="#8a8f96" />
+      <Rect x={barX + 8} y={prog + 20} width={Math.max(0, (barW - 16) * pct)} height={28} fill="#6f757c" />
       <Bevel x={barX + (barW - 34) * pct} y={prog + 2} w={34} h={64} e={3} />
-      <SvgText x={WX + WW - 52} y={prog + 44} fill="#0a0a0a" fontSize={34}
-        fontFamily="monospace" textAnchor="end">
-        {track?.durationMs ? mmss(track.durationMs) : '--:--'}
-      </SvgText>
 
       {/* ── taskbar: the natural home for the address ── */}
       <Bevel x={0} y={cardH - TASK_H} w={CARD_W} h={TASK_H} e={4} />

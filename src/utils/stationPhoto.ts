@@ -35,6 +35,11 @@ import * as FileSystem from 'expo-file-system/legacy';
  * about 1080x1900 photographs; blurring a 540-wide one is a quarter of the
  * work, and it is one image rather than ten.
  *
+ * DO NOT compensate for this width with a bigger blur radius. That was tried
+ * and it is backwards — the blur is applied at this file's own size and the
+ * result is then enlarged to the screen, so the enlargement scales the blur up
+ * too. StationBackdrop DIVIDES; the reasoning and the measurements are there.
+ *
  * NATIVE, so everything here degrades to "unavailable" until a build carries
  * the two modules — the same shape as saveToPhotos. Written ahead of that
  * build so the build only has to switch it on.

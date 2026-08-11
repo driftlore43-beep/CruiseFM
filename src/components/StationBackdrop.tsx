@@ -84,11 +84,32 @@ export function StationBackdrop({
   // enlarging can only ever put hard edges back). So the blur happens here,
   // where it is a real gaussian and cannot block.
   //
-  // The multiplier is because that companion file is 540 wide against a
-  // built-in's 1080, so the same radius reads as half the softening. If it
-  // ever needs tuning this is the one number to move.
+  // THE CORRECTION IS A DIVISION, AND IT USED TO BE A MULTIPLICATION.
+  //
+  // This was `blurRadius * 3`, on the reasoning that the companion file is 540
+  // wide against a built-in's 1080, so the same radius would read as half the
+  // softening. That is upside down. The blur happens at the file's OWN size and
+  // the result is then enlarged to fill the screen, so the enlargement scales
+  // the blur up with everything else — a small source needs LESS radius, not
+  // more. Getting it backwards made it wrong by roughly the square of the
+  // factor, which is why a user's photo came out far softer than any built-in.
+  //
+  // MEASURED rather than judged (owner, 11.08, third round on this: "reduce the
+  // blur of the selected photos much more"). Taking a built-in station's
+  // shipped backdrop as 1.0 — the softness the app has always had — a user's
+  // photo was landing at 0.22-0.60 of its detail, i.e. two to five times softer
+  // than the thing it sits beside. At /3 it lands at about 2x, so it is now
+  // clearly the sharpest backdrop in the app, which is the point: it is their
+  // picture. Harness in scratchpad/photoblur (measure.py / sweep.py) reports
+  // any candidate as a multiple of that reference — reuse it, there is plenty
+  // of headroom left (radius 0 would be ~4x).
+  //
+  // NOTE THE 540 SOURCE IS NOT THE LIMIT and was never the problem: at radius 0
+  // it retains MORE detail than a built-in backdrop. Raising it would buy finer
+  // texture but only for photos picked afterwards, so old and new stations
+  // would stop matching. This is the one number to move.
   const userPhoto = typeof station.image === 'string';
-  const liveBlur = userPhoto ? blurRadius * 3 : station.imageBlur ? 0 : blurRadius;
+  const liveBlur = userPhoto ? blurRadius / 3 : station.imageBlur ? 0 : blurRadius;
 
   return (
     <>

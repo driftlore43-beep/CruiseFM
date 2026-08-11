@@ -20,8 +20,12 @@ import { saveImageToPhotos } from '@/utils/saveToPhotos';
 import { getProfileName } from '@/utils/spotify';
 import type { NowPlaying } from '@/utils/useMusicPlayback';
 
-/** Where a recipient without the app is sent. */
-const INSTALL_URL = 'https://cruisefm.app';
+/** Where a recipient without the app is sent.
+ *  cruisefm.app is NOT registered (owner, 11.08), so anyone who typed it in off
+ *  a shared card landed nowhere. This is the live site. Move it back the day
+ *  the short domain exists and points here — and change INSTALL_HOST in
+ *  ShareCardStyles at the same time, since that is what the card PRINTS. */
+const INSTALL_URL = 'https://cruisefm.netlify.app';
 
 /**
  * The shareable card — a now-playing pin, in whichever of the three design

@@ -57,7 +57,11 @@ export const SHARE_STYLES = [
 export type ShareStyleId = (typeof SHARE_STYLES)[number]['id'];
 export const DEFAULT_SHARE_STYLE: ShareStyleId = 'ticket';
 
-const INSTALL_HOST = 'cruisefm.app';
+/** The address printed on every card. cruisefm.app was never registered
+ *  (owner, 11.08) — a card that names a dead domain is worse than one that
+ *  names none, since it is the only route a recipient has. Keep it in step
+ *  with INSTALL_URL in ShareCard.tsx. */
+const INSTALL_HOST = 'cruisefm.netlify.app';
 
 /** A real screenshot of the running mode plus the trim lines computed at
  *  capture time from the live layout (see ModeActionRow.grabModeSnapshot).

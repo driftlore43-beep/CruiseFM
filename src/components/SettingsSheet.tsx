@@ -311,7 +311,7 @@ function DiagnosticsSection() {
 
 // ── Refer a Friend ───────────────────────────────────────────────────────────
 const SHARE_MESSAGE =
-  "I've been using Cruise FM to turn my Spotify playlists into a proper driving experience — mood stations, cinematic visual modes, the works. Worth a try: https://cruisefm.app";
+  "I've been using Cruise FM to turn my Spotify playlists into a proper driving experience — mood stations, cinematic visual modes, the works. Worth a try: https://cruisefm.netlify.app";
 
 function ReferBody() {
   const [copied, setCopied] = useState(false);

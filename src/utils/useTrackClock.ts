@@ -147,8 +147,31 @@ export function useTrackClock(opts: {
     // A finger is on the bar: it owns the clock, nothing else may move it.
     if (scrubbingRef.current) return;
     if (track?.progressMs != null) {
-      // Real position, plus however long ago we asked.
-      const base = track.progressMs + (playing ? Date.now() - track.syncedAt : 0);
+      /**
+       * IS IT REALLY PLAYING, or have we just asked?
+       *
+       * `playing` is OPTIMISTIC — the transport flips it the instant a thumb
+       * lands, before the service has been asked, let alone answered. That is
+       * right for the button (a control that waits feels broken) and wrong for
+       * the clock, which makes a falsifiable claim about where in the song we
+       * are.
+       *
+       * THE BUG IT CAUSED (owner, 11.08): press play, Spotify is asleep, so
+       * the bar and the scene run ahead of silence. The listener, reasonably,
+       * assumes something is wrong and presses pause — and the next poll
+       * reports the position never moved, so the bar JUMPS BACK to where it
+       * started. They then go to Spotify, press play there, and come back. The
+       * app was wrong twice: it claimed to be playing, then took it back.
+       *
+       * `track.isPlaying` is the service's own verdict, so the clock waits for
+       * it. In the ordinary case the chase poll answers in about 300ms and
+       * nobody sees a thing; in the asleep case the bar simply never moves,
+       * which is the truth and leaves nothing to rewind.
+       */
+      const confirmed = track.isPlaying !== false;
+      // Real position, plus however long ago we asked — only extrapolate
+      // forward if the music is genuinely running.
+      const base = track.progressMs + (playing && confirmed ? Date.now() - track.syncedAt : 0);
       // Just seeked? Only believe a reading once it agrees with where we went.
       if (seekTargetRef.current != null) {
         if (Date.now() > seekUntilRef.current) {
@@ -159,9 +182,13 @@ export function useTrackClock(opts: {
           seekTargetRef.current = null;        // it landed; back to normal
         }
       }
-      if (playing) {
+      if (playing && confirmed) {
         startFrom(base);
       } else {
+        // Paused, OR asked-but-not-yet-confirmed: park on the real position
+        // and wait. Landing here after a play tap is the whole point — the
+        // next poll either confirms and we start, or it never does and the
+        // bar honestly never moved.
         anim.current?.stop();
         progress.setValue(durationRef.current > 0 ? Math.min(1, base / durationRef.current) : 0);
       }
@@ -173,7 +200,10 @@ export function useTrackClock(opts: {
     }
     return () => anim.current?.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, playing, track?.progressMs, track?.syncedAt, track?.title, durationMs]);
+    // isPlaying is load-bearing in this list: it is the signal that turns a
+    // held clock into a running one, so without it the bar would wait for the
+    // next position change instead of starting the moment play is confirmed.
+  }, [visible, playing, track?.isPlaying, track?.progressMs, track?.syncedAt, track?.title, durationMs]);
 
   return { progress, elapsedMs, durationMs, scrub };
 }

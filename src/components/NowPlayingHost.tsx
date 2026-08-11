@@ -23,7 +23,7 @@ import { VinylFullscreen } from '@/components/VinylMode';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
-import { useNowPlaying } from '@/context/NowPlayingContext';
+import { useNowPlaying, WAKEABLE_NOTICES } from '@/context/NowPlayingContext';
 import { allowRotation, LANDSCAPE_READY, lockPortrait } from '@/utils/orientation';
 import { isSpotifyConnected, pause as pauseSpotify } from '@/utils/spotify';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
@@ -260,6 +260,18 @@ function PlaybackNotice() {
             <MaterialCommunityIcons name="spotify" size={22} color="#1DB954" />
           </View>
           <Text style={pn.text}>{notice}</Text>
+          {/* The fix, as a tap. Every one of these notices ends with the same
+              errand — open Spotify, press play, come back — so the card offers
+              it rather than describing it. Stops the drive dead otherwise:
+              you cannot follow written instructions and keep driving. */}
+          {WAKEABLE_NOTICES.includes(notice) && (
+            <Pressable
+              style={pn.action}
+              onPress={() => { np.clearPlaybackNotice(); np.returnToSpotify(); }}>
+              <MaterialCommunityIcons name="spotify" size={17} color="#0b1a10" />
+              <Text style={pn.actionText}>Open Spotify</Text>
+            </Pressable>
+          )}
           <Text style={pn.hint}>Tap anywhere to dismiss</Text>
         </View>
       </Pressable>
@@ -294,6 +306,12 @@ const pn = StyleSheet.create({
     backgroundColor: 'rgba(29,185,84,0.14)',
   },
   text: { color: 'rgba(255,255,255,0.92)', fontSize: 14.5, lineHeight: 21, textAlign: 'center', fontWeight: '600' },
+  action: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#1DB954', borderRadius: 999,
+    paddingHorizontal: 18, paddingVertical: 11, marginTop: 4,
+  },
+  actionText: { color: '#0b1a10', fontSize: 14.5, fontWeight: '800' },
   hint: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '600' },
 });
 

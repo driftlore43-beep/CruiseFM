@@ -133,7 +133,26 @@ const START_NOTICES: Record<StartResult, string | null> = {
  * over control once its own app is awake, and new users need to know that
  * up front, not after a timeout. A clean 'playing' verdict clears it. */
 const WAKE_SPOTIFY_NUDGE =
-  "Waking Spotify… if nothing plays in a few seconds, open Spotify and play any song for a moment, then come back and press play.";
+  "Waking Spotify… if nothing plays in a few seconds, open Spotify and play any song for a moment, then come back.";
+
+/**
+ * Notices whose fix is "go and wake Spotify up".
+ *
+ * The listener's own workaround for all three is identical and it is a trip
+ * out of the app: open Spotify, press play, come back (owner, 11.08 —
+ * "the user goes up and back to Spotify and then plays from there and then
+ * everything's okay"). Telling someone to do that in prose, mid-drive, is
+ * asking them to run an errand. The notice card offers the tap instead.
+ *
+ * Membership is by the message itself so a new notice cannot silently inherit
+ * a button that doesn't fit it — 'premium-required' and 'no-playlist' are
+ * deliberately absent, because opening Spotify fixes neither.
+ */
+export const WAKEABLE_NOTICES: readonly string[] = [
+  WAKE_SPOTIFY_NUDGE,
+  "Spotify isn't awake and wouldn't open. Open it, play any song for a second, then come back and press play.",
+  "Spotify didn't respond. Check the Spotify app is open and logged in, then press play to retry.",
+];
 
 export type NowPlayingSession = { mode: string; stationId: string; preview?: boolean };
 

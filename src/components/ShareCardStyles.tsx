@@ -52,6 +52,7 @@ export const SHARE_STYLES = [
   // sleeve mode and keep the snapshot and the ticket mode."
   { id: 'snapshot', label: 'Snapshot' },
   { id: 'ticket', label: 'Ticket' },
+  { id: 'y2k', label: 'Y2K' },
 ] as const;
 
 export type ShareStyleId = (typeof SHARE_STYLES)[number]['id'];
@@ -124,6 +125,8 @@ function ticketBand(snap: SnapshotInfo) {
 /** The card's height for a given style/format/capture. The sheet sizes the
  *  preview and the export copy with this; the styles lay out against it. */
 export function cardHeightFor(styleId: ShareStyleId, format: ShareFormat, snap?: SnapshotInfo | null): number {
+  // Y2K draws no capture, so its shape is always the chosen format.
+  if (styleId === 'y2k') return FORMAT_H[format];
   if (snap && snap.h >= snap.w) {
     if (styleId === 'snapshot') {
       const band = snapBand(snap);
@@ -685,6 +688,238 @@ function SnapshotStyle(p: StyleProps) {
   );
 }
 
+// ── Y2K — the card as a desktop music player ─────────────────────────────────
+
+/**
+ * A Windows 95/98 dialog, and the owner's idea (11.08, with two reference
+ * images): "having a Y2K windows style type… I wouldn't show the mood station
+ * or music mode for these — maybe keep the album and just write the stations
+ * and the mode as text".
+ *
+ * That brief is what makes this style work rather than fight the others. Every
+ * other card leads with the mode's artwork; this one leads with CHROME, and
+ * the station and mode arrive as text in dialog fields — which is exactly how
+ * a nineties player would have shown them. So it needs no ModeHero, no station
+ * photograph, and no scrim, and it cannot look like a recolour of the ticket.
+ *
+ * It also happens to suit the SVG-only rule better than anything here: period
+ * chrome is built entirely from 1px light and dark edges, with no gradients,
+ * no blur and no shadows. Every bevel below is four rectangles.
+ */
+const W_FACE   = '#c3c7cb';   // the grey everything is made of
+const W_LIT    = '#ffffff';
+const W_LIT2   = '#dfe3e6';
+const W_SHADE  = '#818a94';
+const W_EDGE   = '#0a0a0a';
+
+/** The top-left L of a bevel: up the left side, along the top, then back
+ *  inside. The bottom-right edge is just the rect underneath showing. */
+function bevelL(x: number, y: number, w: number, h: number, e: number): string {
+  return `M${x} ${y + h} L${x} ${y} L${x + w} ${y} L${x + w - e} ${y + e} L${x + e} ${y + e} L${x + e} ${y + h - e} Z`;
+}
+
+/** A raised or sunken box. Raised is lit from the top-left, sunken is the same
+ *  edges swapped — that inversion is the whole language of the period. */
+function Bevel({ x, y, w, h, sunken = false, face = W_FACE, e = 4 }: {
+  x: number; y: number; w: number; h: number; sunken?: boolean; face?: string; e?: number;
+}) {
+  const tl1 = sunken ? W_SHADE : W_LIT;
+  const br1 = sunken ? W_LIT : W_EDGE;
+  const tl2 = sunken ? W_EDGE : W_LIT2;
+  const br2 = sunken ? W_LIT2 : W_SHADE;
+  return (
+    <>
+      <Rect x={x} y={y} width={w} height={h} fill={br1} />
+      <Path d={bevelL(x, y, w, h, e)} fill={tl1} />
+      <Rect x={x + e} y={y + e} width={w - e * 2} height={h - e * 2} fill={br2} />
+      <Path d={bevelL(x + e, y + e, w - e * 2, h - e * 2, e)} fill={tl2} />
+      <Rect x={x + e * 2} y={y + e * 2} width={w - e * 4} height={h - e * 4} fill={face} />
+    </>
+  );
+}
+
+/** Black or white, whichever survives on this background. The title bar takes
+ *  the station's own colour, and those run from near-white to deep violet. */
+function lum(hex: string): number {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return (((n >> 16) & 255) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114) / 255;
+}
+function inkOn(hex: string): string { return lum(hex) > 0.62 ? '#0a0a0a' : '#ffffff'; }
+
+function mmss(ms: number): string {
+  const t = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
+
+/** One labelled dialog field: grey label outside, sunken white well, and the
+ *  combo-box button that every such field had whether or not it did anything. */
+function Field({ label, value, y, labelRight, boxX, boxW, h }: {
+  label: string; value: string; y: number; labelRight: number; boxX: number; boxW: number; h: number;
+}) {
+  const btn = h - 12;
+  return (
+    <>
+      <SvgText x={labelRight} y={y + h * 0.66} fill="#0a0a0a" fontSize={34}
+        fontFamily="monospace" textAnchor="end">{label}</SvgText>
+      <Bevel x={boxX} y={y} w={boxW} h={h} sunken face="#ffffff" e={3} />
+      <SvgText x={boxX + 20} y={y + h * 0.68} fill="#0a0a0a" fontSize={36} fontFamily="monospace">
+        {clip(value, Math.floor((boxW - btn - 46) / 21))}
+      </SvgText>
+      <Bevel x={boxX + boxW - btn - 6} y={y + 6} w={btn} h={btn} e={3} />
+      <Path d={`M${boxX + boxW - btn / 2 - 6 - 11} ${y + h / 2 - 5} l22 0 l-11 13 Z`} fill="#0a0a0a" />
+    </>
+  );
+}
+
+function Y2KStyle(p: StyleProps) {
+  const { station, track, modeLabel, cardH } = p;
+  const d = derive(p);
+
+  // The desktop behind the window. The station's hue, taken well down toward a
+  // period wallpaper grey-lilac: it keeps a trace of the mood WITHOUT showing
+  // the station, which is the line the owner drew.
+  const desktop = mixHex(d.eq[1], '#b7b3d4', 0.48);
+  // A very pale station (Mountain Pass's eqColors are literally three whites)
+  // gives a title bar barely distinguishable from the window's own grey, so
+  // the bar stops reading as a bar. Deepen only those.
+  const raw = d.eq[1];
+  const bar = lum(raw) > 0.74 ? mixHex(raw, '#5d5a80', 0.42) : raw;
+  const barInk = inkOn(bar);
+
+  // The window is sized from its CONTENTS and then centred, rather than
+  // stretched to the taskbar — a dialog that ends where its controls end is
+  // most of what makes this read as a real window instead of a panel.
+  const TASK_H = 92, PAD = 34, TITLE_H = 70;
+  const ART = 400, TOP_H = 420, FH = 68, FGAP = 14, PROG_H = 68;
+  const WX = 74, WW = CARD_W - WX * 2;
+  const WH = TITLE_H + PAD + TOP_H + 44 + (FH + FGAP) * 4 + 26 + PROG_H + PAD;
+  const WY = Math.round(cardH - TASK_H - 44 - WH);
+
+  const artX = WX + 52, artY = WY + TITLE_H + PAD;
+  const panelX = artX + ART + 46;
+  const panelR = WX + WW - 52;
+
+  const fieldsY = artY + TOP_H + 44;
+  const labelRight = WX + 262, boxX = WX + 282, boxW = WW - 282 - 52;
+  const prog = fieldsY + (FH + FGAP) * 4 + 26;
+  const barX = WX + 240, barW = WW - 240 - 240;
+  const pct = track?.durationMs ? Math.min(1, (track.progressMs ?? 0) / track.durationMs) : 0.42;
+
+  const btn = (i: number) => panelX + i * 76;
+
+  return (
+    <>
+      <Rect x={0} y={0} width={CARD_W} height={cardH} fill={desktop} />
+
+      {/* ── the window ── */}
+      <Bevel x={WX} y={WY} w={WW} h={WH} />
+      <Rect x={WX + 8} y={WY + 8} width={WW - 16} height={TITLE_H} fill={bar} />
+      <SvgText x={WX + 28} y={WY + 8 + TITLE_H * 0.72} fill={barInk} fontSize={44}
+        fontWeight="700" fontFamily="monospace" letterSpacing={1}>Cruise FM</SvgText>
+      {[0, 1, 2].map((i) => {
+        const bw = 52, bx = WX + WW - 28 - (3 - i) * (bw + 6);
+        const by = WY + 8 + (TITLE_H - bw) / 2;
+        return (
+          <G key={i}>
+            <Bevel x={bx} y={by} w={bw} h={bw} e={3} />
+            {i === 0 && <Rect x={bx + 13} y={by + bw - 21} width={26} height={5} fill="#0a0a0a" />}
+            {i === 1 && <Rect x={bx + 13} y={by + 13} width={26} height={26} fill="none" stroke="#0a0a0a" strokeWidth={5} />}
+            {i === 2 && <Path d={`M${bx + 15} ${by + 15} l22 22 M${bx + 37} ${by + 15} l-22 22`} stroke="#0a0a0a" strokeWidth={5} />}
+          </G>
+        );
+      })}
+
+      {/* ── album art in a sunken well — the one picture on the card ── */}
+      <Bevel x={artX - 10} y={artY - 10} w={ART + 20} h={ART + 20} sunken face="#6b6b6b" e={4} />
+      {d.art
+        ? <SvgImage x={artX} y={artY} width={ART} height={ART} href={{ uri: d.art }} preserveAspectRatio="xMidYMid slice" />
+        : <Rect x={artX} y={artY} width={ART} height={ART} fill={mixHex(d.eq[1], '#20202a', 0.55)} />}
+
+      {/* ── the little hardware, straight off the owner's reference ── */}
+      <Circle cx={panelX + 58} cy={artY + 58} r={54} fill="#d8dade" stroke="#8b8f96" strokeWidth={3} />
+      <Circle cx={panelX + 58} cy={artY + 58} r={37} fill="#eceef1" />
+      <Circle cx={panelX + 58} cy={artY + 58} r={15} fill={W_FACE} stroke="#8b8f96" strokeWidth={3} />
+      <Path d={`M${panelX + 24} ${artY + 38} a54 54 0 0 1 42 -21`} stroke="#ffffff" strokeWidth={7} fill="none" />
+      <Bevel x={panelX} y={artY + 140} w={172} h={94} e={3} />
+      <Rect x={panelX + 18} y={artY + 160} width={136} height={30} fill="#8f949b" />
+      <Rect x={panelX + 24} y={artY + 166} width={26} height={18} fill="#c8302c" />
+      {Array.from({ length: 11 }).map((_, i) => (
+        <Rect key={i} x={panelX + 20 + i * 13} y={artY + 202} width={8} height={14} fill="#7d828a" />
+      ))}
+
+      {/* ── volume ── */}
+      <Bevel x={panelR - 162} y={artY} w={78} h={72} e={3} />
+      <Path d={`M${panelR - 142} ${artY + 36} h38 M${panelR - 123} ${artY + 17} v38`} stroke="#0a0a0a" strokeWidth={8} />
+      <Bevel x={panelR - 162} y={artY + 84} w={78} h={72} e={3} />
+      <Path d={`M${panelR - 142} ${artY + 120} h38`} stroke="#0a0a0a" strokeWidth={8} />
+      <Bevel x={panelR - 66} y={artY} w={32} h={156} sunken face="#a9adb3" e={3} />
+      <Rect x={panelR - 58} y={artY + 44} width={16} height={104} fill="#1f7a4d" />
+
+      {/* ── transport, two rows, clear of the fields below ── */}
+      <Bevel x={panelX} y={artY + 262} w={216} h={68} e={3} />
+      <Rect x={panelX + 96} y={artY + 280} width={9} height={32} fill="#0a0a0a" />
+      <Rect x={panelX + 112} y={artY + 280} width={9} height={32} fill="#0a0a0a" />
+      {/* shuffle: two crossing paths with heads, not a close-box X */}
+      <Bevel x={panelX + 228} y={artY + 262} w={68} h={68} e={3} />
+      <Path d={`M${panelX + 242} ${artY + 282} q18 0 26 14 q8 14 26 14 M${panelX + 242} ${artY + 310} q18 0 26 -14 q8 -14 26 -14`}
+        stroke="#0a0a0a" strokeWidth={5} fill="none" />
+      <Path d={`M${panelX + 286} ${artY + 276} l12 6 l-12 6 Z M${panelX + 286} ${artY + 304} l12 6 l-12 6 Z`} fill="#0a0a0a" />
+      {/* repeat: a broken loop with a head */}
+      <Bevel x={panelX + 304} y={artY + 262} w={68} h={68} e={3} />
+      <Path d={`M${panelX + 338} ${artY + 278} a18 18 0 1 1 -16 10`} stroke="#0a0a0a" strokeWidth={5} fill="none" />
+      <Path d={`M${panelX + 332} ${artY + 270} l10 8 l-10 8 Z`} fill="#0a0a0a" />
+      {['prev', 'rew', 'ff', 'next', 'heart'].map((k, i) => {
+        const bx = btn(i), by = artY + 346, cx0 = bx + 34, cy0 = by + 34;
+        return (
+          <G key={k}>
+            <Bevel x={bx} y={by} w={68} h={68} e={3} />
+            {k === 'prev' && <Path d={`M${cx0 - 17} ${cy0 - 15} v30 M${cx0 + 17} ${cy0 - 15} v30 l-25 -15 Z`} fill="#0a0a0a" stroke="#0a0a0a" strokeWidth={5} strokeLinejoin="round" />}
+            {k === 'rew' && <Path d={`M${cx0 - 1} ${cy0 - 15} v30 l-20 -15 Z M${cx0 + 19} ${cy0 - 15} v30 l-20 -15 Z`} fill="#0a0a0a" />}
+            {k === 'ff' && <Path d={`M${cx0 + 1} ${cy0 - 15} v30 l20 -15 Z M${cx0 - 19} ${cy0 - 15} v30 l20 -15 Z`} fill="#0a0a0a" />}
+            {k === 'next' && <Path d={`M${cx0 + 17} ${cy0 - 15} v30 M${cx0 - 17} ${cy0 - 15} v30 l25 -15 Z`} fill="#0a0a0a" stroke="#0a0a0a" strokeWidth={5} strokeLinejoin="round" />}
+            {k === 'heart' && (
+              <Path d={`M${cx0} ${cy0 + 16} C${cx0 - 27} ${cy0 - 2} ${cx0 - 16} ${cy0 - 23} ${cx0} ${cy0 - 8} C${cx0 + 16} ${cy0 - 23} ${cx0 + 27} ${cy0 - 2} ${cx0} ${cy0 + 16} Z`} fill="#0a0a0a" />
+            )}
+          </G>
+        );
+      })}
+
+      {/* ── THE POINT: station and mode as plain dialog fields (owner, 11.08:
+             "just write the stations and the mode as a text") ── */}
+      <Field label="Artist:"  value={d.artist || 'Cruise FM'} y={fieldsY}
+        labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} />
+      <Field label="Title:"   value={d.title} y={fieldsY + (FH + FGAP)}
+        labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} />
+      <Field label="Station:" value={station.name} y={fieldsY + (FH + FGAP) * 2}
+        labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} />
+      <Field label="Mode:"    value={modeLabel} y={fieldsY + (FH + FGAP) * 3}
+        labelRight={labelRight} boxX={boxX} boxW={boxW} h={FH} />
+
+      {/* ── scrub ── */}
+      <SvgText x={WX + 52} y={prog + 44} fill="#0a0a0a" fontSize={34} fontFamily="monospace">
+        {track?.progressMs != null ? mmss(track.progressMs) : '0:00'}
+      </SvgText>
+      <Bevel x={barX} y={prog + 12} w={barW} h={44} sunken face="#a9adb3" e={3} />
+      <Rect x={barX + 8} y={prog + 20} width={Math.max(0, (barW - 16) * pct)} height={28} fill="#8a8f96" />
+      <Bevel x={barX + (barW - 34) * pct} y={prog + 2} w={34} h={64} e={3} />
+      <SvgText x={WX + WW - 52} y={prog + 44} fill="#0a0a0a" fontSize={34}
+        fontFamily="monospace" textAnchor="end">
+        {track?.durationMs ? mmss(track.durationMs) : '--:--'}
+      </SvgText>
+
+      {/* ── taskbar: the natural home for the address ── */}
+      <Bevel x={0} y={cardH - TASK_H} w={CARD_W} h={TASK_H} e={4} />
+      <Bevel x={16} y={cardH - TASK_H + 16} w={196} h={TASK_H - 32} e={3} />
+      <Circle cx={62} cy={cardH - TASK_H / 2} r={17} fill={bar} stroke="#6c7078" strokeWidth={3} />
+      <SvgText x={92} y={cardH - TASK_H / 2 + 13} fill="#0a0a0a" fontSize={36}
+        fontWeight="700" fontFamily="monospace">Start</SvgText>
+      <Bevel x={CARD_W - 442} y={cardH - TASK_H + 16} w={426} h={TASK_H - 32} sunken e={3} />
+      <SvgText x={CARD_W - 229} y={cardH - TASK_H / 2 + 13} fill="#0a0a0a" fontSize={34}
+        fontFamily="monospace" textAnchor="middle">{INSTALL_HOST}</SvgText>
+    </>
+  );
+}
+
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 
 /** The card's contents, with no <Svg> wrapper — so the same geometry can be
@@ -694,6 +929,7 @@ export function ShareCardBody(props: StyleProps & { styleId: ShareStyleId }) {
   switch (styleId) {
     // With no capture to show, Snapshot quietly becomes the Ticket — a chip
     // that renders an empty window would be worse than no chip.
+    case 'y2k': return <Y2KStyle {...rest} />;
     case 'snapshot': return <SnapshotStyle {...rest} />;
     case 'ticket':
     default: return <TicketStyle {...rest} />;

@@ -613,11 +613,16 @@ function ScrubProgressBar({ progress, isScrubbing, onLayout, panHandlers }: {
   onLayout: (e: any) => void; panHandlers: any;
 }) {
   const [barWidth, setBarWidth] = useState(300);
-  const fillW      = progress.interpolate({ inputRange: [0, 1], outputRange: [0, barWidth] });
   const trackH     = isScrubbing ? 8 : 6;
   const DOT        = 14;
-  const trackHalf  = trackH / 2;
   const dotOff     = DOT / 2;
+  // Scaled, not resized — see SeekBar, which carries the full reasoning. width
+  // is a layout property and so cannot leave the JS thread; scaleX can, and
+  // the paired translateX pins the left edge because RN scales about the
+  // centre. The dot rides outside the scaled view or it would be squashed.
+  const fillScale  = progress.interpolate({ inputRange: [0, 1], outputRange: [0.0001, 1], extrapolate: 'clamp' });
+  const fillShift  = progress.interpolate({ inputRange: [0, 1], outputRange: [-barWidth / 2, 0], extrapolate: 'clamp' });
+  const dotShift   = progress.interpolate({ inputRange: [0, 1], outputRange: [0, barWidth], extrapolate: 'clamp' });
 
   return (
     <View
@@ -631,25 +636,28 @@ function ScrubProgressBar({ progress, isScrubbing, onLayout, panHandlers }: {
         height: trackH, borderRadius: trackH / 2,
         backgroundColor: 'rgba(255,255,255,0.22)',
       }} />
-      {/* White fill + dot at right edge */}
+      {/* White fill */}
       <Animated.View style={{
-        position: 'absolute', left: 0,
+        position: 'absolute', left: 0, width: barWidth,
         height: trackH, borderRadius: trackH / 2,
-        width: fillW, backgroundColor: '#ffffff',
-      }}>
-        {/* Dot sits at the fill end */}
-        <View style={{
-          position: 'absolute',
-          right: -dotOff, top: trackHalf - dotOff,
-          width: DOT, height: DOT, borderRadius: dotOff,
-          backgroundColor: '#ffffff',
-          shadowColor: '#000',
-          shadowOpacity: isScrubbing ? 0.6 : 0.4,
-          shadowRadius: isScrubbing ? 8 : 5,
-          shadowOffset: { width: 0, height: 2 },
-          elevation: isScrubbing ? 8 : 4,
-        }} />
-      </Animated.View>
+        backgroundColor: '#ffffff',
+        transform: [{ translateX: fillShift }, { scaleX: fillScale }],
+      }} />
+      {/* Dot rides the fill's end, unscaled */}
+      <Animated.View style={{
+        // No `top`: an absolutely-positioned child with neither top nor bottom
+        // is placed by the parent's justifyContent, which is 'center' — the
+        // same rule that centres the fill, so the two line up by construction.
+        position: 'absolute', left: -dotOff,
+        width: DOT, height: DOT, borderRadius: dotOff,
+        backgroundColor: '#ffffff',
+        shadowColor: '#000',
+        shadowOpacity: isScrubbing ? 0.6 : 0.4,
+        shadowRadius: isScrubbing ? 8 : 5,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: isScrubbing ? 8 : 4,
+        transform: [{ translateX: dotShift }],
+      }} />
     </View>
   );
 }
@@ -969,9 +977,19 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     return () => spinValue.removeListener(id);
   }, []);
   useEffect(() => {
+    // COMMIT STATE ONLY WHEN THE DISPLAYED SECOND CHANGES. Without that guard
+    // this ran setState on EVERY animation frame — so the whole deck (record,
+    // grooves, tonearm, fireflies, backdrop) re-rendered ~60 times a second for
+    // the entire song, to move a readout that changes once a second.
+    //
+    // Every other clock in the app already had the guard: the shared
+    // useTrackClock carries it with a comment saying exactly this, and Cassette
+    // has its own copy. Vinyl predates the shared clock (it still has its own
+    // progress value and its own listeners) and simply never got it.
     const id = progress.addListener(({ value }) => {
       progressValue.current = value;
-      setCurrentTimeMs(Math.round(value * trackMsRef.current));
+      const ms = Math.round(value * trackMsRef.current);
+      setCurrentTimeMs((prev) => (Math.floor(ms / 1000) === Math.floor(prev / 1000) ? prev : ms));
     });
     return () => progress.removeListener(id);
   }, []);

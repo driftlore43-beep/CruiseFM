@@ -97,8 +97,41 @@ export function rampFromColor(color: string): [string, string, string] {
   return [mixHex(color, '#ffffff', 0.45), color, mixHex(color, '#0c0f1a', 0.42)];
 }
 
-/** A custom station dressed as a full Station so modes can render it. */
+/**
+ * Converted stations, cached by the object they were built from.
+ *
+ * THIS IS A PERFORMANCE FIX AND IT IS LOAD-BEARING. Every mode calls
+ * `resolveAnyStation(id)` DURING RENDER, and for a custom station that used to
+ * build a brand-new Station object — with a brand-new `eqColors` ramp — every
+ * single time. So each render handed every child new props by identity, and
+ * every `useMemo` keyed on them missed. The Mirror Ball was rebuilding its
+ * entire flipbook (six frames of sphere projection, ~1500 tiles) from scratch
+ * once a second.
+ *
+ * MEASURED on the Mirror Ball, 12 seconds of playback: a built-in station
+ * blocked the thread for 587ms, worst task 61ms; the SAME mode on a custom
+ * station blocked for 2394ms, worst task 243ms. Four times the work, and a
+ * quarter-second freeze once a second — which is the "response is a bit slow"
+ * the owner reported, on the kind of station she actually drives.
+ *
+ * A WeakMap keyed on the source object needs no invalidation: saving or
+ * reloading replaces the stored objects, so a changed station simply misses
+ * and is rebuilt, and dropped ones are collected.
+ */
+const converted = new WeakMap<CustomStation, Station>();
+
+/** A custom station dressed as a full Station so modes can render it.
+ *  Stable by identity — see `converted` above; do not make this return a fresh
+ *  object again. */
 export function customToStation(c: CustomStation): Station {
+  const hit = converted.get(c);
+  if (hit) return hit;
+  const out = buildStation(c);
+  converted.set(c, out);
+  return out;
+}
+
+function buildStation(c: CustomStation): Station {
   return {
     ...c,
     // A user photo is a file path; the ten built-in stations are bundled

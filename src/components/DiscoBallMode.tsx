@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing, Modal, PanResponder,
   StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
@@ -217,7 +217,7 @@ function LightFace({ size, eq, blobs, sfx }: {
  * They do NOT ride the spin: a lamp is bolted to the room, so its reflection
  * stays put on the near face while the mirrors travel through it.
  */
-function ColourReflections({ size, eq, lit }: { size: number; eq: [string, string, string]; lit: Animated.Value }) {
+const ColourReflections = memo(function ColourReflections({ size, eq, lit }: { size: number; eq: [string, string, string]; lit: Animated.Value }) {
   // Patch 5 is deliberately NEUTRAL — a cool-white ambient reflection of the
   // room itself, so the mood colours always sit alongside plain light and the
   // ball never reads as fully tinted (the owner's brief, 30.07: white light
@@ -273,7 +273,7 @@ function ColourReflections({ size, eq, lit }: { size: number; eq: [string, strin
       ))}
     </View>
   );
-}
+});
 
 
 
@@ -342,7 +342,7 @@ function NeonSweep({ size, eq, pulse }: { size: number; eq: [string, string, str
 // gradients, same trick as AmbientGlow's Haze) since RN has no blur filter.
 // Sized well past the ball so it reads as light spilling into the room, not
 // a rim on the sphere itself.
-function BallBloom({ size, color, pulse }: { size: number; color: string; pulse: Animated.Value }) {
+const BallBloom = memo(function BallBloom({ size, color, pulse }: { size: number; color: string; pulse: Animated.Value }) {
   const bloomSize = size * 2.3;
   const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.62] });
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1.05] });
@@ -364,7 +364,7 @@ function BallBloom({ size, color, pulse }: { size: number; color: string; pulse:
       </Svg>
     </Animated.View>
   );
-}
+});
 
 
 // The single soft specular where the key light hits strongest (owner's
@@ -430,7 +430,7 @@ function spotPath(R: number) {
 }
 
 
-function SpotlightPan({ size, lit, pan, eq }: { size: number; lit: Animated.Value; pan: Animated.Value; eq: [string, string, string] }) {
+const SpotlightPan = memo(function SpotlightPan({ size, lit, pan, eq }: { size: number; lit: Animated.Value; pan: Animated.Value; eq: [string, string, string] }) {
   const R = size / 2;
   const tint = eq[1];
   const tintHi = mixHex(eq[0], '#ffffff', 0.35);
@@ -477,7 +477,7 @@ function SpotlightPan({ size, lit, pan, eq }: { size: number; lit: Animated.Valu
       </Svg>
     </Animated.View>
   );
-}
+});
 
 function KeySpecular({ size, lit }: { size: number; lit: Animated.Value }) {
   const breathe = useRef(new Animated.Value(0)).current;
@@ -510,7 +510,7 @@ function KeySpecular({ size, lit }: { size: number; lit: Animated.Value }) {
   );
 }
 
-function MirrorBall({ size, eq, spin, pulse, lit, spotPan }: { size: number; eq: [string, string, string]; spin: Animated.Value; pulse: Animated.Value; lit: Animated.Value; spotPan: Animated.Value }) {
+const MirrorBall = memo(function MirrorBall({ size, eq, spin, pulse, lit, spotPan }: { size: number; eq: [string, string, string]; spin: Animated.Value; pulse: Animated.Value; lit: Animated.Value; spotPan: Animated.Value }) {
   const flip = useMemo(() => buildFlipbook(size, eq), [size, eq]);
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#0b0b0c' }}>
@@ -624,7 +624,7 @@ function MirrorBall({ size, eq, spin, pulse, lit, spotPan }: { size: number; eq:
       </Animated.View>
     </View>
   );
-}
+});
 
 // ── Scattered light dots that orbit the room ──────────────────────────────────
 // A fixed field of dots; the whole field slowly rotates (one native transform)
@@ -700,7 +700,7 @@ function GlitterSpeck({ x, y, r, color, flare, opacity }: {
   );
 }
 
-function GlitterField({ eq, lit, winW, winH }: {
+const GlitterField = memo(function GlitterField({ eq, lit, winW, winH }: {
   eq: [string, string, string]; lit: Animated.Value; winW: number; winH: number;
 }) {
   const phases = useRef(Array.from({ length: GLITTER_PHASES }, () => new Animated.Value(0))).current;
@@ -751,7 +751,7 @@ function GlitterField({ eq, lit, winW, winH }: {
       })}
     </Animated.View>
   );
-}
+});
 
 /**
  * FIREFLIES (owner, 03.08: "go softly into the mirror ball… add more glitter
@@ -820,7 +820,7 @@ function Firefly({ x, y, r, color, drift, input, px, py, op }: {
   );
 }
 
-function Fireflies({ eq, live, winW, winH }: {
+const Fireflies = memo(function Fireflies({ eq, live, winW, winH }: {
   eq: [string, string, string]; live: Animated.Value; winW: number; winH: number;
 }) {
   const phases = useRef(Array.from({ length: FIREFLY_PHASES }, () => new Animated.Value(0))).current;
@@ -893,14 +893,14 @@ function Fireflies({ eq, live, winW, winH }: {
       ))}
     </Animated.View>
   );
-}
+});
 
 /**
  * A dark vignette pulling the corners down (owner's lighting brief, 31.07):
  * the room reads as a deep studio rather than a flat backdrop, and the ball
  * — the one bright thing — gains depth for free. Static, costs nothing.
  */
-function Vignette({ winW, winH }: { winW: number; winH: number }) {
+const Vignette = memo(function Vignette({ winW, winH }: { winW: number; winH: number }) {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Svg width={winW} height={winH} viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -915,7 +915,7 @@ function Vignette({ winW, winH }: { winW: number; winH: number }) {
       </Svg>
     </View>
   );
-}
+});
 
 /**
  * THE RAYS (owner's reference photograph, 02.08: a real ball in a lit room
@@ -936,7 +936,7 @@ function Vignette({ winW, winH }: { winW: number; winH: number }) {
 const RAY_COUNT = 44;
 const RAY_PHASES = 6;
 
-function LightRays({ size, eq, winW, winH, lit }: {
+const LightRays = memo(function LightRays({ size, eq, winW, winH, lit }: {
   size: number; eq: [string, string, string]; winW: number; winH: number;
   lit: Animated.Value;
 }) {
@@ -1012,7 +1012,7 @@ function LightRays({ size, eq, winW, winH, lit }: {
       ))}
     </Animated.View>
   );
-}
+});
 
 function DustMote({ x, y, size, tint, dur, delay, driftX }: {
   x: number; y: number; size: number; tint: string; dur: number; delay: number; driftX: number;
@@ -1044,7 +1044,7 @@ function DustMote({ x, y, size, tint, dur, delay, driftX }: {
 }
 const winHDrift = 64;
 
-function DustField({ count, eq, live, winW, winH }: {
+const DustField = memo(function DustField({ count, eq, live, winW, winH }: {
   count: number; eq: [string, string, string]; live: Animated.Value; winW: number; winH: number;
 }) {
   const motes = useMemo(() => Array.from({ length: count }, (_, i) => ({
@@ -1061,7 +1061,7 @@ function DustField({ count, eq, live, winW, winH }: {
       {motes.map((m, i) => <DustMote key={i} {...m} />)}
     </Animated.View>
   );
-}
+});
 
 
 

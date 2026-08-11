@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
@@ -320,7 +320,22 @@ function frameOpacity(spin: Animated.Value, f: number): Animated.AnimatedInterpo
   return spin.interpolate({ inputRange: xs, outputRange: ys, extrapolate: 'clamp' });
 }
 
-export function FlipbookGrid({ size, frames, spin }: {
+/**
+ * MEMOIZED, AND THAT IS NOT DECORATION. This lays out roughly 1500 `<Path>`
+ * elements — six frames of about 250 tiles. They are static: built once, never
+ * animated, with only the six wrapper opacities moving. But an unmemoized
+ * component re-runs whenever its PARENT renders, and the mode above it
+ * re-renders every time the elapsed-time readout ticks over. Measured before
+ * this: one 55ms freeze per second, on the second, for the whole drive — the
+ * long tasks landed 1007, 998, 1011, 997ms apart, which is the clock and
+ * nothing else.
+ *
+ * The props are shallow-comparable on purpose: `size` is a number, `spin` is a
+ * ref-stable Animated.Value, and `frames` comes from a useMemo. That last one
+ * only holds if the station object is stable too — see the WeakMap in
+ * customStations.ts, which exists for this.
+ */
+export const FlipbookGrid = memo(function FlipbookGrid({ size, frames, spin }: {
   size: number; frames: FlipTile[][]; spin: Animated.Value;
 }) {
   const ops = useMemo(() => frames.map((_, f) => frameOpacity(spin, f)), [frames, spin]);
@@ -337,4 +352,4 @@ export function FlipbookGrid({ size, frames, spin }: {
       ))}
     </View>
   );
-}
+});

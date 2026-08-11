@@ -99,15 +99,44 @@ export function useTrackClock(opts: {
   // Stable ref object: every captured function only touches refs, so the
   // first-render closures stay correct for the component's whole life.
   const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+  /**
+   * A scrub in progress, and the moments just after one.
+   *
+   * THE POLL USED TO WIN AND THIS IS WHY THE BAR SPRANG BACK. The effect below
+   * re-syncs the clock every time Spotify reports a position, and Spotify is
+   * eventually consistent — asked right after a seek it still returns where
+   * the song WAS. So a successful seek was immediately overwritten by a stale
+   * reading, and the bar snapped to where the finger started (owner, 10.08,
+   * with a screen recording: the dot follows the drag, then jumps back on
+   * release, twice).
+   *
+   * So while a finger is down the poll may not touch the clock at all, and
+   * after a seek its readings are ignored until one of them AGREES with where
+   * we asked to go — or until the guard times out, so a seek that genuinely
+   * failed cannot freeze the bar forever.
+   */
+  const scrubbingRef = useRef(false);
+  const seekTargetRef = useRef<number | null>(null);
+  const seekUntilRef = useRef(0);
+  /** How close a reported position has to be to count as "the seek landed". */
+  const SEEK_TOLERANCE_MS = 2500;
+  /** After this, believe the poll again whatever it says. */
+  const SEEK_GUARD_MS = 6000;
+
   const scrub = useRef<ScrubApi>({
-    begin: () => { anim.current?.stop(); },
+    begin: () => { scrubbingRef.current = true; anim.current?.stop(); },
     move: (pct: number) => { progress.setValue(clamp01(pct)); },
     end: (pct: number) => {
       const p = clamp01(pct);
       const ms = p * durationRef.current;
+      scrubbingRef.current = false;
       // Real song → actually seek whichever platform is playing; the demo
       // bar just moves.
-      if (trackRef.current?.durationMs != null) seekActive(ms);
+      if (trackRef.current?.durationMs != null) {
+        seekActive(ms);
+        seekTargetRef.current = ms;
+        seekUntilRef.current = Date.now() + SEEK_GUARD_MS;
+      }
       if (playingRef.current) startFrom(ms);
       else progress.setValue(p);
     },
@@ -115,9 +144,21 @@ export function useTrackClock(opts: {
 
   useEffect(() => {
     if (!visible) { anim.current?.stop(); return; }
+    // A finger is on the bar: it owns the clock, nothing else may move it.
+    if (scrubbingRef.current) return;
     if (track?.progressMs != null) {
       // Real position, plus however long ago we asked.
       const base = track.progressMs + (playing ? Date.now() - track.syncedAt : 0);
+      // Just seeked? Only believe a reading once it agrees with where we went.
+      if (seekTargetRef.current != null) {
+        if (Date.now() > seekUntilRef.current) {
+          seekTargetRef.current = null;        // guard expired — trust the poll
+        } else if (Math.abs(base - seekTargetRef.current) > SEEK_TOLERANCE_MS) {
+          return;                              // stale: Spotify hasn't caught up
+        } else {
+          seekTargetRef.current = null;        // it landed; back to normal
+        }
+      }
       if (playing) {
         startFrom(base);
       } else {

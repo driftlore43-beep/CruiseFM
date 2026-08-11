@@ -2,8 +2,8 @@
   "_comment": "Deliberate exceptions for scripts/preflight.mjs. Every entry needs a reason, and the reason has to be evidence — the whole point of the check is that this class of fault looks fine right up until the phone refuses to launch.",
 
   "_provenCommit": "The last commit whose build was INSTALLED AND OPENED on a real phone. Native versions unchanged since here are trusted, because a launching build is the only proof that a module's symbols resolve against this SDK's core. MOVE THIS FORWARD only after a build from the new commit has actually been opened — never because it merely built.",
-  "provenCommit": "712b43b",
-  "_provenNote": "712b43b is build 26 — installed from TestFlight on 08.08 and confirmed opening, which is what makes expo-media-library 56.0.6 and expo-notifications 56.0.16 trusted. It replaced 108c7e7 (build 23, the App Store release), which was the baseline while build 25 was crashing.",
+  "provenCommit": "057c023",
+  "_provenNote": "057c023 is build 28 (1.3.0) — installed from TestFlight on 10.08 and used for days, which is what makes expo-image-picker 56.0.16 and expo-image-manipulator 56.0.17 trusted: the owner opened it, picked a photo from her library and reported back on how it looked, so the picker and the manipulator both genuinely ran. It replaced 712b43b (build 26), which proved expo-media-library 56.0.6 and expo-notifications 56.0.16.",
 
   "_newerThanSdk": "Packages deliberately newer than the version this Expo SDK ships. Only needed for packages that ALSO changed since provenCommit.",
   "newerThanSdk": {},

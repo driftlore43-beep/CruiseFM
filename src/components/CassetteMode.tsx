@@ -13,6 +13,7 @@ import Svg, {
 import { Fonts } from '@/constants/theme';
 import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
+import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { StationIdentity } from '@/components/StationIdentity';
@@ -658,6 +659,10 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const spotify = useMusicPlayback(visible);
+  // The SCENE waits for the service's own verdict; the transport keeps the
+  // optimistic `playing`, because a button that hesitates reads as broken.
+  // See utils/confirmedPlaying for why, and for the clip that proved it.
+  const live = confirmedPlaying(playing, spotify.track, musicSwitching);
 
   // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
   useEffect(() => {
@@ -792,9 +797,9 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   };
 
   useEffect(() => {
-    if (playing) { startReels(); } else { stopReels(); }
+    if (live) { startReels(); } else { stopReels(); }
     return () => stopReels();
-  }, [playing]);
+  }, [live]);
 
   // ── Reset progress when track changes (demo tape only) ─────────────────────
   useEffect(() => {
@@ -824,12 +829,15 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   useEffect(() => {
     const t = spotify.track;
     if (!visible || !t || t.progressMs == null || t.durationMs == null || t.durationMs <= 0) return;
-    const base = Math.min(t.durationMs, t.progressMs + (playing ? Date.now() - t.syncedAt : 0));
+    // Same rule as the vinyl deck and the shared clock: extrapolate only
+    // when the service confirms, or the tape runs on over silence.
+    const running = confirmedPlaying(playing, t, musicSwitching);
+    const base = Math.min(t.durationMs, t.progressMs + (running ? Date.now() - t.syncedAt : 0));
     progressAnimRef.current?.stop();
     const pct = base / t.durationMs;
     progress.setValue(pct);
     progressValue.current = pct;
-    if (playing) {
+    if (running) {
       const remaining = t.durationMs - base;
       if (remaining > 0) {
         progressAnimRef.current = Animated.timing(progress, {
@@ -839,7 +847,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, playing, spotify.track?.progressMs, spotify.track?.syncedAt, spotify.track?.title]);
+  }, [visible, playing, musicSwitching, spotify.track?.isPlaying, spotify.track?.progressMs, spotify.track?.syncedAt, spotify.track?.title]);
 
   useEffect(() => {
     if (!visible) return;
@@ -1046,7 +1054,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             contextUri={spotify.contextUri}
           />
 
-          <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
+          <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
           <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
           {handoff && !spotify.track && <HandoffOverlay />}
           <PreviewGate onSilence={spotify.pause} />
@@ -1107,7 +1115,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             {/* Notes BEHIND the shell. Drawn after it they landed on the
                 plastic — between the reels, on the top edge — and on a
                 physical object that reads as dirt rather than atmosphere. */}
-            <FloatingNotes playing={playing} color={neonColor} />
+            <FloatingNotes playing={live} color={neonColor} />
             <TouchableOpacity onPress={togglePlay} activeOpacity={0.92}>
               <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} />
             </TouchableOpacity>
@@ -1192,7 +1200,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
         <ModeCloseButton onPress={handleClose} />
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
+        <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

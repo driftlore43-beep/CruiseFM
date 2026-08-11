@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
+import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { Fonts } from '@/constants/theme';
@@ -1098,6 +1099,10 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
+  // The SCENE waits for the service's own verdict; the transport keeps the
+  // optimistic `playing`, because a button that hesitates reads as broken.
+  // See utils/confirmedPlaying for why, and for the clip that proved it.
+  const running = confirmedPlaying(playing, spotify.track, musicSwitching);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [showMood, setShowMood] = useState(false);
@@ -1182,7 +1187,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   ).current;
 
   // The room lights up while the music plays, dims between/at rest.
-  const lightsOn = playing && !musicSwitching;
+  const lightsOn = running;
   // The ball only turns while audio is genuinely playing — pause the music
   // and it coasts to a stop, exactly like the power being cut to the motor.
   const spinning = lightsOn && (spotify.track?.isPlaying ?? true);
@@ -1663,7 +1668,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         </Animated.View>
         )}
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
+        <AmbientGlow active={visible && running} beat={visible && running} trackKey={spotify.track?.title ?? null} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

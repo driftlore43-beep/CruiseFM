@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Cruise, Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
+import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { ModeScrim } from '@/components/ModeScrim';
@@ -252,6 +253,13 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const glowPulse = useRef(new Animated.Value(0.3)).current;
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
+  // Declared here, above the meter's effect, because that effect now gates on
+  // the service's verdict rather than on our optimistic flag.
+  const spotify = useMusicPlayback(visible);
+  // The SCENE waits for the service's own verdict; the transport keeps the
+  // optimistic `playing`, because a button that hesitates reads as broken.
+  // See utils/confirmedPlaying for why, and for the clip that proved it.
+  const live = confirmedPlaying(playing, spotify.track, musicSwitching);
   const [activeStation, setActiveStation] = useState(stationId ?? 'night-run');
   const [shuffle,       setShuffle]       = useState(false);
   const [repeat,        setRepeat]        = useState(false);
@@ -319,28 +327,26 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   useEffect(() => {
     if (!visible) return;
     stopBarAnims(fsValues, timers);
-    if (playing) startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
+    if (live) startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
     return () => stopBarAnims(fsValues, timers);
-  }, [visible, playing, isLandscape]);
+  }, [visible, live, isLandscape]);
 
   // ── Ambient glow breathes slowly while the music plays — steady and calm,
   //    with no microphone involved. ──
   useEffect(() => {
-    if (!visible || !playing) { glowPulse.setValue(0.3); return; }
+    if (!visible || !live) { glowPulse.setValue(0.3); return; }
     const loop = Animated.loop(Animated.sequence([
       Animated.timing(glowPulse, { toValue: 0.55, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       Animated.timing(glowPulse, { toValue: 0.20, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ]));
     loop.start();
     return () => loop.stop();
-  }, [visible, playing]);
+  }, [visible, live]);
 
   const handleClose = () => {
     stopBarAnims(fsValues, timers);
     Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
-
-  const spotify = useMusicPlayback(visible);
 
   // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
   useEffect(() => {
@@ -503,7 +509,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             contextUri={spotify.contextUri}
           />
 
-          <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
+          <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
           <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
           {handoff && !spotify.track && <HandoffOverlay />}
           <PreviewGate onSilence={spotify.pause} />
@@ -615,7 +621,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               maxH={FS_MAX_H}
               colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
             />
-            <FloatingNotes playing={playing} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
+            <FloatingNotes playing={live} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
           </View>
 
           {/* Song title when connected, else the mood's own line — never a fake track */}
@@ -693,7 +699,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
         <ModeCloseButton onPress={handleClose} />
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
+        <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

@@ -12,6 +12,7 @@ import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/Lands
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { STATIONS } from '@/constants/stations';
+import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { mixHex } from '@/components/GlassPane';
@@ -462,6 +463,10 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
   const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
+  // The SCENE waits for the service's own verdict; the transport keeps the
+  // optimistic `playing`, because a button that hesitates reads as broken.
+  // See utils/confirmedPlaying for why, and for the clip that proved it.
+  const live = confirmedPlaying(playing, spotify.track, musicSwitching);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [showMood, setShowMood] = useState(false);
@@ -585,7 +590,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             the native-driver overlays drift off the drawing). */}
         {isLandscape && (
           <Animated.View style={[StyleSheet.absoluteFill, deckScene]} pointerEvents="none">
-            <HorizonScene playing={playing} eq={eq} geom={geom} />
+            <HorizonScene playing={live} eq={eq} geom={geom} />
           </Animated.View>
         )}
 
@@ -602,7 +607,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             instead of sitting empty. */}
         {!isLandscape && (
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <HorizonScene playing={playing} eq={eq} geom={geom} />
+            <HorizonScene playing={live} eq={eq} geom={geom} />
           </View>
         )}
 
@@ -650,7 +655,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
           {/* The scene itself is the full-bleed layer above; this slot just
               holds the column's shape and carries the floating notes. */}
           <View style={{ flex: 1 }}>
-            <FloatingNotes playing={playing} color={eq[1]} />
+            <FloatingNotes playing={live} color={eq[1]} />
           </View>
 
           {/* Song title / mood line */}
@@ -733,7 +738,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
 
         {!isLandscape && <ModeCloseButton onPress={handleClose} />}
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} hero={false} color={eq[1]} />
+        <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} hero={false} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

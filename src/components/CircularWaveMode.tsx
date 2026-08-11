@@ -12,6 +12,7 @@ import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/Lands
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { STATIONS } from '@/constants/stations';
+import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
@@ -231,6 +232,10 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   const eq = station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF'];
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
+  // The SCENE waits for the service's own verdict; the transport keeps the
+  // optimistic `playing`, because a button that hesitates reads as broken.
+  // See utils/confirmedPlaying for why, and for the clip that proved it.
+  const live = confirmedPlaying(playing, spotify.track, musicSwitching);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [showMood, setShowMood] = useState(false);
@@ -425,9 +430,9 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
 
               {/* Soft halo so the ring reads over the scene — centre stays hollow */}
               <Circle cx={CX} cy={CY} r={R0 + MAXLEN} fill="url(#cwCore)" />
-              <WaveRing eq={eq} playing={playing} beating={playing && !musicSwitching && !kickHold} />
+              <WaveRing eq={eq} playing={live} beating={live && !kickHold} />
             </Svg>
-            <FloatingNotes playing={playing} emitter="ring" color={eq[0]} />
+            <FloatingNotes playing={live} emitter="ring" color={eq[0]} />
             </Animated.View>
           </View>
 
@@ -514,7 +519,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
 
         {!isLandscape && <ModeCloseButton onPress={handleClose} />}
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
+        <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

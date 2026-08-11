@@ -11,6 +11,7 @@ import { OWNER_MODE } from '@/constants/config';
 import { Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
+import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { ModeScrim } from '@/components/ModeScrim';
@@ -702,6 +703,10 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const spotify = useMusicPlayback(visible);
+  // The SCENE waits for the service's own verdict; the transport keeps the
+  // optimistic `playing`, because a button that hesitates reads as broken.
+  // See utils/confirmedPlaying for why, and for the clip that proved it.
+  const live = confirmedPlaying(playing, spotify.track, musicSwitching);
 
   // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
   useEffect(() => {
@@ -970,7 +975,10 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   ).current;
 
   useEffect(() => { activeTrackRef.current = activeTrack; }, [activeTrack]);
-  useEffect(() => { playingRef.current = playing; }, [playing]);
+  // The spin loop and its safety net read this every cycle, so it carries the
+  // CONFIRMED state: a record that keeps turning over a sleeping Spotify is
+  // the exact thing the owner filmed.
+  useEffect(() => { playingRef.current = live; }, [live]);
   // Track spinValue position so we can manually setValue during rotational scrub
   useEffect(() => {
     const id = spinValue.addListener(({ value }) => { spinCurrentRef.current = value; });
@@ -1069,7 +1077,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const stopLabelSpin = () => { labelSpinRef.current?.stop(); };
 
   useEffect(() => {
-    if (playing) {
+    if (live) {
       spinUp();
       shimmerLoopRef.current = Animated.loop(Animated.sequence([
         Animated.timing(ringShimmer, { toValue: 1.0, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
@@ -1082,7 +1090,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       ringShimmer.setValue(0.6);
     }
     return () => { stopSpin(); shimmerLoopRef.current?.stop(); };
-  }, [playing]);
+  }, [live]);
 
   // Safety net — restart spin if it stopped unexpectedly. Stops dead when the
   // app is backgrounded: a repeating timer is one of the things iOS kills a
@@ -1094,23 +1102,23 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       if (playingRef.current && !isSpinning.current) startSpin();
     }, 3000);
     return () => clearInterval(interval);
-  }, [playing, appActive]);
+  }, [live, appActive]);
 
   // Tonearm
   useEffect(() => {
     Animated.timing(tonearmVal, {
-      toValue: playing ? 1 : 0,
-      duration: playing ? 1200 : 900,
-      easing: playing ? Easing.out(Easing.cubic) : Easing.inOut(Easing.ease),
+      toValue: live ? 1 : 0,
+      duration: live ? 1200 : 900,
+      easing: live ? Easing.out(Easing.cubic) : Easing.inOut(Easing.ease),
       // JS driver: the arm angle is combined with the (JS-driven) track
       // progress for the inward creep — Animated can't mix drivers.
       useNativeDriver: false,
     }).start();
-  }, [playing]);
+  }, [live]);
 
   // Glow + progress
   useEffect(() => {
-    if (playing) {
+    if (live) {
       pulseLoopRef.current = Animated.loop(Animated.sequence([
         Animated.timing(glowPulse, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
         Animated.timing(glowPulse, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
@@ -1123,7 +1131,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       Animated.timing(glowPulse, { toValue: 0, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
     }
     return () => { pulseLoopRef.current?.stop(); progressAnimRef.current?.stop(); };
-  }, [playing]);
+  }, [live]);
 
   // Track change (demo deck only — real tracks change on Spotify's side)
   useEffect(() => {
@@ -1233,15 +1241,20 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     const t = spotify.track;
     if (!visible || !t || t.progressMs == null || t.durationMs == null || t.durationMs <= 0) return;
     if (scrubbingRef.current) return;
-    const base = Math.min(t.durationMs, t.progressMs + (playing ? Date.now() - t.syncedAt : 0));
+    // Only extrapolate forward if the music is REALLY running. `playing` is
+    // our optimistic flag, so against a sleeping Spotify this term grew
+    // without bound — the owner's clip measured the deck reading 01:49 while
+    // the true position sat at 00:16 and never moved. See confirmedPlaying.
+    const running = confirmedPlaying(playing, t, musicSwitching);
+    const base = Math.min(t.durationMs, t.progressMs + (running ? Date.now() - t.syncedAt : 0));
     progressAnimRef.current?.stop();
     const pct = base / t.durationMs;
     progress.setValue(pct);
     progressValue.current = pct;
     setCurrentTimeMs(Math.round(base));
-    if (playing) _restartProgressFrom(base, t.durationMs);
+    if (running) _restartProgressFrom(base, t.durationMs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, playing, spotify.track?.progressMs, spotify.track?.syncedAt, spotify.track?.title]);
+  }, [visible, playing, musicSwitching, spotify.track?.isPlaying, spotify.track?.progressMs, spotify.track?.syncedAt, spotify.track?.title]);
 
   pbHandlerRef.current.onGrant = (x: number) => {
     progressAnimRef.current?.stop();
@@ -1327,7 +1340,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           <Animated.View style={[fs.turntableWrap, isLandscape && { flex: 1, justifyContent: 'center' }, deckScene]}>
             <TurntableHero
               platSize={platSize} spin={spin} tonearmAnim={tonearmVal} glowOpacity={glowOpacity}
-              ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={spin} playing={playing}
+              ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={spin} playing={live}
               panHandlers={recordPanRef.panHandlers} scrubbing={isScrubbing} scrubDir={scrubDir}
               accent={VINYL_ACCENTS[station.id] ?? station.eqColors?.[1] ?? V.gold}
               labelText={station.name.toUpperCase()}
@@ -1412,7 +1425,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             rested={chromeRested}
             station={station}
             track={spotify.track}
-            playing={playing}
+            playing={live}
             tagline={station.tagline}
             seekBar={spotify.track ? (
               <ScrubProgressBar
@@ -1434,7 +1447,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
         {!isLandscape && <ModeCloseButton onPress={handleClose} />}
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={station.eqColors?.[1] ?? V.gold} />
+        <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={station.eqColors?.[1] ?? V.gold} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

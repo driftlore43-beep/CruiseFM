@@ -14,6 +14,7 @@ import { StationIdentity } from '@/components/StationIdentity';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
 import { cachedCustomStations, customToStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
+import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
@@ -522,6 +523,10 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     setRepeat(spotify.repeatMode !== 'off');
   }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
+  // The SCENE waits for the service's own verdict; the transport keeps the
+  // optimistic `playing`, because a button that hesitates reads as broken.
+  // See utils/confirmedPlaying for why, and for the clip that proved it.
+  const live = confirmedPlaying(playing, spotify.track, musicSwitching);
   const [phase, setPhase] = useState(0);
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -871,7 +876,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
                 onBand={pickBand}
                 freq={freq}
                 lock={lock}
-                playing={playing}
+                playing={live}
                 title={title}
                 artist={artist}
                 hasTrack={hasTrack}
@@ -903,7 +908,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             contextUri={spotify.contextUri}
           />
 
-          <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
+          <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={eq[1]} />
           <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
           {handoff && !spotify.track && <HandoffOverlay />}
           <PreviewGate onSilence={spotify.pause} />
@@ -979,7 +984,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
                 onBand={pickBand}
                 freq={freq}
                 lock={lock}
-                playing={playing}
+                playing={live}
                 title={title}
                 artist={artist}
                 hasTrack={hasTrack}
@@ -991,7 +996,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
               <DialRuler band={band} freq={freq} width={winW} color={accent} lock={lock} />
               <StaticNoise width={winW} height={116} phase={phase} opacity={offAir * 0.55} />
               {/* Notes only flow once the needle locks onto a station */}
-              <FloatingNotes playing={playing && lock > 0.9} color={accent} />
+              <FloatingNotes playing={live && lock > 0.9} color={accent} />
             </View>
 
             <Text style={[fs.dragHint, { fontFamily: Fonts.mono }]}>tap am / fm  ·  drag to tune</Text>
@@ -1055,7 +1060,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
         <ModeCloseButton onPress={handleClose} />
 
-        <AmbientGlow active={visible && playing} beat={visible && playing && !musicSwitching && (spotify.track?.isPlaying ?? true)} trackKey={spotify.track?.title ?? null} color={eq[1]} />
+        <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
         {handoff && !spotify.track && <HandoffOverlay />}
         <PreviewGate onSilence={spotify.pause} />

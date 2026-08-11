@@ -88,8 +88,10 @@ const PALETTES: { label: string; color: string; gradientColors: [string, string,
 ];
 
 /**
- * The ring that marks the selected swatch is white, which is invisible on a
- * pale colour — Pearl, Ice, Sage. So it flips to near-black on light swatches.
+ * Ink for the tick on the selected swatch. White is invisible on a pale colour
+ * — Pearl, Ice, Sage — so it flips to near-black on light swatches. (The RING
+ * no longer needs this: it sits outside the swatch on the dark sheet, so it is
+ * always white.)
  * Perceived brightness, not a plain average: the eye weights green far more
  * than blue, and a plain mean calls #33C5FF light when it plainly isn't.
  */
@@ -338,14 +340,23 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
               {PALETTES.map((p) => (
                 <Pressable
                   key={p.label}
-                  style={[
-                    styles.paletteBtn,
-                    { backgroundColor: p.color },
-                    selectedPalette.label === p.label && styles.paletteBtnActive,
-                    selectedPalette.label === p.label && { borderColor: ringOn(p.color) },
-                  ]}
-                  onPress={() => !atLimit && setSelectedPalette(p)}
-                />
+                  style={styles.paletteCell}
+                  hitSlop={4}
+                  onPress={() => !atLimit && setSelectedPalette(p)}>
+                  <View style={[styles.paletteDot, { backgroundColor: p.color }]} />
+                  {selectedPalette.label === p.label && (
+                    <>
+                      {/* The ring sits OUTSIDE the swatch with a gap of sheet
+                          between them, so it neither eats into the colour nor
+                          has to compete with it — which is why it can simply
+                          be white on every swatch, pale ones included. */}
+                      <View style={styles.paletteRing} pointerEvents="none" />
+                      <MaterialCommunityIcons
+                        name="check-bold" size={16} color={ringOn(p.color)}
+                        style={styles.paletteTick} pointerEvents="none" />
+                    </>
+                  )}
+                </Pressable>
               ))}
             </View>
 
@@ -497,16 +508,32 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
   },
-  paletteBtn: {
+  paletteCell: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paletteDot: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
   },
-  paletteBtnActive: {
+  // Inset -4 into the row's 10pt gap, so the ring clears its neighbours by 6.
+  paletteRing: {
+    position: 'absolute',
+    top: -4, left: -4, right: -4, bottom: -4,
+    borderRadius: 20,
+    borderWidth: 2.5,
     borderColor: '#fff',
-    transform: [{ scale: 1.15 }],
+  },
+  paletteTick: {
+    position: 'absolute',
+    // A tick as well as a ring: with 25 swatches on screen, a ring alone still
+    // makes you hunt for which one is lit (owner, 11.08). Its colour flips on
+    // pale swatches — that is what ringOn is for now.
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowRadius: 3,
   },
   // ── Preview: one row off the Stations dial ───────────────────────────────
   // Column widths and type sizes are copied from stations.tsx on purpose —

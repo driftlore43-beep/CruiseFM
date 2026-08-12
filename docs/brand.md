@@ -60,9 +60,27 @@ still carries its name.**
 - Possessive of the short form in formal copy: write "Strofi Technologies'
   privacy policy", not "Strofi's privacy policy" — the second reads as the app.
 
-**Pronunciation and meaning.** Not recorded anywhere. If there is an intended
-pronunciation or origin, write it here — it will be asked, and a coined name
-with no story invites people to invent one.
+### Where the name comes from (owner, 12 August 2026)
+
+**Strofi** is from the Greek **στροφή** — *strofí* — which in English became
+**strophe**.
+
+It means **a turn, or a bend.** In literature a *strophe* is a structural
+section of a poem — and, in its older sense, a turn at a familiar landmark.
+
+That is an unusually good fit, and it is worth using rather than leaving in a
+file:
+
+- **A bend in the road** is the most literal thing a driving product could be
+  named after.
+- **A section of a poem** is what both products actually deal in — Cruise FM
+  divides listening into moods rather than genres; Strofi divides a journey into
+  a route worth repeating.
+- **A turn at a familiar landmark** is navigation described the way people
+  actually give directions.
+
+Say it **STRO-fee**. Write the Greek form only where there is room to explain
+it; never as the name itself.
 
 ---
 
@@ -138,12 +156,12 @@ Stated plainly, because brand documents are where wishful thinking accumulates.
 
 | | Status |
 |---|---|
-| Name chosen | **Yes** — 9 August 2026 |
+| Name chosen | **Yes** — 9 August 2026. Meaning and pronunciation recorded 12.08, see §2. |
 | Used in product, legal and web copy | **Yes** — see §4 |
 | Legally registered company | **Not as far as this repo records.** Nothing here evidences an incorporation. Only the owner can confirm. |
-| Trademark filed | **No** |
+| Trademark filed | **No** — owner agreed to start on 12.08. See §7. |
 | Logo / visual identity | **No** — deliberately not started |
-| Domain owned | **No dedicated domain.** Cruise FM lives at `cruisefm.netlify.app`; `cruisefm.app` was never registered. |
+| Domain owned | **No dedicated domain.** Cruise FM lives at `cruisefm.netlify.app`. Owner agreed to change this on 12.08 — see §9a. |
 | Company bank account, VAT, trader status | **Unknown / not recorded** |
 
 **Do not write "Ltd", "Limited", "Inc" or any suffix until an entity exists.**
@@ -186,9 +204,70 @@ how good names get thrown away.
   Ocaso, Glovebox, Highbeam** — all had software or App Store namesakes, several
   in transport or fintech, one publicly traded.
 
-**Before spending anything on a logo,** run a proper trademark search in the
-territories that matter (UK IPO, EUIPO, USPTO). A visual identity built on a
-name that cannot be registered is money spent twice.
+### Where to actually look (owner asked, 12.08)
+
+There is no single register. These are the authoritative ones, all free:
+
+| What | Where |
+|---|---|
+| **UK trade marks** | `gov.uk/search-for-trademark` |
+| **UK companies** | `find-and-update.company-information.service.gov.uk` |
+| **EU trade marks** | `euipo.europa.eu` → eSearch plus |
+| **US trade marks** | `tmsearch.uspto.gov` |
+| **Many registers at once** | `branddb.wipo.int` — WIPO's Global Brand Database. Start here. |
+| **Greek trade marks** | `obi.gr` — the Hellenic Industrial Property Organisation |
+
+### The Greek restaurant, and the song
+
+Both were found by the owner, and **neither is likely to be a blocker.** This is
+the single most misunderstood thing about trade marks, so it is worth stating
+properly:
+
+**A trade mark is registered per CLASS and per TERRITORY, not over a word.** The
+same word can be registered by different people for different kinds of goods.
+There are 45 classes; the ones that matter here are:
+
+- **Class 9** — downloadable software and mobile apps *(the main one)*
+- **Class 42** — software as a service, software design and development
+- **Class 41** — entertainment services *(possibly, for the visual side)*
+- **Class 43** — *services for providing food and drink* ← **a restaurant**
+
+A taverna in Athens registered in Class 43 does not stop a UK or EU software
+mark in Classes 9 and 42. Different class, different territory, and no realistic
+prospect of a consumer confusing a restaurant with a driving app.
+
+**A song is not a trade mark at all.** Song titles are not registrable as marks
+in the ordinary case, and a recording is protected by copyright, which is a
+different right entirely. It has no bearing on this.
+
+**What WOULD be a problem**, and what the search is actually for: an existing
+mark in **Class 9 or 42**, in the **UK or EU**, for something a person might
+confuse with this — another app, a music service, a navigation product. That is
+the search to run, and it is narrower and more answerable than "is anyone called
+Strofi".
+
+### Filing — what it involves
+
+Owner is happy to proceed (12.08). Order of operations:
+
+1. **Search first**, in the classes and territories above. Filing into a
+   conflict wastes the fee — it is not refunded.
+2. **Decide the territory.** The UK is home and the obvious first filing. The EU
+   is a single filing covering all member states and costs more. The US only
+   matters once there are US users worth defending.
+3. **Decide the classes.** Realistically **9 and 42**. Adding classes you do not
+   trade in is a common and expensive mistake.
+4. **File.** Online, directly with the IPO — no attorney is required for a
+   straightforward word mark, and this is a word mark with no logo, which is the
+   simplest case there is.
+
+**UK fees, from 1 April 2026:** **£205** for the first class, **£60** for each
+additional class. That was the first increase since 1998, so figures quoted in
+older guidance will be wrong — confirm on the IPO's own page before paying.
+
+**Register the WORD, not a logo.** A word mark protects the name however it is
+set, which is broader than a logo mark and cannot be outdated by a redesign.
+This is also why the logo can wait: the valuable registration does not need one.
 
 ---
 
@@ -210,6 +289,47 @@ is ever needed, describe what the company **makes**, not what it **feels**.
 
 ---
 
+## 9a. The domain
+
+`cruisefm.netlify.app` is **printed on every share card that leaves the app.**
+It is the one piece of the brand that reaches strangers, and it currently
+advertises the hosting company.
+
+A domain is the cheapest, most visible upgrade available — around £10–35 a year
+depending on the ending.
+
+**What is already taken** (checked 12.08 by DNS; a domain that resolves is
+definitely registered, but one that does not resolve is *not* proof it is free —
+confirm at a registrar before planning around it):
+
+| Domain | Status |
+|---|---|
+| `strofi.com` | **Taken** — resolves |
+| `cruisefm.com` | **Taken** — resolves |
+| `cruisefm.co.uk` | **Taken** — resolves |
+| `strofi.app`, `strofi.tech`, `strofi.co.uk` | No DNS — possibly free |
+| `strofitechnologies.com` | No DNS — possibly free |
+| `cruisefm.app`, `cruise.fm` | No DNS — possibly free |
+
+**Two domains are wanted, and they do different jobs:**
+
+1. **One for Cruise FM**, because that is what goes on the share cards.
+   `cruisefm.app` is the natural fit and appears to be free — and `.app` is
+   worth knowing about: it is on the HSTS preload list, so it is **https-only by
+   design**, which is a small mark of seriousness. `cruise.fm` is the prettiest
+   option by some distance, but `.fm` domains are priced as a novelty
+   (typically £70–150 a year) — worth it only if the name is staying for good.
+2. **One for the company** — `strofi.tech` or `strofitechnologies.com`. It needs
+   to hold a one-page site saying what the company is and how to contact it,
+   which is also useful when applying for anything.
+
+**Whichever is chosen, the address is printed in the app**
+(`INSTALL_HOST` in `ShareCardStyles.tsx` and `INSTALL_URL` in `ShareCard.tsx` —
+they must move together), so switching is a code change plus a Netlify domain
+setting, not just a purchase.
+
+---
+
 ## 9. Rules for the future
 
 - **A new product does not need a new company.** It ships as "A Strofi
@@ -225,16 +345,21 @@ is ever needed, describe what the company **makes**, not what it **feels**.
 
 ---
 
-## 10. Open questions for the owner
+## 10. Decided, and still open
 
-Only you can answer these, and each changes what should be written above:
+**Answered 12 August 2026**
 
-1. **Is there a registered entity?** If so, its exact legal name and number
-   belong in §6, and the Terms should name it precisely.
-2. **What does "Strofi" mean, and how is it said?** Worth recording before
-   someone else decides.
-3. **Trademark — worth filing?** Cheap now, and the answer decides whether a
-   logo is worth commissioning.
-4. **A dedicated domain?** `cruisefm.netlify.app` is the live address and is
-   printed on every share card. A real domain is the single most visible
-   upgrade available to the brand, and it is inexpensive.
+1. **Meaning and pronunciation** — recorded in §2. στροφή / strophe: a turn, a
+   bend, a section of a poem.
+2. **Trademark** — going ahead. §7 has the registers, the classes and the fees.
+3. **Domain** — going ahead. §9a has what is taken and what to weigh.
+
+**Still open — only the owner can answer**
+
+1. **Is there a registered entity?** If so, its exact legal name and company
+   number belong in §6, and the Terms should name it precisely. If not, §6 says
+   when it starts to matter.
+2. **Which domains?** The choice in §9a between `cruisefm.app` (practical) and
+   `cruise.fm` (memorable, several times the price).
+3. **A logo — when?** Not before the trademark search comes back clean. A word
+   mark is the valuable registration and needs no logo, so there is no rush.

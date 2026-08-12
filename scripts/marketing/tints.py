@@ -5,8 +5,14 @@ import colorsys, glob, os, json
 
 SHOTS = 'screenshots-appstore'
 out = {}
-for p in sorted(glob.glob(f'{SHOTS}/*.jpg')):
-    im = Image.open(p).convert('RGB').resize((160, 346))
+# The .png entries are the rendered share cards rather than device screenshots,
+# and the rule is the same: the surround is sampled from whatever the slide
+# actually shows. Resize to each file's own shape — squashing a near-square
+# card into a phone's aspect would not change the average, but it would make
+# the next person doubt the numbers.
+for p in sorted(glob.glob(f'{SHOTS}/*.jpg') + glob.glob(f'{SHOTS}/*.png')):
+    src = Image.open(p).convert('RGB')
+    im = src.resize((160, max(1, round(160 * src.height / src.width))))
     wr = wg = wb = wt = 0.0
     for r, g, b in im.getdata():
         h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)

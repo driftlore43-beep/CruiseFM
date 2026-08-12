@@ -23,10 +23,12 @@ time with no review at all.
 
 ## Promotional text (170 characters — editable any time, no review)
 
-> Apple Music and Spotify both play inside Cruise FM now, with the controls on
-> the card. Ten mood stations, eight full-screen modes, all free.
+> New: put your own photo behind a station you made. Apple Music plays inside
+> Cruise FM with the controls on the card. Ten moods, eight modes, all free.
 
-(146 characters.)
+(150 characters.) Refreshed 12.08 for 1.3.0. This is the one field that can be
+edited at any time with **no review**, so it is the right place to lead with
+whatever shipped most recently.
 
 ## Keywords (100 characters, comma-separated, no spaces after commas)
 
@@ -75,16 +77,33 @@ rather than submitting for it alone.
 
 ## Description (max 4000 characters)
 
-> Spotify organises music by artist. Cruise FM organises it by how a drive feels.
+Rewritten 12.08 at the owner's request — "can we change the description to
+focus more on Apple users." It was Spotify-first from the opening line down,
+which is backwards on two counts: this is an **iOS-only app**, so everyone
+reading it is already in Apple's world; and Apple Music is the platform where
+Cruise FM actually works properly for everyone. Spotify's developer tier caps
+us at **five** accounts with full in-app control, so for almost every reader
+"connect Spotify" means the visual layer and nothing more, while any Apple
+Music subscriber gets the whole thing. Leading with Spotify was selling the
+thing most people cannot have.
+
+Nothing has been dropped — Spotify is still named in the same three places,
+just second. And nothing overclaims: the fifth paragraph still says plainly
+what happens without a subscription.
+
+> Cruise FM turns your iPhone into the dashboard your music deserves.
 >
-> Pick a mood station, tap Start Drive, and your dashboard becomes the film your
-> music deserves.
+> Apple organises music by artist. Cruise FM organises it by how a drive feels.
+> Pick a mood station, tap Start Drive, and the screen becomes a cassette deck,
+> a turning record, a mirror ball scattering light around the car.
 >
-> YOUR MUSIC, YOUR ACCOUNT
-> Connect Apple Music or Spotify and play your own playlists with full control
-> inside Cruise FM — play, pause, skip, scrub the track, pick a song from the
-> queue. Listening on something else? Press play in your own app and Cruise FM
-> runs the visuals alongside it.
+> BUILT FOR APPLE MUSIC
+> Connect Apple Music and play your own playlists with full control inside
+> Cruise FM — play, pause, skip, scrub the track, pick a song from the queue.
+> Album art lands on the record and the disc. Your Music app keeps the lock
+> screen and CarPlay controls, exactly as it should. Spotify Premium works the
+> same way; on anything else, press play in your own app and Cruise FM runs the
+> visuals alongside it.
 >
 > TEN MOOD STATIONS
 > Night Run. Sunset. Daylight. Rain Drive. Coastal. Mountain Pass. After Hours.
@@ -117,7 +136,8 @@ rather than submitting for it alone.
 > Cruise FM controls your own Apple Music or Spotify app — it does not stream,
 > download or store any music itself. Full in-app playback needs an Apple Music
 > subscription or Spotify Premium; without either, Cruise FM runs as the visual
-> layer while you play music in your own app.
+> layer while you play music in your own app. Nothing about you leaves your
+> phone: no account, no sign-up, no tracking.
 >
 > Please don't watch the screen while you're driving. That's what passengers
 > are for.

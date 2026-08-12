@@ -837,7 +837,10 @@ function Y2KStyle(p: StyleProps) {
   // The two seven-segment wells are 168 wide with a 52 margin, so the
   // trough starts clear of them on both sides.
   const barX = WX + 196, barW = WW - 196 - 196;
-  const pct = track?.durationMs ? Math.min(1, (track.progressMs ?? 0) / track.durationMs) : 0.42;
+  // Zero when there is no track, not a decorative 0.42 — the times either side
+  // read 0:00 in that case, and a bar sitting 42% along beside them says two
+  // different things at once.
+  const pct = track?.durationMs ? Math.min(1, (track.progressMs ?? 0) / track.durationMs) : 0;
 
   const btn = (i: number) => panelX + i * 76;
 
@@ -867,7 +870,25 @@ function Y2KStyle(p: StyleProps) {
       <Bevel x={artX - 10} y={artY - 10} w={ART + 20} h={ART + 20} sunken face="#6b6b6b" e={4} />
       {d.art
         ? <SvgImage x={artX} y={artY} width={ART} height={ART} href={{ uri: d.art }} preserveAspectRatio="xMidYMid slice" />
-        : <Rect x={artX} y={artY} width={ART} height={ART} fill={mixHex(d.eq[1], '#20202a', 0.55)} />}
+        : (
+          /* No cover — companion listeners have no track at all, and a cover
+             can be a moment late even when there is one. A flat tinted square
+             is the one thing in this well that reads as a bug rather than a
+             design, so it falls back to the STATION'S OWN PHOTOGRAPH, which is
+             what the card is about anyway. Under a wash, or a bright picture
+             fights the grey chrome around it. Custom stations may still have
+             no picture, and those keep the tint. */
+          <>
+            <Rect x={artX} y={artY} width={ART} height={ART} fill={mixHex(d.eq[1], '#20202a', 0.55)} />
+            {!!d.backdrop && (
+              <>
+                <SvgImage x={artX} y={artY} width={ART} height={ART} href={d.backdrop as string}
+                  preserveAspectRatio="xMidYMid slice" />
+                <Rect x={artX} y={artY} width={ART} height={ART} fill="#0b0b12" opacity={0.22} />
+              </>
+            )}
+          </>
+        )}
 
       {/* ── the disc ── */}
       {(() => {

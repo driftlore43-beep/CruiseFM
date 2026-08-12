@@ -15,6 +15,7 @@ import { Cruise, Fonts, TAB_SAFE_INSET, PAGE_GUTTER } from '@/constants/theme';
 import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { deleteCustomStation, isCustomStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
+import { consumeCreateRequest } from '@/utils/createStationRequest';
 import { recordDriveStart } from '@/utils/driveStats';
 import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
 
@@ -194,6 +195,40 @@ function SubHeader({ label }: { label: string }) {
 }
 
 /**
+ * The empty slot on the dial, shown only while the driver has no stations of
+ * their own.
+ *
+ * Making a station was previously discoverable only through the small Create
+ * button on the hero, so someone scrolling the dial had no way of learning the
+ * feature exists at all. A vacant frequency in the AM band says it in the
+ * page's own language — and it disappears the moment it stops being true,
+ * replaced by the YOUR STATIONS block.
+ */
+function EmptySlotRow({ onPress }: { onPress: () => void }) {
+  const day = useDaylight();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, styles.emptySlot, pressed && styles.rowPressed]}>
+      <View style={styles.numCol}>
+        <Text style={[styles.emptySlotDash, day && styles.emptySlotDashDay]}>— —</Text>
+      </View>
+      <Text style={[styles.rowName, styles.emptySlotName, day && styles.rowNameDay]} numberOfLines={1}>
+        Your own station
+      </Text>
+      <View style={styles.rowTrail}>
+        <View style={styles.iconSlot}>
+          <MaterialCommunityIcons name="plus" size={20} color={Cruise.amber} />
+        </View>
+        <View style={styles.ctrlSlot}>
+          <Ionicons name="chevron-forward" size={16} color={day ? 'rgba(255,255,255,0.68)' : 'rgba(255,255,255,0.28)'} />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+/**
  * One station on the dial: number, name, its own colour as the icon, and a
  * hairline underneath. No card, no photograph, no rim.
  *
@@ -302,6 +337,9 @@ export default function StationsScreen() {
   useFocusEffect(useCallback(() => {
     fetchCustom();
     setOnAirStation(stationById(defaultStationForNow()));
+    // Someone pressed "make a station" on the home page and was sent here.
+    // Reading the request clears it, so arriving again later is quiet.
+    if (consumeCreateRequest()) setShowCreate(true);
   }, []));
 
   // AM = free + the user's own; FM = premium. Sorted up the dial within each
@@ -348,11 +386,13 @@ export default function StationsScreen() {
             dial={dial}
             tuned={station.id === tunedId}
             lcd={lcd}
-            last={i === amDefaults.length - 1 && amCustom.length === 0}
+            // Never the last row of the band any more: either YOUR STATIONS
+            // follows, or the empty slot does.
             onPress={() => setSelectedStation(station)}
           />
         ))}
         {amCustom.length > 0 && <SubHeader label="YOUR STATIONS" />}
+        {amCustom.length === 0 && <EmptySlotRow onPress={() => setShowCreate(true)} />}
         {amCustom.map(({ station, dial }, i) => (
           <StationRow
             key={station.id}
@@ -596,6 +636,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
   },
+  // The vacant frequency: no hairline (it is the last row of the band) and a
+  // quieter name than a real station's, so it reads as an offer rather than as
+  // something already on air.
+  emptySlot: { opacity: 0.92 },
+  emptySlotName: { color: 'rgba(255,255,255,0.72)', fontWeight: '600' },
+  emptySlotDash: {
+    color: 'rgba(255,255,255,0.30)',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -1,
+  },
+  emptySlotDashDay: { color: 'rgba(255,255,255,0.70)' },
   mineChip: {
     borderWidth: 1,
     borderColor: 'rgba(180,195,255,0.45)',

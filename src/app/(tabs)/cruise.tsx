@@ -1,15 +1,16 @@
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { ConnectMusicCard } from '@/components/ConnectMusicCard';
 import { ConnectSpotifyCard } from '@/components/ConnectSpotifyCard';
 import { SpotifyNudgeCard } from '@/components/SpotifyNudgeCard';
+import { MakeStationCard } from '@/components/MakeStationCard';
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
 import { HeroCard } from '@/components/HeroCard';
-import { ShelfCard, SHELF_CARD_W } from '@/components/ShelfCard';
+import { NewStationCard, ShelfCard, SHELF_CARD_W } from '@/components/ShelfCard';
 import { StationDetailModal } from '@/components/StationDetailModal';
 import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
@@ -24,7 +25,10 @@ import {
 } from '@/utils/lastCruise';
 import { recordDriveStart } from '@/utils/driveStats';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
-import { loadCustomStations, resolveAnyStation } from '@/utils/customStations';
+import {
+  customToStation, loadCustomStations, resolveAnyStation, type CustomStation,
+} from '@/utils/customStations';
+import { requestCreateStation } from '@/utils/createStationRequest';
 import { DEFAULT_DRIVER_NAME, getDriverName } from '@/utils/driverName';
 
 const recommended = STATIONS.filter((s) => RECOMMENDED_IDS.includes(s.id));
@@ -59,6 +63,7 @@ function greetingFor(hour: number, returning: boolean): string {
 
 export default function CruiseScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const np = useNowPlaying();
   const { isPro } = useEntitlements();
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
@@ -68,6 +73,10 @@ export default function CruiseScreen() {
   const [lastCruise, setLastCruise] = useState<LastCruise | null>(null);
   const [statsKey, setStatsKey] = useState(0);
   const [driverName, setDriverName] = useState(DEFAULT_DRIVER_NAME);
+  // The driver's own stations, which get the first shelf on this page — the
+  // more of yourself you have put into the app, the more of it should be yours
+  // when you open it.
+  const [mine, setMine] = useState<CustomStation[]>([]);
 
   // Refresh on every focus — the name, time of day, last cruise and stats move on.
   const [focused, setFocused] = useState(false);
@@ -78,7 +87,9 @@ export default function CruiseScreen() {
       setTonightPick(stationById(defaultStationForNow()));
       setStatsKey((k) => k + 1);
       getDriverName().then((n) => { if (active) setDriverName(n); });
-      loadCustomStations().then(() => loadLastCruise()).then((last) => { if (active) setLastCruise(last); });
+      loadCustomStations()
+        .then((list) => { if (active) setMine(list); return loadLastCruise(); })
+        .then((last) => { if (active) setLastCruise(last); });
       return () => { active = false; setFocused(false); };
     }, []),
   );
@@ -158,7 +169,40 @@ export default function CruiseScreen() {
           <ConnectSpotifyCard />
           <ConnectMusicCard />
           <SpotifyNudgeCard />
+          {/* Only ever appears once someone has actually listened a couple of
+              times, and never again after they make one — see the component. */}
+          <MakeStationCard />
         </View>
+
+        {/* YOUR stations come before ours. This is the whole point of the
+            section: ten moods somebody else chose is a product, and four you
+            made is yours, so the page should open with the second one as soon
+            as it exists. Absent until it does — an empty shelf teaches nothing
+            that the invitation card above doesn't say better. */}
+        {mine.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeading}>Your stations</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={SHELF_CARD_W + 14}
+              decelerationRate="fast"
+              contentContainerStyle={styles.shelf}>
+              {mine.map((c) => {
+                const station = customToStation(c);
+                return (
+                  <ShelfCard
+                    key={c.id}
+                    station={station}
+                    onPress={() => setSelectedStation(station)}
+                  />
+                );
+              })}
+              {/* The end of your own shelf is where "one more" occurs to you. */}
+              <NewStationCard onPress={() => { requestCreateStation(); router.push('/stations'); }} />
+            </ScrollView>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionHeading}>Recommended</Text>

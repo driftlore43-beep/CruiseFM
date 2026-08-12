@@ -74,6 +74,32 @@ export function ShelfCard({ station, onPress }: { station: Station; onPress?: ()
   );
 }
 
+/**
+ * The empty slot at the end of your own shelf.
+ *
+ * Deliberately the same size and rhythm as a station, but drawn as an outline
+ * rather than a picture — it reads as a space waiting to be filled instead of
+ * as another station you own. Only ever the LAST card on the "Your stations"
+ * shelf, where "one more" is the obvious next thought.
+ */
+export function NewStationCard({ onPress }: { onPress?: () => void }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const press = (to: number) =>
+    Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 42, bounciness: 5 }).start();
+
+  return (
+    <Animated.View style={{ width: SHELF_CARD_W, transform: [{ scale }] }}>
+      <Pressable onPress={onPress} onPressIn={() => press(0.96)} onPressOut={() => press(1)}>
+        <View style={[st.art, st.newArt]}>
+          <MaterialCommunityIcons name="plus" size={26} color="rgba(255,255,255,0.66)" />
+        </View>
+        <Text style={st.name} numberOfLines={1}>New station</Text>
+        <Text style={st.tag} numberOfLines={1}>your photo, your mood</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 const st = StyleSheet.create({
   art: {
     width: SHELF_CARD_W,
@@ -81,6 +107,13 @@ const st = StyleSheet.create({
     borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#0d0d14',
+  },
+  newArt: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.045)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
   },
   icon: {
     position: 'absolute',

@@ -210,6 +210,7 @@ There is no single register. These are the authoritative ones, all free:
 
 | What | Where |
 |---|---|
+| **Australian trade marks** | `search.ipaustralia.gov.au/trademarks/search/quick` — **home registry, search this first** |
 | **UK trade marks** | `gov.uk/search-for-trademark` |
 | **UK companies** | `find-and-update.company-information.service.gov.uk` |
 | **EU trade marks** | `euipo.europa.eu` → eSearch plus |
@@ -239,9 +240,18 @@ that came back empty prove less than they appear to.
 
 | Search | Result | What it means |
 |---|---|---|
-| EUIPO eSearch plus, `Strofi Technologies` | 0 in all four tabs | **Too narrow to rely on.** Nobody registers a two-word company name; the risk is someone owning *Strofi* on its own. Re-run with `Strofi`. |
+| EUIPO eSearch plus, `Strofi Technologies` | 0 in all four tabs | **Too narrow to rely on.** Nobody registers a two-word company name; the risk is someone owning *Strofi* on its own. Re-run with `Strofi` — the owner's follow-up link shows she did, result not yet recorded here. |
 | UK IPO, by word | no marks found | Same caveat, unless the word searched was `Strofi` alone. |
 | A multi-register search, `Strofi` | 6 hits | **This is the useful one.** See below. |
+| **IP Australia** | **not yet run** | The home registry, and the gap in the set. |
+
+**A note on evidence, learned the same day.** Neither the EUIPO nor the UK IPO
+result page can be shared as a link: EUIPO's eSearch keeps its state in the part
+of the URL after the `#`, which its own page reads only on load, and the UK
+IPO's results live behind a form POST, so its `/page/Results` address carries no
+query at all. Both open a blank search for anyone else. **Screenshots are the
+only reliable record** of a search on either site — which is what makes the
+third search above usable and the first two hard to verify.
 
 The six hits, and the pattern in them:
 
@@ -298,37 +308,66 @@ confuse with this — another app, a music service, a navigation product. That i
 the search to run, and it is narrower and more answerable than "is anyone called
 Strofi".
 
-### Filing — what it involves
+### THE OWNER IS IN AUSTRALIA — corrected 12.08
 
-Owner is happy to proceed (12.08). Order of operations:
+**This section previously assumed the UK was home. It is not.** The owner is
+in Australia; the App Store record already said so (base price AUD 0) and it
+was read past. Everything about the *order* of filing changes as a result, so
+the correction is recorded rather than quietly edited.
 
-1. **Search first**, in the classes and territories above. Filing into a
-   conflict wastes the fee — it is not refunded.
-2. **Decide the territory.** The UK is home and the obvious first filing. The EU
-   is a single filing covering all member states and costs more. The US only
-   matters once there are US users worth defending.
-3. **Decide the classes.** Realistically **9 and 42**. Adding classes you do not
-   trade in is a common and expensive mistake.
-4. **File.** Online, directly with the IPO — no attorney is required for a
-   straightforward word mark, and this is a word mark with no logo, which is the
-   simplest case there is.
+**The home registry is [IP Australia](https://www.ipaustralia.gov.au).** Search
+at `search.ipaustralia.gov.au/trademarks/search/quick`, or via **TM Checker**,
+which is IP Australia's own free pre-filing check. As of 12.08 **this search has
+not been run**, and it is the most important one on the list — none of the EU,
+UK or worldwide searches say anything about who holds *Strofi* in Australia.
 
-**UK fees, from 1 April 2026:** **£205** for the first class, **£60** for each
-additional class. That was the first increase since 1998, so figures quoted in
-older guidance will be wrong — confirm on the IPO's own page before paying.
-Classes 9 and 42 together: **£265**.
+**Australian fees:** **AUD $250 per class** for a standard application using the
+picklist (the pre-approved list of goods and services descriptions — writing
+your own costs more). Classes 9 and 42 together: **$500**. **TM Headstart** is
+IP Australia's pre-application service: an examiner looks at the mark before you
+commit, **$330 per class** all in. For a first filing with nobody advising, the
+extra $80 a class buys a professional opinion before the money is spent, which
+is good value.
 
-**EU fees (EUTM, filed online):** **€850** for the first class, **€50** for the
-second, **€150** for each class from the third. Classes 9 and 42 together:
-**€900**. One filing covers all member states, which is why it is worth roughly
-three times the UK — it is not three times the paperwork.
+### Does the EU actually matter from Australia? (owner asked, 12.08)
 
-**The EUIPO SME Fund is worth a look and is NOT a plan to rely on.** It
-reimburses up to 75% of trade mark application fees, but two conditions bite:
-it is for **EU-established** SMEs, so a UK-only business does not qualify at
-all; and the 2026 trade-mark voucher has already been reported as **exhausted**
-for new applications. Check its current state before budgeting around it, and
-never delay a filing waiting for it.
+**A trade mark is territorial, so it follows your USERS, not your desk.** Being
+in Australia does not make the EU irrelevant — the app is on a global App Store
+and is downloadable across Europe today. What an EU right-holder could do, in
+principle, is object to the name being used there and ask Apple to pull the app
+from EU storefronts. That is the real exposure, and it is the same for the UK.
+
+But *could* is doing a lot of work in that sentence, and the searches so far
+say the risk is small: no Class 9, 42 or 41 mark turned up anywhere. So the
+proportionate answer is **not** to spend €900 in Europe now.
+
+**File Australia first, then keep the door open.** Two mechanisms make this
+work, and they are why sequencing beats filing everywhere at once:
+
+1. **The Paris Convention priority period.** File in Australia, and for the next
+   **six months** any filing abroad can claim the Australian date. So a European
+   filing made five months later is treated as if made on day one — anyone who
+   files in between does not get ahead of you.
+2. **The Madrid Protocol.** After the Australian application exists, one
+   international application through IP Australia can designate the EU, the UK,
+   the US and 120-odd other territories, with one form and one payment, instead
+   of separate filings in each.
+
+So: **Australia now; decide about Europe within six months**, by which point
+there will be actual evidence about where the users are. If the app has no
+European users, it can wait; if it does, Madrid picks it up at the original
+date.
+
+**Foreign fees, for when that decision comes.** EU trade mark (EUTM, online):
+**€850** first class, **€50** second, **€150** each from the third — classes 9
+and 42 together **€900**, covering all 27 member states in one filing. UK, from
+1 April 2026: **£205** first class, **£60** each additional — **£265** for the
+two. The UK left the EU system, so it is now a separate filing from the EUTM.
+
+**The EUIPO SME Fund does not apply.** It reimburses up to 75% of trade mark
+fees, but only for **EU-established** SMEs — an Australian business is not
+eligible on any reading. (Its 2026 trade-mark voucher is also reported
+exhausted.) Mentioned only so nobody rediscovers it and plans around it.
 
 **Register the WORD, not a logo.** A word mark protects the name however it is
 set, which is broader than a logo mark and cannot be outdated by a redesign.

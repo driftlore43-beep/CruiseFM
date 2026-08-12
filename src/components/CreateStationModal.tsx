@@ -21,7 +21,11 @@ import { useDsegFont } from '@/components/StationIdentity';
 import { stationDial } from '@/constants/stations';
 import { Cruise, Fonts } from '@/constants/theme';
 import { saveCustomStation, updateCustomStation, type CustomStation } from '@/utils/customStations';
-import { deleteStationPhoto, pickStationPhoto, stationPhotoAvailable, type StationPhoto } from '@/utils/stationPhoto';
+import {
+  choosePhoto, deleteStationPhoto, saveStationPhoto, stationPhotoAvailable,
+  type ChosenPhoto, type CropRect, type StationPhoto,
+} from '@/utils/stationPhoto';
+import { PhotoFrameSheet } from '@/components/PhotoFrameSheet';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -133,6 +137,9 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
   // A photo of their own, behind the station. Null keeps today's behaviour —
   // the chosen colour — which is what every station made before this had.
   const [photo, setPhoto] = useState<StationPhoto | null>(null);
+  // The photo they just chose, waiting to be framed. Held here rather than
+  // saved straight away, because the crop has to come off the ORIGINAL.
+  const [framing, setFraming] = useState<ChosenPhoto | null>(null);
   const [picking, setPicking] = useState(false);
   // Once the slide-in settles we drop the transform entirely — a lingering
   // transform on the sheet stops iOS Safari from focusing the text inputs.
@@ -304,9 +311,11 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
                     onPress={async () => {
                       if (picking) return;
                       setPicking(true);
-                      const r = await pickStationPhoto(previewId);
+                      const r = await choosePhoto();
                       setPicking(false);
-                      if (r.kind === 'photo') { setPhoto(r.photo); setError(''); }
+                      // Nothing is written yet — the framing sheet decides the
+                      // crop, and only then is anything saved.
+                      if (r.kind === 'chosen') { setFraming(r.photo); setError(''); }
                       else if (r.kind === 'failed') setError("That photo couldn't be used. Try another one.");
                     }}
                     style={[styles.photoBtn, !!photo && styles.photoBtnSet]}>
@@ -396,6 +405,24 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
           </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
+
+      {/* Framing. A second Modal over this one is fine — the create sheet is a
+          page-level modal, not one opened from inside a running drive, so the
+          iOS "no third window" rule the modes live under does not apply. */}
+      <PhotoFrameSheet
+        photo={framing}
+        onCancel={() => setFraming(null)}
+        onConfirm={async (crop: CropRect) => {
+          const chosen = framing;
+          setFraming(null);
+          if (!chosen) return;
+          setPicking(true);
+          const r = await saveStationPhoto(previewId, chosen.uri, crop);
+          setPicking(false);
+          if (r.kind === 'photo') { setPhoto(r.photo); setError(''); }
+          else if (r.kind !== 'cancelled') setError("That photo couldn't be used. Try another one.");
+        }}
+      />
     </Modal>
   );
 }

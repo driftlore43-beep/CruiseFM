@@ -109,34 +109,74 @@ export type PickResult =
  * gains access to anyone's photos. Worth re-checking on the first real build
  * rather than trusting it here.
  */
-export async function pickStationPhoto(stationId: string): Promise<PickResult> {
+/** A chosen photo, before any framing — the raw asset the picker returned. */
+export type ChosenPhoto = { uri: string; width: number; height: number };
+
+/** A rectangle in the SOURCE image's own pixels. */
+export type CropRect = { originX: number; originY: number; width: number; height: number };
+
+export type ChooseResult =
+  | { kind: 'chosen'; photo: ChosenPhoto }
+  | { kind: 'cancelled' }
+  | { kind: 'unavailable' }
+  | { kind: 'failed' };
+
+/**
+ * Step one: choose the photo. No processing, no writing — this hands back the
+ * asset so the framing step can crop from the ORIGINAL.
+ *
+ * DELIBERATELY NO `allowsEditing`. It sounds like the right thing — let them
+ * frame it — but on iOS it forces a SQUARE crop and ignores `aspect` entirely
+ * (expo-image-picker's own types say so). That would make someone crop a
+ * landscape photo of their car into a square for something that ends up as a
+ * tall full-screen backdrop, losing most of it twice over. The app's own
+ * framing step does the job properly, against the shape the photo will
+ * actually be seen at.
+ */
+export async function choosePhoto(): Promise<ChooseResult> {
   const m = modules();
   if (!m) return { kind: 'unavailable' };
   try {
-    // DELIBERATELY NO `allowsEditing`. It sounds like the right thing — let
-    // them frame it — but on iOS it forces a SQUARE crop and ignores `aspect`
-    // entirely (expo-image-picker's own types say so). That would make someone
-    // crop a landscape photo of their car into a square for something that
-    // ends up as a tall full-screen backdrop, losing most of it twice over.
-    // Taking the whole photo is better: every place it appears already fits it
-    // with `contentFit="cover"`, which crops correctly for that box — the
-    // backdrop, the card and the hero each want a different shape anyway.
-    const picked = await m.picker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 1,
-    });
+    const picked = await m.picker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     if (picked.canceled || !picked.assets?.length) return { kind: 'cancelled' };
+    const a = picked.assets[0];
+    if (!a.uri || !a.width || !a.height) return { kind: 'failed' };
+    return { kind: 'chosen', photo: { uri: a.uri, width: a.width, height: a.height } };
+  } catch {
+    return { kind: 'failed' };
+  }
+}
 
+/**
+ * Step two: save what they framed.
+ *
+ * THE CROP HAPPENS FIRST, on the original. Cropping a copy we had already
+ * shrunk would throw away detail we still needed — which is the whole reason
+ * choosing and saving are separate calls rather than one.
+ *
+ * `crop` is in the source image's own pixels and is clamped here rather than
+ * trusted: manipulateAsync throws on a rectangle that leaves the image, and a
+ * rounding error at the edge is very easy to produce from a gesture. Omit it
+ * to keep the whole photo.
+ */
+export async function saveStationPhoto(
+  stationId: string,
+  src: string,
+  crop?: CropRect,
+): Promise<PickResult> {
+  const m = modules();
+  if (!m) return { kind: 'unavailable' };
+  try {
     await ensureDir();
-    const src = picked.assets[0].uri;
     const stamp = Date.now(); // new name each time, so the old file can't be cached in its place
+    const pre = crop ? [{ crop }] : [];
 
-    const full = await m.manip.manipulateAsync(src, [{ resize: { width: FULL_W } }], {
+    const full = await m.manip.manipulateAsync(src, [...pre, { resize: { width: FULL_W } }], {
       compress: 0.82, format: m.manip.SaveFormat.JPEG,
     });
     // Downscale only. Quality stays high because this is NOT pre-blurred —
     // the softening happens on screen, so there is real detail worth keeping.
-    const tiny = await m.manip.manipulateAsync(src, [{ resize: { width: SOFT_W } }], {
+    const tiny = await m.manip.manipulateAsync(src, [...pre, { resize: { width: SOFT_W } }], {
       compress: 0.8, format: m.manip.SaveFormat.JPEG,
     });
 
@@ -151,6 +191,52 @@ export async function pickStationPhoto(stationId: string): Promise<PickResult> {
   } catch {
     return { kind: 'failed' };
   }
+}
+
+/**
+ * The framing maths, kept OUT of the component so it can be tested for real.
+ * A mock of this arithmetic would prove nothing about what ships — the
+ * repeated lesson from the probes in this repo.
+ *
+ * The model: `scale` maps image pixels to screen points, and (tx, ty) is the
+ * top-left of the displayed image in the stage's coordinates. The frame is a
+ * fixed rectangle in those same coordinates.
+ */
+
+/** The smallest scale at which the photo still fills the frame. Also the floor
+ *  on zooming out — below it you would see through to the background. */
+export function coverScale(imgW: number, imgH: number, frameW: number, frameH: number): number {
+  return Math.max(frameW / imgW, frameH / imgH);
+}
+
+/**
+ * The frame, expressed in the photo's own pixels — from the scroll view's own
+ * numbers rather than from a gesture.
+ *
+ * `base` is the scale the photo is laid out at (cover), `zoom` is the scroll
+ * view's zoomScale, and `offset` is its contentOffset, which iOS reports in
+ * ZOOMED points — so both divisions are needed, in that order.
+ */
+export function cropFromScroll(
+  offsetX: number, offsetY: number, zoom: number, base: number,
+  frameW: number, frameH: number,
+): CropRect {
+  const k = base * Math.max(zoom, 0.0001);
+  return { originX: offsetX / k, originY: offsetY / k, width: frameW / k, height: frameH / k };
+}
+
+/** Keep a crop inside the image, in whole pixels. A gesture can land a
+ *  fraction of a pixel outside, and manipulateAsync throws rather than
+ *  clamping. */
+export function clampCrop(c: CropRect, imgW: number, imgH: number): CropRect {
+  const width = Math.max(1, Math.min(Math.round(c.width), imgW));
+  const height = Math.max(1, Math.min(Math.round(c.height), imgH));
+  return {
+    width,
+    height,
+    originX: Math.max(0, Math.min(Math.round(c.originX), imgW - width)),
+    originY: Math.max(0, Math.min(Math.round(c.originY), imgH - height)),
+  };
 }
 
 /**

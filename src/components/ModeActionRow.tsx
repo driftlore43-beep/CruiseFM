@@ -186,7 +186,10 @@ export function ModeActionRow({
 
   const isPlaylist = (uri?: string | null) =>
     !!/^spotify:playlist:[A-Za-z0-9]+$/.exec(uri ?? '') || !!/^applemusic:playlist:.+$/.exec(uri ?? '');
-  const usableLinked = usableUri(linkedUri);
+  // The LINKED playlist no longer needs judging: playlists are stored per
+  // service, so the store already returned the one this platform can play.
+  // `contextUri` still does — that is whatever the service itself reports.
+  const usableLinked = linkedUri ?? null;
   const canList = isPlaylist(usableUri(contextUri)) || isPlaylist(usableLinked);
   // The mode's own name for the card. Read from the session rather than passed
   // in by each mode — one less prop for eight callers to keep in step.

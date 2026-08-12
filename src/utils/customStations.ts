@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STATIONS, type Station } from '@/constants/stations';
+import { clearStationPlaylistAll } from '@/utils/stationPlaylists';
 import { deleteStationPhoto } from '@/utils/stationPhoto';
 
 const KEY = 'cruise_custom_stations';
@@ -77,6 +78,9 @@ export async function deleteCustomStation(id: string): Promise<void> {
   // Take its photo with it — otherwise a deleted station leaves a file on the
   // phone forever, and nothing would ever go looking for it again.
   await deleteStationPhoto(id).catch(() => {});
+  // …and its linked playlists, BOTH services'. Same reasoning: nothing would
+  // ever look them up again, and a recreated station would inherit a stranger.
+  await clearStationPlaylistAll(id).catch(() => {});
 }
 
 /** Blend two hex colours — used to spread one chosen colour into a mood ramp. */

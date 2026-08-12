@@ -32,6 +32,7 @@ import { appleMusicAvailable, isApplePlaylist } from '@/utils/appleMusic';
 import { getSavedPlatform } from '@/utils/musicPlatform';
 import {
   getStationPlaylist,
+  getStationPlaylistSlots,
   setStationPlaylist,
   type LinkedPlaylist,
 } from '@/utils/stationPlaylists';
@@ -108,6 +109,8 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const slideY = useRef(new Animated.Value(0)).current;
   const [selectedMode, setSelectedMode] = useState('cassette');
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
+  // Both services' choices, so the page can reassure rather than look empty.
+  const [slots, setSlots] = useState<Partial<Record<string, LinkedPlaylist>>>({});
   const [linkToast, setLinkToast] = useState<string | null>(null);
   const [spotifyPlatform, setSpotifyPlatform] = useState(true);
   const [applePlatform, setApplePlatform] = useState(false);
@@ -120,7 +123,11 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
       setSelectedMode('cassette');
       setShowMenu(false);
       setConfirmDelete(false);
-      if (station) getStationPlaylist(station.id).then(setLinked);
+      if (station) {
+        getStationPlaylist(station.id).then(setLinked);
+        // What is saved for the OTHER service — only to offer a hint, never to play.
+        getStationPlaylistSlots(station.id).then(setSlots);
+      }
       getSavedPlatform().then((p) => {
         setSpotifyPlatform(p === 'spotify' || p == null);
         setApplePlatform(p === 'appleMusic');
@@ -243,8 +250,14 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
    * agree: a link only counts if it belongs to the platform in use.
    */
   const appleActive = applePlatform && appleMusicAvailable();
-  const linkUsable = !!linked && (appleActive ? isApplePlaylist(linked.uri) : !isApplePlaylist(linked.uri));
-  const needsPlaylist = !linkUsable && (spotifyPlatform || appleActive);
+  // Playlists are stored PER SERVICE now, so `linked` can only ever be one this
+  // platform can play — the 04.08 mismatch is impossible by construction rather
+  // than caught after the fact. What survives is the useful half of that fix:
+  // if the other service has one, say so, because "add a playlist" alone would
+  // read as though their earlier choice had been thrown away. Which is what
+  // used to happen.
+  const otherPlaylist = appleActive ? slots.spotify : slots.appleMusic;
+  const needsPlaylist = !linked && (spotifyPlatform || appleActive);
   const tint = appleActive ? PLATFORM_TINT.apple : PLATFORM_TINT.spotify;
 
   return (
@@ -373,17 +386,17 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
               style={[styles.playlistBtnIcon, { color: tint.solid }]} />
             <View style={{ flex: 1 }}>
               <Text style={styles.playlistBtnText}>
-                {linkUsable ? linked!.name : 'Add your playlist'}
+                {linked ? linked.name : 'Add your playlist'}
               </Text>
               <Text style={styles.playlistBtnSub}>
-                {linkUsable
+                {linked
                   ? 'Tap to change'
-                  : linked
-                    // Saved for the other platform: say so, rather than
-                    // silently showing a name that cannot play.
+                  : otherPlaylist
+                    // Their other service's choice is safe — say so, or this
+                    // reads as though it had been lost.
                     ? (appleActive
-                        ? `“${linked.name}” is a Spotify playlist — pick an Apple Music one`
-                        : `“${linked.name}” is an Apple Music playlist — pick a Spotify one`)
+                        ? `“${otherPlaylist.name}” is saved for Spotify — pick an Apple Music one too`
+                        : `“${otherPlaylist.name}” is saved for Apple Music — pick a Spotify one too`)
                     : needsPlaylist
                       ? 'Give your station its sound'
                       : appleActive
@@ -465,6 +478,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
             onPick={async (pl) => {
               const changed = linked?.uri !== pl.uri;
               await setStationPlaylist(station.id, pl);
+              getStationPlaylistSlots(station.id).then(setSlots);
               setLinked(pl);
               setShowPicker(false);
               if (changed) {

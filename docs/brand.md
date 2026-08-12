@@ -243,7 +243,51 @@ that came back empty prove less than they appear to.
 | EUIPO eSearch plus, `Strofi Technologies` | 0 in all four tabs | **Too narrow to rely on.** Nobody registers a two-word company name; the risk is someone owning *Strofi* on its own. Re-run with `Strofi` — the owner's follow-up link shows she did, result not yet recorded here. |
 | UK IPO, by word | no marks found | Same caveat, unless the word searched was `Strofi` alone. |
 | A multi-register search, `Strofi` | 6 hits | **This is the useful one.** See below. |
-| **IP Australia** | **not yet run** | The home registry, and the gap in the set. |
+| **IP Australia TM Checker**, `Strofi` | **no Strofi**; 20 flagged as similar | The home registry has the word free. See below for what the 20 are. |
+
+### The 20 "similar" marks TM Checker flagged (12.08)
+
+**No Australian registration for *Strofi*.** That is the finding. The warning
+beside it is TM Checker's similarity check, which is deliberately
+over-inclusive — it is built to make you look, not to refuse anything, and a
+short invented word assembled from two very common fragments (`STRO-` and
+`-OFI`) will always pull a long list.
+
+What it returned: STRO, STROW, STROBE, STROBO, STROFT, STROM, STROOM, STROXX,
+STROMAG, STRAFE, SOFI, ROFI, SANOFI, SANOFI GENZYME, and a handful of logo
+marks. **None of them is *Strofi*.**
+
+**THE TEST HAS TWO LIMBS AND BOTH MUST BE MET.** A mark is only an obstacle if
+it is deceptively similar **and** covers similar or closely related goods and
+services. TM Checker's tiles show neither the class nor the owner, so the list
+on its own cannot tell you anything — the work is to open the closest few and
+ask *what class is it in*. Only **9, 42 and 41** matter here.
+
+Worth opening first, on sound rather than spelling:
+
+- **SANOFI** and **SANOFI GENZYME** — same length, same `S···OFI` skeleton, and
+  Sanofi is a global pharmaceutical company. Famous marks get wider protection
+  than their own goods, so this is the one to look at properly even though
+  medicines and a driving app are far apart.
+- **SOFI** — a well-known financial-services brand with a consumer app, so
+  plausibly in Class 9 or 42.
+- **STROFT** — one letter away in writing.
+- **STROM / STROOM / STROMAG** — industrial-sounding; likely Class 7 or 9,
+  which is why they are worth a glance rather than a shrug.
+
+### Australia examines this itself — the EU and UK do not
+
+A genuine difference, and it changes what the list above is worth. Under
+**section 44** of the Trade Marks Act 1995, an IP Australia examiner searches
+the register themselves and **must** raise an objection if an earlier mark is
+substantially identical or deceptively similar for similar or closely related
+goods. Neither the EUIPO nor the UK IPO does this — there, an application is
+only refused on those grounds if the earlier owner actively opposes it.
+
+So in Australia these similars can be raised by the office itself, not only by
+a rival who happens to be paying attention. That is exactly why **TM Headstart
+is now the right route rather than filing blind**: the same examiners give a
+preliminary opinion before the full fee is committed.
 
 **A note on evidence, learned the same day.** Neither the EUIPO nor the UK IPO
 result page can be shared as a link: EUIPO's eSearch keeps its state in the part
@@ -317,17 +361,18 @@ the correction is recorded rather than quietly edited.
 
 **The home registry is [IP Australia](https://www.ipaustralia.gov.au).** Search
 at `search.ipaustralia.gov.au/trademarks/search/quick`, or via **TM Checker**,
-which is IP Australia's own free pre-filing check. As of 12.08 **this search has
-not been run**, and it is the most important one on the list — none of the EU,
-UK or worldwide searches say anything about who holds *Strofi* in Australia.
+which is IP Australia's own free pre-filing check. **Run 12.08: no Australian
+registration for *Strofi*** — see the similarity results recorded above.
 
 **Australian fees:** **AUD $250 per class** for a standard application using the
 picklist (the pre-approved list of goods and services descriptions — writing
 your own costs more). Classes 9 and 42 together: **$500**. **TM Headstart** is
 IP Australia's pre-application service: an examiner looks at the mark before you
-commit, **$330 per class** all in. For a first filing with nobody advising, the
-extra $80 a class buys a professional opinion before the money is spent, which
-is good value.
+commit, around **$330 per class** all in — confirm on IP Australia's own price
+calculator, since it is charged in two parts and the figures move. For a first
+filing with nobody advising, that buys an examiner's opinion before the money is
+committed, which given the section 44 point below is the difference between a
+cheap no and an expensive one.
 
 ### Does the EU actually matter from Australia? (owner asked, 12.08)
 

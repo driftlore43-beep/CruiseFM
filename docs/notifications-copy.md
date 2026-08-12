@@ -1,8 +1,20 @@
 # Notifications — the restraint rules and the full copy set
 
-Draft for review. Nothing here is built yet; notifications need a new binary
-(see the next-fresh-build batch). The copy and the timing are ordinary code
-afterwards, so both can be tuned over the air.
+**BUILT AND LIVE as of 12.08.** This document is the spec; the code is
+`src/utils/notifications.ts` (the engine and every rule below),
+`src/constants/notificationCopy.ts` (every line), `NotificationHost` (the tap
+handler and the replanning) and `NotifyPrompt` (the earned permission ask).
+
+Three test suites hold it to what is written here, and they run offline against
+the shipped code:
+
+| Script | What it proves |
+|---|---|
+| `scripts/test-notifications.mjs` | Every on-air line is TRUE — the station it names is genuinely on air at the hour it fires — plus no banned phrasing, no duplicate ids, nothing in the quiet hours. |
+| `scripts/test-notification-budget.mjs` | The ceiling, the 48-hour gap, the quiet hours, the six-hour hush after a drive, the whole back-off ladder, the 8-week no-repeat, badges and the release announcement. |
+| `scripts/test-schedule.mjs` | The station timetable the on-air lines depend on. |
+
+Run all three after touching any copy or any rule.
 
 ---
 
@@ -240,10 +252,15 @@ other notification. Any stored value from it is ignored. The sheet now carries
 the ceiling in plain sight: *"Cruise FM sends at most two notifications a week,
 and fewer if you don't use them. Nothing is ever sent to sell you something."*
 
-**Still inert until the next build.** The two toggles that remain save a
-preference that nothing reads yet — `expo-notifications` isn't installed, so
-build 23 sends nothing at all. They become real in the same build that brings
-Save to Photos.
+**All five toggles now do something (12.08).** Two of them did not until that
+day: `badges` was never read, because nothing called `noteBadgesEarned`, and
+`newStations` was never read at all. Both are wired now — badges are judged when
+a drive ends, and a release announces itself once via `WHATS_NEW`. An inert
+toggle is the same fault as a clock running over silence, and this page had two.
+
+The last row was relabelled **New in Cruise FM**: it announces whatever a
+release adds, and 1.3.0's line is about photos rather than a station or a mode,
+so "New Stations & Modes" was narrower than the behaviour.
 
 Plus, at the foot, an honest line stating the ceiling — something like
 *"Cruise FM sends at most two notifications a week, and fewer if you don't use

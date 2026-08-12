@@ -246,7 +246,7 @@ function NotificationsBody() {
           value={prefs.recap} onChange={(v) => update({ recap: v })} last />
       </SettingsSection>
       <SettingsSection label="WHAT'S NEW">
-        <ToggleRow label="New Stations & Modes" sub="When a new mood station or visual mode launches — at most one per update"
+        <ToggleRow label="New in Cruise FM" sub="When an update adds something worth seeing — at most one per release"
           value={prefs.newStations} onChange={(v) => update({ newStations: v })} last />
       </SettingsSection>
       <View style={styles.para}>

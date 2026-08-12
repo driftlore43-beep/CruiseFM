@@ -9,8 +9,13 @@ import Constants from 'expo-constants';
  * On the plain installed build (no OTA yet) it reads "base build". Guarded so
  * it never throws on web or in builds without the updates module.
  */
+/** Just the version, for anything that needs to compare releases. */
+export function appVersion(): string {
+  return Constants.expoConfig?.version ?? '1.0.0';
+}
+
 export function appVersionLabel(): string {
-  const v = Constants.expoConfig?.version ?? '1.0.0';
+  const v = appVersion();
   let stamp = 'base build';
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

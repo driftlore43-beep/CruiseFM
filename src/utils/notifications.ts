@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-import { BADGE_COPY, BADGE_NEARLY, ON_AIR, recapCopy, type Nudge } from '@/constants/notificationCopy';
+import { BADGE_COPY, BADGE_NEARLY, ON_AIR, WHATS_NEW, recapCopy, type Nudge } from '@/constants/notificationCopy';
+import { isOnAir } from '@/constants/schedule';
 import { STATIONS } from '@/constants/stations';
 import { getDriveLog, getDriveStats } from '@/utils/driveStats';
 import { loadLastCruise } from '@/utils/lastCruise';
@@ -88,6 +89,12 @@ type State = {
   badgesSent: string[];
   /** Set when the permission prompt has been shown, so it is never shown twice. */
   asked: boolean;
+  /** True once the badges already earned have been written down. Without it
+   *  the first check would congratulate someone for a badge they won weeks
+   *  ago, which is not what "earned" means. */
+  badgesSeeded?: boolean;
+  /** The app version last announced, so a release is announced at most once. */
+  announcedVersion?: string;
 };
 
 const DEFAULT_STATE: State = {
@@ -124,6 +131,30 @@ async function getState(): Promise<State> {
 
 async function putState(s: State): Promise<void> {
   await AsyncStorage.setItem(STATE_KEY, JSON.stringify(s)).catch(() => {});
+}
+
+/**
+ * Every read-modify-write on the state goes through here, one at a time.
+ *
+ * WHY: two callers race on launch. Tapping a notification opens the app, which
+ * mounts NotificationHost, which both handles the tap (zeroing the ignored
+ * streak — they wanted it) and reschedules (which reconciles, counting fired
+ * notifications as ignored). Both read the state, both write it, and whichever
+ * lands last wins — so a tapped notification could still be recorded as
+ * ignored and shrink the allowance. Serialising makes the order irrelevant.
+ */
+let queue: Promise<unknown> = Promise.resolve();
+
+function updateState(fn: (s: State) => State | Promise<State>): Promise<State> {
+  const run = async () => {
+    const next = await fn(await getState());
+    await putState(next);
+    return next;
+  };
+  // `.then(run, run)` so one failed update cannot stall the queue for good.
+  const p = queue.then(run, run);
+  queue = p.catch(() => {});
+  return p;
 }
 
 // ── The budget ───────────────────────────────────────────────────────────────
@@ -185,7 +216,7 @@ export async function shouldOfferPrompt(): Promise<boolean> {
   if (s.asked) return false;
   try {
     const perm = await Notifications.getPermissionsAsync();
-    if (perm.status !== 'undetermined') { await putState({ ...s, asked: true }); return false; }
+    if (perm.status !== 'undetermined') { await updateState((x) => ({ ...x, asked: true })); return false; }
   } catch { return false; }
   const log = await getDriveLog().catch(() => []);
   return log.length >= 3;
@@ -194,8 +225,7 @@ export async function shouldOfferPrompt(): Promise<boolean> {
 /** Runs the system prompt. Called only from the pre-prompt card's yes button. */
 export async function requestPermission(): Promise<boolean> {
   if (!Notifications) return false;
-  const s = await getState();
-  await putState({ ...s, asked: true });
+  await updateState((s) => ({ ...s, asked: true }));
   try {
     const { status } = await Notifications.requestPermissionsAsync();
     const granted = status === 'granted';
@@ -207,8 +237,7 @@ export async function requestPermission(): Promise<boolean> {
 }
 
 export async function markPromptDismissed(): Promise<void> {
-  const s = await getState();
-  await putState({ ...s, asked: true });
+  await updateState((s) => ({ ...s, asked: true }));
 }
 
 /**
@@ -266,19 +295,17 @@ async function reconcile(s: State): Promise<State> {
 
 /** A tap resets the back-off — they wanted it, so the app carries on. */
 export async function noteOpenedFromNotification(id: string): Promise<void> {
-  const s = await getState();
-  await putState({
+  await updateState((s) => ({
     ...s,
     ignoredStreak: 0,
     pending: s.pending.filter((p) => p.id !== id),
-  });
+  }));
 }
 
 /** Opening the app by hand also lifts a full stop — the rule is that silence
  *  ends when they come back on their own, not when we decide to try again. */
 export async function noteAppOpened(): Promise<void> {
-  const s = await getState();
-  if (s.ignoredStreak >= 6) await putState({ ...s, ignoredStreak: 0 });
+  await updateState((s) => (s.ignoredStreak >= 6 ? { ...s, ignoredStreak: 0 } : s));
 }
 
 // ── Planning ─────────────────────────────────────────────────────────────────
@@ -287,9 +314,7 @@ type Planned = { id: string; title: string; body: string; at: Date; stationId: s
 
 async function plan(): Promise<Planned[]> {
   const prefs = await getNotifPrefs();
-  let s = await getState();
-  s = await reconcile(s);
-  await putState(s);
+  const s = await updateState((cur) => reconcile(cur));
 
   const now = Date.now();
   // Nothing at all on install day.
@@ -323,6 +348,12 @@ async function plan(): Promise<Planned[]> {
       .filter((n) => !s.usedAt[n.id] || now - s.usedAt[n.id] > NO_REPEAT_MS)
       .map((n) => ({ n, at: nextOccurrence(n, earliest) }))
       .filter(({ n, at }) => (n.lateNight ? true : !inQuietHours(at)))
+      // THE HONESTY RULE, ENFORCED RATHER THAN TRUSTED. Every line here says a
+      // station is on air; this drops any whose station would not actually be
+      // broadcasting when it fires. scripts/test-notifications.mjs checks the
+      // same thing, but copy ships over the air and nobody has to run a test to
+      // do that — so the guard lives in the code as well.
+      .filter(({ n, at }) => isOnAir(n.stationId, at))
       // Never on a day they have already driven.
       .filter(({ at }) => !log.some((d) => sameDay(d.ts, at.getTime())))
       .sort((a, b) => a.at.getTime() - b.at.getTime());
@@ -342,21 +373,27 @@ async function plan(): Promise<Planned[]> {
 // ── Scheduling ───────────────────────────────────────────────────────────────
 
 let rescheduling = false;
+/** A reschedule asked for while one was already running. Without this the
+ *  second request is simply dropped — and the commonest second request is a
+ *  settings change, which would then be planned against the OLD preferences
+ *  and appear not to have taken effect until something else triggered a
+ *  replan. */
+let rescheduleAgain = false;
 
 /**
  * Cancel everything and lay out the next allowed nudges. Safe to call often —
  * on launch, on foreground, when a drive ends, when settings change.
  */
 export async function reschedule(): Promise<void> {
-  if (!Notifications || rescheduling) return;
+  if (!Notifications) return;
+  if (rescheduling) { rescheduleAgain = true; return; }
   if (!(await hasPermission())) return;
   rescheduling = true;
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
     const planned = await plan();
-    const s = await getState();
     const pending: { id: string; at: number }[] = [];
-    const usedAt = { ...s.usedAt };
+    const usedAt: Record<string, number> = {};
 
     for (const p of planned) {
       try {
@@ -372,12 +409,13 @@ export async function reschedule(): Promise<void> {
         usedAt[p.id] = p.at.getTime();
       } catch { /* one failure must not lose the rest */ }
     }
-    await putState({ ...s, pending, usedAt });
+    await updateState((s) => ({ ...s, pending, usedAt: { ...s.usedAt, ...usedAt } }));
   } catch {
     /* scheduling is best-effort; a failure must never surface to a driver */
   } finally {
     rescheduling = false;
   }
+  if (rescheduleAgain) { rescheduleAgain = false; await reschedule(); }
 }
 
 /** Congratulate a freshly-earned badge — outside the weekly budget, because
@@ -389,13 +427,20 @@ export async function noteBadgesEarned(earnedIds: string[]): Promise<void> {
   if (!prefs.badges) return;
   if (!(await hasPermission())) return;
   const s = await getState();
+  // FIRST LOOK: write down what is already won and say nothing. Everyone who
+  // had the app before this shipped has a drawer full of badges, and "Night
+  // Owl, earned" about something from three weeks ago is simply untrue.
+  if (!s.badgesSeeded) {
+    await updateState((x) => ({ ...x, badgesSeeded: true, badgesSent: [...new Set([...x.badgesSent, ...earnedIds])] }));
+    return;
+  }
   const fresh = earnedIds.filter((id) => BADGE_COPY[id] && !s.badgesSent.includes(id));
   if (!fresh.length) return;
   const copy = BADGE_COPY[fresh[0]];
   const last = await loadLastCruise().catch(() => null);
   const stationId = last?.stationId ?? 'night-run';
   if (inQuietHours(new Date())) {
-    await putState({ ...s, badgesSent: [...s.badgesSent, ...fresh] });
+    await updateState((x) => ({ ...x, badgesSent: [...x.badgesSent, ...fresh] }));
     return;
   }
   try {
@@ -404,7 +449,7 @@ export async function noteBadgesEarned(earnedIds: string[]): Promise<void> {
       trigger: { type: 'timeInterval', seconds: 60, repeats: false } as never,
     });
   } catch { /* ignore */ }
-  await putState({ ...s, badgesSent: [...s.badgesSent, ...fresh] });
+  await updateState((x) => ({ ...x, badgesSent: [...x.badgesSent, ...fresh] }));
 }
 
 /** The Sunday recap. Silence when the week was empty is deliberate — a nag
@@ -428,6 +473,50 @@ export async function scheduleRecapIfDue(): Promise<void> {
     await Notifications.scheduleNotificationAsync({
       content: { title: copy.title, body: copy.body, data: { id: 'recap', stationId: stats.favoriteStationId ?? 'night-run' } },
       trigger: { type: 'date', date: at } as never,
+    });
+  } catch { /* ignore */ }
+}
+
+/**
+ * "Something new in the app" — at most one per release, and only when that
+ * release has a line in WHATS_NEW.
+ *
+ * FIRST RUN ANNOUNCES NOTHING. A fresh install has no announced version, and
+ * telling somebody about a feature on the day they downloaded the app is both
+ * meaningless and against the install-day rule. So the first sighting of a
+ * version is simply written down.
+ *
+ * Deliberately outside the weekly budget: this is a fact about the app rather
+ * than an attempt to win somebody back, and it can only happen when they have
+ * just installed an update. Still silent in the quiet hours.
+ */
+export async function announceReleaseIfNew(version: string): Promise<void> {
+  if (!Notifications || !version) return;
+  const s = await getState();
+  if (s.announcedVersion === version) return;
+
+  const first = !s.announcedVersion;
+  await updateState((x) => ({ ...x, announcedVersion: version }));
+  if (first) return;
+
+  const prefs = await getNotifPrefs();
+  if (!prefs.newStations) return;
+  if (!(await hasPermission())) return;
+  const copy = WHATS_NEW[version];
+  if (!copy) return;
+  if (inQuietHours(new Date())) return;
+
+  const last = await loadLastCruise().catch(() => null);
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: copy.title,
+        body: copy.body,
+        data: { id: `whatsnew:${version}`, stationId: copy.stationId ?? last?.stationId ?? 'night-run' },
+      },
+      // A couple of minutes out, so it does not land while they are still
+      // looking at the screen they just opened.
+      trigger: { type: 'timeInterval', seconds: 150, repeats: false } as never,
     });
   } catch { /* ignore */ }
 }

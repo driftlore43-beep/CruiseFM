@@ -45,13 +45,15 @@ export const ON_AIR: Nudge[] = [
   { id: 'friday-finally', kind: 'onair', days: [5], hour: 19, minute: 30,
     title: 'Friday, finally', body: "Downtown FM's on. Violet towers, sleeping streets.", stationId: 'downtown' },
 
-  // Saturday morning — the weekend jam.
+  // Weekend mornings — the jam, and the one window Cars & Coffee keeps.
   { id: 'sat-nowhere', kind: 'onair', days: [6], hour: 10, minute: 15,
     title: 'Saturday. Nowhere to be.', body: "Daylight AM's playing. Top down, open road.", stationId: 'daylight' },
   { id: 'cold-morning', kind: 'onair', days: [6], hour: 8, minute: 45,
     title: 'Cold morning, warm cup', body: 'Cars & Coffee FM is on air. Engines idling.', stationId: 'cars-coffee' },
   { id: 'roads-are-yours', kind: 'onair', days: [6], hour: 11, minute: 30,
     title: 'The roads are yours today', body: 'Daylight AM. Go somewhere.', stationId: 'daylight' },
+  { id: 'sunday-coffee', kind: 'onair', days: [0], hour: 9, minute: 15,
+    title: 'Sunday, slow start', body: 'Cars & Coffee FM is on air. Nowhere to be yet.', stationId: 'cars-coffee' },
 
   // Sunday — the wind-down.
   { id: 'sunday-last-light', kind: 'onair', days: [0], hour: 17, minute: 45,
@@ -62,8 +64,12 @@ export const ON_AIR: Nudge[] = [
   // Weekday morning — the run in.
   { id: 'morning-air', kind: 'onair', days: [1, 2, 3, 4, 5], hour: 7, minute: 45,
     title: 'Morning air', body: 'Mountain Pass FM. Cold air, fog ahead, one more corner.', stationId: 'mountain-pass' },
+  // WAS Cars & Coffee, and that was a lie: its window is weekend mornings, so
+  // on a Tuesday at 8:20 the station named here was not on air. Caught by
+  // scripts/test-notifications.mjs the day the schedule landed. Mountain Pass
+  // is the station that genuinely broadcasts on a weekday morning.
   { id: 'beat-traffic', kind: 'onair', days: [1, 2, 3, 4, 5], hour: 8, minute: 20,
-    title: 'Beat the traffic', body: 'Cars & Coffee FM is on air. Warm cup, cold morning.', stationId: 'cars-coffee' },
+    title: 'Beat the traffic', body: 'Mountain Pass FM is on air. Take the long way in.', stationId: 'mountain-pass' },
 
   // Late night — opt-in only, deliberately outside quiet hours.
   { id: 'world-asleep', kind: 'onair', hour: 23, minute: 30, lateNight: true,
@@ -90,6 +96,22 @@ export const BADGE_NEARLY: Record<string, { title: string; body: string }> = {
   'three-peat': { title: 'One more for Three-Peat', body: 'Two days running. Tomorrow makes it three.' },
 };
 
+/**
+ * One line per release, and only for something you can actually go and look
+ * at. Never "we fixed some bugs", never an offer.
+ *
+ * Keyed by the version in app.json. A release with no entry here announces
+ * NOTHING — which is the right default, since most releases have nothing worth
+ * interrupting anyone for. Add a line only when a version genuinely adds
+ * something to see.
+ */
+export const WHATS_NEW: Record<string, { title: string; body: string; stationId?: string }> = {
+  '1.3.0': {
+    title: 'Your own photo, behind your own station',
+    body: 'Make a station, give it a picture from your camera roll, and drive to it.',
+  },
+};
+
 /** Sunday recap. Never sent when the week was empty — silence is the
  *  correct message, and a nag about not driving is the fastest way to be
  *  muted forever. */
@@ -104,6 +126,3 @@ export function recapCopy(drives: number, minutes: number, station: string | nul
   if (drives >= 6) return { title: 'Some week', body: `${drives} drives, ${time}.${where}` };
   return { title: 'Your week on the road', body: `${drives} drives, ${time}.${where}` };
 }
-
-/** What's new. At most one per release, and never "we fixed some bugs". */
-export const WHATS_NEW: { id: string; title: string; body: string; stationId: string } | null = null;

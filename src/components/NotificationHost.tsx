@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 
+import { judgeBadges } from '@/constants/badges';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { appVersion } from '@/utils/appVersion';
+import { getDriveLog } from '@/utils/driveStats';
 import { loadLastCruise } from '@/utils/lastCruise';
 import {
-  noteAppOpened, noteOpenedFromNotification, notificationsAvailable,
-  reschedule, scheduleRecapIfDue,
+  announceReleaseIfNew, noteAppOpened, noteBadgesEarned, noteOpenedFromNotification,
+  notificationsAvailable, reschedule, scheduleRecapIfDue,
 } from '@/utils/notifications';
 
 /**
@@ -37,6 +40,12 @@ export function NotificationHost() {
     if (wasDriving && !np.session) {
       void reschedule();
       void scheduleRecapIfDue();
+      // A drive is the only thing that can win a badge, so this is the moment
+      // to look. noteBadgesEarned congratulates only what is genuinely new —
+      // the first check just writes down what was already won.
+      void getDriveLog()
+        .then((log) => noteBadgesEarned(judgeBadges(log).filter((b) => b.earned).map((b) => b.id)))
+        .catch(() => {});
     }
   }, [np.session, wasDriving]);
 
@@ -63,6 +72,7 @@ export function NotificationHost() {
     void noteAppOpened();
     void reschedule();
     void scheduleRecapIfDue();
+    void announceReleaseIfNew(appVersion());
 
     const app = AppState.addEventListener('change', (s) => {
       if (s !== 'active') return;

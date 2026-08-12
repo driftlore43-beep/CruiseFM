@@ -147,12 +147,24 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   // Claiming on MOVE, never on start — capture-on-start is what killed the
   // back button on the settings pages.
   const swipeAxis = useRef<'x' | 'y' | null>(null);
+  /**
+   * How far the page is scrolled. A REF, because the responder below is built
+   * once and would otherwise read the first render's value for ever.
+   *
+   * PULL-TO-DISMISS IS ONLY AVAILABLE AT THE TOP (owner, 11.08: "scroll to the
+   * bottom and slightly scroll up — the whole card likes to come down, so then
+   * I have to be careful scrolling back down"). Scrolling back up MEANS
+   * dragging your finger down, which is the same gesture as throwing the card
+   * away — so anywhere but the top, that drag belongs to the list.
+   */
+  const scrollY = useRef(0);
   const closeRef = useRef<(down?: boolean) => void>(() => {});
   const dismissPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, g) => {
-        if (g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx)) return true;
+        // Down = dismiss, but only from the top of the page — see scrollY.
+        if (g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx) && scrollY.current <= 0.5) return true;
         // Edge-only, or a rightward drag would fight the horizontal mode strip.
         return g.x0 < 44 && g.dx > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4;
       },
@@ -355,7 +367,9 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[styles.content, { paddingTop: topPad + 40, paddingBottom: insets.bottom + 28 }]}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }}>
 
           {/* Push the title block just below the hero image */}
           <View style={{ flex: 1, minHeight: SCREEN_H * 0.50 }} />

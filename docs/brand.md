@@ -214,8 +214,60 @@ There is no single register. These are the authoritative ones, all free:
 | **UK companies** | `find-and-update.company-information.service.gov.uk` |
 | **EU trade marks** | `euipo.europa.eu` → eSearch plus |
 | **US trade marks** | `tmsearch.uspto.gov` |
-| **Many registers at once** | `branddb.wipo.int` — WIPO's Global Brand Database. Start here. |
+| **Many registers at once** | `tmdn.org/tmview` — **TMview. Start here.** |
+| **Also many at once** | `branddb.wipo.int` — WIPO's Global Brand Database |
 | **Greek trade marks** | `obi.gr` — the Hellenic Industrial Property Organisation |
+
+**TMview replaced WIPO's database at the top of that list on 12.08**, because it
+is the one search that answers the question we actually have. It carries every
+EU national office — Greece's OBI included — plus the EUIPO and the UK, in a
+single query. Running it once is worth more than running EUIPO, the UK IPO and
+Greece separately, and it removes the "I couldn't find the Greek search"
+problem entirely.
+
+**Greece is genuinely hard to find, and it is not the owner's fault.** Greek
+trade marks used to be handled by the Ministry of Development's General
+Secretariat of Commerce (the *Hellenic Sign Register*, «Σήματα»), and moved to
+OBI — which for years handled only patents and designs. Half the guidance
+online still points at the old place. Search Greece through TMview and the
+question does not arise.
+
+### The searches run on 12.08, and what they actually showed
+
+The owner ran three. Recorded here with what each one proves, because the two
+that came back empty prove less than they appear to.
+
+| Search | Result | What it means |
+|---|---|---|
+| EUIPO eSearch plus, `Strofi Technologies` | 0 in all four tabs | **Too narrow to rely on.** Nobody registers a two-word company name; the risk is someone owning *Strofi* on its own. Re-run with `Strofi`. |
+| UK IPO, by word | no marks found | Same caveat, unless the word searched was `Strofi` alone. |
+| A multi-register search, `Strofi` | 6 hits | **This is the useful one.** See below. |
+
+The six hits, and the pattern in them:
+
+- **STROFI**, **STROFI .**, **STROFI MULTIUSO**, and one figurative mark — all
+  Italian national registrations, all in **Classes 21, 24 and 27**, owned by
+  ARIX S.p.A. and La Commissionaria Veneta. Those classes are household
+  utensils, textiles and floor coverings: these are **cleaning-cloth brands**.
+  The name is close to descriptive in Italian (*strofinaccio* — a cleaning
+  cloth), which is why it exists there several times over.
+- **STROFI SOUVLAKI** and **STROFI OF MILOS** — Canadian, **Class 43**,
+  restaurants. The same finding as the Athens taverna, in a different country.
+
+**Nothing in Class 9, Class 42 or Class 41, anywhere, in any of the three
+searches.** That is the answer to the only question that mattered. The classes
+Cruise FM and Strofi need are, on this evidence, clear.
+
+Two honest caveats, neither of them alarming:
+
+1. An Italian **national** registration can still be raised in opposition to an
+   EU-wide mark, since an EUTM has to be free across the whole Union. In
+   practice, cleaning cloths against a music and driving app is about as far
+   apart as two businesses get, so this is a theoretical risk rather than a
+   real one.
+2. A clear search is not a guarantee. Applications published after the search,
+   and unregistered rights built up by trading, do not show up. This is the
+   normal position for every filing anyone makes.
 
 ### The Greek restaurant, and the song
 
@@ -264,6 +316,19 @@ Owner is happy to proceed (12.08). Order of operations:
 **UK fees, from 1 April 2026:** **£205** for the first class, **£60** for each
 additional class. That was the first increase since 1998, so figures quoted in
 older guidance will be wrong — confirm on the IPO's own page before paying.
+Classes 9 and 42 together: **£265**.
+
+**EU fees (EUTM, filed online):** **€850** for the first class, **€50** for the
+second, **€150** for each class from the third. Classes 9 and 42 together:
+**€900**. One filing covers all member states, which is why it is worth roughly
+three times the UK — it is not three times the paperwork.
+
+**The EUIPO SME Fund is worth a look and is NOT a plan to rely on.** It
+reimburses up to 75% of trade mark application fees, but two conditions bite:
+it is for **EU-established** SMEs, so a UK-only business does not qualify at
+all; and the 2026 trade-mark voucher has already been reported as **exhausted**
+for new applications. Check its current state before budgeting around it, and
+never delay a filing waiting for it.
 
 **Register the WORD, not a logo.** A word mark protects the name however it is
 set, which is broader than a logo mark and cannot be outdated by a redesign.

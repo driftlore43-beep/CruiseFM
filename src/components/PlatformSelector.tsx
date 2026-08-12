@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 3.5,
   },
   title: {
-    color: '#fff', fontSize: 26, fontWeight: '700', marginBottom: 6, letterSpacing: -0.3,
+    color: '#fff', fontSize: 26, fontWeight: '700', marginBottom: 6, letterSpacing: 0,
   },
   subtitle: {
     color: Cruise.textSecondary, fontSize: 13.5, lineHeight: 20, marginBottom: 24,

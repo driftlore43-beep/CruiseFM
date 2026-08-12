@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 27,
     fontWeight: '800',
-    letterSpacing: -0.8,
+    letterSpacing: 0,
   },
   cue: {
     color: 'rgba(255,255,255,0.62)',

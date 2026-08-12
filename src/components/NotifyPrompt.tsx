@@ -80,7 +80,7 @@ const np2 = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
     marginBottom: 2,
   },
-  title: { color: '#fff', fontSize: 21, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
+  title: { color: '#fff', fontSize: 21, fontWeight: '800', letterSpacing: 0, textAlign: 'center' },
   sub: { color: 'rgba(255,255,255,0.6)', fontSize: 13.5, lineHeight: 20, textAlign: 'center' },
   fine: { color: 'rgba(255,255,255,0.4)', fontSize: 12, lineHeight: 17, textAlign: 'center' },
   cta: {

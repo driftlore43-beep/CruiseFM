@@ -1483,7 +1483,7 @@ const fs = StyleSheet.create({
   headerEyebrow: { color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
   headerStation: { color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 },
   trackBlock:  { alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 16, paddingBottom: 4, alignItems: 'flex-start' },
-  trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+  trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: 0 },
   trackArtist: { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 },
   turntableWrap:{ flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%' },
   progressWrap: { width: '100%', paddingHorizontal: 28, marginTop: 22, marginBottom: 0 },

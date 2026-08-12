@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.12)',
   },
-  referTitle: { color: '#fff', fontSize: 21, fontWeight: '800', textAlign: 'center', letterSpacing: -0.4 },
+  referTitle: { color: '#fff', fontSize: 21, fontWeight: '800', textAlign: 'center', letterSpacing: 0 },
   referSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13.5, lineHeight: 19, textAlign: 'center', marginBottom: 6 },
   shareBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

@@ -94,7 +94,7 @@ const cs = StyleSheet.create({
     backgroundColor: 'rgba(29,185,84,0.10)',
     borderWidth: 1, borderColor: 'rgba(29,185,84,0.30)',
   },
-  title: { color: '#fff', fontSize: 15.5, fontWeight: '800', letterSpacing: -0.2 },
+  title: { color: '#fff', fontSize: 15.5, fontWeight: '800', letterSpacing: 0 },
   sub: { color: 'rgba(255,255,255,0.6)', fontSize: 12.5, lineHeight: 17, marginTop: 2 },
   btn: {
     backgroundColor: SPOTIFY_GREEN,

@@ -893,7 +893,7 @@ const fs = StyleSheet.create({
     paddingBottom: 4,
     alignItems: 'flex-start',
   },
-  trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+  trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: 0 },
   trackArtist: { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 },
 
   // ── Visualizer section — flex to fill available space ────────────────────

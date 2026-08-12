@@ -185,7 +185,7 @@ const tl = StyleSheet.create({
   divider:      { borderTopWidth: 1.5, borderTopColor: 'rgba(255,255,255,0.08)' },
   num:   { color: C.amber, fontSize: 16, fontWeight: '700', letterSpacing: 0.5, width: 28 },
   mid:   { flex: 1, gap: 3 },
-  title: { color: '#ffffff', fontSize: 20, fontWeight: '700', letterSpacing: -0.2 },
+  title: { color: '#ffffff', fontSize: 20, fontWeight: '700', letterSpacing: 0 },
   artist:{ color: C.body, fontSize: 14, opacity: 0.7 },
   dur:   { color: C.amber, fontSize: 16, fontWeight: '600', letterSpacing: 0.3 },
 });
@@ -1330,7 +1330,7 @@ const fs = StyleSheet.create({
   headerEyebrow: { color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
   headerStation: { color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 },
   trackBlock:  { paddingHorizontal: 28, paddingTop: 16, paddingBottom: 4, alignItems: 'flex-start' },
-  trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+  trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: 0 },
   trackArtist: { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 },
 
   cassetteWrap: { alignItems: 'center', justifyContent: 'center', gap: 10 },

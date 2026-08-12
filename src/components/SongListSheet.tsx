@@ -349,7 +349,7 @@ const s = StyleSheet.create({
   // what the finger actually lands on.
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 22, paddingTop: 16, marginBottom: 12 },
   eyebrow: { color: 'rgba(255,255,255,0.42)', fontSize: 9.5, fontWeight: '800', letterSpacing: 2.5 },
-  title: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: -0.3, marginTop: 2 },
+  title: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 0, marginTop: 2 },
   // The one way out, so it reads as a button rather than a hint: bigger,
   // brighter fill, a rim, and a full-strength glyph.
   closeBtn: {

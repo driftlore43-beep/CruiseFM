@@ -1582,8 +1582,8 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
           <Animated.View style={{ opacity: chrome }} pointerEvents={chromeRested ? 'none' : 'auto'}>
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
             {hasTrack
-              ? <MarqueeText text={title} style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }} />
-              : <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={2}>{title}</Text>}
+              ? <MarqueeText text={title} style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: 0 }} />
+              : <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 0 }} numberOfLines={2}>{title}</Text>}
             {hasTrack && <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 }} numberOfLines={1}>{artist}</Text>}
           </View>
 

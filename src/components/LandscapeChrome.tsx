@@ -314,7 +314,7 @@ const st = StyleSheet.create({
   },
   panelInner: { flex: 1, paddingLeft: 24 },
 
-  title: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
+  title: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 0 },
   artist: { color: 'rgba(255,255,255,0.55)', fontSize: 13.5, fontWeight: '500', marginTop: 2 },
   seekWrap: { marginTop: 10 },
 

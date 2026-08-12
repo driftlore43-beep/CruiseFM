@@ -1006,7 +1006,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
               mood line only appears when there's no track to show. */}
           {!hasTrack && (
             <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
-              <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={2}>{title}</Text>
+              <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 0 }} numberOfLines={2}>{title}</Text>
             </View>
           )}
 

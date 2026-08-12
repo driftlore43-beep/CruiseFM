@@ -582,7 +582,7 @@ const styles = StyleSheet.create({
   previewName: {
     flexShrink: 1,
     color: 'rgba(255,255,255,0.94)',
-    fontSize: 17, fontWeight: '600', letterSpacing: -0.3,
+    fontSize: 17, fontWeight: '600', letterSpacing: 0,
   },
   mineChip: {
     borderWidth: 1, borderColor: 'rgba(180,195,255,0.45)',

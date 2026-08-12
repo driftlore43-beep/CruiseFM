@@ -157,7 +157,7 @@ const dc = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
     marginBottom: 2,
   },
-  title: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+  title: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: 0 },
   sub: { color: 'rgba(255,255,255,0.6)', fontSize: 13.5, lineHeight: 20, textAlign: 'center' },
   // The app's standard primary: solid white, dark type.
   cta: {

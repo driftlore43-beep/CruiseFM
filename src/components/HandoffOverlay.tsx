@@ -68,7 +68,7 @@ const st = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(29,185,84,0.4)',
     marginBottom: 2,
   },
-  title: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: -0.2 },
+  title: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 0 },
   sub: {
     color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: 18,
     textAlign: 'center', maxWidth: 300,

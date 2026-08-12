@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 21,
     fontWeight: '800',
-    letterSpacing: -0.6,
+    letterSpacing: 0,
     paddingHorizontal: 22,
     marginBottom: 14,
   },
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 26,
     fontWeight: '800',
-    letterSpacing: -0.8,
+    letterSpacing: 0,
   },
   label: {
     color: 'rgba(255,255,255,0.42)',

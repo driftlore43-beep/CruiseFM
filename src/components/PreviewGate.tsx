@@ -105,7 +105,7 @@ const pg = StyleSheet.create({
     borderColor: 'rgba(245,158,11,0.4)',
   },
   crest: { color: '#F5B014', fontSize: 26 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+  title: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: 0 },
   sub: { color: 'rgba(255,255,255,0.72)', fontSize: 13.5, lineHeight: 20, textAlign: 'center' },
   cta: {
     alignSelf: 'stretch',

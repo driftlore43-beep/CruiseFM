@@ -93,7 +93,7 @@ const st = StyleSheet.create({
     color: '#fff',
     fontSize: 14.5,
     fontWeight: '600',
-    letterSpacing: -0.2,
+    letterSpacing: 0,
     marginTop: 8,
   },
   dial: { color: 'rgba(255,255,255,0.55)', fontSize: 10.5 },

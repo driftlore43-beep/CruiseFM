@@ -79,7 +79,7 @@ const sn = StyleSheet.create({
     backgroundColor: 'rgba(29,185,84,0.16)',
     borderWidth: 1, borderColor: 'rgba(29,185,84,0.4)',
   },
-  title: { color: '#fff', fontSize: 14.5, fontWeight: '800', letterSpacing: -0.2 },
+  title: { color: '#fff', fontSize: 14.5, fontWeight: '800', letterSpacing: 0 },
   sub: { color: 'rgba(255,255,255,0.62)', fontSize: 12.5, lineHeight: 17, marginTop: 2 },
   close: { alignSelf: 'flex-start', padding: 2 },
 });

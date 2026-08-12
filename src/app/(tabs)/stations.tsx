@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
     color: '#08080c',
     fontSize: 15.5,
     fontWeight: '700',
-    letterSpacing: -0.2,
+    letterSpacing: 0,
   },
   onAirRow: {
     flexDirection: 'row',
@@ -584,10 +584,13 @@ const styles = StyleSheet.create({
   },
   rowName: {
     flexShrink: 1,
-    color: 'rgba(255,255,255,0.94)',
+    // Full white and 700, matching the share sheet's buttons — which is the
+    // treatment the owner picked out as "bolder and more spaced out" against
+    // these names at 600 with -0.3 tracking (11.08).
+    color: '#ffffff',
     fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: -0.3,
+    fontWeight: '700',
+    letterSpacing: 0,
   },
   rowNameTuned: {
     color: '#fff',

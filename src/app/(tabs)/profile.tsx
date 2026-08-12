@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 21,
     fontWeight: '800',
-    letterSpacing: -0.6,
+    letterSpacing: 0,
   },
   sectionMeta: {
     color: 'rgba(255,255,255,0.45)',
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
-    letterSpacing: -0.1,
+    letterSpacing: 0,
   },
   badgeNameLit: { color: '#fff' },
 
@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7B733', opacity: 0.13,
   },
   upgradeEyebrow: { color: PREMIUM_GOLD, fontSize: 9.5, fontWeight: '800', letterSpacing: 2.4 },
-  upgradeTitle: { color: Cruise.textPrimary, fontSize: 22, fontWeight: '800', letterSpacing: -0.6, marginTop: 8, lineHeight: 26 },
+  upgradeTitle: { color: Cruise.textPrimary, fontSize: 22, fontWeight: '800', letterSpacing: 0, marginTop: 8, lineHeight: 26 },
   upgradeSub: { color: 'rgba(255,255,255,0.55)', fontSize: 13.5, lineHeight: 19, marginTop: 6 },
   upgradeBtnText: { color: '#1a0e02', fontSize: 15, fontWeight: '800' },
   settingsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingVertical: 15, gap: 16 },

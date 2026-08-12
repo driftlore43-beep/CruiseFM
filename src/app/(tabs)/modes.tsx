@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 26,
     fontWeight: '800',
-    letterSpacing: -0.7,
+    letterSpacing: 0,
   },
   heroDesc: {
     color: 'rgba(255,255,255,0.6)',
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
-    letterSpacing: -0.4,
+    letterSpacing: 0,
   },
   rowDesc: {
     color: 'rgba(255,255,255,0.48)',

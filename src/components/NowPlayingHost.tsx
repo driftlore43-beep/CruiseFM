@@ -384,6 +384,6 @@ const mp = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#0d0d14',
   },
-  title: { color: '#fff', fontSize: 14.5, fontWeight: '600', letterSpacing: -0.2 },
+  title: { color: '#fff', fontSize: 14.5, fontWeight: '600', letterSpacing: 0 },
   sub:   { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '500' },
 });

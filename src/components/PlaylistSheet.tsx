@@ -199,7 +199,19 @@ export function PlaylistSheet({
 }
 
 const ps = StyleSheet.create({
-  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  backdrop: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end',
+    /**
+     * ABOVE EVERYTHING ON THE PAGE BENEATH. In React Native, a sibling that
+     * declares a zIndex paints above one that does not, whatever the order in
+     * the tree — so the station page's custom-station hero (zIndex 5) was
+     * floating its icon and MY STATION badge on top of this sheet while the
+     * owner was pasting a link (11.08). Coming later in the tree is not
+     * enough; the sheet has to out-rank the page's highest layer, which is 30.
+     */
+    zIndex: 60,
+  },
   sheet: {
     backgroundColor: '#12121c', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingHorizontal: 20, paddingTop: 12,

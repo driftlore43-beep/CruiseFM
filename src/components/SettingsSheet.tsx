@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
-import { Image, Modal, Platform, Pressable, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Image, Linking, Modal, Platform, Pressable, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { SettingsInfoRow, SettingsPageShell, SettingsSection } from '@/components/SettingsPageShell';
 import { OWNER_MODE } from '@/constants/config';
@@ -11,7 +11,10 @@ import { PRIVACY_POLICY, TERMS_OF_SERVICE, type LegalDoc } from '@/constants/leg
 import { sendTestCrash } from '@/utils/crashReports';
 import { DEFAULT_DRIVER_NAME, getDriverName, setDriverName } from '@/utils/driverName';
 import { disconnectSpotify } from '@/utils/spotify';
-import { DEFAULT_NOTIF_PREFS, getNotifPrefs, setNotifPrefs, type NotifPrefs } from '@/utils/notifications';
+import {
+  DEFAULT_NOTIF_PREFS, getNotifPrefs, getPermissionState, requestPermission, setNotifPrefs,
+  type NotifPermission, type NotifPrefs,
+} from '@/utils/notifications';
 
 export type SettingsPage =
   | 'account' | 'notifications' | 'privacy' | 'about' | 'refer'
@@ -178,6 +181,21 @@ function ToggleRow({
 
 function NotificationsBody() {
   const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_NOTIF_PREFS);
+  /**
+   * WITHOUT PERMISSION, EVERY TOGGLE BELOW IS DECORATIVE — it saves a
+   * preference that can never produce a notification. The owner found this on
+   * 11.08 ("it should be found in the settings page where the permissions can
+   * come up"), and it is the same fault as a clock that runs over silence: a
+   * control claiming to do something it cannot.
+   *
+   * So this page now states the real position and offers the way forward. iOS
+   * allows exactly ONE system prompt, so once it is spent the only route is
+   * the phone's own Settings, and we say so rather than pretending a button
+   * will work.
+   */
+  const [perm, setPerm] = useState<NotifPermission>('unsupported');
+  const refreshPerm = () => { getPermissionState().then(setPerm).catch(() => {}); };
+  useEffect(() => { refreshPerm(); }, []);
 
   useEffect(() => { getNotifPrefs().then(setPrefs).catch(() => {}); }, []);
 
@@ -187,8 +205,34 @@ function NotificationsBody() {
     void setNotifPrefs(patch);
   };
 
+  const off = perm !== 'granted' && perm !== 'unsupported';
+
   return (
     <>
+      {off && (
+        <SettingsSection label="PERMISSION">
+          <View style={styles.permBox}>
+            <Text style={styles.permTitle}>
+              {perm === 'askable' ? 'Notifications are off' : 'Turned off in iOS Settings'}
+            </Text>
+            <Text style={styles.permBody}>
+              {perm === 'askable'
+                ? 'Nothing below can reach you until you turn them on. At most two a week, and they back off if you ignore them.'
+                : 'Cruise FM can only ask once, and that ask has been used. You can switch them back on in the phone\u2019s Settings.'}
+            </Text>
+            <Pressable
+              style={styles.permBtn}
+              onPress={async () => {
+                if (perm === 'askable') { await requestPermission(); refreshPerm(); }
+                else Linking.openSettings().catch(() => {});
+              }}>
+              <Text style={styles.permBtnText}>
+                {perm === 'askable' ? 'Turn on notifications' : 'Open iOS Settings'}
+              </Text>
+            </Pressable>
+          </View>
+        </SettingsSection>
+      )}
       <SettingsSection label="DRIVE NUDGES">
         <ToggleRow label="When a station comes on air" sub="A couple a week, around the times you drive"
           value={prefs.onAir} onChange={(v) => update({ onAir: v })} />
@@ -383,6 +427,17 @@ const styles = StyleSheet.create({
   toggleBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   toggleLabel: { color: '#fff', fontSize: 14.5, fontWeight: '600' },
   toggleSub: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 16 },
+  // ── Notification permission ──
+  permBox: { paddingHorizontal: 16, paddingVertical: 16, gap: 10 },
+  permTitle: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
+  permBody: { color: 'rgba(255,255,255,0.55)', fontSize: 13.5, lineHeight: 19 },
+  permBtn: {
+    alignSelf: 'flex-start', marginTop: 2,
+    paddingHorizontal: 20, paddingVertical: 11, borderRadius: 999,
+    backgroundColor: '#fff',
+  },
+  permBtnText: { color: '#0a0a10', fontSize: 14.5, fontWeight: '800' },
+
   para: { paddingHorizontal: 16, paddingVertical: 15 },
   paraBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   paraText: { color: 'rgba(255,255,255,0.75)', fontSize: 13.5, lineHeight: 20 },

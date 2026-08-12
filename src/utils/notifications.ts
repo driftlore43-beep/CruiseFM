@@ -211,6 +211,29 @@ export async function markPromptDismissed(): Promise<void> {
   await putState({ ...s, asked: true });
 }
 
+/**
+ * What iOS currently thinks, for the settings page.
+ *
+ *  - 'granted'      — notifications will arrive.
+ *  - 'askable'      — the one system prompt has never been spent; we can ask.
+ *  - 'denied'       — they said no, or turned it off later. Only the phone's
+ *                     own Settings can undo that; the app cannot ask again.
+ *  - 'unsupported'  — no module (web, or a build before notifications landed).
+ */
+export type NotifPermission = 'granted' | 'askable' | 'denied' | 'unsupported';
+
+export async function getPermissionState(): Promise<NotifPermission> {
+  if (!Notifications) return 'unsupported';
+  try {
+    const p = await Notifications.getPermissionsAsync();
+    if (p.status === 'granted') return 'granted';
+    if (p.status === 'undetermined') return 'askable';
+    return p.canAskAgain ? 'askable' : 'denied';
+  } catch {
+    return 'unsupported';
+  }
+}
+
 async function hasPermission(): Promise<boolean> {
   if (!Notifications) return false;
   try {

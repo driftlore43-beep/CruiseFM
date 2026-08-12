@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STATIONS } from '@/constants/stations';
+import { primaryOnAir } from '@/constants/schedule';
 import { knownMode } from '@/constants/modeCatalog';
 
 const KEY = 'cruise_last_cruise';
@@ -23,15 +24,17 @@ export async function loadLastCruise(): Promise<LastCruise | null> {
   }
 }
 
-/** Picks a sensible station for the current time of day (first-run default). */
+/**
+ * The station the current hour belongs to.
+ *
+ * This used to be a five-way switch on the hour, living here, which chose one
+ * station and told the rest of the app nothing — so the dial, the station
+ * pages and everything else stayed identical around the clock. The schedule
+ * now owns it (constants/schedule.ts) and every surface reads from the same
+ * timetable. Kept as a named function because a dozen call sites use it.
+ */
 export function defaultStationForNow(): string {
-  const h = new Date().getHours();
-  let id: string;
-  if (h >= 0 && h < 5) id = 'after-midnight';
-  else if (h >= 5 && h < 11) id = 'mountain-pass';
-  else if (h >= 11 && h < 16) id = 'daylight';
-  else if (h >= 16 && h < 20) id = 'sunset';
-  else id = 'night-run';
+  const id = primaryOnAir();
   // Fall back to the first station if that id is somehow missing.
   return STATIONS.some((s) => s.id === id) ? id : STATIONS[0].id;
 }

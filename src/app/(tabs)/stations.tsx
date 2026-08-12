@@ -15,6 +15,7 @@ import { Cruise, Fonts, TAB_SAFE_INSET, PAGE_GUTTER } from '@/constants/theme';
 import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { deleteCustomStation, isCustomStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
+import { clockLabel, isScheduled, onAirNow, upNext } from '@/constants/schedule';
 import { consumeCreateRequest } from '@/utils/createStationRequest';
 import { recordDriveStart } from '@/utils/driveStats';
 import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
@@ -99,11 +100,13 @@ function OnAirDot() {
  * costs more trust than a plainer word costs excitement.
  */
 function OnAirHero({
-  station, height, topPad, onPress, onCreate,
+  station, height, topPad, upNextLine, onPress, onCreate,
 }: {
   station: Station;
   height: number;
   topPad: number;
+  /** "Sunset AM at 4pm" — what comes on next, or null when nothing is queued. */
+  upNextLine: string | null;
   onPress: () => void;
   onCreate: () => void;
 }) {
@@ -144,6 +147,14 @@ function OnAirHero({
         <View style={styles.heroBtn}>
           <Text style={styles.heroBtnText}>Tune in</Text>
         </View>
+        {/* What's on later — the half of a schedule that gives anyone a reason
+            to look again. Printed small, under the button, so it informs
+            without competing with the station that is on now. */}
+        {!!upNextLine && (
+          <Text style={[styles.upNext, { fontFamily: Fonts.mono }]} numberOfLines={1}>
+            UP NEXT · {upNextLine}
+          </Text>
+        )}
       </View>
     </Pressable>
   );
@@ -242,7 +253,7 @@ function EmptySlotRow({ onPress }: { onPress: () => void }) {
  * list looking exactly like everything else — just with their MINE chip.
  */
 function StationRow({
-  station, dial, tuned, locked, lcd, last, onPress,
+  station, dial, tuned, locked, lcd, last, onAir, onPress,
 }: {
   station: Station | CustomStation;
   dial: { band: Band; label: string };
@@ -251,6 +262,12 @@ function StationRow({
   lcd: boolean;
   /** Last row in its group — no hairline under it. */
   last?: boolean;
+  /**
+   * Broadcasting right now. PRESENTATION ONLY — an off-air station is still
+   * fully playable, because a listener who wants Night Run at two in the
+   * afternoon must never be told no. See constants/schedule.ts.
+   */
+  onAir?: boolean;
   onPress?: () => void;
 }) {
   const day = useDaylight();
@@ -273,6 +290,9 @@ function StationRow({
         !last && styles.rowRule,
         !last && day && styles.rowRuleDay,
         locked && styles.rowLocked,
+        // Nothing is taken away when a station is off air — it simply sits
+        // back, the way a quiet frequency does.
+        onAir === false && !tuned && styles.rowOffAir,
         pressed && onPress ? styles.rowPressed : null,
       ]}>
       {/* The tuning needle: the page's one glowing mark, on the tuned row. */}
@@ -281,6 +301,10 @@ function StationRow({
       <View style={styles.numCol}>
         <LcdNumber label={dial.label} tuned={tuned} lcd={lcd} />
       </View>
+      {/* The broadcast lamp. A receiver shows which frequencies are live with
+          a lit dot, not with a word — and a dot costs no row height, which
+          this dial cannot spare (every row must stay the same height). */}
+      {onAir && <View style={[styles.onAirLamp, { backgroundColor: accent }]} pointerEvents="none" />}
       <Text style={[styles.rowName, tuned && styles.rowNameTuned, day && styles.rowNameDay]} numberOfLines={1}>{station.name}</Text>
       {mine && (
         <View style={styles.mineChip}>
@@ -327,6 +351,12 @@ export default function StationsScreen() {
   });
 
   const [onAirStation, setOnAirStation] = useState<Station>(() => stationById(defaultStationForNow()));
+  // Which frequencies are actually broadcasting, and what comes on next.
+  // Recomputed on focus rather than on a timer: the page is looked at, not
+  // watched, and a repeating timer here would be one more thing to gate on
+  // AppState (see the SIGKILL note in AGENTS.md).
+  const [live, setLive] = useState<string[]>(() => onAirNow());
+  const [next, setNext] = useState(() => upNext());
 
   async function fetchCustom() {
     const loaded = await loadCustomStations();
@@ -337,6 +367,8 @@ export default function StationsScreen() {
   useFocusEffect(useCallback(() => {
     fetchCustom();
     setOnAirStation(stationById(defaultStationForNow()));
+    setLive(onAirNow());
+    setNext(upNext());
     // Someone pressed "make a station" on the home page and was sent here.
     // Reading the request clears it, so arriving again later is quiet.
     if (consumeCreateRequest()) setShowCreate(true);
@@ -374,6 +406,9 @@ export default function StationsScreen() {
           station={onAirStation}
           height={heroH}
           topPad={insets.top}
+          upNextLine={next
+            ? `${stationById(next.id).name} at ${clockLabel(new Date(Date.now() + next.minutes * 60000).getHours())}`
+            : null}
           onPress={() => setSelectedStation(onAirStation)}
           onCreate={() => setShowCreate(true)}
         />
@@ -385,6 +420,7 @@ export default function StationsScreen() {
             station={station}
             dial={dial}
             tuned={station.id === tunedId}
+            onAir={isScheduled(station.id) ? live.includes(station.id) : undefined}
             lcd={lcd}
             // Never the last row of the band any more: either YOUR STATIONS
             // follows, or the empty slot does.
@@ -399,6 +435,8 @@ export default function StationsScreen() {
             station={station}
             dial={dial}
             tuned={station.id === tunedId}
+            // Deliberately unscheduled: nobody puts their own station off air,
+            // and a lamp on every one of them would be noise rather than news.
             lcd={lcd}
             last={i === amCustom.length - 1}
             onPress={() => setSelectedStation(station)}
@@ -412,6 +450,7 @@ export default function StationsScreen() {
             station={station}
             dial={dial}
             tuned={station.id === tunedId}
+            onAir={isScheduled(station.id) ? live.includes(station.id) : undefined}
             locked={!isPro}
             lcd={lcd}
             last={i === fmBand.length - 1}
@@ -539,6 +578,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0,
   },
+  upNext: {
+    marginTop: 12,
+    color: 'rgba(255,255,255,0.52)',
+    fontSize: 10.5,
+    letterSpacing: 1.4,
+  },
   onAirRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -579,6 +624,22 @@ const styles = StyleSheet.create({
   // Dimmer, not grey — the premium band still has to sell itself.
   rowLocked: {
     opacity: 0.6,
+  },
+  // Off air: a step back, never a wall. Anything heavier reads as disabled,
+  // and these rows are fully playable.
+  rowOffAir: { opacity: 0.62 },
+  // The broadcast lamp, in the 16pt gutter between the dial number and the
+  // name. ABSOLUTELY POSITIONED on purpose: in the flex row it would push
+  // every on-air station's name across, and the whole page depends on names
+  // starting at the same x whether or not the station is live.
+  onAirLamp: {
+    position: 'absolute',
+    left: PAGE_GUTTER + NUM_COL_W + 5,
+    top: '50%',
+    marginTop: -3,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   // Press feedback: the row takes a beat of light rather than shrinking.
   // Scaling a full-width list row looks like the page flexing; scaling a

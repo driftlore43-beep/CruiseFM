@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { stationDial, type Station } from '@/constants/stations';
 import { useDsegFonts } from '@/components/StationIdentity';
 import { isCustomStation, type CustomStation } from '@/utils/customStations';
+import { backOnLabel, isOnAir } from '@/constants/schedule';
 import { Cruise } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
 import { StationBackdrop } from '@/components/StationBackdrop';
@@ -242,6 +243,8 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   // NOT `!station.image` — see isCustomStation. Custom stations can have a
   // photo since 10.08, and that shortcut hid the ⋯ menu the moment one did.
   const isCustom = isCustomStation(station);
+  // Presentation only — an off-air station starts a drive exactly like any other.
+  const live = isOnAir(station.id);
   const custom = isCustom ? (station as CustomStation) : null;
   // Every station — built-in or custom — needs its own playlist before a
   // drive makes sound. The glowing playlist button + quiet Start Drive make
@@ -379,6 +382,14 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
           <Text style={[styles.dialLine, { fontFamily: dseg }]}>
             {dial.label}
             <Text style={[styles.dialBand, { fontFamily: seg14 }]}>  {dial.band}</Text>
+            {/* The schedule, on the row that already carries the receiver
+                identity — this page has the room the dial's fixed-height rows
+                do not. Custom stations are unscheduled and print nothing. */}
+            {!isCustom && (
+              <Text style={styles.schedNote}>
+                {'   '}{live ? '● ON AIR' : (backOnLabel(station.id) ?? '').toUpperCase()}
+              </Text>
+            )}
           </Text>
           <Text style={styles.stationName}>{station.name}</Text>
           <Text style={styles.stationTagline}>{station.tagline}</Text>
@@ -576,6 +587,9 @@ const styles = StyleSheet.create({
 
   dialLine: { color: 'rgba(255,255,255,0.6)', fontSize: 15, marginBottom: 10 },
   dialBand: { color: 'rgba(255,255,255,0.4)', fontSize: 12 },
+  // Plain face, not the segment one: seven segments cannot draw most of these
+  // letters (the 31.07 lesson), and this is printed text rather than a readout.
+  schedNote: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   stationName: {
     color: '#fff', fontSize: 40, fontWeight: '800',
     letterSpacing: -0.5, marginBottom: 8,

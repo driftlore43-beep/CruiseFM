@@ -2,8 +2,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRef, useState } from 'react';
 import { Animated, PanResponder, View } from 'react-native';
 
-import { useNowPlaying } from '@/context/NowPlayingContext';
-import { resolveAnyStation } from '@/utils/customStations';
 import type { ScrubApi } from '@/utils/useTrackClock';
 
 /**
@@ -49,13 +47,9 @@ const CAR_SIT = 6;
  * rather than two, or the deck would end up the only mode without a car and
  * that would read as a bug.
  *
- * IT FINDS ITS OWN COLOUR rather than taking one as a prop. Nine call sites
- * across eight modes and the landscape chrome each name their station
- * differently (`station` / `currentStation` / `lockedStation` — see
- * ModeActionRow, which takes it as a prop for exactly that reason), so
- * threading a colour through all of them is how one gets missed and a single
- * mode quietly keeps a white car. The session already knows which station is
- * playing, so it asks.
+ * IT IS WHITE, not the station's accent. That was tried (13.08) and rolled
+ * back on the owner's call: every mode already throws its station's colour, so
+ * one more coloured object was the surface losing its one neutral marker.
  */
 export function SeekCar({
   shift, trackH = 6, rowH = 36,
@@ -64,12 +58,6 @@ export function SeekCar({
   trackH?: number;
   rowH?: number;
 }) {
-  const { session } = useNowPlaying();
-  // eqColors[1] is the app-wide accent slot — the mini-player's edge, the mode
-  // glow bands — so the car matches the light the rest of the mode is throwing.
-  // Every station's is luminous enough to read against a dark backdrop; the
-  // shadow below covers the pale ones (Mountain Pass is very nearly white).
-  const paint = resolveAnyStation(session?.stationId).eqColors?.[1] ?? '#ffffff';
   return (
     <Animated.View
       pointerEvents="none"
@@ -87,7 +75,7 @@ export function SeekCar({
       <MaterialCommunityIcons
         name="car-convertible"
         size={CAR}
-        color={paint}
+        color="#ffffff"
         style={{
           textShadowColor: 'rgba(0,0,0,0.55)',
           textShadowOffset: { width: 0, height: 1 },

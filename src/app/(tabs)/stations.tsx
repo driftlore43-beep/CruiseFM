@@ -225,6 +225,7 @@ function SubHeader({ label }: { label: string }) {
  */
 function EmptySlotRow({ onPress }: { onPress: () => void }) {
   const styles = useStyles(makeStyles);
+  const pal = usePalette();
   const day = useDaylight();
   return (
     <Pressable
@@ -238,7 +239,7 @@ function EmptySlotRow({ onPress }: { onPress: () => void }) {
       </Text>
       <View style={styles.rowTrail}>
         <View style={styles.iconSlot}>
-          <MaterialCommunityIcons name="plus" size={20} color={Cruise.amber} />
+          <MaterialCommunityIcons name="plus" size={20} color={pal.amber} />
         </View>
         <View style={styles.ctrlSlot}>
           <Ionicons name="chevron-forward" size={16} color={day ? 'rgba(255,255,255,0.68)' : 'rgba(255,255,255,0.28)'} />
@@ -689,14 +690,14 @@ const makeStyles = (p: Palette) => StyleSheet.create({
   // absolutely positioned to protect.
   airChip: {
     borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.55)',
-    backgroundColor: 'rgba(245,158,11,0.14)',
+    borderColor: p.mode === 'light' ? 'rgba(168,94,6,0.5)' : 'rgba(245,158,11,0.55)',
+    backgroundColor: p.mode === 'light' ? 'rgba(168,94,6,0.10)' : 'rgba(245,158,11,0.14)',
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   airChipText: {
-    color: Cruise.amber,
+    color: p.amber,
     fontSize: 8.5,
     fontWeight: '800',
     letterSpacing: 1,
@@ -770,7 +771,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
   emptySlot: { opacity: 0.92 },
   emptySlotName: { color: p.ink(0.72), fontWeight: '600' },
   emptySlotDash: {
-    color: p.ink(0.34),
+    color: p.ink(0.45),
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: -1,
@@ -827,7 +828,7 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     marginBottom: 10,
   },
   bandLetters: {
-    color: Cruise.amber,
+    color: p.amber,
     fontSize: 19,
   },
   bandGhost: {
@@ -835,10 +836,10 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     left: 0,
     top: 0,
     fontSize: 19,
-    color: 'rgba(245,158,11,0.16)',
+    color: p.mode === 'light' ? 'rgba(168,94,6,0.16)' : 'rgba(245,158,11,0.16)',
   },
   bandCaption: {
-    color: 'rgba(245,158,11,0.7)',
+    color: p.mode === 'light' ? p.amber : 'rgba(245,158,11,0.7)',
     fontSize: 9.5,
     fontWeight: '800',
     letterSpacing: 2.2,

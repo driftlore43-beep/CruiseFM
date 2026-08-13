@@ -24,6 +24,7 @@ import { loadSessionKind, setSessionKind, type SessionKind } from '@/utils/sessi
  */
 export function HeadingAnywhereCard({ onAnswered }: { onAnswered: (kind: SessionKind) => void }) {
   const ha = useStyles(makeHa);
+  const pal = usePalette();
   const [show, setShow] = useState(false);
 
   useFocusEffect(
@@ -48,7 +49,7 @@ export function HeadingAnywhereCard({ onAnswered }: { onAnswered: (kind: Session
     <View style={ha.card}>
       <View style={ha.head}>
         <View style={ha.iconRing}>
-          <MaterialCommunityIcons name="steering" size={20} color={Cruise.amber} />
+          <MaterialCommunityIcons name="steering" size={20} color={pal.amber} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={ha.title}>Heading anywhere?</Text>

@@ -72,6 +72,18 @@ export type Palette = {
    */
   ink: (alpha: number) => string;
   /**
+   * THE DIAL'S LIT AMBER, and the premium gold — the app's two warm accents.
+   *
+   * They need a per-theme value for the same reason nothing else does: they
+   * are the only colours used as TEXT on the page rather than on a card. On
+   * black, #F59E0B is a lit lamp. On paper it measures 1.95:1 against the
+   * ground, which is a colour you can see but not read — and the band captions,
+   * the ON AIR chip and the PREMIUM badge are all set in it at 8-10pt. Deepened
+   * they land at 4.5:1 and 4.3:1 and still read as amber and gold.
+   */
+  amber: string;
+  gold: string;
+  /**
    * A shadow that reads on this ground. Black on paper is a bruise — a light
    * theme's depth comes from a soft warm-grey shadow at low opacity, which is
    * why this is a colour AND an opacity rather than just a colour.
@@ -89,6 +101,8 @@ const DARK: Palette = {
   bar: '#0d0d0d',
   barMuted: '#6A6A72',
   ink: (a) => `rgba(255,255,255,${a})`,
+  amber: '#F59E0B',
+  gold: '#F7B733',
   shadow: '#000000',
   shadowOpacity: 1,
 };
@@ -107,6 +121,8 @@ const LIGHT: Palette = {
   bar: '#FFFDF8',
   barMuted: '#8A877F',
   ink: (a) => `rgba(23,23,27,${a})`,
+  amber: '#A85E06',
+  gold: '#9A6B00',
   // Lower opacity than dark's, and warm rather than black: on paper a shadow is
   // the only thing separating a panel from the page, so it has to be present
   // without being a smudge.

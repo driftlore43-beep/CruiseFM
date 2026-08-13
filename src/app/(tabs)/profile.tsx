@@ -224,9 +224,12 @@ export default function ProfileScreen() {
             {/* Premium wears the paywall's gold, not the app's violet — it
                 is the same badge as the upgrade card's eyebrow and should
                 read as the same thing. Free stays on the accent. */}
-            <View style={[styles.planBadge, isPro && { borderColor: PREMIUM_GOLD + '66' }]}>
-              <MaterialCommunityIcons name="star-four-points" size={10} color={isPro ? PREMIUM_GOLD : theme.accentColor} />
-              <Text style={[styles.planText, { color: isPro ? PREMIUM_GOLD : theme.accentColor }]}>
+            {/* The gold comes from the palette, not the constant: #F7B733 is a
+                lit gold on black and measures 1.62:1 on paper, i.e. visible but
+                not readable at 9.5pt. */}
+            <View style={[styles.planBadge, isPro && { borderColor: pal.gold + '66' }]}>
+              <MaterialCommunityIcons name="star-four-points" size={10} color={isPro ? pal.gold : theme.accentColor} />
+              <Text style={[styles.planText, { color: isPro ? pal.gold : theme.accentColor }]}>
                 {isPro ? 'PREMIUM' : 'FREE PLAN'}
               </Text>
             </View>

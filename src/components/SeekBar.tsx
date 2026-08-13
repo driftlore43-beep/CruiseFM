@@ -7,10 +7,10 @@ import { resolveAnyStation } from '@/utils/customStations';
 import type { ScrubApi } from '@/utils/useTrackClock';
 
 /**
- * A little cab, driving the length of the song (owner, 13.08: "a little car
- * driving on the scrub", then "make the car a cabby"). The bar already reads as
- * a road — the played part lit, the rest ahead of you — so this costs almost
- * nothing and is the most on-brand detail available.
+ * A little drop-top, driving the length of the song (owner, 13.08: "a little
+ * car driving on the scrub", then "a cabriolet - a drop top"). The bar already
+ * reads as a road — the played part lit, the rest ahead of you — so this costs
+ * almost nothing and is the most on-brand detail available.
  *
  * IT SITS ABOVE THE BAR, not on it, and that is not a stylistic preference: at
  * the playhead the bar changes from solid white to dark, so a marker sitting
@@ -22,20 +22,20 @@ import type { ScrubApi } from '@/utils/useTrackClock';
  * the whole 36pt row is the touch target, not the dot, so the affordance was
  * never the dot's job.
  *
- * THE GLYPH IS `taxi`, WHICH FACES YOU rather than driving in profile, and
- * that trade is deliberate: MaterialCommunityIcons has no side-view cab, and
- * without the roof sign a cab is just a car. Rendered against all ten stations
- * before shipping — the sign is legible at this size, which is the whole point
- * of choosing it.
+ * SIDE VIEW, FACING THE WAY IT IS TRAVELLING. `car-convertible` is drawn in
+ * profile with the roof down and the screen raked forward, so at this size the
+ * open top is legible and the nose points right — the same direction the bar
+ * fills. A front-facing glyph was tried first (`taxi`, briefly shipped) and
+ * loses that: a car coming at you does not read as one driving the song.
  */
-const CAR = 23;
+const CAR = 25;
 /**
  * How far the wheels sink into the road. Small: any deeper and they cross into
  * the played (white) half of the bar and disappear into it whenever the car's
  * own colour is pale. Sitting ON the surface keeps the whole silhouette against
  * the backdrop wherever it is along the song.
  */
-const CAR_SIT = 5;
+const CAR_SIT = 6;
 
 /**
  * The shared draggable progress bar. Touch anywhere on it and the position
@@ -44,7 +44,7 @@ const CAR_SIT = 5;
  * touch on start so it can't lose the gesture to a parent swipe.
  */
 /**
- * The cab itself, exported because Vinyl carries its own copy of the bar (it
+ * The car itself, exported because Vinyl carries its own copy of the bar (it
  * predates the shared one and grows its track while you scrub). One definition
  * rather than two, or the deck would end up the only mode without a car and
  * that would read as a bug.
@@ -54,7 +54,7 @@ const CAR_SIT = 5;
  * differently (`station` / `currentStation` / `lockedStation` — see
  * ModeActionRow, which takes it as a prop for exactly that reason), so
  * threading a colour through all of them is how one gets missed and a single
- * mode quietly keeps a white cab. The session already knows which station is
+ * mode quietly keeps a white car. The session already knows which station is
  * playing, so it asks.
  */
 export function SeekCar({
@@ -66,7 +66,7 @@ export function SeekCar({
 }) {
   const { session } = useNowPlaying();
   // eqColors[1] is the app-wide accent slot — the mini-player's edge, the mode
-  // glow bands — so the cab matches the light the rest of the mode is throwing.
+  // glow bands — so the car matches the light the rest of the mode is throwing.
   // Every station's is luminous enough to read against a dark backdrop; the
   // shadow below covers the pale ones (Mountain Pass is very nearly white).
   const paint = resolveAnyStation(session?.stationId).eqColors?.[1] ?? '#ffffff';
@@ -85,7 +85,7 @@ export function SeekCar({
           any position. Vector icons are text, so this is a text shadow rather
           than a view shadow. */}
       <MaterialCommunityIcons
-        name="taxi"
+        name="car-convertible"
         size={CAR}
         color={paint}
         style={{

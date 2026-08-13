@@ -56,12 +56,6 @@ export type ModeSnapshot = {
    *  close to the Tuner's play button while giving Vinyl a comfortable gap
    *  (owner, 05.08: "make sure the cut off is consistent"). */
   cropTopPt: number; cropBotPt: number;
-  /** Two more lines for the TICKET's picture band, which shows only the
-   *  mode's object: the bottom of the station identity block (the ticket's
-   *  header already names the station, so the capture's own must not ghost
-   *  under it) and the top of the song block (the counterfoil prints the
-   *  song, and the owner asked the scrub left out). */
-  identBotPt: number; songTopPt: number;
 };
 
 async function grabModeSnapshot(insets: EdgeInsets): Promise<ModeSnapshot | null> {
@@ -93,18 +87,6 @@ async function grabModeSnapshot(insets: EdgeInsets): Promise<ModeSnapshot | null
       // over paddingBottom max(insetBottom,24)+16 — so this cut lands 6pt
       // above the pills on any phone, whatever the mode.
       cropBotPt: Math.max(insets.bottom, 24) + 62,
-      // TICKET BAND — the object only. Identity text ends at
-      // max(insetTop,20)+86 (eyebrow 12 + gap 3 + name row 19 below +52);
-      // +92 is that plus a whisker. The song block's cut line was MEASURED
-      // off the owner's device tickets, not derived from the style sheets:
-      // +300 (the styles' arithmetic) left ~13pt of title crown poking
-      // above the tear on Vinyl/Equalizer/Cassette — the real stack runs
-      // taller than its declared numbers (seek-bar touch padding, marquee)
-      // — putting the title's glyph top at ~+313. +330 hides it with 17pt
-      // to spare while staying at the title block's own top edge, so the
-      // mode's visual above it is untouched.
-      identBotPt: Math.max(insets.top, 20) + 92,
-      songTopPt: Math.max(insets.bottom, 24) + 330,
     };
   } catch {
     return null;
@@ -134,7 +116,7 @@ export function ModeActionRow({
   const day = useDaylight();
   const insets = useSafeAreaInsets();
   // The share pill is PORTRAIT-ONLY: the cards are built around a portrait
-  // capture, and a landscape ticket needs its own design round first
+  // capture, and a landscape card needs its own design round first
   // (owner, 05.08: "the share option is available in the landscape mode —
   // I would remove this option").
   const { width: winW, height: winH } = useWindowDimensions();

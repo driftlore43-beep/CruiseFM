@@ -11,9 +11,49 @@ import {
   startPlayback,
   skipNext,
   skipPrev,
+  seekTo,
   setShuffle as spotifySetShuffle,
   setRepeat as spotifySetRepeat,
 } from './spotify';
+
+/**
+ * How far into a song the back button stops meaning "previous".
+ *
+ * Owner, 13.08: "the back button should restart the song not go back to the
+ * previous song. Press it back twice and then it plays to the previous song."
+ * That is what every music player does, and three seconds is the convention —
+ * long enough that a deliberate double-tap always reaches the previous track
+ * (the first press puts the position at 0, so the second is inside the window),
+ * short enough that pressing back in the opening bars still goes back.
+ *
+ * IT ONLY APPLIES WHEN THERE IS A REAL POSITION TO RETURN TO. With no live
+ * track — companion mode, which is most listeners — there is nothing to
+ * restart, so the button keeps its plain meaning.
+ */
+export const RESTART_WINDOW_MS = 3000;
+
+/** Where the song actually is right now, running the clock forward from the
+ *  last reading the service gave us. */
+export function elapsedMs(
+  t: { progressMs: number | null; syncedAt: number; isPlaying?: boolean } | null,
+  now: number = Date.now(),
+): number | null {
+  if (!t || t.progressMs == null) return null;
+  return t.progressMs + (t.isPlaying === false ? 0 : now - t.syncedAt);
+}
+
+/**
+ * What the back button should do, given where the song is. Pulled out as a
+ * plain function so it can be tested without a player — see
+ * scripts/test-back-button.mjs.
+ */
+export function backButtonAction(
+  t: { progressMs: number | null; syncedAt: number; isPlaying?: boolean } | null,
+  now: number = Date.now(),
+): 'restart' | 'previous' {
+  const at = elapsedMs(t, now);
+  return at != null && at > RESTART_WINDOW_MS ? 'restart' : 'previous';
+}
 
 export type RepeatMode = 'off' | 'context' | 'track';
 
@@ -289,7 +329,21 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
     },
     pause: () => { ping(); lastControlRef.current = Date.now(); isPlayingRef.current = false; spotifyPause().catch(() => {}); after(); },
     next: () => { ping(); lastControlRef.current = Date.now(); skipNext().catch(() => {}); after(true); },
-    prev: () => { ping(); lastControlRef.current = Date.now(); skipPrev().catch(() => {}); after(true); },
+    prev: () => {
+      ping();
+      lastControlRef.current = Date.now();
+      if (backButtonAction(trackRef.current) === 'restart') {
+        // Back to the top of this song. `after()` without watching the track,
+        // because the track is not changing — the chase it starts is what makes
+        // the progress bar snap to zero rather than drifting on until the next
+        // five-second poll.
+        seekTo(0).catch(() => {});
+        after();
+        return;
+      }
+      skipPrev().catch(() => {});
+      after(true);
+    },
     // Optimistic local flip; the API call + next poll settle the truth.
     shuffle: (state: boolean) => { ping(); setShuffleOn(state); spotifySetShuffle(state).catch(() => {}); after(); },
     repeat: (mode: RepeatMode) => { ping(); setRepeatMode(mode); spotifySetRepeat(mode).catch(() => {}); after(); },

@@ -11,12 +11,13 @@ import {
   applePause,
   applePlay,
   applePrev,
+  appleSeekTo,
   appleSetRepeat,
   appleSetShuffle,
   getAppleNowPlaying,
   isAppleMusicConnected,
 } from './appleMusic';
-import type { NowPlaying, RepeatMode } from './useSpotifyPlayback';
+import { backButtonAction, type NowPlaying, type RepeatMode } from './useSpotifyPlayback';
 
 /**
  * Live Apple Music playback bridge — the peer of useSpotifyPlayback, and the
@@ -38,6 +39,9 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
   const [contextName, setContextName] = useState<string | null>(null);
 
   const cancelledRef = useRef(false);
+  // Read by the back button, which has to know where the song is right now.
+  const trackRef = useRef<NowPlaying | null>(null);
+  trackRef.current = track;
   const artCacheRef = useRef<{ key: string | null; url: string | null; at: number }>({ key: null, url: null, at: 0 });
   const refreshRef = useRef<() => void>(() => {});
   const lastControlRef = useRef(0);
@@ -174,7 +178,15 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
     play: () => { ping(); lastControlRef.current = Date.now(); applePlay(); after(); },
     pause: () => { ping(); lastControlRef.current = Date.now(); applePause(); after(); },
     next: () => { ping(); lastControlRef.current = Date.now(); appleNext(); after(); },
-    prev: () => { ping(); lastControlRef.current = Date.now(); applePrev(); after(); },
+    // Restart-then-previous, same rule and same window as Spotify's — see the
+    // note on RESTART_WINDOW_MS there.
+    prev: () => {
+      ping();
+      lastControlRef.current = Date.now();
+      if (backButtonAction(trackRef.current) === 'restart') { appleSeekTo(0); after(); return; }
+      applePrev();
+      after();
+    },
     shuffle: (state: boolean) => { ping(); setShuffleOn(state); appleSetShuffle(state); after(); },
     repeat: (mode: RepeatMode) => { ping(); setRepeatMode(mode); appleSetRepeat(mode); after(); },
   };

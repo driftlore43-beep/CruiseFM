@@ -2,13 +2,15 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRef, useState } from 'react';
 import { Animated, PanResponder, View } from 'react-native';
 
+import { useNowPlaying } from '@/context/NowPlayingContext';
+import { resolveAnyStation } from '@/utils/customStations';
 import type { ScrubApi } from '@/utils/useTrackClock';
 
 /**
- * A little car, driving the length of the song (owner, 13.08: "a little car
- * driving on the scrub"). The bar already reads as a road — the played part
- * lit, the rest ahead of you — so this costs almost nothing and is the most
- * on-brand detail available.
+ * A little cab, driving the length of the song (owner, 13.08: "a little car
+ * driving on the scrub", then "make the car a cabby"). The bar already reads as
+ * a road — the played part lit, the rest ahead of you — so this costs almost
+ * nothing and is the most on-brand detail available.
  *
  * IT SITS ABOVE THE BAR, not on it, and that is not a stylistic preference: at
  * the playhead the bar changes from solid white to dark, so a marker sitting
@@ -19,15 +21,21 @@ import type { ScrubApi } from '@/utils/useTrackClock';
  * It also replaces the old white dot rather than joining it. Nothing is lost:
  * the whole 36pt row is the touch target, not the dot, so the affordance was
  * never the dot's job.
+ *
+ * THE GLYPH IS `taxi`, WHICH FACES YOU rather than driving in profile, and
+ * that trade is deliberate: MaterialCommunityIcons has no side-view cab, and
+ * without the roof sign a cab is just a car. Rendered against all ten stations
+ * before shipping — the sign is legible at this size, which is the whole point
+ * of choosing it.
  */
-const CAR = 18;
+const CAR = 23;
 /**
- * How far the wheels sink into the road. Small: at 5 they crossed into the
- * played (white) half of the bar and disappeared into it, since the car is
- * white too. Sitting ON the surface keeps the whole silhouette against the
- * backdrop wherever it is along the song.
+ * How far the wheels sink into the road. Small: any deeper and they cross into
+ * the played (white) half of the bar and disappear into it whenever the car's
+ * own colour is pale. Sitting ON the surface keeps the whole silhouette against
+ * the backdrop wherever it is along the song.
  */
-const CAR_SIT = 4;
+const CAR_SIT = 5;
 
 /**
  * The shared draggable progress bar. Touch anywhere on it and the position
@@ -36,10 +44,18 @@ const CAR_SIT = 4;
  * touch on start so it can't lose the gesture to a parent swipe.
  */
 /**
- * The car itself, exported because Vinyl carries its own copy of the bar (it
+ * The cab itself, exported because Vinyl carries its own copy of the bar (it
  * predates the shared one and grows its track while you scrub). One definition
  * rather than two, or the deck would end up the only mode without a car and
  * that would read as a bug.
+ *
+ * IT FINDS ITS OWN COLOUR rather than taking one as a prop. Nine call sites
+ * across eight modes and the landscape chrome each name their station
+ * differently (`station` / `currentStation` / `lockedStation` — see
+ * ModeActionRow, which takes it as a prop for exactly that reason), so
+ * threading a colour through all of them is how one gets missed and a single
+ * mode quietly keeps a white cab. The session already knows which station is
+ * playing, so it asks.
  */
 export function SeekCar({
   shift, trackH = 6, rowH = 36,
@@ -48,6 +64,12 @@ export function SeekCar({
   trackH?: number;
   rowH?: number;
 }) {
+  const { session } = useNowPlaying();
+  // eqColors[1] is the app-wide accent slot — the mini-player's edge, the mode
+  // glow bands — so the cab matches the light the rest of the mode is throwing.
+  // Every station's is luminous enough to read against a dark backdrop; the
+  // shadow below covers the pale ones (Mountain Pass is very nearly white).
+  const paint = resolveAnyStation(session?.stationId).eqColors?.[1] ?? '#ffffff';
   return (
     <Animated.View
       pointerEvents="none"
@@ -59,13 +81,13 @@ export function SeekCar({
         transform: [{ translateX: shift }],
       }}>
       {/* The shadow is what grounds it — without one it floats above the road,
-          and it also separates the white body from the white half of the bar
-          at any position. Vector icons are text, so this is a text shadow
-          rather than a view shadow. */}
+          and it also separates a pale body from the white half of the bar at
+          any position. Vector icons are text, so this is a text shadow rather
+          than a view shadow. */}
       <MaterialCommunityIcons
-        name="car-side"
+        name="taxi"
         size={CAR}
-        color="#ffffff"
+        color={paint}
         style={{
           textShadowColor: 'rgba(0,0,0,0.55)',
           textShadowOffset: { width: 0, height: 1 },

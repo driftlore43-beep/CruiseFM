@@ -32,6 +32,7 @@ import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
 import { ModeActionRow } from '@/components/ModeActionRow';
+import { SeekCar } from '@/components/SeekBar';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
@@ -615,8 +616,6 @@ function ScrubProgressBar({ progress, isScrubbing, onLayout, panHandlers }: {
 }) {
   const [barWidth, setBarWidth] = useState(300);
   const trackH     = isScrubbing ? 8 : 6;
-  const DOT        = 14;
-  const dotOff     = DOT / 2;
   // Scaled, not resized — see SeekBar, which carries the full reasoning. width
   // is a layout property and so cannot leave the JS thread; scaleX can, and
   // the paired translateX pins the left edge because RN scales about the
@@ -644,21 +643,9 @@ function ScrubProgressBar({ progress, isScrubbing, onLayout, panHandlers }: {
         backgroundColor: '#ffffff',
         transform: [{ translateX: fillShift }, { scaleX: fillScale }],
       }} />
-      {/* Dot rides the fill's end, unscaled */}
-      <Animated.View style={{
-        // No `top`: an absolutely-positioned child with neither top nor bottom
-        // is placed by the parent's justifyContent, which is 'center' — the
-        // same rule that centres the fill, so the two line up by construction.
-        position: 'absolute', left: -dotOff,
-        width: DOT, height: DOT, borderRadius: dotOff,
-        backgroundColor: '#ffffff',
-        shadowColor: '#000',
-        shadowOpacity: isScrubbing ? 0.6 : 0.4,
-        shadowRadius: isScrubbing ? 8 : 5,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: isScrubbing ? 8 : 4,
-        transform: [{ translateX: dotShift }],
-      }} />
+      {/* The car rides the fill's end, unscaled — shared with SeekBar so the
+          deck cannot end up the one mode without one. */}
+      <SeekCar shift={dotShift} trackH={trackH} />
     </View>
   );
 }

@@ -1,9 +1,33 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRef, useState } from 'react';
 import { Animated, PanResponder, View } from 'react-native';
 
 import type { ScrubApi } from '@/utils/useTrackClock';
 
-const DOT = 14;
+/**
+ * A little car, driving the length of the song (owner, 13.08: "a little car
+ * driving on the scrub"). The bar already reads as a road — the played part
+ * lit, the rest ahead of you — so this costs almost nothing and is the most
+ * on-brand detail available.
+ *
+ * IT SITS ABOVE THE BAR, not on it, and that is not a stylistic preference: at
+ * the playhead the bar changes from solid white to dark, so a marker sitting
+ * there is half over each and reads as a smudge whatever colour it is. Above
+ * the line it is always against the backdrop, and the wheels overlap the road
+ * by a few pixels so it is plainly ON it.
+ *
+ * It also replaces the old white dot rather than joining it. Nothing is lost:
+ * the whole 36pt row is the touch target, not the dot, so the affordance was
+ * never the dot's job.
+ */
+const CAR = 18;
+/**
+ * How far the wheels sink into the road. Small: at 5 they crossed into the
+ * played (white) half of the bar and disappeared into it, since the car is
+ * white too. Sitting ON the surface keeps the whole silhouette against the
+ * backdrop wherever it is along the song.
+ */
+const CAR_SIT = 4;
 
 /**
  * The shared draggable progress bar. Touch anywhere on it and the position
@@ -11,6 +35,47 @@ const DOT = 14;
  * ScrubApi handles the Spotify call and restarting the clock). Claims the
  * touch on start so it can't lose the gesture to a parent swipe.
  */
+/**
+ * The car itself, exported because Vinyl carries its own copy of the bar (it
+ * predates the shared one and grows its track while you scrub). One definition
+ * rather than two, or the deck would end up the only mode without a car and
+ * that would read as a bug.
+ */
+export function SeekCar({
+  shift, trackH = 6, rowH = 36,
+}: {
+  shift: Animated.AnimatedInterpolation<number>;
+  trackH?: number;
+  rowH?: number;
+}) {
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: -CAR / 2,
+        // The track is centred in the row, so its top edge is at (rowH - trackH)/2.
+        top: (rowH - trackH) / 2 - CAR + CAR_SIT,
+        transform: [{ translateX: shift }],
+      }}>
+      {/* The shadow is what grounds it — without one it floats above the road,
+          and it also separates the white body from the white half of the bar
+          at any position. Vector icons are text, so this is a text shadow
+          rather than a view shadow. */}
+      <MaterialCommunityIcons
+        name="car-side"
+        size={CAR}
+        color="#ffffff"
+        style={{
+          textShadowColor: 'rgba(0,0,0,0.55)',
+          textShadowOffset: { width: 0, height: 1 },
+          textShadowRadius: 3,
+        }}
+      />
+    </Animated.View>
+  );
+}
+
 export function SeekBar({ progress, scrub }: { progress: Animated.Value; scrub: ScrubApi }) {
   const [barW, setBarW] = useState(300);
   const wRef = useRef(300);
@@ -52,8 +117,8 @@ export function SeekBar({ progress, scrub }: { progress: Animated.Value; scrub: 
   // The floor of 0.0001 matters: a scaleX of exactly 0 is a degenerate matrix.
   const fillScale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.0001, 1], extrapolate: 'clamp' });
   const fillShift = progress.interpolate({ inputRange: [0, 1], outputRange: [-barW / 2, 0], extrapolate: 'clamp' });
-  // The dot rides OUTSIDE the scaled view on purpose — as a child it would be
-  // squashed with it and read as an ellipse.
+  // The car rides OUTSIDE the scaled view on purpose — as a child it would be
+  // squashed with it and come out stretched.
   const dotShift = progress.interpolate({ inputRange: [0, 1], outputRange: [0, barW], extrapolate: 'clamp' });
 
   return (
@@ -67,14 +132,7 @@ export function SeekBar({ progress, scrub }: { progress: Animated.Value; scrub: 
         backgroundColor: '#ffffff',
         transform: [{ translateX: fillShift }, { scaleX: fillScale }],
       }} />
-      <Animated.View style={{
-        position: 'absolute', left: -DOT / 2,
-        width: DOT, height: DOT, borderRadius: DOT / 2,
-        backgroundColor: '#ffffff',
-        shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 5,
-        shadowOffset: { width: 0, height: 2 }, elevation: 4,
-        transform: [{ translateX: dotShift }],
-      }} />
+      <SeekCar shift={dotShift} />
     </View>
   );
 }

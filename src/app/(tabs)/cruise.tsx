@@ -17,6 +17,8 @@ import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
+import { useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 import { RECOMMENDED_IDS, STATIONS, type Station } from '@/constants/stations';
 import {
   loadLastCruise,
@@ -64,6 +66,7 @@ function greetingFor(hour: number, returning: boolean): string {
 }
 
 export default function CruiseScreen() {
+  const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const np = useNowPlaying();
@@ -261,14 +264,19 @@ export default function CruiseScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * PAGE CHROME ONLY — the greeting, the section headings and the two notice
+ * banners. The shelves are cards (HeroCard, ShelfCard, the connect cards) and
+ * keep their own colours in either theme, per the owner's rule of 13.08.
+ */
+const makeStyles = (p: Palette) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
   content: {},
   // The page title, at the same weight and size as "Now tuning" and "Modes".
   // It was 15pt — smaller than the station names underneath it.
   greeting: {
-    color: Cruise.textPrimary,
+    color: p.text,
     fontSize: 36,
     fontWeight: '800',
     letterSpacing: -1.3,
@@ -282,7 +290,7 @@ const styles = StyleSheet.create({
   // reserved for labels inside artwork now, so section headings can be read
   // rather than deciphered.
   sectionHeading: {
-    color: '#fff',
+    color: p.text,
     fontSize: 21,
     fontWeight: '800',
     letterSpacing: 0,
@@ -304,13 +312,13 @@ const styles = StyleSheet.create({
   },
   bannerText: {
     flex: 1,
-    color: 'rgba(255,255,255,0.75)',
+    color: p.ink(0.75),
     fontSize: 12.5,
     lineHeight: 18,
     fontWeight: '500',
   },
   bannerClose: {
-    color: 'rgba(255,255,255,0.35)',
+    color: p.ink(0.42),
     fontSize: 13,
     fontWeight: '600',
   },

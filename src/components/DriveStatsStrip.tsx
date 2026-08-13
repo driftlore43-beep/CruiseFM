@@ -3,6 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { getDriveStats, type DriveStats } from '@/utils/driveStats';
 import { cachedSessionKind, loadSessionKind, words } from '@/utils/sessionKind';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 
 function formatHours(totalMinutes: number): string {
   if (totalMinutes < 60) return `${totalMinutes}m`;
@@ -23,6 +25,7 @@ function formatHours(totalMinutes: number): string {
  * stats yet gets no empty section either.
  */
 export function DriveStatsStrip({ refreshKey }: { refreshKey: number }) {
+  const styles = useStyles(make_styles);
   const [stats, setStats] = useState<DriveStats | null>(null);
   const [kind, setKind] = useState(cachedSessionKind());
 
@@ -76,9 +79,9 @@ export function DriveStatsStrip({ refreshKey }: { refreshKey: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const make_styles = (p: Palette) => StyleSheet.create({
   heading: {
-    color: '#fff',
+    color: p.text,
     fontSize: 21,
     fontWeight: '800',
     letterSpacing: 0,
@@ -94,13 +97,13 @@ const styles = StyleSheet.create({
   // two lines on a narrow phone and knocks the numbers out of alignment.
   item: { flex: 1, paddingRight: 10 },
   value: {
-    color: '#fff',
+    color: p.text,
     fontSize: 26,
     fontWeight: '800',
     letterSpacing: 0,
   },
   label: {
-    color: 'rgba(255,255,255,0.42)',
+    color: p.ink(0.5),
     fontSize: 10.5,
     fontWeight: '700',
     letterSpacing: 1.3,

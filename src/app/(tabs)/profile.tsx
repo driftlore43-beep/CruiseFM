@@ -22,6 +22,8 @@ import { judgeBadges, type JudgedBadge } from '@/constants/badges';
 import { isFounder } from '@/utils/founder';
 import { appVersionLabel } from '@/utils/appVersion';
 import { DEFAULT_DRIVER_NAME, getDriverName, initialsFor } from '@/utils/driverName';
+import { useAppearance, usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Appearance, Palette } from '@/utils/appearance';
 
 function stationName(id: string | null): string {
   return STATIONS.find((s) => s.id === id)?.name ?? '—';
@@ -72,9 +74,10 @@ const SHEEN_GRADIENT = ['rgba(255,255,255,0.20)', 'rgba(255,255,255,0.03)', 'tra
  * like the Stations and Modes rows.
  */
 function IconChip({ icon, size = 38 }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; size?: number }) {
+  const pal = usePalette();
   return (
     <View style={{ width: 24, alignItems: 'center' }}>
-      <MaterialCommunityIcons name={icon} size={Math.round(size * 0.55)} color="rgba(255,255,255,0.6)" />
+      <MaterialCommunityIcons name={icon} size={Math.round(size * 0.55)} color={pal.ink(0.62)} />
     </View>
   );
 }
@@ -102,7 +105,53 @@ function useMusicPlatformInfo() {
   return { name, color, id, refresh };
 }
 
+/**
+ * Light / Dark / Match my phone.
+ *
+ * A segmented row rather than a switch, on its own line rather than beside the
+ * label: three options do not fit in the right-hand slot the other rows use,
+ * and squeezing them there is how a control ends up unreadable at the exact
+ * moment someone is trying to make the app readable.
+ */
+function AppearanceRow() {
+  const styles = useStyles(makeStyles);
+  const { preference, setPreference } = useAppearance();
+  const OPTIONS: { id: Appearance; label: string }[] = [
+    { id: 'light', label: 'Light' },
+    { id: 'dark', label: 'Dark' },
+    { id: 'system', label: 'Match phone' },
+  ];
+  return (
+    <View style={[styles.settingsRow, styles.settingsBorder, styles.appearanceRow]}>
+      <View style={styles.platformRowLeft}>
+        <IconChip icon="theme-light-dark" size={34} />
+        <View style={styles.settingsTextBlock}>
+          <Text style={styles.settingsLabel}>Appearance</Text>
+          <Text style={styles.dataSaverSub}>
+            Light pages for daylight · the drives themselves stay dark either way
+          </Text>
+        </View>
+      </View>
+      <View style={styles.segment}>
+        {OPTIONS.map((o) => {
+          const on = preference === o.id;
+          return (
+            <Pressable
+              key={o.id}
+              onPress={() => setPreference(o.id)}
+              style={[styles.segmentItem, on && styles.segmentItemOn]}>
+              <Text style={[styles.segmentText, on && styles.segmentTextOn]}>{o.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere, daylight, setDaylight } = useMotion();
@@ -208,10 +257,17 @@ export default function ProfileScreen() {
                   <MaterialCommunityIcons
                     name={b.icon as keyof typeof MaterialCommunityIcons.glyphMap}
                     size={30}
-                    color={founder ? '#F7B733' : b.earned ? '#fff' : 'rgba(255,255,255,0.22)'}
+                    color={founder ? '#F7B733' : b.earned ? pal.text : pal.ink(0.3)}
                   />
                   <Text
-                    style={[styles.badgeName, (b.earned || founder) && styles.badgeNameLit]}
+                    style={[
+                      styles.badgeName,
+                      (b.earned || founder) && styles.badgeNameLit,
+                      // The Founder tile is a coloured object and keeps its
+                      // deep brown in either theme, so its label has to stay
+                      // light rather than follow the page.
+                      founder && styles.badgeNameFounder,
+                    ]}
                     numberOfLines={2}>
                     {b.name}
                   </Text>
@@ -253,6 +309,12 @@ export default function ProfileScreen() {
           {/* Custom Theme was removed until it applies app-wide (only accent +
               glow worked). Station moods now colour the app automatically. */}
 
+          {/* Appearance — first, because it is the one setting that changes
+              everything else on this page. Three choices rather than a switch:
+              "Match my phone" is the one most people want and a two-state
+              toggle cannot offer it. */}
+          <AppearanceRow />
+
           {/* Data Saver toggle — forces still backgrounds for everyone */}
           <View style={[styles.settingsRow, styles.settingsBorder]}>
             <View style={styles.platformRowLeft}>
@@ -265,9 +327,9 @@ export default function ProfileScreen() {
             <Switch
               value={dataSaver}
               onValueChange={setDataSaver}
-              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              trackColor={{ false: pal.ink(0.2), true: Cruise.violet }}
               thumbColor="#fff"
-              ios_backgroundColor="rgba(255,255,255,0.18)"
+              ios_backgroundColor={pal.ink(0.2)}
               {...({ activeThumbColor: '#fff' } as object)}
             />
           </View>
@@ -286,9 +348,9 @@ export default function ProfileScreen() {
             <Switch
               value={daylight}
               onValueChange={setDaylight}
-              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              trackColor={{ false: pal.ink(0.2), true: Cruise.violet }}
               thumbColor="#fff"
-              ios_backgroundColor="rgba(255,255,255,0.18)"
+              ios_backgroundColor={pal.ink(0.2)}
               {...({ activeThumbColor: '#fff' } as object)}
             />
           </View>
@@ -308,9 +370,9 @@ export default function ProfileScreen() {
             <Switch
               value={autoDim}
               onValueChange={setAutoDim}
-              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              trackColor={{ false: pal.ink(0.2), true: Cruise.violet }}
               thumbColor="#fff"
-              ios_backgroundColor="rgba(255,255,255,0.18)"
+              ios_backgroundColor={pal.ink(0.2)}
               {...({ activeThumbColor: '#fff' } as object)}
             />
           </View>
@@ -328,9 +390,9 @@ export default function ProfileScreen() {
             <Switch
               value={atmosphere}
               onValueChange={setAtmosphere}
-              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              trackColor={{ false: pal.ink(0.2), true: Cruise.violet }}
               thumbColor="#fff"
-              ios_backgroundColor="rgba(255,255,255,0.18)"
+              ios_backgroundColor={pal.ink(0.2)}
               {...({ activeThumbColor: '#fff' } as object)}
             />
           </View>
@@ -349,9 +411,9 @@ export default function ProfileScreen() {
             <Switch
               value={softAtmosphere}
               onValueChange={setSoftAtmosphere}
-              trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+              trackColor={{ false: pal.ink(0.2), true: Cruise.violet }}
               thumbColor="#fff"
-              ios_backgroundColor="rgba(255,255,255,0.18)"
+              ios_backgroundColor={pal.ink(0.2)}
               {...({ activeThumbColor: '#fff' } as object)}
             />
           </View>
@@ -378,7 +440,7 @@ export default function ProfileScreen() {
                 )}
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
+            <Ionicons name="chevron-forward" size={18} color={pal.ink(0.5)} />
           </Pressable>
 
           {/* Spotify's connection belongs to the Spotify CHOICE, not to the
@@ -408,9 +470,9 @@ export default function ProfileScreen() {
               <Switch
                 value={devFreePreview}
                 onValueChange={setDevFreePreview}
-                trackColor={{ false: 'rgba(255,255,255,0.18)', true: Cruise.violet }}
+                trackColor={{ false: pal.ink(0.2), true: Cruise.violet }}
                 thumbColor="#fff"
-                ios_backgroundColor="rgba(255,255,255,0.18)"
+                ios_backgroundColor={pal.ink(0.2)}
                 {...({ activeThumbColor: '#fff' } as object)}
               />
             </View>
@@ -425,7 +487,7 @@ export default function ProfileScreen() {
                 <IconChip icon={item.icon} size={34} />
                 <Text style={styles.settingsLabel}>{item.label}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
+              <Ionicons name="chevron-forward" size={18} color={pal.ink(0.5)} />
             </Pressable>
           ))}
         </View>
@@ -454,7 +516,12 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * PAGE CHROME. The badge tiles, the settings rows and the type all follow the
+ * theme; the upgrade card and the avatar keep their own colours, because they
+ * are coloured objects rather than tinted page (owner's rule, 13.08).
+ */
+const makeStyles = (p: Palette) => StyleSheet.create({
   // ── Identity ──────────────────────────────────────────────────────────────
   identity: {
     flexDirection: 'row',
@@ -464,7 +531,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   name: {
-    color: '#fff',
+    color: p.text,
     fontSize: 30,
     fontWeight: '800',
     letterSpacing: -1.1,
@@ -487,7 +554,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
   },
   statLine: {
-    color: 'rgba(255,255,255,0.45)',
+    color: p.ink(0.55),
     fontSize: 13.5,
     fontWeight: '500',
     marginTop: 14,
@@ -502,13 +569,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionTitle: {
-    color: '#fff',
+    color: p.text,
     fontSize: 21,
     fontWeight: '800',
     letterSpacing: 0,
   },
   sectionMeta: {
-    color: 'rgba(255,255,255,0.45)',
+    color: p.ink(0.55),
     fontSize: 13,
   },
 
@@ -533,28 +600,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingHorizontal: 8,
-    backgroundColor: '#0a0a10',
+    backgroundColor: p.panel,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: p.ink(0.09),
   },
   // Earned tiles lift off the page; locked ones stay flat and dark but never
   // vanish, so the set still reads as something to finish.
   badgeTileEarned: {
-    backgroundColor: '#1b1b24',
-    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: p.panelUp,
+    borderColor: p.ink(0.18),
   },
   badgeTileFounder: {
     backgroundColor: '#2e2007',
     borderColor: 'rgba(247,183,51,0.45)',
   },
   badgeName: {
-    color: 'rgba(255,255,255,0.35)',
+    color: p.ink(0.45),
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
     letterSpacing: 0,
   },
-  badgeNameLit: { color: '#fff' },
+  badgeNameLit: { color: p.text },
+  badgeNameFounder: { color: '#FFE9B8' },
 
   // ── The one coloured card ─────────────────────────────────────────────────
   upgradeCard: {
@@ -581,6 +649,25 @@ const styles = StyleSheet.create({
   settingsCard: {
     marginHorizontal: -22,
   },
+  // Stacks instead of sitting side by side, so the three options get the full
+  // width of the row rather than whatever is left over.
+  appearanceRow: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },
+  segment: {
+    flexDirection: 'row',
+    gap: 6,
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: p.ink(0.06),
+  },
+  segmentItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderRadius: 9,
+  },
+  segmentItemOn: { backgroundColor: p.text },
+  segmentText: { color: p.ink(0.62), fontSize: 13.5, fontWeight: '700' },
+  segmentTextOn: { color: p.bg },
 
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
@@ -592,7 +679,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     padding: 2,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: p.ink(0.14),
   },
   avatar: {
     width: 56, height: 56, borderRadius: 28, overflow: 'hidden',
@@ -614,20 +701,20 @@ const styles = StyleSheet.create({
   upgradeSub: { color: 'rgba(255,255,255,0.55)', fontSize: 13.5, lineHeight: 19, marginTop: 6 },
   upgradeBtnText: { color: '#1a0e02', fontSize: 15, fontWeight: '800' },
   settingsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingVertical: 15, gap: 16 },
-  settingsBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.09)' },
-  settingsLabel: { color: '#fff', fontSize: 16.5, fontWeight: '500' },
-  settingsArrow: { color: 'rgba(255,255,255,0.5)', fontSize: 20 },
+  settingsBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: p.ink(0.12) },
+  settingsLabel: { color: p.text, fontSize: 16.5, fontWeight: '500' },
+  settingsArrow: { color: p.ink(0.5), fontSize: 20 },
   platformRowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
   platformRowMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   platformDotSmall: {
     width: 7, height: 7, borderRadius: 4,
     shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.85, shadowRadius: 4, elevation: 2,
   },
-  platformRowName: { color: Cruise.textSecondary, fontSize: 12, fontWeight: '500' },
+  platformRowName: { color: p.ink(0.55), fontSize: 12, fontWeight: '500' },
   // flex:1 is load-bearing — without it a long subtitle keeps its natural
   // width and runs underneath the switch instead of wrapping short of it.
   settingsTextBlock: { flex: 1 },
-  dataSaverSub: { color: Cruise.textSecondary, fontSize: 11.5, marginTop: 3, lineHeight: 16 },
+  dataSaverSub: { color: p.ink(0.55), fontSize: 11.5, marginTop: 3, lineHeight: 16 },
   themeRowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   themeColorDot: {
     width: 10, height: 10, borderRadius: 5, marginRight: 4,
@@ -639,11 +726,11 @@ const styles = StyleSheet.create({
   },
   proBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
   versionText: {
-    color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '600',
+    color: p.ink(0.38), fontSize: 11, fontWeight: '600',
     textAlign: 'center', letterSpacing: 0.3, marginTop: 4,
   },
   byline: {
-    color: 'rgba(255,255,255,0.22)', fontSize: 11, fontWeight: '600',
+    color: p.ink(0.3), fontSize: 11, fontWeight: '600',
     textAlign: 'center', letterSpacing: 1.6, marginTop: 6, textTransform: 'uppercase',
   },
 });

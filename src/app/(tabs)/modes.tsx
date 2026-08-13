@@ -9,7 +9,9 @@ import { StationSheet } from '@/components/StationSheet';
 import { defaultStationForNow, loadLastCruise } from '@/utils/lastCruise';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useEntitlements } from '@/context/EntitlementsContext';
-import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
+import { PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 
 /**
  * SHOW THE MODE, DON'T DESCRIBE IT (owner's pick, 29.07 — "direction Q",
@@ -78,6 +80,7 @@ function Pressy({
 }
 
 function HeroMode({ mode, locked, onPress }: { mode: ModeDef; locked: boolean; onPress: () => void }) {
+  const styles = useStyles(makeStyles);
   return (
     <Pressy onPress={onPress} style={styles.heroWrap} scaleTo={0.985}>
       <View style={styles.hero}>
@@ -112,6 +115,8 @@ function HeroMode({ mode, locked, onPress }: { mode: ModeDef; locked: boolean; o
 function ModeRow({ mode, locked, last, onPress }: {
   mode: ModeDef; locked: boolean; last: boolean; onPress: () => void;
 }) {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   return (
     <Pressy onPress={onPress}>
       <View style={[styles.row, !last && styles.rowRule]}>
@@ -123,8 +128,8 @@ function ModeRow({ mode, locked, last, onPress }: {
           <Text style={styles.rowDesc} numberOfLines={1}>{mode.desc}</Text>
         </View>
         {locked
-          ? <Ionicons name="lock-closed" size={14} color="rgba(255,255,255,0.45)" />
-          : <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.28)" />}
+          ? <Ionicons name="lock-closed" size={14} color={pal.ink(0.45)} />
+          : <Ionicons name="chevron-forward" size={16} color={pal.ink(0.34)} />}
       </View>
     </Pressy>
   );
@@ -137,6 +142,7 @@ const HERO_H = 250;
 const HERO_ART = 202;
 
 export default function ModesScreen() {
+  const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const np = useNowPlaying();
   const { isPro } = useEntitlements();
@@ -212,10 +218,16 @@ export default function ModesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * PAGE CHROME ONLY. The hero and the thumbnails are pictures of the modes and
+ * keep their own colours in either theme — that is the whole arrangement the
+ * owner asked for (13.08), and it is why this page needed almost nothing:
+ * its cards were already pictures rather than coloured slabs.
+ */
+const makeStyles = (p: Palette) => StyleSheet.create({
   root: { flex: 1 },
   pageTitle: {
-    color: Cruise.textPrimary,
+    color: p.text,
     fontSize: 36,
     fontWeight: '800',
     letterSpacing: -1.3,
@@ -223,7 +235,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   section: {
-    color: 'rgba(255,255,255,0.9)',
+    color: p.ink(0.9),
     fontSize: 12.5,
     fontWeight: '800',
     letterSpacing: 3,
@@ -236,9 +248,9 @@ const styles = StyleSheet.create({
   heroWrap: {
     marginHorizontal: 22,
     borderRadius: 24,
-    shadowColor: '#000',
+    shadowColor: p.shadow,
     shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.5 * p.shadowOpacity,
     shadowRadius: 26,
     elevation: 10,
   },
@@ -310,7 +322,7 @@ const styles = StyleSheet.create({
   },
   rowRule: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.10)',
+    borderBottomColor: p.ink(0.14),
   },
   thumbClip: {
     width: THUMB,
@@ -319,13 +331,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   rowTitle: {
-    color: '#fff',
+    color: p.text,
     fontSize: 18,
     fontWeight: '600',
     letterSpacing: 0,
   },
   rowDesc: {
-    color: 'rgba(255,255,255,0.48)',
+    color: p.ink(0.52),
     fontSize: 13,
     marginTop: 2,
   },

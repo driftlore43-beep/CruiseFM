@@ -20,6 +20,8 @@ import { consumeCreateRequest } from '@/utils/createStationRequest';
 import { stationImageSource } from '@/utils/stationImage';
 import { recordDriveStart } from '@/utils/driveStats';
 import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 
 const FREE_CUSTOM_LIMIT = 3;
 const SCREEN_H = Dimensions.get('window').height;
@@ -73,6 +75,7 @@ function stationById(id: string): Station {
 
 /** Pulsing red "live" dot. */
 function OnAirDot() {
+  const styles = useStyles(makeStyles);
   const pulse = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
@@ -111,6 +114,7 @@ function OnAirHero({
   onPress: () => void;
   onCreate: () => void;
 }) {
+  const styles = useStyles(makeStyles);
   const line = ON_AIR_LINES[station.id] ?? `${station.name} is calling.`;
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ height }, pressed && styles.pressedHero]}>
@@ -167,6 +171,7 @@ function OnAirHero({
  * four whole digits; FM ghosts the 888.8 a real tuner shows.
  */
 function LcdNumber({ label, tuned, lcd }: { label: string; tuned: boolean; lcd: boolean }) {
+  const styles = useStyles(makeStyles);
   const family = lcd ? 'DSEG7' : Fonts.mono;
   const day = useDaylight();
   // No ghost segments on the list rows. They earned their place on the old
@@ -185,6 +190,7 @@ function LcdNumber({ label, tuned, lcd }: { label: string; tuned: boolean; lcd: 
 
 /** Segment-face band letters with their caption. */
 function BandHeader({ band, caption, lcd }: { band: Band; caption: string; lcd: boolean }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.bandRow}>
       <View>
@@ -198,6 +204,7 @@ function BandHeader({ band, caption, lcd }: { band: Band; caption: string; lcd: 
 
 /** Small printed label separating the user's own stations from the built-ins. */
 function SubHeader({ label }: { label: string }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.subheadRow}>
       <Text style={[styles.subheadText, { fontFamily: Fonts.mono }]}>{label}</Text>
@@ -217,6 +224,7 @@ function SubHeader({ label }: { label: string }) {
  * replaced by the YOUR STATIONS block.
  */
 function EmptySlotRow({ onPress }: { onPress: () => void }) {
+  const styles = useStyles(makeStyles);
   const day = useDaylight();
   return (
     <Pressable
@@ -275,6 +283,8 @@ function StationRow({
   // Same trap as the detail page: this used to read `.image === null`, which
   // stopped identifying a custom station the moment one could carry a photo.
   const custom = isCustomStation(station) ? (station as CustomStation) : null;
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   const mine = !!custom;
   const accent = station.eqColors?.[1] ?? (custom?.color ?? Cruise.amber);
   // Icon: built-ins store an MCI glyph name; custom stations store either an
@@ -324,9 +334,9 @@ function StationRow({
         </View>
         <View style={styles.ctrlSlot}>
           {locked ? (
-            <MaterialCommunityIcons name="lock" size={14} color="rgba(255,255,255,0.45)" />
+            <MaterialCommunityIcons name="lock" size={14} color={pal.ink(0.5)} />
           ) : (
-            <Ionicons name="chevron-forward" size={16} color={day ? 'rgba(255,255,255,0.68)' : 'rgba(255,255,255,0.28)'} />
+            <Ionicons name="chevron-forward" size={16} color={day ? pal.ink(0.7) : pal.ink(0.34)} />
           )}
         </View>
       </View>
@@ -335,6 +345,7 @@ function StationRow({
 }
 
 export default function StationsScreen() {
+  const styles = useStyles(makeStyles);
   const [customStations, setCustomStations] = useState<CustomStation[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | CustomStation | null>(null);
@@ -511,7 +522,13 @@ export default function StationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * PAGE CHROME ONLY. The hero — "Now tuning", the Create pill, the station name
+ * and its On Air lamp — sits ON the station photograph, so it stays white in
+ * either theme; it is a card by the owner's rule (13.08). What changes is the
+ * dial below it: the rows, their hairlines, the numbers and the band headers.
+ */
+const makeStyles = (p: Palette) => StyleSheet.create({
   safe: {
     // Transparent like every other tab, so the shared near-black root shows
     // through — the opaque midnight fill read as an off purple-navy.
@@ -620,7 +637,7 @@ const styles = StyleSheet.create({
   },
   rowRule: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.10)',
+    borderBottomColor: p.ink(0.14),
   },
   // Dimmer, not grey — the premium band still has to sell itself.
   rowLocked: {
@@ -646,7 +663,7 @@ const styles = StyleSheet.create({
   // Scaling a full-width list row looks like the page flexing; scaling a
   // card looks like the card being pushed. Different shapes, different rule.
   rowPressed: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: p.ink(0.07),
   },
   tunedLine: {
     position: 'absolute',
@@ -670,17 +687,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     // Unplayed stations sit well back so the tuned one reads instantly —
     // this contrast replaced the old ghost-segment trick.
-    color: 'rgba(255,255,255,0.42)',
+    color: p.ink(0.5),
   },
   // Daylight: the dial numbers sit at 42% so the tuned one can stand out —
   // in sun that whole scale simply vanishes, so it comes up to near-full and
   // the tuned one keeps its glow to stay distinguishable.
-  numLitDay: { color: 'rgba(255,255,255,0.86)' },
-  rowNameDay: { color: '#ffffff' },
-  rowRuleDay: { borderBottomColor: 'rgba(255,255,255,0.30)' },
+  numLitDay: { color: p.ink(0.88) },
+  rowNameDay: { color: p.text },
+  rowRuleDay: { borderBottomColor: p.ink(0.34) },
   numLitTuned: {
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(255,255,255,0.75)',
+    color: p.text,
+    // The glow is what separates the tuned number from the rest of the scale
+    // on black. On paper there is nothing for a halo to glow against, so the
+    // full-strength ink does that job on its own.
+    textShadowColor: p.mode === 'light' ? 'transparent' : 'rgba(255,255,255,0.75)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 10,
   },
@@ -689,36 +709,36 @@ const styles = StyleSheet.create({
     // Full white and 700, matching the share sheet's buttons — which is the
     // treatment the owner picked out as "bolder and more spaced out" against
     // these names at 600 with -0.3 tracking (11.08).
-    color: '#ffffff',
+    color: p.text,
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: 0,
   },
   rowNameTuned: {
-    color: '#fff',
+    color: p.text,
     fontWeight: '700',
   },
   // The vacant frequency: no hairline (it is the last row of the band) and a
   // quieter name than a real station's, so it reads as an offer rather than as
   // something already on air.
   emptySlot: { opacity: 0.92 },
-  emptySlotName: { color: 'rgba(255,255,255,0.72)', fontWeight: '600' },
+  emptySlotName: { color: p.ink(0.72), fontWeight: '600' },
   emptySlotDash: {
-    color: 'rgba(255,255,255,0.30)',
+    color: p.ink(0.34),
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: -1,
   },
-  emptySlotDashDay: { color: 'rgba(255,255,255,0.70)' },
+  emptySlotDashDay: { color: p.ink(0.7) },
   mineChip: {
     borderWidth: 1,
-    borderColor: 'rgba(180,195,255,0.45)',
+    borderColor: p.mode === 'light' ? 'rgba(78,101,190,0.45)' : 'rgba(180,195,255,0.45)',
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   mineChipText: {
-    color: '#cdd8ff',
+    color: p.mode === 'light' ? '#4E65BE' : '#cdd8ff',
     fontSize: 8.5,
     fontWeight: '800',
     letterSpacing: 1,
@@ -742,7 +762,7 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 13,
     borderWidth: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: p.ink(0.1),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -785,7 +805,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subheadText: {
-    color: 'rgba(255,255,255,0.45)',
+    color: p.ink(0.5),
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 2,
@@ -793,7 +813,7 @@ const styles = StyleSheet.create({
   subheadRule: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: p.ink(0.12),
     marginLeft: 10,
     marginRight: 2,
   },

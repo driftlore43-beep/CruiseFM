@@ -5,6 +5,8 @@ import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NowPlayingHost } from '@/components/NowPlayingHost';
+import { useStyles, usePalette } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 import { PAGE_GUTTER, TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -26,6 +28,8 @@ function FloatingTabBar({
   state: { routes: { key: string; name: string }[]; index: number };
   navigation: { navigate: (name: string) => void };
 }) {
+  const styles = useStyles(makeStyles);
+  const palette = usePalette();
   const insets = useSafeAreaInsets();
   const bottom = Platform.OS === 'ios'
     ? Math.max(insets.bottom, TAB_BAR_BOTTOM)
@@ -95,7 +99,7 @@ function FloatingTabBar({
               <Ionicons
                 name={active ? tab.iconActive : tab.icon}
                 size={28}
-                color={active ? '#FFFFFF' : '#6A6A72'}
+                color={active ? palette.text : palette.barMuted}
               />
               <Text style={[styles.label, active && styles.labelActive]}>
                 {tab.label}
@@ -125,7 +129,7 @@ export default function TabLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (p: Palette) => StyleSheet.create({
   wrapper: {
     position: 'absolute',
     left: PAGE_GUTTER,
@@ -137,24 +141,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    backgroundColor: '#0d0d0d',
+    backgroundColor: p.bar,
     borderRadius: 30,
     height: TAB_BAR_HEIGHT,
     paddingHorizontal: 16,
     paddingVertical: 12,
     width: '100%',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    shadowColor: '#000',
+    borderColor: p.ink(0.08),
+    shadowColor: p.shadow,
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.55,
+    shadowOpacity: 0.55 * p.shadowOpacity,
     shadowRadius: 24,
     elevation: 18,
   },
   pressGlow: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: '#ffffff',
+    backgroundColor: p.mode === 'light' ? '#000000' : '#ffffff',
     borderRadius: 30,
   },
   pod: {
@@ -163,7 +167,7 @@ const styles = StyleSheet.create({
     top: 9,
     bottom: 9,
     borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.13)',
+    backgroundColor: p.ink(0.13),
   },
   tabItem: {
     flex: 1,
@@ -176,9 +180,9 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '600',
     letterSpacing: 1.5,
-    color: '#6A6A72',
+    color: p.barMuted,
   },
   labelActive: {
-    color: '#FFFFFF',
+    color: p.text,
   },
 });

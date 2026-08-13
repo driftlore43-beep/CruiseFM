@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Cruise } from '@/constants/theme';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 
 /**
  * "Check for updates" — a button for something that was previously invisible.
@@ -40,6 +42,8 @@ function loadUpdates(): typeof import('expo-updates') | null {
 }
 
 export function UpdateCheckRow() {
+  const st = useStyles(makeSt);
+  const pal = usePalette();
   const [state, setState] = useState<State>({ kind: 'idle' });
 
   const Updates = loadUpdates();
@@ -102,7 +106,7 @@ export function UpdateCheckRow() {
           <MaterialCommunityIcons
             name={state.kind === 'ready' ? 'cloud-download-outline' : 'cloud-sync-outline'}
             size={21}
-            color={state.kind === 'ready' ? Cruise.violet : 'rgba(255,255,255,0.6)'}
+            color={state.kind === 'ready' ? Cruise.violet : pal.ink(0.62)}
           />
         </View>
         <View style={{ flex: 1 }}>
@@ -111,13 +115,13 @@ export function UpdateCheckRow() {
         </View>
       </View>
       {busy
-        ? <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" />
-        : <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.28)" />}
+        ? <ActivityIndicator size="small" color={pal.ink(0.62)} />
+        : <Ionicons name="chevron-forward" size={16} color={pal.ink(0.34)} />}
     </Pressable>
   );
 }
 
-const st = StyleSheet.create({
+const makeSt = (p: Palette) => StyleSheet.create({
   // Matches the other Profile settings rows exactly: 22pt inset, 24pt icon
   // column, 16.5pt label — see the note in SpotifyConnectRow.
   row: {
@@ -130,10 +134,10 @@ const st = StyleSheet.create({
   },
   border: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.09)',
+    borderBottomColor: p.ink(0.12),
   },
   left: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16, minWidth: 0 },
   iconCol: { width: 24, alignItems: 'center' },
-  label: { color: '#fff', fontSize: 16.5, fontWeight: '500' },
-  sub: { color: Cruise.textMuted, fontSize: 11.5, marginTop: 3, lineHeight: 16 },
+  label: { color: p.text, fontSize: 16.5, fontWeight: '500' },
+  sub: { color: p.ink(0.55), fontSize: 11.5, marginTop: 3, lineHeight: 16 },
 });

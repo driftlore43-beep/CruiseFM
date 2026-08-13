@@ -5,6 +5,8 @@ import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { isSpotifyConnected } from '@/utils/spotify';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 
 const SPOTIFY_GREEN = '#1DB954';
 const DISMISS_KEY = 'cruise_spotify_nudge_dismissed';
@@ -20,6 +22,8 @@ const DISMISS_KEY = 'cruise_spotify_nudge_dismissed';
  * over the player is still the backstop if they skip it.
  */
 export function SpotifyNudgeCard() {
+  const sn = useStyles(make_sn);
+  const pal = usePalette();
   const [connected, setConnected] = useState<boolean | null>(null);
   const [dismissed, setDismissed] = useState<boolean | null>(null);
 
@@ -52,13 +56,13 @@ export function SpotifyNudgeCard() {
         </Text>
       </View>
       <Pressable onPress={dismiss} hitSlop={12} style={sn.close}>
-        <Ionicons name="close" size={16} color="rgba(255,255,255,0.5)" />
+        <Ionicons name="close" size={16} color={pal.ink(0.55)} />
       </Pressable>
     </View>
   );
 }
 
-const sn = StyleSheet.create({
+const make_sn = (p: Palette) => StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -79,7 +83,7 @@ const sn = StyleSheet.create({
     backgroundColor: 'rgba(29,185,84,0.16)',
     borderWidth: 1, borderColor: 'rgba(29,185,84,0.4)',
   },
-  title: { color: '#fff', fontSize: 14.5, fontWeight: '800', letterSpacing: 0 },
-  sub: { color: 'rgba(255,255,255,0.62)', fontSize: 12.5, lineHeight: 17, marginTop: 2 },
+  title: { color: p.text, fontSize: 14.5, fontWeight: '800', letterSpacing: 0 },
+  sub: { color: p.ink(0.66), fontSize: 12.5, lineHeight: 17, marginTop: 2 },
   close: { alignSelf: 'flex-start', padding: 2 },
 });

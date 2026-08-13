@@ -4,6 +4,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
 import { Cruise } from '@/constants/theme';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 import { loadSessionKind, setSessionKind, type SessionKind } from '@/utils/sessionKind';
 
 /**
@@ -20,6 +22,7 @@ import { loadSessionKind, setSessionKind, type SessionKind } from '@/utils/sessi
  * behaves identically either way.
  */
 export function HeadingAnywhereCard({ onAnswered }: { onAnswered: (kind: SessionKind) => void }) {
+  const ha = useStyles(makeHa);
   const [show, setShow] = useState(false);
 
   useFocusEffect(
@@ -66,7 +69,14 @@ export function HeadingAnywhereCard({ onAnswered }: { onAnswered: (kind: Session
   );
 }
 
-const ha = StyleSheet.create({
+/**
+ * A TRANSLUCENT CARD IS PAGE CHROME, NOT A CARD. The rule for the light theme
+ * is that cards keep their own colours — but this one has none of its own: it
+ * is an amber wash over whatever the page is, so on paper it becomes pale amber
+ * and its white type disappears into it. Anything that tints the ground rather
+ * than covering it has to follow the theme.
+ */
+const makeHa = (p: Palette) => StyleSheet.create({
   card: {
     marginHorizontal: 16,
     marginTop: 4,
@@ -86,20 +96,20 @@ const ha = StyleSheet.create({
     backgroundColor: 'rgba(255,154,46,0.15)',
     borderWidth: 1, borderColor: 'rgba(255,154,46,0.36)',
   },
-  title: { color: '#fff', fontSize: 14.5, fontWeight: '800' },
-  sub: { color: 'rgba(255,255,255,0.62)', fontSize: 12.5, lineHeight: 17, marginTop: 2 },
+  title: { color: p.text, fontSize: 14.5, fontWeight: '800' },
+  sub: { color: p.ink(0.66), fontSize: 12.5, lineHeight: 17, marginTop: 2 },
   row: { flexDirection: 'row', gap: 10 },
   ghost: {
     flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: p.ink(0.06),
+    borderWidth: StyleSheet.hairlineWidth, borderColor: p.ink(0.18),
   },
-  ghostText: { color: 'rgba(255,255,255,0.86)', fontSize: 14, fontWeight: '700' },
+  ghostText: { color: p.ink(0.86), fontSize: 14, fontWeight: '700' },
   primary: {
     flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 999,
-    backgroundColor: '#fff',
+    backgroundColor: p.text,
   },
-  primaryText: { color: '#0a0a10', fontSize: 14, fontWeight: '800' },
+  primaryText: { color: p.bg, fontSize: 14, fontWeight: '800' },
 });
 
 /**
@@ -112,13 +122,15 @@ const ha = StyleSheet.create({
 export function SessionKindSwitch({
   kind, onChange,
 }: { kind: SessionKind; onChange: (k: SessionKind) => void }) {
+  const sk = useStyles(makeSk);
+  const pal = usePalette();
   const flip = () => onChange(kind === 'driving' ? 'listening' : 'driving');
   return (
     <Pressable style={sk.row} onPress={flip} hitSlop={8}>
       <MaterialCommunityIcons
         name={kind === 'driving' ? 'steering' : 'headphones'}
         size={14}
-        color="rgba(255,255,255,0.5)"
+        color={pal.ink(0.58)}
       />
       <Text style={sk.text}>{kind === 'driving' ? 'Driving' : 'Just listening'}</Text>
       <Text style={sk.swap}>Switch</Text>
@@ -126,14 +138,14 @@ export function SessionKindSwitch({
   );
 }
 
-const sk = StyleSheet.create({
+const makeSk = (p: Palette) => StyleSheet.create({
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 7,
     marginHorizontal: 16, marginTop: 12,
   },
-  text: { color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '600' },
+  text: { color: p.ink(0.58), fontSize: 12.5, fontWeight: '600' },
   swap: {
-    color: 'rgba(255,255,255,0.34)', fontSize: 12.5, fontWeight: '700',
+    color: p.ink(0.44), fontSize: 12.5, fontWeight: '700',
     textDecorationLine: 'underline',
   },
 });

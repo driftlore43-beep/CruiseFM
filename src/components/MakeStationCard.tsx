@@ -8,6 +8,8 @@ import { Cruise } from '@/constants/theme';
 import { getDriveStats } from '@/utils/driveStats';
 import { loadCustomStations } from '@/utils/customStations';
 import { requestCreateStation } from '@/utils/createStationRequest';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 
 const DISMISS_KEY = 'cruise_make_station_dismissed';
 
@@ -29,6 +31,8 @@ const DISMISS_KEY = 'cruise_make_station_dismissed';
 const MIN_SESSIONS = 2;
 
 export function MakeStationCard() {
+  const ms = useStyles(make_ms);
+  const pal = usePalette();
   const router = useRouter();
   const [show, setShow] = useState(false);
 
@@ -74,13 +78,13 @@ export function MakeStationCard() {
         </Text>
       </View>
       <Pressable onPress={dismiss} hitSlop={12} style={ms.close}>
-        <Ionicons name="close" size={16} color="rgba(255,255,255,0.5)" />
+        <Ionicons name="close" size={16} color={pal.ink(0.55)} />
       </Pressable>
     </Pressable>
   );
 }
 
-const ms = StyleSheet.create({
+const make_ms = (p: Palette) => StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -101,7 +105,7 @@ const ms = StyleSheet.create({
     backgroundColor: 'rgba(255,154,46,0.15)',
     borderWidth: 1, borderColor: 'rgba(255,154,46,0.36)',
   },
-  title: { color: '#fff', fontSize: 14.5, fontWeight: '800', letterSpacing: 0 },
-  sub: { color: 'rgba(255,255,255,0.62)', fontSize: 12.5, lineHeight: 17, marginTop: 2 },
+  title: { color: p.text, fontSize: 14.5, fontWeight: '800', letterSpacing: 0 },
+  sub: { color: p.ink(0.66), fontSize: 12.5, lineHeight: 17, marginTop: 2 },
   close: { alignSelf: 'flex-start', padding: 2 },
 });

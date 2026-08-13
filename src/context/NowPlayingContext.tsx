@@ -4,7 +4,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
 import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
-import { recordDriveEnd } from '@/utils/driveStats';
+import { noteDriveMode, recordDriveEnd, type DriveEvent } from '@/utils/driveStats';
 import { getSavedPlatform } from '@/utils/musicPlatform';
 import {
   appleMusicAvailable,
@@ -159,6 +159,10 @@ export type NowPlayingSession = { mode: string; stationId: string; preview?: boo
 type NowPlayingCtx = {
   /** The active drive (mode + station), or null when nothing is up. */
   session: NowPlayingSession | null;
+  /** A drive that has just ended and is worth showing a stub for, or null.
+   *  Cleared by whoever shows it. */
+  justFinished: DriveEvent | null;
+  clearJustFinished: () => void;
   /** True while the mode fullscreen covers the app; false = mini-player. */
   expanded: boolean;
   /** Shared play state so the fullscreen and mini-player stay in sync. */
@@ -231,6 +235,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const isProRef = useRef(isPro);
   useEffect(() => { isProRef.current = isPro; }, [isPro]);
   const [session, setSession] = useState<NowPlayingSession | null>(null);
+  /** The drive that just ended, waiting for its stub to be shown. */
+  const [justFinished, setJustFinished] = useState<DriveEvent | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [playing, setPlayingRaw] = useState(false);
   const [activityTick, setActivityTick] = useState(0);
@@ -375,7 +381,12 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     if (!current || current.mode === mode) return;
     const preview = !isProRef.current && isProMode(mode);
     setSession({ ...current, mode, preview });
+    // The stub prints where you ENDED UP — the mode a drive is remembered as
+    // is the one it finished in, not the one it opened with.
+    noteDriveMode(mode).catch(() => {});
   }, []);
+
+  const clearJustFinished = useCallback(() => setJustFinished(null), []);
 
   const stop = useCallback(() => {
     setSession(null);
@@ -392,7 +403,13 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     isSpotifyConnected()
       .then((c) => { if (c) pauseSpotify().catch(() => {}); })
       .catch(() => {});
-    recordDriveEnd().catch(() => {});
+    // THE ✕ IS WHERE A DRIVE ENDS, not where the fullscreen closes — closing a
+    // mode drops to the mini-player and the drive carries on. So this is the
+    // one honest moment to hand back a finished drive, and it comes back null
+    // for anything under the two-minute threshold.
+    recordDriveEnd()
+      .then((finished) => { if (finished) setJustFinished(finished); })
+      .catch(() => {});
   }, []);
 
   const relinkStationPlaylist = useCallback((stationId: string) => {
@@ -414,8 +431,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, expanded, playing, setPlaying, open, minimize, expand, setStationId, setMode, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching, sheetCount, holdSheet }),
-    [session, expanded, playing, setPlaying, open, minimize, expand, setStationId, setMode, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching, sheetCount, holdSheet],
+    () => ({ session, justFinished, clearJustFinished, expanded, playing, setPlaying, open, minimize, expand, setStationId, setMode, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching, sheetCount, holdSheet }),
+    [session, justFinished, clearJustFinished, expanded, playing, setPlaying, open, minimize, expand, setStationId, setMode, stop, activityTick, activityPing, playbackNotice, clearPlaybackNotice, reportStartResult, handoff, returnToSpotify, relinkStationPlaylist, showWakeNudge, adoptPlayState, musicSwitching, sheetCount, holdSheet],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -6,7 +6,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { ModeThumb, type ModeThumbId } from '@/components/ModeThumb';
 import { StationSheet } from '@/components/StationSheet';
-import { defaultStationForNow, loadLastCruise } from '@/utils/lastCruise';
+import { defaultStationForNow, loadLastCruise, saveLastCruise } from '@/utils/lastCruise';
+import { recordDriveStart } from '@/utils/driveStats';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
@@ -172,6 +173,16 @@ export default function ModesScreen() {
     // also meant `playStationMusic` never ran, so the station's playlist
     // never started and Spotify was never woken (owner: "the redirect doesn't
     // open for … modes page -> stations mood -> plain mode").
+    // AND IT COUNTS. This page never called recordDriveStart, so a drive begun
+    // from Modes was missing from the stats, the badges and the streak
+    // entirely — it only counted if you came in through Cruise or Stations.
+    // Found 13.08 building the stub, which is what made the omission visible:
+    // the drive ended and there was nothing to print. A preview is still a
+    // taste and still doesn't count.
+    if (!pending.locked) {
+      saveLastCruise({ stationId, mode: pending.mode });
+      recordDriveStart(stationId, undefined, pending.mode);
+    }
     np.open(pending.mode, stationId, { preview: pending.locked });
     setLastStation(stationId);
     setPending(null);

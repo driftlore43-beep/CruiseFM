@@ -538,7 +538,7 @@ export default function StationsScreen() {
             if (!preview) {
               // A taste shouldn't overwrite the saved cruise or count as a drive.
               saveLastCruise({ stationId: selectedStation.id, mode });
-              recordDriveStart(selectedStation.id);
+              recordDriveStart(selectedStation.id, undefined, mode);
             }
             np.open(mode, selectedStation.id, { preview });
           }

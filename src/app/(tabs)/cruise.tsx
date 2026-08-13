@@ -119,7 +119,7 @@ export default function CruiseScreen() {
     if (!preview) {
       await saveLastCruise(cruise);
       setLastCruise(cruise);
-      recordDriveStart(cruise.stationId);
+      recordDriveStart(cruise.stationId, undefined, cruise.mode);
     }
     // np.open also kicks Spotify toward the station's linked playlist.
     np.open(cruise.mode, cruise.stationId, { preview });
@@ -252,7 +252,7 @@ export default function CruiseScreen() {
               const cruise = { stationId: selectedStation.id, mode };
               saveLastCruise(cruise);
               setLastCruise(cruise);
-              recordDriveStart(selectedStation.id);
+              recordDriveStart(selectedStation.id, undefined, mode);
             }
             np.open(mode, selectedStation.id, { preview });
           }

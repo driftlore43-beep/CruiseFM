@@ -23,6 +23,8 @@ import { TunerFullscreen } from '@/components/TunerMode';
 import { VinylFullscreen } from '@/components/VinylMode';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
+import { DriveStub } from '@/components/DriveStub';
+import { getDriveStats } from '@/utils/driveStats';
 import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useNowPlaying, WAKEABLE_NOTICES } from '@/context/NowPlayingContext';
 import { allowRotation, LANDSCAPE_READY, lockPortrait } from '@/utils/orientation';
@@ -341,11 +343,56 @@ export function NowPlayingHost() {
       {mode === 'disco' && <DiscoBallFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       {mode === 'cd' && <CDFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       <MiniPlayer />
+      <JustFinishedStub />
       <DriveCheckCard />
       <PlaybackNotice />
       <AutoDim />
       <OrientationGate />
     </>
+  );
+}
+
+/**
+ * The stub for the drive that just ended.
+ *
+ * Mounted here rather than inside a mode, and that is load-bearing: the ✕ has
+ * already torn the session down, so by the time this renders the mode's own
+ * Modal is gone and there is only one window to present. Stacking it over a
+ * live mode would be the third-modal trap this app has hit twice (PreviewGate
+ * 24.07, AutoDim 03.08) — iOS presents nothing and swallows every touch.
+ *
+ * The stats are read fresh rather than passed in, because "your 12th" has to
+ * count the drive that just finished.
+ */
+function JustFinishedStub() {
+  const np = useNowPlaying();
+  const drive = np.justFinished;
+  const [counts, setCounts] = useState<{ ordinal: number; week: number } | null>(null);
+
+  useEffect(() => {
+    if (!drive) { setCounts(null); return; }
+    let alive = true;
+    getDriveStats().then((st) => {
+      if (!alive) return;
+      const listening = drive.kind === 'listening';
+      setCounts({
+        ordinal: listening ? st.totalListens : st.totalDrives,
+        week: listening ? st.listensThisWeek : st.drivesThisWeek,
+      });
+    }).catch(() => { if (alive) setCounts({ ordinal: 1, week: 1 }); });
+    return () => { alive = false; };
+  }, [drive]);
+
+  // Wait for the counts rather than printing "your 0th" for a frame.
+  if (!drive || !counts) return null;
+  return (
+    <DriveStub
+      drive={drive}
+      visible
+      onClose={np.clearJustFinished}
+      ordinal={counts.ordinal}
+      thisWeek={counts.week}
+    />
   );
 }
 

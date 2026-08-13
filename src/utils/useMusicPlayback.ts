@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { noteTrackHeard } from './driveStats';
+
 import { getSavedPlatform, type PlatformId } from './musicPlatform';
 import { appleMusicAvailable } from './appleMusic';
 import { useAppleMusicPlayback } from './useAppleMusicPlayback';
@@ -45,6 +47,20 @@ export function useMusicPlayback(visible: boolean, opts?: { pollMs?: number }) {
   const useApple = platform === 'appleMusic' && appleMusicAvailable();
   const spotify = useSpotifyPlayback(visible && !useApple, opts);
   const apple = useAppleMusicPlayback(visible && useApple, opts);
+
+  const live = useApple ? apple : spotify;
+
+  // THE DRIVE REMEMBERS WHAT IT PLAYED. Recorded here rather than in either
+  // player, because this is the one seat every screen already sits in — and
+  // several of them mount it at once, which is why noteTrackHeard dedupes
+  // against the last song rather than trusting a single caller. It no-ops
+  // entirely when no drive is open, and in companion mode there is no track
+  // to record, which is exactly why the stub has to read well without one.
+  const heard = live.track ? `${live.track.title}\u0000${live.track.artist}` : null;
+  useEffect(() => {
+    if (!live.track?.title) return;
+    noteTrackHeard(live.track.title, live.track.artist ?? '').catch(() => {});
+  }, [heard]);
 
   return useApple ? { ...apple, platform } : { ...spotify, platform };
 }

@@ -24,6 +24,8 @@ import { appVersionLabel } from '@/utils/appVersion';
 import { DEFAULT_DRIVER_NAME, getDriverName, initialsFor } from '@/utils/driverName';
 import { useAppearance, usePalette, useStyles } from '@/context/AppearanceContext';
 import type { Appearance, Palette } from '@/utils/appearance';
+import { DriveRow, DriveStub } from '@/components/DriveStub';
+import { getFinishedDrives, type DriveEvent, type DriveStats } from '@/utils/driveStats';
 
 function stationName(id: string | null): string {
   return STATIONS.find((s) => s.id === id)?.name ?? '—';
@@ -103,6 +105,102 @@ function useMusicPlatformInfo() {
 
   useEffect(() => { refresh(); }, []);
   return { name, color, id, refresh };
+}
+
+/**
+ * Your drives, newest first.
+ *
+ * Deliberately quiet: a week strip that shows the gaps and never mentions
+ * them, then the list. The moment this becomes "don't lose your streak" it
+ * stops being a record of what you did and starts being pressure to do it —
+ * which is the opposite of the restraint written into the rest of this app.
+ *
+ * Old history appears immediately: the drive log has always carried the time,
+ * the station and the length. Mode and songs only exist from 13.08 onward, and
+ * a stub simply doesn't print what it doesn't have.
+ */
+function DriveLog() {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
+  const [drives, setDrives] = useState<DriveEvent[]>([]);
+  const [open, setOpen] = useState<DriveEvent | null>(null);
+  const [stats, setStats] = useState<DriveStats | null>(null);
+
+  useFocusEffect(useCallback(() => {
+    let alive = true;
+    getFinishedDrives().then((d) => { if (alive) setDrives(d); }).catch(() => {});
+    getDriveStats().then((st) => { if (alive) setStats(st); }).catch(() => {});
+    return () => { alive = false; };
+  }, []));
+
+  if (drives.length === 0) return null;
+
+  const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+  const thisWeek = drives.filter((d) => d.ts >= weekAgo);
+  const earlier = drives.filter((d) => d.ts < weekAgo);
+
+  // Seven days ending today, so the strip always reads left-to-right toward
+  // now rather than sitting on a calendar week that resets on a Monday.
+  const dayLetters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const today = new Date();
+  const strip = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - (6 - i));
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const on = drives.some((e) => {
+      const t = new Date(e.ts);
+      return `${t.getFullYear()}-${t.getMonth()}-${t.getDate()}` === key;
+    });
+    return { letter: dayLetters[d.getDay()], on };
+  });
+
+  const ordinalOf = (d: DriveEvent) => {
+    // Its position counting from the oldest, within its own kind — which is
+    // what "your 12th" means, and it must not change when a later drive lands.
+    const kind = d.kind ?? 'driving';
+    const sameKind = drives.filter((e) => (e.kind ?? 'driving') === kind);
+    return sameKind.length - sameKind.indexOf(d);
+  };
+  const weekOf = (d: DriveEvent) => {
+    const kind = d.kind ?? 'driving';
+    return (kind === 'listening' ? stats?.listensThisWeek : stats?.drivesThisWeek) ?? 1;
+  };
+
+  return (
+    <>
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle}>Your drives</Text>
+        <Text style={styles.sectionMeta}>{drives.length} kept</Text>
+      </View>
+
+      <View style={styles.weekStrip}>
+        {strip.map((d, i) => (
+          <View key={i} style={[styles.weekDay, d.on && styles.weekDayOn]}>
+            <Text style={[styles.weekDayText, d.on && styles.weekDayTextOn]}>{d.letter}</Text>
+          </View>
+        ))}
+      </View>
+
+      {thisWeek.length > 0 && <Text style={styles.logGroup}>THIS WEEK</Text>}
+      {thisWeek.map((d, i) => (
+        <DriveRow key={d.ts} drive={d} onPress={() => setOpen(d)} last={i === thisWeek.length - 1} />
+      ))}
+      {earlier.length > 0 && <Text style={styles.logGroup}>EARLIER</Text>}
+      {earlier.slice(0, 20).map((d, i) => (
+        <DriveRow key={d.ts} drive={d} onPress={() => setOpen(d)} last={i === Math.min(earlier.length, 20) - 1} />
+      ))}
+
+      {!!open && (
+        <DriveStub
+          drive={open}
+          visible
+          onClose={() => setOpen(null)}
+          ordinal={ordinalOf(open)}
+          thisWeek={weekOf(open)}
+        />
+      )}
+    </>
+  );
 }
 
 /**
@@ -240,6 +338,13 @@ export default function ProfileScreen() {
             with an icon chip each; a statistic is the least interesting thing
             on a page about badges, so it gets a line, not a panel. */}
         <Text style={styles.statLine}>{STAT_LINE}</Text>
+
+        {/* THE LOG SITS ABOVE THE BADGES on purpose. Badges are a set you
+            finish; this is a record that never stops growing, and it is the
+            only thing on the page that gets bigger the longer you own the
+            app. That is the half that builds a habit — one stub is a moment,
+            the shelf it goes on is the reason to come back. */}
+        <DriveLog />
 
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Badges</Text>
@@ -651,6 +756,20 @@ const makeStyles = (p: Palette) => StyleSheet.create({
   // the screen edges while the content keeps the page's 22pt inset.
   settingsCard: {
     marginHorizontal: -22,
+  },
+  // Seven days ending today. Quiet by design — see the note on DriveLog.
+  weekStrip: { flexDirection: 'row', gap: 7, marginTop: 4, marginBottom: 8 },
+  weekDay: {
+    flex: 1, height: 34, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: p.ink(0.13),
+  },
+  weekDayOn: { backgroundColor: p.mode === 'light' ? 'rgba(168,94,6,0.12)' : 'rgba(245,158,11,0.16)', borderColor: p.amber + '80' },
+  weekDayText: { fontSize: 11, fontWeight: '700', color: p.ink(0.34) },
+  weekDayTextOn: { color: p.amber },
+  logGroup: {
+    fontSize: 9.5, fontWeight: '800', letterSpacing: 2,
+    color: p.ink(0.4), marginTop: 16, marginBottom: 2,
   },
   // Stacks instead of sitting side by side, so the three options get the full
   // width of the row rather than whatever is left over.

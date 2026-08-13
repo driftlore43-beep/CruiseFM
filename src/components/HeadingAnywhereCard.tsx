@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -142,7 +143,17 @@ export function SessionKindSwitch({
         return (
           <Pressable
             key={o.id}
-            onPress={() => onChange(o.id)}
+            // A tick under the thumb, because this switch has no other
+            // feedback — nothing moves, nothing plays, the app just quietly
+            // changes what it calls things (owner, 13.08: "there needs to be
+            // a little vibration effect to feel the effect"). Only on a real
+            // change: buzzing when you tap the option you are already on
+            // teaches people the tick means nothing.
+            onPress={() => {
+              if (on) return;
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onChange(o.id);
+            }}
             style={[sk.item, on && sk.itemOn]}
             hitSlop={4}>
             <MaterialCommunityIcons

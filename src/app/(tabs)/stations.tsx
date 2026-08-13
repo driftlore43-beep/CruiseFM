@@ -456,7 +456,14 @@ export default function StationsScreen() {
             station={station}
             dial={dial}
             tuned={station.id === tunedId}
-            onAir={isScheduled(station.id) ? live.includes(station.id) : undefined}
+            // `: true` is the Rain Drive case, and it is the fix for a real
+            // ambiguity (owner, 13.08: "rain drive and downtown FM are both
+            // bolded so it looks like they're both live"). A built-in that is
+            // not SCHEDULED is one that broadcasts round the clock, so it was
+            // sitting at full strength beside dimmed neighbours with no chip
+            // to explain why — which reads as live, because on paper full
+            // strength IS bold. It genuinely is on air, so it says so.
+            onAir={isScheduled(station.id) ? live.includes(station.id) : true}
             lcd={lcd}
             // Never the last row of the band any more: either YOUR STATIONS
             // follows, or the empty slot does.
@@ -486,7 +493,14 @@ export default function StationsScreen() {
             station={station}
             dial={dial}
             tuned={station.id === tunedId}
-            onAir={isScheduled(station.id) ? live.includes(station.id) : undefined}
+            // `: true` is the Rain Drive case, and it is the fix for a real
+            // ambiguity (owner, 13.08: "rain drive and downtown FM are both
+            // bolded so it looks like they're both live"). A built-in that is
+            // not SCHEDULED is one that broadcasts round the clock, so it was
+            // sitting at full strength beside dimmed neighbours with no chip
+            // to explain why — which reads as live, because on paper full
+            // strength IS bold. It genuinely is on air, so it says so.
+            onAir={isScheduled(station.id) ? live.includes(station.id) : true}
             locked={!isPro}
             lcd={lcd}
             last={i === fmBand.length - 1}

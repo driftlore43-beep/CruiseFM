@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRef, useState } from 'react';
 import { Animated, PanResponder, View } from 'react-native';
 
+import { useSessionKind } from '@/utils/sessionKind';
 import type { ScrubApi } from '@/utils/useTrackClock';
 
 /**
@@ -50,6 +51,11 @@ const CAR_SIT = 6;
  * IT IS WHITE, not the station's accent. That was tried (13.08) and rolled
  * back on the owner's call: every mode already throws its station's colour, so
  * one more coloured object was the surface losing its one neutral marker.
+ *
+ * AND IT ONLY APPEARS WHEN THERE IS A DRIVE. Someone who has said "just
+ * listening" gets a plain dot instead (owner, 13.08) — a car driving along the
+ * bar is a small claim about what they are doing, and the whole point of that
+ * setting is to stop the app claiming it.
  */
 export function SeekCar({
   shift, trackH = 6, rowH = 36,
@@ -58,6 +64,8 @@ export function SeekCar({
   trackH?: number;
   rowH?: number;
 }) {
+  const kind = useSessionKind();
+  if (kind === 'listening') return <SeekDot shift={shift} trackH={trackH} rowH={rowH} />;
   return (
     <Animated.View
       pointerEvents="none"
@@ -83,6 +91,34 @@ export function SeekCar({
         }}
       />
     </Animated.View>
+  );
+}
+
+/** The plain playhead, for anyone not driving. What the bar carried before the
+ *  car, so nothing is lost — the whole 36pt row is still the touch target. */
+const DOT = 12;
+
+function SeekDot({
+  shift, trackH = 6, rowH = 36,
+}: {
+  shift: Animated.AnimatedInterpolation<number>;
+  trackH?: number;
+  rowH?: number;
+}) {
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: -DOT / 2,
+        top: (rowH - DOT) / 2,
+        width: DOT,
+        height: DOT,
+        borderRadius: DOT / 2,
+        backgroundColor: '#ffffff',
+        transform: [{ translateX: shift }],
+      }}
+    />
   );
 }
 

@@ -40,6 +40,9 @@ const S = load(`${ROOT}/constants/schedule.ts`, {
 const SK = load(`${ROOT}/utils/sessionKind.ts`, {
   '@react-native-async-storage/async-storage':
     '({ __esModule: true, default: { getItem: async () => null, setItem: async () => {} } })',
+  // sessionKind exports a hook as well as the plain functions, so it imports
+  // React. Nothing here renders, so the hooks only need to exist.
+  react: '({ useEffect: () => {}, useState: (v) => [v, () => {}] })',
 });
 globalThis.__sk = SK;
 const C = load(`${ROOT}/constants/notificationCopy.ts`, { '@/utils/sessionKind': 'globalThis.__sk' });

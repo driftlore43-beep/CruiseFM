@@ -303,20 +303,33 @@ function StationRow({
         locked && styles.rowLocked,
         // Nothing is taken away when a station is off air — it simply sits
         // back, the way a quiet frequency does.
+        tuned && styles.rowTuned,
         onAir === false && !tuned && styles.rowOffAir,
         pressed && onPress ? styles.rowPressed : null,
       ]}>
-      {/* The tuning needle: the page's one glowing mark, on the tuned row. */}
+      {/* The tuning needle: the page's one glowing mark, on the tuned row.
+          Paired with a faint wash across the row, so "where you are" reads as a
+          SELECTED row and "what is broadcasting" reads as a chip — two
+          different visual languages for two different facts. */}
       {tuned && <View style={styles.tunedLine} pointerEvents="none" />}
 
       <View style={styles.numCol}>
         <LcdNumber label={dial.label} tuned={tuned} lcd={lcd} />
       </View>
-      {/* The broadcast lamp. A receiver shows which frequencies are live with
-          a lit dot, not with a word — and a dot costs no row height, which
-          this dial cannot spare (every row must stay the same height). */}
-      {onAir && <View style={[styles.onAirLamp, { backgroundColor: accent }]} pointerEvents="none" />}
       <Text style={[styles.rowName, tuned && styles.rowNameTuned, day && styles.rowNameDay]} numberOfLines={1}>{station.name}</Text>
+      {/* ON AIR says what it means. It was a coloured dot in the gutter, tinted
+          with the STATION'S OWN accent — so it was orange on Sunset, purple on
+          Downtown, and never read as one consistent signal; worse, on a warm
+          station it looked like the red tuning needle, which means something
+          else entirely (owner, 13.08: "I can't tell which station is selected
+          and which is currently live"). A word cannot be mistaken for the
+          needle, and amber is the dial's own lit colour, used by the band
+          letters directly above. */}
+      {onAir && (
+        <View style={styles.airChip}>
+          <Text style={styles.airChipText}>ON AIR</Text>
+        </View>
+      )}
       {mine && (
         <View style={styles.mineChip}>
           <Text style={styles.mineChipText}>MINE</Text>
@@ -364,9 +377,14 @@ export default function StationsScreen() {
 
   const [onAirStation, setOnAirStation] = useState<Station>(() => stationById(defaultStationForNow()));
   // Which frequencies are actually broadcasting, and what comes on next.
-  // Recomputed on focus rather than on a timer: the page is looked at, not
-  // watched, and a repeating timer here would be one more thing to gate on
-  // AppState (see the SIGKILL note in AGENTS.md).
+  //
+  // Recomputed on focus AND on the minute while the page is open. Focus alone
+  // was not enough: the page left sitting on screen kept announcing a handover
+  // that had already happened, which is how it came to say "Night Run AM at
+  // 7pm" at half past seven (owner, 13.08). The interval is cleared when the
+  // screen loses focus, and it is a state read rather than a network call, so
+  // it is not the kind of repeating timer the SIGKILL note in AGENTS.md is
+  // about — but it must still never outlive the screen.
   const [live, setLive] = useState<string[]>(() => onAirNow());
   const [next, setNext] = useState(() => upNext());
 
@@ -384,6 +402,12 @@ export default function StationsScreen() {
     // Someone pressed "make a station" on the home page and was sent here.
     // Reading the request clears it, so arriving again later is quiet.
     if (consumeCreateRequest()) setShowCreate(true);
+    const tick = setInterval(() => {
+      setOnAirStation(stationById(defaultStationForNow()));
+      setLive(onAirNow());
+      setNext(upNext());
+    }, 60000);
+    return () => clearInterval(tick);
   }, []));
 
   // AM = free + the user's own; FM = premium. Sorted up the dial within each
@@ -419,7 +443,7 @@ export default function StationsScreen() {
           height={heroH}
           topPad={insets.top}
           upNextLine={next
-            ? `${stationById(next.id).name} at ${clockLabel(new Date(Date.now() + next.minutes * 60000).getHours())}`
+            ? `${stationById(next.id).name} at ${clockLabel(next.hour)}`
             : null}
           onPress={() => setSelectedStation(onAirStation)}
           onCreate={() => setShowCreate(true)}
@@ -646,18 +670,26 @@ const makeStyles = (p: Palette) => StyleSheet.create({
   // Off air: a step back, never a wall. Anything heavier reads as disabled,
   // and these rows are fully playable.
   rowOffAir: { opacity: 0.62 },
-  // The broadcast lamp, in the 16pt gutter between the dial number and the
-  // name. ABSOLUTELY POSITIONED on purpose: in the flex row it would push
-  // every on-air station's name across, and the whole page depends on names
-  // starting at the same x whether or not the station is live.
-  onAirLamp: {
-    position: 'absolute',
-    left: PAGE_GUTTER + NUM_COL_W + 5,
-    top: '50%',
-    marginTop: -3,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  // The ON AIR chip sits AFTER the name, exactly where the MINE chip does, so
+  // the names still all start at the same x — which is what the old lamp was
+  // absolutely positioned to protect.
+  airChip: {
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.55)',
+    backgroundColor: 'rgba(245,158,11,0.14)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  airChipText: {
+    color: Cruise.amber,
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  // The tuned row, washed. Faint on purpose — the needle is the loud mark.
+  rowTuned: {
+    backgroundColor: p.ink(0.05),
   },
   // Press feedback: the row takes a beat of light rather than shrinking.
   // Scaling a full-width list row looks like the page flexing; scaling a

@@ -38,7 +38,9 @@ export const ON_AIR: Nudge[] = [
     title: 'Clocking off?', body: 'Sunset AM is on air. Golden hour, open roads.', stationId: 'sunset' },
   { id: 'long-way-home', kind: 'onair', days: [1, 2, 3, 4], hour: 17, minute: 40,
     title: 'The long way home', body: "Sunset AM's playing. No need to rush back.", stationId: 'sunset' },
-  { id: 'sun-going-down', kind: 'onair', days: [1, 2, 3], hour: 18, minute: 5,
+  // 17:10, not 18:05 — golden hour is 5-6pm since 13.08, and the truth test
+  // caught this line the moment the window moved.
+  { id: 'sun-going-down', kind: 'onair', days: [1, 2, 3], hour: 17, minute: 10,
     title: "Sun's going down", body: 'Golden hour on Sunset AM. Take the scenic route.', stationId: 'sunset' },
 
   // Friday — the week ends.

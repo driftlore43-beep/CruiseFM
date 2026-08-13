@@ -59,6 +59,9 @@ const asyncStorage = {
 // engine uses, rather than faked.
 const sessionKind = run(`${ROOT}/utils/sessionKind.ts`, (m) => {
   if (m === '@react-native-async-storage/async-storage') return asyncStorage;
+  // The module gained a hook (useSessionKind) when the car went on the scrub
+  // bar; nothing here renders, so the hooks only need to exist.
+  if (m === 'react') return { useEffect: () => {}, useState: (v) => [v, () => {}] };
   throw new Error('unstubbed ' + m);
 });
 const copy = run(`${ROOT}/constants/notificationCopy.ts`, (m) => {

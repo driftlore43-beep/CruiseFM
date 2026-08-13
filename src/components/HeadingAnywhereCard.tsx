@@ -113,39 +113,73 @@ const makeHa = (p: Palette) => StyleSheet.create({
 });
 
 /**
- * The switch, once the question has been answered — two words and a tap.
+ * The switch, once the question has been answered — two options, both visible.
  *
- * Sits under the hero rather than in Settings, because the context is the
- * thing that changes: car today, desk tomorrow. Buried in Profile it would be
- * answered once and then quietly wrong for ever.
+ * It was a line of text with the word "Switch" after it, which the owner could
+ * not see as a control (13.08: "needs to be a bit more obvious. More of a
+ * button option or on off switch"). A segmented pair says three things a text
+ * link cannot: that there are exactly two states, which one you are in, and
+ * that the other one is one tap away. Same shape as the Appearance control in
+ * Settings, so the app has one way of asking a two-or-three-way question.
+ *
+ * Still under the hero rather than in Settings: the context genuinely changes
+ * — car today, desk tomorrow — and buried in Settings it would be answered
+ * once and then quietly wrong for ever.
  */
 export function SessionKindSwitch({
   kind, onChange,
 }: { kind: SessionKind; onChange: (k: SessionKind) => void }) {
   const sk = useStyles(makeSk);
   const pal = usePalette();
-  const flip = () => onChange(kind === 'driving' ? 'listening' : 'driving');
+  const OPTIONS: { id: SessionKind; label: string; icon: 'steering' | 'headphones' }[] = [
+    { id: 'driving', label: 'Driving', icon: 'steering' },
+    { id: 'listening', label: 'Just listening', icon: 'headphones' },
+  ];
   return (
-    <Pressable style={sk.row} onPress={flip} hitSlop={8}>
-      <MaterialCommunityIcons
-        name={kind === 'driving' ? 'steering' : 'headphones'}
-        size={14}
-        color={pal.ink(0.58)}
-      />
-      <Text style={sk.text}>{kind === 'driving' ? 'Driving' : 'Just listening'}</Text>
-      <Text style={sk.swap}>Switch</Text>
-    </Pressable>
+    <View style={sk.wrap}>
+      {OPTIONS.map((o) => {
+        const on = kind === o.id;
+        return (
+          <Pressable
+            key={o.id}
+            onPress={() => onChange(o.id)}
+            style={[sk.item, on && sk.itemOn]}
+            hitSlop={4}>
+            <MaterialCommunityIcons
+              name={o.icon}
+              size={15}
+              color={on ? pal.bg : pal.ink(0.6)}
+            />
+            <Text style={[sk.label, on && sk.labelOn]}>{o.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
 const makeSk = (p: Palette) => StyleSheet.create({
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    marginHorizontal: 16, marginTop: 12,
+  // Sized to its content rather than stretched across the page: this is a
+  // quiet preference under the hero, not the page's main control.
+  wrap: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    gap: 4,
+    padding: 4,
+    borderRadius: 999,
+    backgroundColor: p.ink(0.07),
+    marginHorizontal: 16,
+    marginTop: 12,
   },
-  text: { color: p.ink(0.58), fontSize: 12.5, fontWeight: '600' },
-  swap: {
-    color: p.ink(0.44), fontSize: 12.5, fontWeight: '700',
-    textDecorationLine: 'underline',
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
   },
+  itemOn: { backgroundColor: p.text },
+  label: { color: p.ink(0.6), fontSize: 12.5, fontWeight: '700' },
+  labelOn: { color: p.bg },
 });

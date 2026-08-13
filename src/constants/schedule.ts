@@ -48,7 +48,10 @@ const SCHEDULE: Record<string, Window[] | 'always'> = {
   'cars-coffee': [{ start: 6, end: 11, days: WEEKEND }],
   daylight: [{ start: 10, end: 16 }],
   coastal: [{ start: 15, end: 19 }],
-  sunset: [{ start: 16, end: 20 }],
+  // GOLDEN HOUR IS AN HOUR (owner, 13.08: "I would suggest that sunset am to
+  // run from 5-6pm"). It ran 4-8pm, which is most of an evening and is why the
+  // hero was still calling it golden hour at half past seven.
+  sunset: [{ start: 17, end: 18 }],
   downtown: [{ start: 19, end: 23 }],
   'night-run': [{ start: 20, end: 1 }],
   tunnel: [{ start: 21, end: 2 }],
@@ -100,15 +103,26 @@ export function onAirNow(now: Date = new Date()): string[] {
  * window is the one this hour most belongs to, which rotates the pick through
  * the day for free and needs no priority list to maintain.
  */
-function windowProgress(w: Window, hour: number): number {
-  const span = w.start <= w.end ? w.end - w.start : 24 - w.start + w.end;
-  const into = w.start <= w.end ? hour - w.start : (hour - w.start + 24) % 24;
+function windowSpan(w: Window): number {
+  return w.start <= w.end ? w.end - w.start : 24 - w.start + w.end;
+}
+
+/**
+ * MINUTE-ACCURATE, and that is not fussiness. On whole hours a ONE-HOUR window
+ * is always at position 0 — you are never "half way through" it — so it scores
+ * its worst possible distance from the middle for the entire time it is on, and
+ * can never headline. Golden hour would have been on air and never announced.
+ */
+function windowProgress(w: Window, at: number): number {
+  const span = windowSpan(w);
+  const into = w.start <= w.end ? at - w.start : (at - w.start + 24) % 24;
   return span === 0 ? 0 : into / span;
 }
 
 /** The station this hour belongs to — the app's single recommendation. */
 export function primaryOnAir(now: Date = new Date()): string {
   const hour = now.getHours();
+  const at = hour + now.getMinutes() / 60;
   const day = now.getDay();
   let bestId = STATIONS[0].id;
   let bestScore = Infinity;
@@ -118,10 +132,15 @@ export function primaryOnAir(now: Date = new Date()): string {
     if (!windows || windows === 'always') continue;
     for (const w of windows) {
       if (!inWindow(w, hour, day)) continue;
-      // Distance from the middle of the window. A day-limited window wins ties
-      // against an everyday one, because it is the more specific occasion:
-      // Saturday at 8am is Cars & Coffee rather than Mountain Pass.
-      const score = Math.abs(windowProgress(w, hour) - 0.5) - (w.days ? 0.25 : 0);
+      // Distance from the middle of the window, less two bonuses for being
+      // the more SPECIFIC occasion. A day-limited window beats an everyday one
+      // (Saturday at 8am is Cars & Coffee, not Mountain Pass), and a short
+      // window beats a long one that happens to overlap it — a station on air
+      // for one hour a day owns that hour more than one on air for six.
+      // Without the second bonus a narrow window is drowned by whatever wide
+      // one it sits inside, which is exactly what happened to golden hour.
+      const shortBonus = Math.max(0, (4 - windowSpan(w)) * 0.2);
+      const score = Math.abs(windowProgress(w, at) - 0.5) - (w.days ? 0.25 : 0) - shortBonus;
       if (score < bestScore) { bestScore = score; bestId = s.id; }
     }
   }
@@ -147,14 +166,37 @@ export function minutesUntilOnAir(stationId: string, now: Date = new Date()): nu
 }
 
 /** The next station to come on air that isn't already, as an id + when. */
-export function upNext(now: Date = new Date()): { id: string; minutes: number } | null {
-  let best: { id: string; minutes: number } | null = null;
+export function upNext(now: Date = new Date()): { id: string; minutes: number; hour: number } | null {
+  let best: { id: string; minutes: number; hour: number } | null = null;
   for (const s of STATIONS) {
     if (isOnAir(s.id, now)) continue;
     const minutes = minutesUntilOnAir(s.id, now);
-    if (minutes > 0 && (!best || minutes < best.minutes)) best = { id: s.id, minutes };
+    if (minutes <= 0) continue;
+    if (!best || minutes < best.minutes) {
+      // THE HOUR IS RETURNED, not left to be worked out from `minutes`.
+      // Callers used to print `now + minutes` and read the hour off that,
+      // which is only true at the instant it is computed — and this line is
+      // rendered on focus, so a page left open drifts and starts announcing a
+      // time that has already passed. A start hour cannot go stale: it is a
+      // fact about the schedule, not about now.
+      best = { id: s.id, minutes, hour: nextOnAirHour(s.id, now) };
+    }
   }
   return best;
+}
+
+/** The hour this station is next on air — the same walk as
+ *  `minutesUntilOnAir`, reporting the hour it lands on instead of the gap. */
+function nextOnAirHour(stationId: string, now: Date): number {
+  const windows = SCHEDULE[stationId];
+  if (!windows || windows === 'always') return now.getHours();
+  const probe = new Date(now.getTime());
+  probe.setMinutes(0, 0, 0);
+  for (let i = 1; i <= 24 * 7; i++) {
+    probe.setHours(probe.getHours() + 1);
+    if (windows.some((w) => inWindow(w, probe.getHours(), probe.getDay()))) return probe.getHours();
+  }
+  return now.getHours();
 }
 
 /** "8pm", "5am", "midnight", "noon" — the way somebody would say it. */

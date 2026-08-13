@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useState } from 'react';
 
 /**
  * Driving, or just listening.
@@ -45,7 +46,25 @@ export function cachedSessionKind(): SessionKind {
 
 export async function setSessionKind(kind: SessionKind): Promise<void> {
   cached = kind;
+  listeners.forEach((fn) => fn(kind));
   await AsyncStorage.setItem(KEY, kind).catch(() => {});
+}
+
+/**
+ * The answer, live.
+ *
+ * It became observable when the car appeared on the scrub bar (13.08): the
+ * seek bar is drawn inside eight different modes, none of which owns this
+ * state, and "just listening" has to take the car off the road immediately
+ * rather than at the next cold start. A subscription is the cheapest way for
+ * any component anywhere to follow it without threading a prop through
+ * everything.
+ */
+const listeners = new Set<(k: SessionKind) => void>();
+
+export function subscribeSessionKind(fn: (k: SessionKind) => void): () => void {
+  listeners.add(fn);
+  return () => { listeners.delete(fn); };
 }
 
 /**
@@ -99,4 +118,20 @@ const LISTENING: Words = {
 
 export function words(kind: SessionKind): Words {
   return kind === 'driving' ? DRIVING : LISTENING;
+}
+
+/**
+ * React's view of it. Primes itself from storage on mount — the sync cache is
+ * only populated once something has loaded it, and a mode can be the first
+ * screen a listener opens.
+ */
+export function useSessionKind(): SessionKind {
+  const [kind, setKind] = useState<SessionKind>(cachedSessionKind());
+  useEffect(() => {
+    let alive = true;
+    loadSessionKind().then((k) => { if (alive && k) setKind(k); });
+    const off = subscribeSessionKind(setKind);
+    return () => { alive = false; off(); };
+  }, []);
+  return kind;
 }

@@ -208,13 +208,14 @@ function CDDisc({ size, spin, albumArt }: {
               <SvgImage
                 href={{ uri: albumArt }}
                 x={R - ART_OUT} y={R - ART_OUT} width={ART_OUT * 2} height={ART_OUT * 2}
-                preserveAspectRatio="xMidYMid slice" opacity={0.60}
+                preserveAspectRatio="xMidYMid slice" opacity={0.82}
               />
               {/* pewter wash — etched into the disc rather than pasted on.
-                  Lightened along with the artwork (owner, 03.08: "so each song
-                  feels more personal") — the disc still reads as etched, but
-                  the record you're playing is recognisable. */}
-              <Circle cx={R} cy={R} r={ART_OUT} fill="#9fb0d4" fillOpacity={0.09} />
+                  Lifted twice now (03.08 "so each song feels more personal",
+                  then 13.08 for more again), so the wash comes down with it:
+                  the two are a pair, and leaving the wash where it was would
+                  just fog the artwork the extra opacity was buying. */}
+              <Circle cx={R} cy={R} r={ART_OUT} fill="#9fb0d4" fillOpacity={0.05} />
             </G>
           )}
           {marks.arcs.map((a, i) => <Path key={`a${i}`} d={a.d} fill="none" stroke="#ffffff" strokeOpacity={a.op} strokeWidth={a.w} />)}
@@ -238,6 +239,10 @@ function CDDisc({ size, spin, albumArt }: {
   );
 }
 
+/** How much of the case the disc fills. Shared, because the case draws the
+ *  disc's cast shadow and has to know how big the thing casting it is. */
+const DISC_FRACTION = 0.85;
+
 /** The clear case. Thickness is faked with paired strokes — a lit outer edge,
  *  a dark inner line just behind it, then a faint inner highlight — which is
  *  what reads as moulded plastic rather than a drawn rectangle. */
@@ -250,6 +255,32 @@ function JewelCase({ size, children }: { size: number; children: React.ReactNode
   const corners = [[20, 20, 1, 1], [size - 20, 20, -1, 1], [20, size - 20, 1, -1], [size - 20, size - 20, -1, -1]] as const;
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* THE DISC'S CAST SHADOW (owner, 13.08: "add some shadowing from the
+          CD"). It lives in the CASE rather than in the disc, and that is the
+          only place it can: a shadow has to fall BESIDE the thing casting it,
+          and the disc's own canvas is exactly disc-sized — anything drawn
+          outside it gets clipped, which was measurable (luminance either side
+          of the disc identical to a tenth of a level). The case is bigger than
+          the disc, so here there is room.
+
+          Gradient falloff, not a solid offset circle: there is no blur filter
+          available, and a hard-edged dark disc peeping out from behind reads
+          as a second disc — the rule the mirror ball's rim and the share
+          cards' fades both settled on. */}
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          <RadialGradient id="cdCast" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#000000" stopOpacity="0.55" />
+            <Stop offset="72%" stopColor="#000000" stopOpacity="0.5" />
+            <Stop offset="88%" stopColor="#000000" stopOpacity="0.24" />
+            <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle
+          cx={size / 2 + size * 0.03} cy={size / 2 + size * 0.038}
+          r={size * DISC_FRACTION * 0.56} fill="url(#cdCast)"
+        />
+      </Svg>
       {children}
       <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
         <Defs>
@@ -311,7 +342,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   const caseSize = isLandscape
     ? Math.min(winH * 0.94, 384)
     : Math.min(winW * 0.97, winH * 0.47, 430);
-  const discSize = caseSize * 0.85;
+  const discSize = caseSize * DISC_FRACTION;
   const station = resolveAnyStation(activeId);
   const spotify = useMusicPlayback(visible);
   const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as [string, string, string];

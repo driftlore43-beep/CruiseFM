@@ -6,6 +6,8 @@ import { Animated, ImageBackground, Pressable, StyleSheet, Text, View } from 're
 import { stationDial, type Station } from '@/constants/stations';
 import { useDsegFont } from '@/components/StationIdentity';
 import { stationImageSource } from '@/utils/stationImage';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 
 export const SHELF_CARD_W = 150;
 
@@ -23,6 +25,7 @@ export const SHELF_CARD_W = 150;
  * needs no scrim, so nothing is darkened to make room for it.
  */
 export function ShelfCard({ station, onPress }: { station: Station; onPress?: () => void }) {
+  const st = useStyles(makeSt);
   const scale = useRef(new Animated.Value(1)).current;
   // NOT `station.image` directly — a custom station's is a file path string,
   // which RN's Image draws as nothing. See utils/stationImage.
@@ -87,6 +90,8 @@ export function ShelfCard({ station, onPress }: { station: Station; onPress?: ()
  * shelf, where "one more" is the obvious next thought.
  */
 export function NewStationCard({ onPress }: { onPress?: () => void }) {
+  const st = useStyles(makeSt);
+  const pal = usePalette();
   const scale = useRef(new Animated.Value(1)).current;
   const press = (to: number) =>
     Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 42, bounciness: 5 }).start();
@@ -95,7 +100,7 @@ export function NewStationCard({ onPress }: { onPress?: () => void }) {
     <Animated.View style={{ width: SHELF_CARD_W, transform: [{ scale }] }}>
       <Pressable onPress={onPress} onPressIn={() => press(0.96)} onPressOut={() => press(1)}>
         <View style={[st.art, st.newArt]}>
-          <MaterialCommunityIcons name="plus" size={26} color="rgba(255,255,255,0.66)" />
+          <MaterialCommunityIcons name="plus" size={26} color={pal.ink(0.66)} />
         </View>
         <Text style={st.name} numberOfLines={1}>New station</Text>
         <Text style={st.tag} numberOfLines={1}>your photo, your mood</Text>
@@ -104,7 +109,14 @@ export function NewStationCard({ onPress }: { onPress?: () => void }) {
   );
 }
 
-const st = StyleSheet.create({
+/**
+ * THE CAPTION IS PAGE, NOT CARD. The picture keeps its own colours in either
+ * theme — it is a photograph — but the name, dial number and tag are printed
+ * on the page BELOW it, which is the whole reason they need no scrim. So they
+ * follow the theme, and on paper they were white on white until the owner
+ * spotted it (13.08).
+ */
+const makeSt = (p: Palette) => StyleSheet.create({
   art: {
     width: SHELF_CARD_W,
     height: SHELF_CARD_W,
@@ -115,9 +127,9 @@ const st = StyleSheet.create({
   newArt: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    backgroundColor: p.ink(0.045),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: p.ink(0.18),
   },
   icon: {
     position: 'absolute',
@@ -127,15 +139,19 @@ const st = StyleSheet.create({
     textShadowRadius: 6,
   },
   name: {
-    color: '#fff',
+    // Grey rather than full ink on paper (owner's call): a caption under a
+    // picture at 14.5pt reads as a label, and solid black there competes with
+    // the photograph it is describing. On black it stays white, where the same
+    // weight is already a step down from the page's headings.
+    color: p.mode === 'light' ? p.ink(0.74) : p.text,
     fontSize: 14.5,
     fontWeight: '600',
     letterSpacing: 0,
     marginTop: 8,
   },
-  dial: { color: 'rgba(255,255,255,0.55)', fontSize: 10.5 },
+  dial: { color: p.ink(0.55), fontSize: 10.5 },
   tag: {
-    color: 'rgba(255,255,255,0.45)',
+    color: p.ink(0.5),
     fontSize: 12.5,
     marginTop: 1,
   },

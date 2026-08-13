@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, ImageBackground, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { stationImageSource } from '@/utils/stationImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useMotion } from '@/context/MotionContext';
@@ -77,9 +78,9 @@ function MiniPlayer() {
         <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(18,18,24,0.96)' }]} />
         <View style={[mp.accent, { backgroundColor: station.eqColors?.[1] ?? station.glowColor }]} />
         <View style={mp.artwork}>
-          {station.image ? (
+          {stationImageSource(station.image) ? (
             <ImageBackground
-              source={station.image}
+              source={stationImageSource(station.image)!}
               style={StyleSheet.absoluteFill}
               imageStyle={{ width: '100%', height: '100%' }}
               resizeMode="cover"

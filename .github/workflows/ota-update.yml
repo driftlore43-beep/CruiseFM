@@ -1,8 +1,19 @@
 # Ship an over-the-air update from anywhere — including a phone.
 #
-# This is a BUTTON, not an automation: it only runs when you press "Run
-# workflow" in GitHub. Nothing ships on a plain push, so what goes out is
-# still your call.
+# TWO WAYS IN.
+#
+#   1. AUTOMATIC, preview only. Every push to the development branch publishes
+#      to the `preview` channel, which is the owner's own phone and the
+#      TestFlight testers. Added 13.08 after a day's work sat in the repo
+#      unpublished: pushing is not shipping, and "it's OTA" is only true of
+#      what the code COULD do until something actually sends it. Preview is
+#      the right channel to automate because it reaches people who have opted
+#      into unfinished work.
+#
+#   2. THE BUTTON, for everything else — a different channel, a build, a
+#      submission, or a diagnose. PRODUCTION IS NEVER AUTOMATIC: that channel
+#      is the public App Store app, and pushing a commit must never change what
+#      a stranger is running, or what Apple is reviewing.
 #
 # github.com → Actions → "Ship OTA update" → Run workflow → set "Use workflow
 # from" to this branch → pick a channel → Run.
@@ -22,6 +33,18 @@
 name: Ship OTA update
 
 on:
+  # Automatic preview publishes. Confined to the development branch, and to
+  # changes that can actually reach a phone over the air: an update carries JS
+  # and assets only, so a docs or workflow edit publishing a new bundle is pure
+  # noise. Native changes need a build and are handled by the button.
+  push:
+    branches: [claude/cruise-fm-v4wk5f]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'app.json'
+      - 'package.json'
+      - 'package-lock.json'
   workflow_dispatch:
     inputs:
       channel:
@@ -60,8 +83,17 @@ on:
 
 jobs:
   update:
-    name: eas update --branch ${{ inputs.channel }}
+    name: eas update --branch ${{ inputs.channel || 'preview' }}
     runs-on: ubuntu-latest
+    # A push carries no inputs, so the defaults ARE the automatic behaviour:
+    # publish, to preview. Everything below reads these rather than `inputs`,
+    # so a push and a button press follow exactly the same path — including
+    # every guard.
+    env:
+      CHANNEL: ${{ inputs.channel || 'preview' }}
+      MODE: ${{ inputs.mode || 'publish' }}
+      BUILD_PROFILE: ${{ inputs.build_profile || 'testflight' }}
+      NOTE: ${{ inputs.message || format('Push {0}', github.sha) }}
     steps:
       # "Use workflow from" decides which code gets bundled, and main is a long
       # way behind the branch the app is actually built from — publishing from
@@ -76,7 +108,7 @@ jobs:
           exit 1
 
       - name: Refuse production without a good reason
-        if: inputs.mode == 'publish' && inputs.channel == 'production'
+        if: env.MODE == 'publish' && env.CHANNEL == 'production'
         run: |
           echo "::warning::Publishing to PRODUCTION. Never do this while the app"
           echo "::warning::is sitting in App Review — it changes the build Apple is looking at."
@@ -121,9 +153,9 @@ jobs:
       # Every command prints its own output including stderr and then
       # continues, so one unsupported flag can't mask the rest.
       - name: Ask Expo what state things are in
-        if: inputs.mode == 'diagnose'
+        if: env.MODE == 'diagnose'
         run: |
-          CH="${{ inputs.channel }}"
+          CH="${{ env.CHANNEL }}"
           echo "════════ $CH channel → branch ════════"
           eas channel:view "$CH" --non-interactive 2>&1 | head -30 || true
           echo "════════ newest updates on the $CH branch ════════"
@@ -192,7 +224,7 @@ jobs:
       # that was seen to launch; see scripts/preflight.mjs for what each check
       # is protecting against and which build taught it.
       - name: Preflight
-        if: inputs.mode == 'build' || inputs.mode == 'publish'
+        if: env.MODE == 'build' || env.MODE == 'publish'
         run: node scripts/preflight.mjs
 
       # A BUILD READS ITS KEYS FROM THE PROFILE'S `environment`, NOT THE
@@ -202,11 +234,11 @@ jobs:
       # costs a whole review cycle to fix. The publish-path check below looks
       # at the channel, which is the wrong question for a build.
       - name: Check the Spotify keys for the environment this build will use
-        if: inputs.mode == 'build'
+        if: env.MODE == 'build'
         run: |
           set -euo pipefail
-          ENV=$([ "${{ inputs.build_profile }}" = "production" ] && echo production || echo preview)
-          echo "The ${{ inputs.build_profile }} profile builds against the '$ENV' environment."
+          ENV=$([ "${{ env.BUILD_PROFILE }}" = "production" ] && echo production || echo preview)
+          echo "The ${{ env.BUILD_PROFILE }} profile builds against the '$ENV' environment."
           if ! vars=$(eas env:list --environment "$ENV" --include-sensitive --format short 2>&1); then
             echo "::error::Could not read EAS environment '$ENV'. eas said:"; echo "$vars"; exit 1
           fi
@@ -223,12 +255,12 @@ jobs:
           done
 
       - name: Start an EAS build
-        if: inputs.mode == 'build'
+        if: env.MODE == 'build'
         run: |
           set -euo pipefail
-          echo "Starting a ${{ inputs.build_profile }} build for iOS from $(git rev-parse --short HEAD)."
-          eas build --platform ios --profile ${{ inputs.build_profile }} \
-            --auto-submit-with-profile ${{ inputs.build_profile }} \
+          echo "Starting a ${{ env.BUILD_PROFILE }} build for iOS from $(git rev-parse --short HEAD)."
+          eas build --platform ios --profile ${{ env.BUILD_PROFILE }} \
+            --auto-submit-with-profile ${{ env.BUILD_PROFILE }} \
             --non-interactive --no-wait
           echo "::notice::Build queued, and it will submit itself to App Store Connect when it finishes."
           echo "::notice::Watch it at https://expo.dev/accounts/driftlore/projects/CruiseFM/builds"
@@ -238,16 +270,16 @@ jobs:
       # every build cut before --auto-submit was added above. Takes the newest
       # finished iOS build on that profile and sends it to App Store Connect.
       - name: Submit the newest build to App Store Connect
-        if: inputs.mode == 'submit'
+        if: env.MODE == 'submit'
         run: |
           set -euo pipefail
-          echo "Submitting the newest ${{ inputs.build_profile }} iOS build."
-          eas submit --platform ios --profile ${{ inputs.build_profile }} \
+          echo "Submitting the newest ${{ env.BUILD_PROFILE }} iOS build."
+          eas submit --platform ios --profile ${{ env.BUILD_PROFILE }} \
             --latest --non-interactive
           echo "::notice::Submitted. Apple takes 5-15 minutes to process before TestFlight lists it."
 
       - name: Check the Spotify keys are present AND readable
-        if: inputs.mode == 'publish'
+        if: env.MODE == 'publish'
         run: |
           set -euo pipefail
           # DO NOT add --non-interactive here. It is not one of env:list's
@@ -261,8 +293,8 @@ jobs:
           # The output is captured WITH stderr and printed on failure for the
           # same reason: the original version swallowed it with `|| true`, so
           # the one line that said what actually went wrong never appeared.
-          if ! vars=$(eas env:list --environment ${{ inputs.channel }} --include-sensitive --format short 2>&1); then
-            echo "::error::Could not read environment variables from EAS for '${{ inputs.channel }}'."
+          if ! vars=$(eas env:list --environment ${{ env.CHANNEL }} --include-sensitive --format short 2>&1); then
+            echo "::error::Could not read environment variables from EAS for '${{ env.CHANNEL }}'."
             echo "::error::eas said:"
             echo "$vars"
             exit 1
@@ -271,7 +303,7 @@ jobs:
             # Anchored to "KEY=" so a similarly-named variable can't satisfy it.
             line=$(echo "$vars" | grep -E "^${key}=" || true)
             if [ -z "$line" ]; then
-              echo "::error::$key is not set for the '${{ inputs.channel }}' environment in EAS."
+              echo "::error::$key is not set for the '${{ env.CHANNEL }}' environment in EAS."
               echo "::error::Add it at expo.dev → your project → Environment variables, then run this again."
               exit 1
             fi
@@ -295,7 +327,7 @@ jobs:
       # it forever. So ask, before publishing, whether any real iOS build on
       # this channel is actually listening on the number we're about to stamp.
       - name: Check a real build is listening on this runtime version
-        if: inputs.mode == 'publish'
+        if: env.MODE == 'publish'
         run: |
           set -euo pipefail
           mine=$(npx expo config --type public --json \
@@ -310,7 +342,7 @@ jobs:
           # The build list goes in through the ENVIRONMENT, not a pipe: the
           # heredoc below is already using stdin to carry the script, so a
           # piped `echo "$builds"` would have python reading its own source.
-          CFM_BUILDS="$builds" CFM_MINE="$mine" CFM_CHANNEL="${{ inputs.channel }}" python3 <<'PY'
+          CFM_BUILDS="$builds" CFM_MINE="$mine" CFM_CHANNEL="${{ env.CHANNEL }}" python3 <<'PY'
           import json, os, sys
           mine, channel = os.environ["CFM_MINE"], os.environ["CFM_CHANNEL"]
           try:
@@ -344,12 +376,12 @@ jobs:
       # CI=true — so removing this flag produces no error, no prompt and no
       # warning, just an update with empty Spotify credentials. Never drop it.
       - name: Publish
-        if: inputs.mode == 'publish'
+        if: env.MODE == 'publish'
         run: >-
           eas update
-          --branch ${{ inputs.channel }}
-          --environment ${{ inputs.channel }}
-          --message "${{ inputs.message }}"
+          --branch ${{ env.CHANNEL }}
+          --environment ${{ env.CHANNEL }}
+          --message "${{ env.NOTE }}"
           --non-interactive
 
   # (A second job on a macOS runner used to live here, to prove whether the

@@ -5,6 +5,7 @@ import { Animated, ImageBackground, Pressable, StyleSheet, Text, View } from 're
 
 import { stationDial, type Station } from '@/constants/stations';
 import { useDsegFont } from '@/components/StationIdentity';
+import { stationImageSource } from '@/utils/stationImage';
 
 export const SHELF_CARD_W = 150;
 
@@ -23,6 +24,9 @@ export const SHELF_CARD_W = 150;
  */
 export function ShelfCard({ station, onPress }: { station: Station; onPress?: () => void }) {
   const scale = useRef(new Animated.Value(1)).current;
+  // NOT `station.image` directly — a custom station's is a file path string,
+  // which RN's Image draws as nothing. See utils/stationImage.
+  const art = stationImageSource(station.image);
   const dseg = useDsegFont();
   const dial = stationDial(station.id, !!station.premium);
   const press = (to: number) =>
@@ -32,9 +36,9 @@ export function ShelfCard({ station, onPress }: { station: Station; onPress?: ()
     <Animated.View style={{ width: SHELF_CARD_W, transform: [{ scale }] }}>
       <Pressable onPress={onPress} onPressIn={() => press(0.96)} onPressOut={() => press(1)}>
         <View style={st.art}>
-          {station.image ? (
+          {art ? (
             <ImageBackground
-              source={station.image}
+              source={art}
               style={StyleSheet.absoluteFill}
               imageStyle={{ width: '100%', height: '100%' }}
               resizeMode="cover"

@@ -17,6 +17,7 @@ import { useEntitlements } from '@/context/EntitlementsContext';
 import { deleteCustomStation, isCustomStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
 import { clockLabel, isScheduled, onAirNow, upNext } from '@/constants/schedule';
 import { consumeCreateRequest } from '@/utils/createStationRequest';
+import { stationImageSource } from '@/utils/stationImage';
 import { recordDriveStart } from '@/utils/driveStats';
 import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
 
@@ -114,7 +115,7 @@ function OnAirHero({
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ height }, pressed && styles.pressedHero]}>
       <ImageBackground
-        source={station.image}
+        source={stationImageSource(station.image) ?? undefined}
         style={StyleSheet.absoluteFill}
         imageStyle={{ width: '100%', height: '100%' }}
         resizeMode="cover"

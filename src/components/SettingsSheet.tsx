@@ -15,6 +15,8 @@ import {
   DEFAULT_NOTIF_PREFS, getNotifPrefs, getPermissionState, requestPermission, setNotifPrefs,
   type NotifPermission, type NotifPrefs,
 } from '@/utils/notifications';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 
 export type SettingsPage =
   | 'account' | 'notifications' | 'privacy' | 'about' | 'refer'
@@ -33,6 +35,8 @@ const TITLES: Record<SettingsPage, string> = {
 // ── Full-screen settings modal — presented over the current screen so there's
 // no route change to swipe-back from (which on web reset the tab to home). ──
 export function SettingsSheet({ page, onClose }: { page: SettingsPage | null; onClose: () => void }) {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   // Sub-page navigation (Privacy → Privacy Policy / Terms) stays inside the
   // sheet: back returns to the parent page, not to the profile.
   const [sub, setSub] = useState<SettingsPage | null>(null);
@@ -60,6 +64,8 @@ export function SettingsSheet({ page, onClose }: { page: SettingsPage | null; on
 
 // ── Legal documents (shared renderer) ───────────────────────────────────────
 function LegalBody({ doc }: { doc: LegalDoc }) {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   return (
     <>
       <Text style={styles.legalUpdated}>Last updated {doc.updated}</Text>
@@ -76,6 +82,8 @@ function LegalBody({ doc }: { doc: LegalDoc }) {
 
 // ── Account ──────────────────────────────────────────────────────────────────
 function AccountBody() {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   const [name, setName] = useState('');
   const [loaded, setLoaded] = useState(false);
 
@@ -103,7 +111,7 @@ function AccountBody() {
             returnKeyType="done"
             selectionColor="#ffffff"
           />
-          <MaterialCommunityIcons name="pencil-outline" size={15} color="rgba(255,255,255,0.4)" />
+          <MaterialCommunityIcons name="pencil-outline" size={15} color={pal.ink(0.45)} />
         </View>
         <SettingsInfoRow label="Email" value="Not connected" />
         <SettingsInfoRow label="Plan" value="Free" last />
@@ -126,6 +134,8 @@ function AccountBody() {
 // second tap actually wipes. No accounts exist, so "delete account" honestly
 // means: disconnect Spotify + erase every locally stored trace of you.
 function DeleteDataRow() {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   const [state, setState] = useState<'idle' | 'confirm' | 'done'>('idle');
 
   const handle = async () => {
@@ -147,7 +157,7 @@ function DeleteDataRow() {
   return (
     <Pressable onPress={handle} style={({ pressed }) => pressed && state !== 'done' ? { opacity: 0.7 } : undefined}>
       <View style={styles.dangerRow}>
-        <Text style={[styles.dangerLabel, state === 'done' && { color: 'rgba(255,255,255,0.5)' }]}>{label}</Text>
+        <Text style={[styles.dangerLabel, state === 'done' && { color: pal.ink(0.5) }]}>{label}</Text>
         {value != null && <Text style={styles.dangerValue}>{value}</Text>}
       </View>
     </Pressable>
@@ -161,6 +171,8 @@ function ToggleRow({
 }: {
   label: string; sub: string; value: boolean; onChange: (v: boolean) => void; last?: boolean;
 }) {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   return (
     <View style={[styles.toggleRow, !last && styles.toggleBorder]}>
       <View style={{ flex: 1, paddingRight: 12, gap: 2 }}>
@@ -180,6 +192,8 @@ function ToggleRow({
 }
 
 function NotificationsBody() {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_NOTIF_PREFS);
   /**
    * WITHOUT PERMISSION, EVERY TOGGLE BELOW IS DECORATIVE — it saves a
@@ -264,6 +278,8 @@ function NotificationsBody() {
 
 // ── Privacy ──────────────────────────────────────────────────────────────────
 function PrivacyBody({ onOpen }: { onOpen: (p: SettingsPage) => void }) {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   return (
     <>
       <SettingsSection label="WHAT WE STORE">
@@ -283,11 +299,11 @@ function PrivacyBody({ onOpen }: { onOpen: (p: SettingsPage) => void }) {
       <SettingsSection label="LEGAL">
         <Pressable style={[styles.legalRow, styles.legalRowBorder]} onPress={() => onOpen('privacyPolicy')}>
           <Text style={styles.legalRowLabel}>Privacy Policy</Text>
-          <MaterialCommunityIcons name="chevron-right" size={18} color="rgba(255,255,255,0.5)" />
+          <MaterialCommunityIcons name="chevron-right" size={18} color={pal.ink(0.55)} />
         </Pressable>
         <Pressable style={styles.legalRow} onPress={() => onOpen('terms')}>
           <Text style={styles.legalRowLabel}>Terms of Service</Text>
-          <MaterialCommunityIcons name="chevron-right" size={18} color="rgba(255,255,255,0.5)" />
+          <MaterialCommunityIcons name="chevron-right" size={18} color={pal.ink(0.55)} />
         </Pressable>
       </SettingsSection>
     </>
@@ -296,6 +312,8 @@ function PrivacyBody({ onOpen }: { onOpen: (p: SettingsPage) => void }) {
 
 // ── About ────────────────────────────────────────────────────────────────────
 function AboutBody() {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   return (
     <>
       <View style={{ alignItems: 'center', gap: 12, marginBottom: 28 }}>
@@ -304,7 +322,7 @@ function AboutBody() {
           style={{ width: 84, height: 84 }}
           resizeMode="contain"
         />
-        <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 2 }}>CRUISE FM</Text>
+        <Text style={{ color: pal.text, fontSize: 20, fontWeight: '800', letterSpacing: 2 }}>CRUISE FM</Text>
         <Text style={styles.aboutTagline}>
           Spotify organises by artist and genre. Cruise FM organises by how a drive feels.
         </Text>
@@ -327,6 +345,8 @@ function AboutBody() {
 
 // Owner-only: prove the Sentry pipeline end to end. Never shown to real users.
 function DiagnosticsSection() {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
 
   const handleTestCrash = async () => {
@@ -358,6 +378,8 @@ const SHARE_MESSAGE =
   "I've been using Cruise FM to turn my Spotify playlists into a proper driving experience — mood stations, cinematic visual modes, the works. Worth a try: https://cruisefm.netlify.app";
 
 function ReferBody() {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   const [copied, setCopied] = useState(false);
 
   async function handleShare() {
@@ -401,7 +423,7 @@ function ReferBody() {
   // violet gradient slab with a glowing violet button, the last of the purple.
   return (
     <View style={styles.referCard}>
-      <MaterialCommunityIcons name="star-four-points" size={28} color="rgba(255,255,255,0.85)" style={{ marginBottom: 4 }} />
+      <MaterialCommunityIcons name="star-four-points" size={28} color={pal.ink(0.85)} style={{ marginBottom: 4 }} />
 
       <Text style={styles.referTitle}>Share the drive.</Text>
       <Text style={styles.referSub}>
@@ -411,7 +433,7 @@ function ReferBody() {
         <MaterialCommunityIcons
           name={copied ? 'check' : 'share-variant'}
           size={16}
-          color="#0a0a10"
+          color={pal.bg}
         />
         <Text style={styles.shareBtnText}>{copied ? 'Link copied' : 'Share Cruise FM'}</Text>
       </Pressable>
@@ -419,70 +441,70 @@ function ReferBody() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (p: Palette) => StyleSheet.create({
   toggleRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 14,
   },
-  toggleBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  toggleLabel: { color: '#fff', fontSize: 14.5, fontWeight: '600' },
-  toggleSub: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 16 },
+  toggleBorder: { borderBottomWidth: 1, borderBottomColor: p.ink(0.09) },
+  toggleLabel: { color: p.text, fontSize: 14.5, fontWeight: '600' },
+  toggleSub: { color: p.ink(0.55), fontSize: 12, lineHeight: 16 },
   // ── Notification permission ──
   permBox: { paddingHorizontal: 16, paddingVertical: 16, gap: 10 },
-  permTitle: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
-  permBody: { color: 'rgba(255,255,255,0.55)', fontSize: 13.5, lineHeight: 19 },
+  permTitle: { color: p.text, fontSize: 15.5, fontWeight: '700' },
+  permBody: { color: p.ink(0.6), fontSize: 13.5, lineHeight: 19 },
   permBtn: {
     alignSelf: 'flex-start', marginTop: 2,
     paddingHorizontal: 20, paddingVertical: 11, borderRadius: 999,
-    backgroundColor: '#fff',
+    backgroundColor: p.text,
   },
-  permBtnText: { color: '#0a0a10', fontSize: 14.5, fontWeight: '800' },
+  permBtnText: { color: p.bg, fontSize: 14.5, fontWeight: '800' },
 
   para: { paddingHorizontal: 16, paddingVertical: 15 },
-  paraBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  paraText: { color: 'rgba(255,255,255,0.75)', fontSize: 13.5, lineHeight: 20 },
+  paraBorder: { borderBottomWidth: 1, borderBottomColor: p.ink(0.09) },
+  paraText: { color: p.ink(0.78), fontSize: 13.5, lineHeight: 20 },
   dangerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 15,
   },
   dangerLabel: { color: '#FF5C5C', fontSize: 14.5, fontWeight: '700' },
   dangerValue: { color: 'rgba(255,92,92,0.75)', fontSize: 12.5, fontWeight: '600' },
-  aboutTagline: { color: 'rgba(255,255,255,0.55)', fontSize: 13.5, textAlign: 'center', lineHeight: 19, paddingHorizontal: 24 },
+  aboutTagline: { color: p.ink(0.6), fontSize: 13.5, textAlign: 'center', lineHeight: 19, paddingHorizontal: 24 },
   referCard: {
     borderRadius: 20, padding: 26, gap: 12, overflow: 'hidden', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: p.mode === 'light' ? p.panel : p.ink(0.04),
+    borderWidth: StyleSheet.hairlineWidth, borderColor: p.ink(0.14),
   },
-  referTitle: { color: '#fff', fontSize: 21, fontWeight: '800', textAlign: 'center', letterSpacing: 0 },
-  referSub: { color: 'rgba(255,255,255,0.6)', fontSize: 13.5, lineHeight: 19, textAlign: 'center', marginBottom: 6 },
+  referTitle: { color: p.text, fontSize: 21, fontWeight: '800', textAlign: 'center', letterSpacing: 0 },
+  referSub: { color: p.ink(0.65), fontSize: 13.5, lineHeight: 19, textAlign: 'center', marginBottom: 6 },
   shareBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     borderRadius: 26, paddingVertical: 14, paddingHorizontal: 28,
-    backgroundColor: '#fff',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
+    backgroundColor: p.text,
+    shadowColor: p.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
   },
-  shareBtnText: { color: '#0a0a10', fontSize: 15, fontWeight: '700' },
+  shareBtnText: { color: p.bg, fontSize: 15, fontWeight: '700' },
   nameRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 16, paddingVertical: 8,
   },
-  nameRowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  nameRowLabel: { color: '#fff', fontSize: 14.5, fontWeight: '600', flex: 1 },
+  nameRowBorder: { borderBottomWidth: 1, borderBottomColor: p.ink(0.09) },
+  nameRowLabel: { color: p.text, fontSize: 14.5, fontWeight: '600', flex: 1 },
   nameInput: {
-    color: '#ffffff', fontSize: 14, fontWeight: '600',
+    color: p.text, fontSize: 14, fontWeight: '600',
     textAlign: 'right', minWidth: 120, paddingVertical: 8,
   },
   legalRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 15,
   },
-  legalRowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  legalRowLabel: { color: '#fff', fontSize: 14.5, fontWeight: '600' },
+  legalRowBorder: { borderBottomWidth: 1, borderBottomColor: p.ink(0.09) },
+  legalRowLabel: { color: p.text, fontSize: 14.5, fontWeight: '600' },
   legalUpdated: {
-    color: 'rgba(255,255,255,0.4)', fontSize: 11.5, fontWeight: '600',
+    color: p.ink(0.45), fontSize: 11.5, fontWeight: '600',
     letterSpacing: 0.4, marginBottom: 14,
   },
-  legalIntro: { color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 21, marginBottom: 22 },
-  legalHeading: { color: '#fff', fontSize: 14.5, fontWeight: '700', marginBottom: 5 },
-  legalBody: { color: 'rgba(255,255,255,0.65)', fontSize: 13, lineHeight: 20 },
+  legalIntro: { color: p.ink(0.85), fontSize: 14, lineHeight: 21, marginBottom: 22 },
+  legalHeading: { color: p.text, fontSize: 14.5, fontWeight: '700', marginBottom: 5 },
+  legalBody: { color: p.ink(0.7), fontSize: 13, lineHeight: 20 },
 });

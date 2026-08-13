@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRef } from 'react';
 import { Animated, Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -12,6 +14,8 @@ export function SettingsPageShell({
   onBack: () => void;
   children: React.ReactNode;
 }) {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   const insets = useSafeAreaInsets();
 
   // Settings live in a modal, so the iOS edge-swipe-back doesn't exist here —
@@ -79,7 +83,7 @@ export function SettingsPageShell({
       <View style={{ flex: 1, paddingTop: Math.max(insets.top, 20) }}>
         <View style={styles.header}>
           <Pressable style={[styles.backBtn, styles.backBtnRing]} onPress={onBack} hitSlop={14}>
-            <Ionicons name="chevron-back" size={22} color="#fff" />
+            <Ionicons name="chevron-back" size={22} color={pal.text} />
           </Pressable>
           <Text style={styles.title} numberOfLines={1}>{title}</Text>
           <View style={styles.backBtn} />
@@ -97,6 +101,7 @@ export function SettingsPageShell({
 
 // ── Shared row/section building blocks for settings pages ────────────────────
 export function SettingsSection({ label, children }: { label?: string; children: React.ReactNode }) {
+  const sectionStyles = useStyles(makeSectionStyles);
   return (
     <View style={{ marginBottom: 28 }}>
       {label && <Text style={sectionStyles.label}>{label}</Text>}
@@ -110,6 +115,7 @@ export function SettingsInfoRow({
 }: {
   label: string; value?: string; last?: boolean;
 }) {
+  const sectionStyles = useStyles(makeSectionStyles);
   return (
     <View style={[sectionStyles.row, !last && sectionStyles.rowBorder]}>
       <Text style={sectionStyles.rowLabel}>{label}</Text>
@@ -118,8 +124,8 @@ export function SettingsInfoRow({
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a0a10' },
+const makeStyles = (p: Palette) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: p.mode === 'light' ? p.bg : '#0a0a10' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 12, paddingTop: 4, paddingBottom: 10,
@@ -132,30 +138,30 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   backBtnRing: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: p.ink(0.06),
+    borderWidth: StyleSheet.hairlineWidth, borderColor: p.ink(0.16),
   },
-  title: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
+  title: { color: p.text, fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
   content: { paddingHorizontal: 20, paddingTop: 8 },
 });
 
-const sectionStyles = StyleSheet.create({
+const makeSectionStyles = (p: Palette) => StyleSheet.create({
   label: {
-    color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700',
+    color: p.ink(0.55), fontSize: 11, fontWeight: '700',
     letterSpacing: 2, marginBottom: 10, marginLeft: 4,
   },
   // Dark glass on black, matching the Profile page's settings card exactly —
   // one card style across every settings surface.
   card: {
     borderRadius: 16, overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: p.mode === 'light' ? p.panel : p.ink(0.04),
+    borderWidth: StyleSheet.hairlineWidth, borderColor: p.ink(0.14),
   },
   row: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 15,
   },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-  rowLabel: { color: '#fff', fontSize: 14.5, fontWeight: '600' },
-  rowValue: { color: 'rgba(255,255,255,0.5)', fontSize: 13.5, maxWidth: '55%' },
+  rowBorder: { borderBottomWidth: 1, borderBottomColor: p.ink(0.09) },
+  rowLabel: { color: p.text, fontSize: 14.5, fontWeight: '600' },
+  rowValue: { color: p.ink(0.55), fontSize: 13.5, maxWidth: '55%' },
 });

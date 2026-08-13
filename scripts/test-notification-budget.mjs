@@ -34,7 +34,6 @@ const schedule = run(`${ROOT}/constants/schedule.ts`, (s) => {
   if (s === '@/constants/stations') return stationsStub;
   throw new Error('unstubbed ' + s);
 });
-const copy = run(`${ROOT}/constants/notificationCopy.ts`, () => { throw new Error('no deps'); });
 
 // ── the world ────────────────────────────────────────────────────────────────
 let store = {};
@@ -52,6 +51,21 @@ const asyncStorage = {
     setItem: async (k, v) => { store[k] = v; },
   },
 };
+// notificationCopy reaches for the vocabulary (drives vs sessions), which
+// reaches for storage — so the real module is loaded against the same stub the
+// engine uses, rather than faked.
+// notificationCopy reaches for the vocabulary (drives vs sessions), which
+// reaches for storage — so the real module is loaded against the same stub the
+// engine uses, rather than faked.
+const sessionKind = run(`${ROOT}/utils/sessionKind.ts`, (m) => {
+  if (m === '@react-native-async-storage/async-storage') return asyncStorage;
+  throw new Error('unstubbed ' + m);
+});
+const copy = run(`${ROOT}/constants/notificationCopy.ts`, (m) => {
+  if (m === '@/utils/sessionKind') return sessionKind;
+  throw new Error('unstubbed ' + m);
+});
+
 const notifications = {
   getPermissionsAsync: async () => ({ status: 'granted', canAskAgain: false }),
   requestPermissionsAsync: async () => ({ status: 'granted' }),
@@ -76,6 +90,7 @@ function loadEngine() {
       };
     }
     if (s === '@/utils/lastCruise') return { loadLastCruise: async () => null };
+    if (s === '@/utils/sessionKind') return sessionKind;
     throw new Error('unstubbed ' + s);
   });
 }

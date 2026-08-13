@@ -1,9 +1,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { cachedSessionKind, type SessionKind } from '@/utils/sessionKind';
+
 const KEY = 'cruise_drive_log';
 const MAX_EVENTS = 400;
 
-export type DriveEvent = { ts: number; stationId: string; minutes?: number };
+export type DriveEvent = {
+  ts: number;
+  stationId: string;
+  minutes?: number;
+  /**
+   * Driving, or listening at a desk. ABSENT MEANS DRIVING — every session
+   * logged before 13.08 was recorded under the old assumption that all use was
+   * driving, and rewriting that history would be its own small lie.
+   */
+  kind?: SessionKind;
+};
 
 /** The raw drive history — badges are judged from this. */
 export async function getDriveLog(): Promise<DriveEvent[]> {
@@ -11,10 +23,18 @@ export async function getDriveLog(): Promise<DriveEvent[]> {
 }
 
 export type DriveStats = {
+  /** Real drives only — these keep their name, so nothing that reads them
+   *  starts quietly counting desk sessions as time on the road. */
   drivesThisWeek: number;
+  totalDrives: number;
+  /** Listening at a desk, counted in its own right. */
+  listensThisWeek: number;
+  totalListens: number;
+  /** BOTH KINDS. What anything asking "have they used this app yet?" wants —
+   *  a listener who never drives has still used it. */
+  totalSessions: number;
   totalMinutes: number;
   streakDays: number;
-  totalDrives: number;
   favoriteStationId: string | null;
 };
 
@@ -42,9 +62,9 @@ async function saveLog(log: DriveEvent[]): Promise<void> {
 }
 
 /** Call when a drive launches (any station, any screen). */
-export async function recordDriveStart(stationId: string): Promise<void> {
+export async function recordDriveStart(stationId: string, kind: SessionKind = cachedSessionKind()): Promise<void> {
   const log = await loadLog();
-  log.push({ ts: Date.now(), stationId });
+  log.push({ ts: Date.now(), stationId, kind });
   driveOpenedAt = Date.now();
   driveSuspended = false;
   await saveLog(log);
@@ -104,9 +124,13 @@ export async function getDriveStats(): Promise<DriveStats> {
     (e.minutes ?? 0) >= QUALIFYING_MINUTES || (e === lastEvent && driveOpenedAt != null),
   );
 
-  const drivesThisWeek = real.filter((e) => e.ts >= weekAgo).length;
+  // Absent kind means driving — see the note on DriveEvent.
+  const drove = real.filter((e) => (e.kind ?? 'driving') === 'driving');
+  const listened = real.filter((e) => e.kind === 'listening');
+  const drivesThisWeek = drove.filter((e) => e.ts >= weekAgo).length;
+  const listensThisWeek = listened.filter((e) => e.ts >= weekAgo).length;
   const totalMinutes = log.reduce((sum, e) => sum + (e.minutes ?? 0), 0);
-  const totalDrives = real.length;
+  const totalDrives = drove.length;
 
   // Favourite = the most-driven station (real drives only).
   const counts: Record<string, number> = {};
@@ -128,5 +152,10 @@ export async function getDriveStats(): Promise<DriveStats> {
     cursor.setDate(cursor.getDate() - 1);
   }
 
-  return { drivesThisWeek, totalMinutes, streakDays, totalDrives, favoriteStationId };
+  return {
+    drivesThisWeek, totalDrives,
+    listensThisWeek, totalListens: listened.length,
+    totalSessions: real.length,
+    totalMinutes, streakDays, favoriteStationId,
+  };
 }

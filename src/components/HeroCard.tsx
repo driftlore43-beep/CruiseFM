@@ -22,6 +22,9 @@ type HeroCardProps = {
   station: Station;
   /** "Start Drive" fresh, "Continue Drive" when resuming. */
   buttonLabel?: string;
+  /** Is there something to pick up? Passed rather than sniffed out of
+   *  buttonLabel — see the eyebrow below. */
+  resuming?: boolean;
 };
 
 /**
@@ -38,7 +41,7 @@ type HeroCardProps = {
  * old wide glass button was the loudest object on the screen, competing with
  * the mini player for attention. A disc reads as "play" without shouting.
  */
-export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start Drive' }: HeroCardProps) {
+export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start Drive', resuming = false }: HeroCardProps) {
   const { dataSaver } = useMotion();
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -50,12 +53,11 @@ export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start
     onStartDrive();
   };
 
-  // "Continue Drive" → "Continue" — the word Drive is already in the cue line
-  // underneath it, and this label now sits in a 52pt circle's shadow rather
-  // than across the whole card.
-  const eyebrow = buttonLabel.toLowerCase().startsWith('continue')
-    ? 'PICK UP WHERE YOU LEFT OFF'
-    : 'TONIGHT’S PICK';
+  // This used to read the word "continue" out of buttonLabel, which broke the
+  // moment the label could say "Keep Listening" instead: a returning desk
+  // listener was told TONIGHT'S PICK for a station they were halfway through.
+  // Meaning comes from the caller now, not from parsing the copy.
+  const eyebrow = resuming ? 'PICK UP WHERE YOU LEFT OFF' : 'TONIGHT’S PICK';
 
   return (
     <Animated.View style={[styles.wrap, { transform: [{ scale }] }]}>

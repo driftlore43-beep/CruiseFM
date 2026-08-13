@@ -10,6 +10,8 @@
  * drive rather than to the home screen.
  */
 
+import { words, type SessionKind } from '@/utils/sessionKind';
+
 export type NudgeKind = 'onair' | 'badge' | 'recap' | 'whatsnew';
 
 export type Nudge = {
@@ -81,13 +83,13 @@ export const ON_AIR: Nudge[] = [
 /** Badge lines. Sent only when something is genuinely earned, or one drive
  *  away — and the "one more" variant fires ONCE per badge, ever. */
 export const BADGE_COPY: Record<string, { title: string; body: string }> = {
-  ignition:      { title: 'Ignition', body: "Your first drive's on the books." },
-  'night-owl':   { title: 'Night Owl, earned', body: 'Three drives after dark. It suits you.' },
+  ignition:      { title: 'Ignition', body: "Your first one's on the books." },
+  'night-owl':   { title: 'Night Owl, earned', body: 'Three after dark. It suits you.' },
   'three-peat':  { title: 'Three-Peat', body: 'Three days running. Something is forming.' },
   'full-week':   { title: 'Full Week', body: "Seven days straight. That's a habit now." },
-  'warm-engine': { title: 'Warm Engine', body: 'An hour of music on the road.' },
-  regular:       { title: 'Regular', body: 'Ten drives in. You know the dial by now.' },
-  'dial-surfer': { title: 'Dial Surfer', body: "Every mood, driven. There isn't one left." },
+  'warm-engine': { title: 'Warm Engine', body: 'An hour of music.' },
+  regular:       { title: 'Regular', body: 'Ten in. You know the dial by now.' },
+  'dial-surfer': { title: 'Dial Surfer', body: "Every mood, heard. There isn't one left." },
 };
 
 /** One drive away — the only forward-looking line, and never a countdown. */
@@ -112,17 +114,29 @@ export const WHATS_NEW: Record<string, { title: string; body: string; stationId?
   },
 };
 
-/** Sunday recap. Never sent when the week was empty — silence is the
- *  correct message, and a nag about not driving is the fastest way to be
- *  muted forever. */
-export function recapCopy(drives: number, minutes: number, station: string | null):
-  { title: string; body: string } | null {
-  if (drives < 1) return null;
+/**
+ * Sunday recap. Never sent when the week was empty — silence is the correct
+ * message, and a nag about not driving is the fastest way to be muted forever.
+ *
+ * Kind-aware, because it was counting DRIVES: a desk listener would have had
+ * zero every week and never received one at all.
+ */
+export function recapCopy(
+  count: number, minutes: number, station: string | null, kind: SessionKind = 'driving',
+): { title: string; body: string } | null {
+  if (count < 1) return null;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   const time = h ? `${h}h ${m}m` : `${m} minutes`;
   const where = station ? ` Mostly ${station}.` : '';
-  if (drives === 1) return { title: 'One drive this week', body: `${time} on the road.${where} Worth it.` };
-  if (drives >= 6) return { title: 'Some week', body: `${drives} drives, ${time}.${where}` };
-  return { title: 'Your week on the road', body: `${drives} drives, ${time}.${where}` };
+  const w = words(kind);
+  const heading = kind === 'driving' ? 'Your week on the road' : 'Your week of listening';
+  if (count === 1) {
+    return {
+      title: `One ${w.noun} this week`,
+      body: `${time}${kind === 'driving' ? ' on the road' : ''}.${where} Worth it.`,
+    };
+  }
+  if (count >= 6) return { title: 'Some week', body: `${count} ${w.plural}, ${time}.${where}` };
+  return { title: heading, body: `${count} ${w.plural}, ${time}.${where}` };
 }

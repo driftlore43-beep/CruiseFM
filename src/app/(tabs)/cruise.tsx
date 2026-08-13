@@ -7,6 +7,7 @@ import { ConnectMusicCard } from '@/components/ConnectMusicCard';
 import { ConnectSpotifyCard } from '@/components/ConnectSpotifyCard';
 import { SpotifyNudgeCard } from '@/components/SpotifyNudgeCard';
 import { MakeStationCard } from '@/components/MakeStationCard';
+import { HeadingAnywhereCard, SessionKindSwitch } from '@/components/HeadingAnywhereCard';
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
 import { HeroCard } from '@/components/HeroCard';
@@ -29,6 +30,7 @@ import {
   customToStation, loadCustomStations, resolveAnyStation, type CustomStation,
 } from '@/utils/customStations';
 import { requestCreateStation } from '@/utils/createStationRequest';
+import { loadSessionKind, setSessionKind, words, type SessionKind } from '@/utils/sessionKind';
 import { DEFAULT_DRIVER_NAME, getDriverName } from '@/utils/driverName';
 
 const recommended = STATIONS.filter((s) => RECOMMENDED_IDS.includes(s.id));
@@ -77,6 +79,9 @@ export default function CruiseScreen() {
   // more of yourself you have put into the app, the more of it should be yours
   // when you open it.
   const [mine, setMine] = useState<CustomStation[]>([]);
+  // Driving or just listening. Decides what gets counted and what things are
+  // called — never what anything DOES.
+  const [kind, setKind] = useState<SessionKind>('driving');
 
   // Refresh on every focus — the name, time of day, last cruise and stats move on.
   const [focused, setFocused] = useState(false);
@@ -87,6 +92,10 @@ export default function CruiseScreen() {
       setTonightPick(stationById(defaultStationForNow()));
       setStatsKey((k) => k + 1);
       getDriverName().then((n) => { if (active) setDriverName(n); });
+      // Unanswered reads as driving until the card gets its answer — which is
+      // also the right migration for everyone who used the app before the
+      // question existed, since all of their history was logged that way.
+      loadSessionKind().then((k) => { if (active && k) setKind(k); });
       loadCustomStations()
         .then((list) => { if (active) setMine(list); return loadLastCruise(); })
         .then((last) => { if (active) setLastCruise(last); });
@@ -158,11 +167,19 @@ export default function CruiseScreen() {
           {greetingFor(new Date().getHours(), !!lastCruise)},{'\n'}{driverName}
         </Text>
 
+        <HeadingAnywhereCard onAnswered={setKind} />
+
         <HeroCard
           onStartDrive={handleStartDrive}
           cueLabel={heroCue}
           station={heroStation}
-          buttonLabel={lastCruise ? 'Continue Drive' : 'Start Drive'}
+          buttonLabel={lastCruise ? words(kind).resume : words(kind).start}
+          resuming={!!lastCruise}
+        />
+
+        <SessionKindSwitch
+          kind={kind}
+          onChange={(k) => { setKind(k); void setSessionKind(k); }}
         />
 
         <View style={styles.connects}>

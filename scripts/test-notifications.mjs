@@ -37,7 +37,12 @@ function load(file, stubs = {}) {
 const S = load(`${ROOT}/constants/schedule.ts`, {
   '@/constants/stations': `({ STATIONS: ${JSON.stringify(IDS.map((id) => ({ id })))} })`,
 });
-const C = load(`${ROOT}/constants/notificationCopy.ts`);
+const SK = load(`${ROOT}/utils/sessionKind.ts`, {
+  '@react-native-async-storage/async-storage':
+    '({ __esModule: true, default: { getItem: async () => null, setItem: async () => {} } })',
+});
+globalThis.__sk = SK;
+const C = load(`${ROOT}/constants/notificationCopy.ts`, { '@/utils/sessionKind': 'globalThis.__sk' });
 
 let fails = 0;
 const fail = (m) => { fails++; console.log('  FAIL', m); };

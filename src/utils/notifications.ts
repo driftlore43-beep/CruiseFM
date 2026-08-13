@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { BADGE_COPY, BADGE_NEARLY, ON_AIR, WHATS_NEW, recapCopy, type Nudge } from '@/constants/notificationCopy';
 import { isOnAir } from '@/constants/schedule';
+import { cachedSessionKind } from '@/utils/sessionKind';
 import { STATIONS } from '@/constants/stations';
 import { getDriveLog, getDriveStats } from '@/utils/driveStats';
 import { loadLastCruise } from '@/utils/lastCruise';
@@ -460,9 +461,11 @@ export async function scheduleRecapIfDue(): Promise<void> {
   if (!prefs.recap) return;
   if (!(await hasPermission())) return;
   const stats = await getDriveStats().catch(() => null);
-  if (!stats || stats.drivesThisWeek < 1) return;
+  if (!stats) return;
   const station = stats.favoriteStationId ? STATIONS.find((x) => x.id === stats.favoriteStationId)?.name ?? null : null;
-  const copy = recapCopy(stats.drivesThisWeek, stats.totalMinutes, station);
+  const kind = cachedSessionKind();
+  const count = kind === 'driving' ? stats.drivesThisWeek : stats.listensThisWeek;
+  const copy = recapCopy(count, stats.totalMinutes, station, kind);
   if (!copy) return;
   const at = new Date();
   const daysToSunday = (7 - at.getDay()) % 7;

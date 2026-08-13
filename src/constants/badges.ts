@@ -18,18 +18,32 @@ export type Badge = {
 
 export type JudgedBadge = Badge & { earned: boolean };
 
+/**
+ * NOT SPLIT INTO ROAD BADGES AND DESK BADGES, and this is worth explaining
+ * because a split was the obvious answer.
+ *
+ * Read what each one actually measures: nights, streaks, hours, stations,
+ * moods. Every single one is about USING THE APP, not about being in a car —
+ * only the wording was drive-shaped. So splitting them would have meant
+ * inventing a second, near-identical set, and left the desk listener with an
+ * empty shelf until it existed.
+ *
+ * They are judged on every session instead, and worded so they are true of
+ * both. The split that IS visible lives where it belongs: the stats strip,
+ * which counts drives and desk sessions separately and says which is which.
+ */
 export const BADGES: Badge[] = [
-  { id: 'ignition',     name: 'Ignition',      desc: 'Your first drive on the books.',            icon: 'key-variant' },
-  { id: 'night-owl',    name: 'Night Owl',     desc: 'Three drives after dark (10pm–5am).',       icon: 'weather-night' },
-  { id: 'three-peat',   name: 'Three-Peat',    desc: 'Drive three days in a row.',                icon: 'fire' },
-  { id: 'full-week',    name: 'Full Week',     desc: 'Drive seven days in a row.',                icon: 'calendar-week' },
-  { id: 'warm-engine',  name: 'Warm Engine',   desc: 'One hour of music on the road.',            icon: 'engine-outline' },
-  { id: 'road-tripper', name: 'Road Tripper',  desc: 'Ten hours cruised.',                        icon: 'map-marker-distance' },
-  { id: 'long-hauler',  name: 'Long Hauler',   desc: 'Fifty hours cruised.',                      icon: 'highway' },
-  { id: 'regular',      name: 'Regular',       desc: 'Ten drives with Cruise FM.',                icon: 'car' },
-  { id: 'veteran',      name: 'Veteran',       desc: 'Fifty drives with Cruise FM.',              icon: 'medal-outline' },
-  { id: 'local-legend', name: 'Local Legend',  desc: 'Ten drives on a single station.',           icon: 'star-circle-outline' },
-  { id: 'dial-surfer',  name: 'Dial Surfer',   desc: 'Drive with every mood.',                    icon: 'radio' },
+  { id: 'ignition',     name: 'Ignition',      desc: 'Your first session on the books.',          icon: 'key-variant' },
+  { id: 'night-owl',    name: 'Night Owl',     desc: 'Three sessions after dark (10pm–5am).',     icon: 'weather-night' },
+  { id: 'three-peat',   name: 'Three-Peat',    desc: 'Three days in a row.',                      icon: 'fire' },
+  { id: 'full-week',    name: 'Full Week',     desc: 'Seven days in a row.',                      icon: 'calendar-week' },
+  { id: 'warm-engine',  name: 'Warm Engine',   desc: 'One hour of music.',                        icon: 'engine-outline' },
+  { id: 'road-tripper', name: 'Road Tripper',  desc: 'Ten hours listened.',                       icon: 'map-marker-distance' },
+  { id: 'long-hauler',  name: 'Long Hauler',   desc: 'Fifty hours listened.',                     icon: 'highway' },
+  { id: 'regular',      name: 'Regular',       desc: 'Ten sessions with Cruise FM.',              icon: 'car' },
+  { id: 'veteran',      name: 'Veteran',       desc: 'Fifty sessions with Cruise FM.',            icon: 'medal-outline' },
+  { id: 'local-legend', name: 'Local Legend',  desc: 'Ten sessions on a single station.',         icon: 'star-circle-outline' },
+  { id: 'dial-surfer',  name: 'Dial Surfer',   desc: 'Every mood, heard.',                        icon: 'radio' },
   { id: 'founder',      name: 'Founder',       desc: 'Here at the start. Never offered again.', icon: 'flag-checkered', reserved: true },
 ];
 

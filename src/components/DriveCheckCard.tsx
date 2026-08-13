@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { cachedSessionKind } from '@/utils/sessionKind';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { resumeDriveClock, suspendDriveClock } from '@/utils/driveStats';
 
@@ -23,6 +24,11 @@ const ANSWER_WINDOW_MS = 2 * 60 * 1000;
  * clock, so a drive left paused overnight banks nothing either.
  */
 export function DriveCheckCard() {
+  // Nothing to check when they have already told us. This card exists ONLY
+  // because the app cannot otherwise tell whether anyone is driving — asking
+  // somebody who answered "just listening" would be asking a question we have
+  // the answer to, and it is the most intrusive thing in the app.
+  const kind = cachedSessionKind();
   const np = useNowPlaying();
   const [asking, setAsking] = useState(false);
   const [round, setRound] = useState(0);
@@ -81,6 +87,7 @@ export function DriveCheckCard() {
   // would freeze the app rather than ask a question. `asking` stays true, so
   // it appears the moment the sheet closes — and someone reading a song list
   // has plainly answered the question anyway.
+  if (kind !== 'driving') return null;
   if (!asking || !np.session || np.sheetCount > 0) return null;
 
   const stillCruising = () => {

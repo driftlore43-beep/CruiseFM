@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { getDriveStats, type DriveStats } from '@/utils/driveStats';
+import { cachedSessionKind, loadSessionKind, words } from '@/utils/sessionKind';
 
 function formatHours(totalMinutes: number): string {
   if (totalMinutes < 60) return `${totalMinutes}m`;
@@ -23,10 +24,12 @@ function formatHours(totalMinutes: number): string {
  */
 export function DriveStatsStrip({ refreshKey }: { refreshKey: number }) {
   const [stats, setStats] = useState<DriveStats | null>(null);
+  const [kind, setKind] = useState(cachedSessionKind());
 
   useEffect(() => {
     let active = true;
     getDriveStats().then((s) => { if (active) setStats(s); });
+    loadSessionKind().then((k) => { if (active && k) setKind(k); });
     return () => { active = false; };
   }, [refreshKey]);
 
@@ -35,14 +38,26 @@ export function DriveStatsStrip({ refreshKey }: { refreshKey: number }) {
   // Nothing to show a driver who hasn't driven yet — three zeros under the
   // heading "Your week" is worse than no section at all. It appears the
   // moment there's a real number in it.
-  if (!stats.drivesThisWeek && !stats.totalMinutes && !stats.streakDays) return null;
+  if (!stats.drivesThisWeek && !stats.listensThisWeek && !stats.totalMinutes && !stats.streakDays) return null;
 
   // Short labels on purpose: at three-to-a-row on a 393pt screen, "DRIVES THIS
   // WEEK" wraps onto two lines and knocks the numbers out of line with each
   // other. The heading already says which week it is.
+  // Drives and desk sessions are counted apart and shown apart, because
+  // rolling them together would put back exactly the vagueness this replaced.
+  // The FIRST column is whichever kind you are in — the other only appears
+  // once there is a real number in it, so somebody who only ever drives never
+  // sees a column of zeros for something they don't do.
+  const w = words(kind);
+  const other = kind === 'driving'
+    ? { value: String(stats.listensThisWeek), label: 'SESSIONS', show: stats.listensThisWeek > 0 }
+    : { value: String(stats.drivesThisWeek), label: 'DRIVES', show: stats.drivesThisWeek > 0 };
+  const mine = kind === 'driving' ? stats.drivesThisWeek : stats.listensThisWeek;
+
   const items = [
-    { value: String(stats.drivesThisWeek),    label: 'DRIVES' },
-    { value: formatHours(stats.totalMinutes), label: 'CRUISED' },
+    { value: String(mine),                    label: w.countLabel },
+    ...(other.show ? [{ value: other.value,   label: other.label }] : []),
+    { value: formatHours(stats.totalMinutes), label: w.timeLabel },
     { value: String(stats.streakDays),        label: 'DAY STREAK' },
   ];
 

@@ -42,7 +42,7 @@ export function MakeStationCard() {
           getDriveStats(),
         ]);
         if (!active) return;
-        setShow(dismissed !== 'true' && mine.length === 0 && stats.totalDrives >= MIN_SESSIONS);
+        setShow(dismissed !== 'true' && mine.length === 0 && stats.totalSessions >= MIN_SESSIONS);
       })();
       return () => { active = false; };
     }, []),

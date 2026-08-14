@@ -19,6 +19,7 @@ import { EntitlementsProvider } from '@/context/EntitlementsContext';
 import { PlatformSelector, usePlatformSelector } from '@/components/PlatformSelector';
 import { setPlatformSkipped } from '@/utils/musicPlatform';
 import { claimFounderIfEligible } from '@/utils/founder';
+import { AutoUpdateHost } from '@/components/AutoUpdateHost';
 import { NotificationHost } from '@/components/NotificationHost';
 import { NotifyPrompt } from '@/components/NotifyPrompt';
 
@@ -54,6 +55,10 @@ function AppShell() {
       {/* Local notifications: schedules them, and turns a tap into a drive.
           Renders nothing. The prompt asks only after the third drive, and
           only when the app is otherwise quiet. */}
+      {/* Keeps the app on the newest version by itself, so nobody has to know
+          the Check-for-updates button exists. Restarts only on returning from
+          a real absence, and never during a drive or over a sheet. */}
+      <AutoUpdateHost />
       <NotificationHost />
       <NotifyPrompt />
       {/* Last child, so it covers everything including the platform sheet. */}

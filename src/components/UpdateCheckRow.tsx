@@ -60,7 +60,10 @@ export function UpdateCheckRow() {
       case 'current':     return 'You’re on the latest version';
       case 'ready':       return 'Ready — tap to restart and apply';
       case 'error':       return state.message;
-      default:            return 'Fetches the newest design and fixes';
+      // AutoUpdateHost now does this by itself on the way back into the app,
+      // so the row is a manual override rather than the only route. Saying so
+      // is the point: someone who never presses it is not falling behind.
+      default:            return 'Happens by itself · tap to check now';
     }
   })();
 

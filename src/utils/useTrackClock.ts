@@ -45,6 +45,24 @@ export type ScrubApi = {
  * (~5s) and right after skips, so it can't drift far or show the wrong
  * duration. Without Spotify it falls back to the classic demo loop.
  */
+/**
+ * How far the clock will run ahead of the last thing Spotify actually told us.
+ *
+ * The bar is animated from a known position to the END of the song, and only a
+ * poll restarts it. That is invisible while polls arrive every five seconds —
+ * and a lie the moment they stop. If the network drops, or the song is paused
+ * somewhere we cannot see, the bar keeps travelling while the music sits still.
+ * The owner watched it happen mid-drive: "it was moving the scrub but not the
+ * actual song".
+ *
+ * So one reading buys a bounded amount of coasting, not the rest of the track.
+ * Six missed polls is a real outage rather than a hiccup, and half a minute is
+ * a small enough error to be honest about. Past that the bar HOLDS rather than
+ * inventing a position — the same rule as the rest of the app: state what is
+ * known, and stop where knowledge stops.
+ */
+const MAX_COAST_MS = 30000;
+
 export function useTrackClock(opts: {
   visible: boolean;
   playing: boolean;
@@ -81,11 +99,18 @@ export function useTrackClock(opts: {
     progress.setValue(dur > 0 ? clamped / dur : 0);
     const remaining = dur - clamped;
     if (remaining <= 0) { progress.setValue(0); return; }
+    // Coast only as far as this one reading justifies — see MAX_COAST_MS. In
+    // normal use a poll lands every five seconds and restarts this long before
+    // the cap, so it is invisible.
+    const span = Math.min(remaining, MAX_COAST_MS);
+    const reachesEnd = span >= remaining;
     anim.current = Animated.timing(progress, {
-      toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false,
+      toValue: (clamped + span) / dur, duration: span, easing: Easing.linear, useNativeDriver: false,
     });
     anim.current.start(({ finished }) => {
-      if (!finished) return;
+      // Stopping at the cap is NOT the track ending: wrapping to 0 there would
+      // restart the song's bar from the beginning while it plays on.
+      if (!finished || !reachesEnd) return;
       progress.setValue(0);
       // Demo mode loops forever; with Spotify the next poll re-syncs us onto
       // the following song anyway.

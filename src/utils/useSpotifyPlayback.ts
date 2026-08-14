@@ -264,10 +264,18 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
     let inFront = isInFront(AppState.currentState);
     const sub = AppState.addEventListener('change', (state) => {
       const now = isInFront(state);
-      if (now === inFront) return;
-      inFront = now;
-      if (now) { refreshRef.current(); startPoll(); }
-      else stopPoll();
+      if (!now) { inFront = false; stopPoll(); return; }
+      // IN FRONT. Restart when we were away — and ALSO whenever the poll is
+      // simply not running, whatever killed it. The first version of this
+      // returned early on every non-transition, which quietly removed a
+      // safety net the old code had: any foreground event used to revive a
+      // dead poll. That matters more than the network call it saves, because
+      // the deck extrapolates between polls — with no updates arriving, the
+      // progress bar sails on toward the end of the song while the music
+      // itself sits still, which is exactly what the owner saw mid-drive.
+      const wasAway = !inFront;
+      inFront = true;
+      if (wasAway || pollRef.current == null) { refreshRef.current(); startPoll(); }
     });
     return () => sub.remove();
   }, [visible]);

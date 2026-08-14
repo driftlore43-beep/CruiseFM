@@ -158,10 +158,12 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
     let inFront = isInFront(AppState.currentState);
     const sub = AppState.addEventListener('change', (state) => {
       const now = isInFront(state);
-      if (now === inFront) return;
-      inFront = now;
-      if (now) { refreshRef.current(); startPoll(); }
-      else stopPoll();
+      if (!now) { inFront = false; stopPoll(); return; }
+      // Also revives a poll that is dead for any other reason — see the note
+      // on the Spotify copy of this.
+      const wasAway = !inFront;
+      inFront = true;
+      if (wasAway || pollRef.current == null) { refreshRef.current(); startPoll(); }
     });
     return () => sub.remove();
   }, [visible]);

@@ -86,6 +86,10 @@ const VINYL_ACCENTS: Record<string, string> = {
 };
 
 /** '#RRGGBB' → 'rgba(r,g,b,a)' — for animated colour interpolation. */
+/** See MAX_COAST_MS in useTrackClock — the deck keeps its own clock, and
+ *  needs the same bound on how far one reading may be extrapolated. */
+const VINYL_MAX_COAST_MS = 30000;
+
 function withAlpha(hex: string, a: number): string {
   const h = hex.replace('#', '');
   return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`;
@@ -1212,11 +1216,19 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const _restartProgressFrom = (posMs: number, trackMs: number) => {
     const remaining = trackMs - posMs;
     if (remaining <= 0) return;
-    progressAnimRef.current = Animated.timing(progress, { toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false });
+    // The deck coasts only as far as one reading justifies. Animating to the
+    // END of the song means that when polls stop arriving — dropped signal, or
+    // the music paused somewhere we cannot see — the bar keeps travelling
+    // while the song sits still. The owner watched exactly that mid-drive.
+    // A poll lands every five seconds, so the cap is never reached in normal
+    // use; when it is, the bar HOLDS instead of inventing a position.
+    const span = Math.min(remaining, VINYL_MAX_COAST_MS);
+    const reachesEnd = span >= remaining;
+    progressAnimRef.current = Animated.timing(progress, { toValue: (posMs + span) / trackMs, duration: span, easing: Easing.linear, useNativeDriver: false });
     progressAnimRef.current.start(({ finished }) => {
-      // Demo deck advances itself; a real track ends on Spotify's side and
-      // the next poll re-syncs us onto whatever plays next.
-      if (finished && !realTrackRef.current) {
+      // Reaching the CAP is not the track ending — only advance the demo deck
+      // when the song genuinely ran out.
+      if (finished && reachesEnd && !realTrackRef.current) {
         setActiveTrack((t) => { const n = Math.min(VINYL_TRACKS.length - 1, t + 1); if (n === t) setPlaying(false); return n; });
       }
     });

@@ -89,7 +89,7 @@ All three must report zero errors.
       unreadable (Guideline 2.3.3 — "not merely the title art"), and any album
       cover, song title or artist name, which the current set deliberately has
       none of because it was shot with no music connected. Full brief and
-      colours: `docs/launch/screenshot-brief.md`.
+      colours: `docs/launch/screenshot-brief.txt`.
 - [ ] **Notes for Review** explain anything a reviewer can't discover alone:
       that no sign-in is required, that music playback needs the user's own
       Spotify or Apple Music, and — since build 7 — that the app deliberately

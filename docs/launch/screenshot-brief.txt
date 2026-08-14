@@ -33,16 +33,20 @@ one of them.
 
    #   SCREENSHOT                    HEADLINE                          COLOUR
    --  ----------------------------  --------------------------------  -------
-   1   Mirror Ball (Downtown)        Drive your music                  #453564
-   2   Vinyl (Sunset)                Spin your album art               #63363c
-   3   Stations dial                 Choose your mood station          #753f24
-   4   Horizon (After Hours)         Take the long way home            #772228
-   5   Tuner (Night Run)             Tune the dial, find the feeling   #234476
+   1   Mirror Ball (Downtown)        Drive your music                  #443663
+   2   Vinyl (Sunset)                Spin your album art               #63363d
+   3   Stations dial                 Choose your mood station          #774622
+   4   Horizon (After Hours)         Take the long way home            #762329
+   5   Tuner (Night Run)             Tune the dial, find the feeling   #244575
    6   Your photo (framing screen)   Your own photo behind the drive   #685531
-   7   Cassette (Daylight)           A tape deck for the road          #675332
-   8   CD (Coastal)                  The disc, spinning again          #366357
-   9   Equalizer (Mountain Pass)     The meter from an old hi-fi       #2d586c
+   7   Cassette (Daylight)           A tape deck for the road          #655334
+   8   CD (Coastal)                  The disc, spinning again          #364d63
+   9   Equalizer (Mountain Pass)     The meter from an old hi-fi       #2e586b
    10  Share card                    Your music wrapped in a drive     #633647
+
+Reshot 14 August, so these colours are current. Two of them moved a little
+from the previous set (the dial and the CD) because the pictures themselves
+changed - that is the sampling working, not drift.
 
 Ten is Apple's maximum, so this fills every slot.
 

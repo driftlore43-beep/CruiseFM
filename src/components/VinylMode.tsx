@@ -195,7 +195,7 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
           top: size / 2 - cR, left: size / 2 - cR,
           overflow: 'hidden',
         }}>
-          <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 0.8 }}>COLUMBIA</Text>
+          <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 0.8 }}>STROFI</Text>
           <Text style={{ position: 'absolute', top: cR * 0.50, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: Math.max(7, cSize * 0.145), fontWeight: '800', letterSpacing: 0.4 }}>CRUISE FM</Text>
           <Text style={{ position: 'absolute', top: cR * 1.22, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: Math.max(4, cSize * 0.065), letterSpacing: 0.3 }}>NIGHT RUN FM</Text>
           <View style={{ position: 'absolute', width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff', top: cR - 2.5, left: cR - 2.5 }} />
@@ -588,7 +588,7 @@ function TurntableHero({
               <Image source={{ uri: albumArt }} style={{ position: 'absolute', width: cSize, height: cSize }} resizeMode="cover" />
             ) : (
               <>
-                <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 1.2 }}>COLUMBIA</Text>
+                <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 1.2 }}>STROFI</Text>
                 <Text style={{ position: 'absolute', top: cR * 0.50, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: Math.max(8, cSize * 0.145), fontWeight: '800', letterSpacing: 0.4 }}>CRUISE FM</Text>
                 <Text style={{ position: 'absolute', top: cR * 1.22, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: Math.max(4, cSize * 0.075), letterSpacing: 0.4 }} numberOfLines={1}>{labelText}</Text>
               </>
@@ -1213,6 +1213,12 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   // the pills inside the snapshot.
   const bottomPad    = Math.max(insets.bottom, 24) + 16;
 
+  // The imprint line on the record's label says STROFI, not COLUMBIA. It read
+  // COLUMBIA for realism, which is a live Sony Music trademark printed on a
+  // simulated label inside a music app — harmless-looking until it goes on an
+  // App Store listing, which is where it was spotted (14.08) while reshooting
+  // the screenshots. The app's own company name reads exactly like a real
+  // imprint and is ours. Do not put a real label back.
   const _restartProgressFrom = (posMs: number, trackMs: number) => {
     const remaining = trackMs - posMs;
     if (remaining <= 0) return;

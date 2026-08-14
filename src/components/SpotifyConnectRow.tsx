@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
-import { Cruise } from '@/constants/theme';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 import {
   connectSpotify,
   isSpotifyConnected,
@@ -15,6 +16,8 @@ WebBrowser.maybeCompleteAuthSession();
 const SPOTIFY_GREEN = '#1DB954';
 
 function SpotifyConnectRowNative() {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -43,7 +46,7 @@ function SpotifyConnectRowNative() {
       onPress={connected ? handleDisconnect : handleConnect}
       disabled={loading}>
       <View style={styles.left}>
-        <View style={[styles.dot, { backgroundColor: connected ? SPOTIFY_GREEN : Cruise.textMuted }]} />
+        <View style={[styles.dot, { backgroundColor: connected ? SPOTIFY_GREEN : pal.ink(0.35) }]} />
         <View>
           <Text style={styles.label}>Spotify Connect</Text>
           <Text style={[styles.sub, connected && { color: SPOTIFY_GREEN }]}>
@@ -53,17 +56,19 @@ function SpotifyConnectRowNative() {
       </View>
       {loading
         ? <ActivityIndicator size="small" color={SPOTIFY_GREEN} />
-        : <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.3)" />
+        : <Ionicons name="chevron-forward" size={18} color={pal.ink(0.4)} />
       }
     </Pressable>
   );
 }
 
 function SpotifyConnectRowWeb() {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   return (
     <View style={[styles.row, styles.border]}>
       <View style={styles.left}>
-        <View style={[styles.dot, { backgroundColor: Cruise.textMuted }]} />
+        <View style={[styles.dot, { backgroundColor: pal.ink(0.35) }]} />
         <View>
           <Text style={styles.label}>Spotify Connect</Text>
           <Text style={styles.sub}>Available in the native app</Text>
@@ -78,7 +83,18 @@ export function SpotifyConnectRow() {
   return <SpotifyConnectRowNative />;
 }
 
-const styles = StyleSheet.create({
+/**
+ * THEMED, and it was the last row on this page that wasn't (owner, 14.08, off
+ * a screenshot of the page on paper: white "Spotify Connect" on a light ground,
+ * i.e. invisible). It sat on hardcoded `Cruise.textPrimary` — the one style of
+ * bug a light theme causes silently, since white on white throws nothing and
+ * shows up in no diff. Its neighbour UpdateCheckRow was already converted; the
+ * numbers below match it exactly so the two rows stay indistinguishable.
+ *
+ * Spotify's green stays literal in both themes — it is a brand mark, not page
+ * furniture, and it reads on paper as well as on black.
+ */
+const makeStyles = (p: Palette) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -90,7 +106,7 @@ const styles = StyleSheet.create({
   },
   border: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.09)',
+    borderBottomColor: p.ink(0.12),
   },
   left: {
     flexDirection: 'row',
@@ -104,17 +120,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   label: {
-    color: Cruise.textPrimary,
+    color: p.text,
     fontSize: 16.5,
     fontWeight: '500',
   },
   sub: {
-    color: Cruise.textMuted,
+    color: p.ink(0.55),
     fontSize: 12,
     marginTop: 2,
-  },
-  arrow: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 22,
   },
 });

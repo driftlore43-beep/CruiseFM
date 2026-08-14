@@ -27,10 +27,14 @@ try {
     '  npm i -D playwright\n' +
     '  ...or point at an existing install:\n' +
     '  PLAYWRIGHT_MODULE=/abs/path/to/node_modules/playwright/index.mjs node scripts/test-contrast.mjs\n' +
-    'It also needs the web build running:  npx expo start --web --port 8081'
+    'It also needs the web build running:  npx expo start --web --port 8081\n' +
+    '(a different port? set BASE_URL=http://localhost:<port>)'
   );
   process.exit(2);
 }
+// The web build's port varies when another instance is already running; the
+// default keeps every existing invocation working unchanged.
+const BASE = (process.env.BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
 const PROBE = fs.readFileSync(new URL('./contrast-probe.js', import.meta.url), 'utf8');
 const PAGES = [['', 'Cruise'], ['stations', 'Stations'], ['modes', 'Modes'], ['profile', 'Profile']];
 const SCROLLS = [0, 700, 1500];
@@ -46,7 +50,7 @@ for (const theme of ['light', 'dark']) {
       window.localStorage.setItem('cruisefm_platform', 'none');
       window.localStorage.setItem('cruise_appearance', t);
     }, theme);
-    await p.goto('http://localhost:8081/' + route, { waitUntil: 'networkidle' });
+    await p.goto(BASE + '/' + route, { waitUntil: 'networkidle' });
     await p.waitForTimeout(6500);
     await p.addScriptTag({ content: PROBE });
     const seen = new Map();

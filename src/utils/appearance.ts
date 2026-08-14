@@ -133,3 +133,41 @@ const LIGHT: Palette = {
 export function paletteFor(mode: Mode): Palette {
   return mode === 'light' ? LIGHT : DARK;
 }
+
+/**
+ * A brand colour, deepened just enough to read on the current ground.
+ *
+ * WHY IT EXISTS: a brand palette is tuned for ONE background, and several of
+ * the ones this app shows are tuned for black. Tidal's mark is `#CBCBCB` — a
+ * near-white, correct on a dark sheet and completely invisible on paper, which
+ * is exactly how it rendered the first time the platform picker went light.
+ * The app's own amber and gold have the same problem and are handled by hand
+ * in the palette above; this is the general form for colours that arrive from
+ * outside and cannot be hand-tuned.
+ *
+ * ON DARK IT RETURNS THE COLOUR UNTOUCHED, so nothing that exists today can
+ * change. In light it only acts on colours that are genuinely too pale, and it
+ * deepens rather than replaces — the hue survives, which is the whole point of
+ * a brand colour. Deepening is also usually what the brand itself does: Tidal's
+ * logo on a white page is black.
+ */
+export function readableOn(color: string, mode: Mode): string {
+  if (mode !== 'light') return color;
+  const m = /^#?([0-9a-f]{6})$/i.exec(color.trim());
+  if (!m) return color;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  // Perceived brightness, not the plain average — a pure yellow and a pure
+  // blue of the same average read nothing alike.
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  if (lum <= LIGHT_SAFE_LUM) return color;
+  // Scale the push to how pale it is, and cap it so even a pure white lands on
+  // a dark grey rather than on black — black would read as ink, not as a mark.
+  const t = Math.min(0.78, (lum - LIGHT_SAFE_LUM) / (255 - LIGHT_SAFE_LUM));
+  const mix = (c: number, target: number) => Math.round(c + (target - c) * t);
+  const hex = (c: number) => c.toString(16).padStart(2, '0');
+  return `#${hex(mix(r, 0x1c))}${hex(mix(g, 0x1c))}${hex(mix(b, 0x20))}`;
+}
+
+/** Above this perceived brightness a colour stops reading on the paper ground. */
+const LIGHT_SAFE_LUM = 150;

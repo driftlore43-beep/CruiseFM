@@ -23,9 +23,9 @@ import { isFounder } from '@/utils/founder';
 import { appVersionLabel } from '@/utils/appVersion';
 import { DEFAULT_DRIVER_NAME, getDriverName, initialsFor } from '@/utils/driverName';
 import { useAppearance, usePalette, useStyles } from '@/context/AppearanceContext';
-import type { Appearance, Palette } from '@/utils/appearance';
-import { DriveRow, DriveStub } from '@/components/DriveStub';
-import { getFinishedDrives, type DriveEvent, type DriveStats } from '@/utils/driveStats';
+import { readableOn, type Appearance, type Palette } from '@/utils/appearance';
+import { DrivesPage, logTitle } from '@/components/DrivesPage';
+import { getFinishedDrives, type DriveEvent } from '@/utils/driveStats';
 
 function stationName(id: string | null): string {
   return STATIONS.find((s) => s.id === id)?.name ?? '—';
@@ -108,12 +108,18 @@ function useMusicPlatformInfo() {
 }
 
 /**
- * Your drives, newest first.
+ * Your drives — the week at a glance, and a door to the rest.
  *
  * Deliberately quiet: a week strip that shows the gaps and never mentions
- * them, then the list. The moment this becomes "don't lose your streak" it
- * stops being a record of what you did and starts being pressure to do it —
- * which is the opposite of the restraint written into the rest of this app.
+ * them. The moment this becomes "don't lose your streak" it stops being a
+ * record of what you did and starts being pressure to do it — which is the
+ * opposite of the restraint written into the rest of this app.
+ *
+ * THE LIST ITSELF LIVES ON ITS OWN PAGE (owner, 14.08: "the driver log is
+ * really long can it be collapsed into a page"). Printed inline it pushed the
+ * settings ever further down as the log grew, so Profile stopped being a
+ * profile. What stays is the part with a reason to be seen every time — seven
+ * days, seven boxes — and it doubles as the way in.
  *
  * Old history appears immediately: the drive log has always carried the time,
  * the station and the length. Mode and songs only exist from 13.08 onward, and
@@ -123,21 +129,15 @@ function DriveLog() {
   const styles = useStyles(makeStyles);
   const pal = usePalette();
   const [drives, setDrives] = useState<DriveEvent[]>([]);
-  const [open, setOpen] = useState<DriveEvent | null>(null);
-  const [stats, setStats] = useState<DriveStats | null>(null);
+  const [page, setPage] = useState(false);
 
   useFocusEffect(useCallback(() => {
     let alive = true;
     getFinishedDrives().then((d) => { if (alive) setDrives(d); }).catch(() => {});
-    getDriveStats().then((st) => { if (alive) setStats(st); }).catch(() => {});
     return () => { alive = false; };
   }, []));
 
   if (drives.length === 0) return null;
-
-  const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
-  const thisWeek = drives.filter((d) => d.ts >= weekAgo);
-  const earlier = drives.filter((d) => d.ts < weekAgo);
 
   // Seven days ending today, so the strip always reads left-to-right toward
   // now rather than sitting on a calendar week that resets on a Monday.
@@ -154,51 +154,37 @@ function DriveLog() {
     return { letter: dayLetters[d.getDay()], on };
   });
 
-  const ordinalOf = (d: DriveEvent) => {
-    // Its position counting from the oldest, within its own kind — which is
-    // what "your 12th" means, and it must not change when a later drive lands.
-    const kind = d.kind ?? 'driving';
-    const sameKind = drives.filter((e) => (e.kind ?? 'driving') === kind);
-    return sameKind.length - sameKind.indexOf(d);
-  };
-  const weekOf = (d: DriveEvent) => {
-    const kind = d.kind ?? 'driving';
-    return (kind === 'listening' ? stats?.listensThisWeek : stats?.drivesThisWeek) ?? 1;
-  };
+  const daysOn = strip.filter((d) => d.on).length;
 
   return (
     <>
       <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>Your drives</Text>
+        <Text style={styles.sectionTitle}>{logTitle(drives)}</Text>
         <Text style={styles.sectionMeta}>{drives.length} kept</Text>
       </View>
 
-      <View style={styles.weekStrip}>
-        {strip.map((d, i) => (
-          <View key={i} style={[styles.weekDay, d.on && styles.weekDayOn]}>
-            <Text style={[styles.weekDayText, d.on && styles.weekDayTextOn]}>{d.letter}</Text>
+      <Pressable
+        onPress={() => setPage(true)}
+        style={({ pressed }) => [styles.logCard, pressed && { opacity: 0.85 }]}>
+        <View style={styles.weekStrip}>
+          {strip.map((d, i) => (
+            <View key={i} style={[styles.weekDay, d.on && styles.weekDayOn]}>
+              <Text style={[styles.weekDayText, d.on && styles.weekDayTextOn]}>{d.letter}</Text>
+            </View>
+          ))}
+        </View>
+        <View style={styles.logOpenRow}>
+          <Text style={styles.logOpenText}>
+            {daysOn === 0 ? 'Nothing this week' : `${daysOn} ${daysOn === 1 ? 'day' : 'days'} this week`}
+          </Text>
+          <View style={styles.logOpenRight}>
+            <Text style={styles.logOpenAll}>See all</Text>
+            <Ionicons name="chevron-forward" size={16} color={pal.ink(0.4)} />
           </View>
-        ))}
-      </View>
+        </View>
+      </Pressable>
 
-      {thisWeek.length > 0 && <Text style={styles.logGroup}>THIS WEEK</Text>}
-      {thisWeek.map((d, i) => (
-        <DriveRow key={d.ts} drive={d} onPress={() => setOpen(d)} last={i === thisWeek.length - 1} />
-      ))}
-      {earlier.length > 0 && <Text style={styles.logGroup}>EARLIER</Text>}
-      {earlier.slice(0, 20).map((d, i) => (
-        <DriveRow key={d.ts} drive={d} onPress={() => setOpen(d)} last={i === Math.min(earlier.length, 20) - 1} />
-      ))}
-
-      {!!open && (
-        <DriveStub
-          drive={open}
-          visible
-          onClose={() => setOpen(null)}
-          ordinal={ordinalOf(open)}
-          thisWeek={weekOf(open)}
-        />
-      )}
+      <DrivesPage visible={page} onClose={() => setPage(false)} />
     </>
   );
 }
@@ -254,7 +240,11 @@ export default function ProfileScreen() {
   const { theme } = useTheme();
   const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere, daylight, setDaylight } = useMotion();
   const { devFreePreview, setDevFreePreview, isPro } = useEntitlements();
-  const { name: platformName, color: platformColor, id: platformId, refresh: refreshPlatform } = useMusicPlatformInfo();
+  const { name: platformName, color: rawPlatformColor, id: platformId, refresh: refreshPlatform } = useMusicPlatformInfo();
+  // The platform's name is set IN its brand colour on this row, and some brand
+  // colours (Tidal's near-white grey) are tuned for a dark sheet only — see
+  // readableOn. Deepened just enough to read on paper; untouched on dark.
+  const platformColor = rawPlatformColor ? readableOn(rawPlatformColor, pal.mode) : null;
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage | null>(null);
   const [stats, setStats] = useState<{ totalDrives: number; totalMinutes: number; favoriteStationId: string | null } | null>(null);
@@ -767,10 +757,23 @@ const makeStyles = (p: Palette) => StyleSheet.create({
   weekDayOn: { backgroundColor: p.mode === 'light' ? 'rgba(168,94,6,0.12)' : 'rgba(245,158,11,0.16)', borderColor: p.amber + '80' },
   weekDayText: { fontSize: 11, fontWeight: '700', color: p.ink(0.34) },
   weekDayTextOn: { color: p.amber },
-  logGroup: {
-    fontSize: 9.5, fontWeight: '800', letterSpacing: 2,
-    color: p.ink(0.4), marginTop: 16, marginBottom: 2,
+  // The whole card is the way into the log's own page, so it carries the
+  // strip AND the row rather than sitting beside a separate button.
+  logCard: {
+    borderRadius: 16, overflow: 'hidden',
+    backgroundColor: p.mode === 'light' ? p.panel : p.ink(0.04),
+    borderWidth: StyleSheet.hairlineWidth, borderColor: p.ink(0.14),
+    paddingHorizontal: 12, paddingTop: 10,
+    marginTop: 4,
   },
+  logOpenRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: p.ink(0.1),
+    marginTop: 8, paddingVertical: 12, paddingHorizontal: 2,
+  },
+  logOpenText: { color: p.ink(0.6), fontSize: 13, fontWeight: '600' },
+  logOpenRight: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  logOpenAll: { color: p.text, fontSize: 13.5, fontWeight: '700' },
   // Stacks instead of sitting side by side, so the three options get the full
   // width of the row rather than whatever is left over.
   appearanceRow: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },

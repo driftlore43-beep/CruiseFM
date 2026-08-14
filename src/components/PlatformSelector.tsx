@@ -19,7 +19,8 @@ import {
   getSavedPlatform,
   savePlatform,
 } from '@/utils/musicPlatform';
-import { Cruise } from '@/constants/theme';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import { readableOn, type Palette } from '@/utils/appearance';
 
 const NONE_ENTRY = { id: 'none' as PlatformId, name: 'None / Other', color: '#666666' };
 
@@ -47,6 +48,8 @@ type Props = {
 };
 
 export function PlatformSelector({ visible, onDismiss }: Props) {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState<PlatformId | null>(null);
 
@@ -153,7 +156,7 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
               onPress={handleClose}
               style={styles.closeBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="close" size={16} color="rgba(255,255,255,0.6)" />
+              <Ionicons name="close" size={16} color={pal.ink(0.6)} />
             </TouchableOpacity>
           </View>
 
@@ -164,15 +167,18 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
 
           {/* ── Platform grid ────────────────────────────────────────────── */}
           <View style={styles.grid}>
-            {PLATFORM_ENTRIES.map((platform) => {
+            {PLATFORM_ENTRIES.map((entry) => {
+              // Tidal's mark is a near-white grey, correct on a dark sheet and
+              // invisible on paper. Deepened only where it has to be.
+              const platform = { ...entry, color: readableOn(entry.color, pal.mode) };
               const isSelected = selected === platform.id;
               const isNone = platform.id === 'none';
               return (
                 <Pressable
-                  key={platform.id}
+                  key={entry.id}
                   style={({ pressed }) => [
                     styles.platformBtn,
-                    { borderColor: isSelected ? platform.color : 'rgba(255,255,255,0.12)' },
+                    { borderColor: isSelected ? platform.color : pal.ink(0.12) },
                     isSelected && { borderWidth: 2 },
                     pressed && { opacity: 0.82 },
                   ]}
@@ -183,19 +189,26 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
                     colors={
                       isSelected
                         ? [`${platform.color}2e`, `${platform.color}12`]
-                        : ['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.03)']
+                        : [pal.ink(0.09), pal.ink(0.03)]
                     }
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={StyleSheet.absoluteFill}
                   />
 
-                  {/* Brand mark — bold white icon on a tinted chip */}
+                  {/* Brand mark on a chip tinted with its own colour. On black
+                      the glyph is white, which is the strongest thing that can
+                      sit on a dark tint. On paper that chip is a PALE wash, so
+                      a white glyph disappears into it — the mark takes the
+                      brand's own colour instead, which is both legible and
+                      more like the real logo. */}
                   <View style={[
                     styles.emojiWrap,
-                    { backgroundColor: `${platform.color}22`, borderColor: `${platform.color}44` },
+                    pal.mode === 'light'
+                      ? { backgroundColor: `${platform.color}1f`, borderColor: `${platform.color}59` }
+                      : { backgroundColor: `${platform.color}22`, borderColor: `${platform.color}44` },
                   ]}>
-                    <PlatformIcon id={platform.id} />
+                    <PlatformIcon id={platform.id} color={pal.mode === 'light' ? platform.color : '#fff'} />
                   </View>
 
                   <View style={{ flex: 1 }}>
@@ -203,8 +216,8 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
                       style={[
                         styles.platformName,
                         isSelected
-                          ? { color: isNone ? '#aaa' : platform.color, fontWeight: '700' }
-                          : { color: Cruise.textPrimary },
+                          ? { color: isNone ? pal.ink(0.62) : platform.color, fontWeight: '700' }
+                          : { color: pal.text },
                       ]}
                       numberOfLines={1}>
                       {platform.name}
@@ -236,12 +249,17 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
             disabled={!isReady}>
             {isReady ? (
               <View style={styles.confirmGradient}>
-                {/* Glassy translucent gradient — the sheet glows through */}
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#ffffff' }]} />
-                <Text style={[styles.confirmText, { color: '#0a0a10' }]}>Let&apos;s Drive</Text>
+                {/* The app's primary button: a solid pill in the OPPOSITE of the
+                    page, so it reads as the one thing to press. On black that
+                    is white with dark type; on paper it has to invert, or a
+                    white pill on a near-white sheet disappears entirely. */}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: pal.mode === 'light' ? pal.text : '#ffffff' }]} />
+                <Text style={[styles.confirmText, { color: pal.mode === 'light' ? pal.bg : '#0a0a10' }]}>
+                  Let&apos;s Drive
+                </Text>
               </View>
             ) : (
-              <Text style={[styles.confirmText, { color: 'rgba(255,255,255,0.3)' }]}>
+              <Text style={[styles.confirmText, { color: pal.ink(0.32) }]}>
                 Select a platform
               </Text>
             )}
@@ -278,10 +296,24 @@ export function usePlatformSelector() {
   };
 }
 
-const styles = StyleSheet.create({
+/**
+ * THEMED (owner, 14.08: "the connect your music is still black in the daytime
+ * mode"). This is the first screen a new listener ever sees, so it sets the
+ * expectation for everything behind it — and on paper it was still a slab of
+ * black, which is exactly the mistake it was restyled away from on 03.08, only
+ * in the other direction.
+ *
+ * The BRAND COLOURS are untouched. Spotify's green and Apple's red are the
+ * whole point of these cards, they read on either ground, and they are the one
+ * thing on the sheet that must not follow the theme.
+ */
+const makeStyles = (p: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(4,4,10,0.92)',
+    // The ground the sheet is lifted off. On paper it must still be a dimming
+    // layer rather than a lighter one, or the sheet has nothing to sit against
+    // — but far softer than the near-opaque black used on dark.
+    backgroundColor: p.mode === 'light' ? 'rgba(28,26,22,0.34)' : 'rgba(4,4,10,0.92)',
     justifyContent: 'flex-end',
   },
   glowOrb: {
@@ -291,10 +323,12 @@ const styles = StyleSheet.create({
     width: 380,
     height: 380,
     borderRadius: 190,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    // A soft light behind the sheet. Light ON light is invisible, so on paper
+    // it goes the other way and reads as a shadow pooling under the sheet.
+    backgroundColor: p.mode === 'light' ? 'rgba(58,52,42,0.07)' : 'rgba(255,255,255,0.05)',
   },
   sheet: {
-    backgroundColor: '#0a0a10',
+    backgroundColor: p.mode === 'light' ? p.panel : '#0a0a10',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingHorizontal: 22,
@@ -302,7 +336,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: p.ink(0.12),
     overflow: 'hidden',
   },
 
@@ -316,19 +350,19 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: p.ink(0.08),
+    borderWidth: 1, borderColor: p.ink(0.12),
     alignItems: 'center', justifyContent: 'center',
   },
-  closeBtnText: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '600' },
+  closeBtnText: { color: p.ink(0.6), fontSize: 14, fontWeight: '600' },
   logoText: {
-    color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 3.5,
+    color: p.text, fontSize: 12, fontWeight: '800', letterSpacing: 3.5,
   },
   title: {
-    color: '#fff', fontSize: 26, fontWeight: '700', marginBottom: 6, letterSpacing: 0,
+    color: p.text, fontSize: 26, fontWeight: '700', marginBottom: 6, letterSpacing: 0,
   },
   subtitle: {
-    color: Cruise.textSecondary, fontSize: 13.5, lineHeight: 20, marginBottom: 24,
+    color: p.ink(0.68), fontSize: 13.5, lineHeight: 20, marginBottom: 24,
   },
 
   // ── Grid ─────────────────────────────────────────────────────────────────────
@@ -348,7 +382,7 @@ const styles = StyleSheet.create({
     gap: 9,
     borderWidth: 1,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: p.ink(0.05),
   },
   emojiWrap: {
     width: 32, height: 32, borderRadius: 9,
@@ -360,7 +394,7 @@ const styles = StyleSheet.create({
     fontSize: 13, fontWeight: '600',
   },
   platformTier: {
-    fontSize: 9.5, fontWeight: '600', color: 'rgba(255,255,255,0.42)', marginTop: 1,
+    fontSize: 9.5, fontWeight: '600', color: p.ink(0.52), marginTop: 1,
   },
   checkCircle: {
     width: 19, height: 19, borderRadius: 10,
@@ -379,17 +413,17 @@ const styles = StyleSheet.create({
   },
   confirmBtnActive: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    shadowColor: Cruise.violet,
+    borderColor: p.ink(0.28),
+    shadowColor: p.shadow,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
+    shadowOpacity: p.mode === 'light' ? 0.28 : 0.5,
     shadowRadius: 18,
     elevation: 12,
   },
   confirmBtnDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: p.ink(0.06),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: p.ink(0.1),
   },
   confirmGradient: {
     width: '100%',
@@ -399,7 +433,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
-  confirmText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
+  confirmText: { color: p.text, fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
   skipRow: { alignItems: 'center', paddingTop: 16 },
-  skipText: { color: 'rgba(255,255,255,0.28)', fontSize: 13, fontWeight: '500' },
+  // Deliberately quiet — but 0.28 of the ink is genuinely hard to read on
+  // paper, where there is no glow to carry a faint colour. 0.4 is still
+  // plainly the secondary option and is still legible outdoors.
+  skipText: { color: p.ink(p.mode === 'light' ? 0.4 : 0.28), fontSize: 13, fontWeight: '500' },
 });

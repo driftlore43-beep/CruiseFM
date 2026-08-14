@@ -17,6 +17,7 @@ import {
 } from '@/utils/notifications';
 import { usePalette, useStyles } from '@/context/AppearanceContext';
 import type { Palette } from '@/utils/appearance';
+import { useSessionKind, words } from '@/utils/sessionKind';
 
 export type SettingsPage =
   | 'account' | 'notifications' | 'privacy' | 'about' | 'refer'
@@ -194,6 +195,7 @@ function ToggleRow({
 function NotificationsBody() {
   const styles = useStyles(makeStyles);
   const pal = usePalette();
+  const w = words(useSessionKind());
   const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_NOTIF_PREFS);
   /**
    * WITHOUT PERMISSION, EVERY TOGGLE BELOW IS DECORATIVE — it saves a
@@ -247,13 +249,16 @@ function NotificationsBody() {
           </View>
         </SettingsSection>
       )}
-      <SettingsSection label="DRIVE NUDGES">
-        <ToggleRow label="When a station comes on air" sub="A couple a week, around the times you drive"
+      {/* These name an activity, so they follow the driving/listening switch —
+          telling someone at a desk we'll nudge them "around the times you
+          drive" is the app not having listened. */}
+      <SettingsSection label={w.nudgeSection}>
+        <ToggleRow label="When a station comes on air" sub={w.onAirWhen}
           value={prefs.onAir} onChange={(v) => update({ onAir: v })} />
-        <ToggleRow label="Late night" sub="After Hours and Night Run, for 1am drives"
+        <ToggleRow label="Late night" sub={w.lateNightWho}
           value={prefs.lateNight} onChange={(v) => update({ lateNight: v })} last />
       </SettingsSection>
-      <SettingsSection label="YOUR DRIVING">
+      <SettingsSection label={w.habitSection}>
         <ToggleRow label="Badges" sub="When you earn one"
           value={prefs.badges} onChange={(v) => update({ badges: v })} />
         <ToggleRow label="Sunday recap" sub="Your week on the road — nothing sent on an empty week"

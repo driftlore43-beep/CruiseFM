@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { isInFront } from '@/utils/useAppActive';
+
 import { useActivityPing, useAdoptPlayState } from '@/context/NowPlayingContext';
 
 import { lookupAppleArtwork } from './appleArtwork';
@@ -138,7 +140,7 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
       };
       refreshRef.current = refresh;
       refresh();
-      if (AppState.currentState === 'active') startPoll();
+      if (isInFront(AppState.currentState)) startPoll();
     })();
 
     return () => {
@@ -152,8 +154,13 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
   // snap into step rather than waiting out the interval.
   useEffect(() => {
     if (!visible || !appleMusicAvailable()) return;
+    // Same rule as Spotify's, and for the same reason — see useAppActive.
+    let inFront = isInFront(AppState.currentState);
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') { refreshRef.current(); startPoll(); }
+      const now = isInFront(state);
+      if (now === inFront) return;
+      inFront = now;
+      if (now) { refreshRef.current(); startPoll(); }
       else stopPoll();
     });
     return () => sub.remove();

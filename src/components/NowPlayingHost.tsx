@@ -196,6 +196,13 @@ function AutoDim() {
   }, [eligible, dimmed, restore]);
 
   // Leaving the app must never leave the phone stuck dim.
+  //
+  // DELIBERATELY `!== 'active'` AND NOT isInFront — do not "fix" this to match
+  // the polls and the animations. Those ask "is our content on screen", and
+  // `inactive` means yes. This asks "is the user looking at OUR content", and
+  // `inactive` means no: they have pulled Notification Centre or Control
+  // Centre over the top, and dimming SYSTEM UI reads as a broken phone rather
+  // than as a driving courtesy. Same AppState, genuinely different questions.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => { if (s !== 'active') restore(); });
     return () => { sub.remove(); restore(); };

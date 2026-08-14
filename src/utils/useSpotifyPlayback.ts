@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { isInFront } from '@/utils/useAppActive';
+
 import { useActivityPing, useAdoptPlayState, useStartResultReporter, useWakeNudge } from '@/context/NowPlayingContext';
 
 import {
@@ -226,7 +228,7 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
       };
       refreshRef.current = refresh;
       refresh();
-      if (AppState.currentState === 'active') startPoll();
+      if (isInFront(AppState.currentState)) startPoll();
     })();
 
     return () => {
@@ -252,13 +254,20 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
    */
   useEffect(() => {
     if (!visible) return;
+    // isInFront, NOT `=== 'active'`: a pulled-down Notification Centre reports
+    // `inactive` with the app still on screen, and stopping the poll there
+    // froze the readout in plain view (owner, 14.08). See useAppActive.
+    //
+    // Acting on the TRANSITION rather than on every event: active → inactive →
+    // active fires twice and both are "in front", so a plain check would spend
+    // a network call on every banner that appears.
+    let inFront = isInFront(AppState.currentState);
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        refreshRef.current();
-        startPoll();
-      } else {
-        stopPoll();
-      }
+      const now = isInFront(state);
+      if (now === inFront) return;
+      inFront = now;
+      if (now) { refreshRef.current(); startPoll(); }
+      else stopPoll();
     });
     return () => sub.remove();
   }, [visible]);

@@ -177,6 +177,7 @@ export default function CruiseScreen() {
           cueLabel={heroCue}
           station={heroStation}
           buttonLabel={lastCruise ? words(kind).resume : words(kind).start}
+          heroLine={words(kind).heroLine}
           resuming={!!lastCruise}
         />
 

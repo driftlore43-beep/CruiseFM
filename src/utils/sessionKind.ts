@@ -94,6 +94,27 @@ export type Words = {
   timeLabel: string;
   /** How the switch on the home page names this mode. */
   modeLabel: string;
+  /**
+   * The home page's big line (owner, 14.08: "should there be a shift in text
+   * between just listening and driving?").
+   *
+   * NOT MADE GENERIC, deliberately. "Start listening" as a hero line is an
+   * instruction where "Let's cruise." is a mood, and this is the only piece of
+   * voice on the home page — going flat to avoid a claim would cost more than
+   * the claim does. The listening line keeps the same "Let's ..." shape and
+   * the same warmth while plainly not saying anyone is driving.
+   */
+  heroLine: string;
+  /** Notification settings: the section over the on-air and late-night rows. */
+  nudgeSection: string;
+  /** Notification settings: the section over badges and streaks. */
+  habitSection: string;
+  /** Why an on-air nudge arrives when it does. */
+  onAirWhen: string;
+  /** Who the late-night nudge is for. */
+  lateNightWho: string;
+  /** Where the connect card says the controls appear. */
+  controlsWhere: string;
 };
 
 const DRIVING: Words = {
@@ -104,6 +125,12 @@ const DRIVING: Words = {
   countLabel: 'DRIVES',
   timeLabel: 'CRUISED',
   modeLabel: 'Driving',
+  heroLine: 'Let’s cruise.',
+  nudgeSection: 'DRIVE NUDGES',
+  habitSection: 'YOUR DRIVING',
+  onAirWhen: 'A couple a week, around the times you drive',
+  lateNightWho: 'After Hours and Night Run, for 1am drives',
+  controlsWhere: 'right from your drive',
 };
 
 const LISTENING: Words = {
@@ -114,6 +141,12 @@ const LISTENING: Words = {
   countLabel: 'SESSIONS',
   timeLabel: 'LISTENED',
   modeLabel: 'Just listening',
+  heroLine: 'Let’s put something on.',
+  nudgeSection: 'LISTENING NUDGES',
+  habitSection: 'YOUR LISTENING',
+  onAirWhen: 'A couple a week, around the times you listen',
+  lateNightWho: 'After Hours and Night Run, for 1am listening',
+  controlsWhere: 'right from the app',
 };
 
 export function words(kind: SessionKind): Words {

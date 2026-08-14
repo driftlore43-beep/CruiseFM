@@ -31,6 +31,7 @@ import { useNowPlaying } from '@/context/NowPlayingContext';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { appleMusicAvailable, isApplePlaylist } from '@/utils/appleMusic';
 import { getSavedPlatform } from '@/utils/musicPlatform';
+import { useSessionKind, words } from '@/utils/sessionKind';
 import {
   getStationPlaylist,
   getStationPlaylistSlots,
@@ -96,6 +97,10 @@ type Props = {
 };
 
 export function StationDetailModal({ station, visible, onClose, onStartDrive, isPro, onEdit, onDelete }: Props) {
+  // The SAME button on the home page has said "Start Listening" since the
+  // switch landed, while this one still said "Start Drive" — one control, two
+  // answers depending on which screen you reached it from (owner, 14.08).
+  const kind = useSessionKind();
   const { seg7: dseg, seg14 } = useDsegFonts();
   // The modal renders with station null while closed.
   const dial = station ? stationDial(station.id, !!station.premium) : { band: 'AM' as const, label: '', value: 0 };
@@ -480,7 +485,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
                   ? 'Add a Playlist to Start'
                   : selectedIsLocked
                     ? `Preview ${MODES.find((m) => m.id === selectedMode)?.label}`
-                    : 'Start Drive'}
+                    : words(kind).start}
               </Text>
               <Ionicons name={needsPlaylist ? 'musical-notes' : 'arrow-forward'} size={18} color="rgba(255,255,255,0.9)" />
             </LinearGradient>

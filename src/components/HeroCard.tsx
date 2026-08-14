@@ -22,6 +22,9 @@ type HeroCardProps = {
   station: Station;
   /** "Start Drive" fresh, "Continue Drive" when resuming. */
   buttonLabel?: string;
+  /** The big line. Kind-aware, and passed in for the same reason buttonLabel
+   *  is — see the eyebrow note below. */
+  heroLine?: string;
   /** Is there something to pick up? Passed rather than sniffed out of
    *  buttonLabel — see the eyebrow below. */
   resuming?: boolean;
@@ -41,7 +44,7 @@ type HeroCardProps = {
  * old wide glass button was the loudest object on the screen, competing with
  * the mini player for attention. A disc reads as "play" without shouting.
  */
-export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start Drive', resuming = false }: HeroCardProps) {
+export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start Drive', heroLine = 'Let’s cruise.', resuming = false }: HeroCardProps) {
   const { dataSaver } = useMotion();
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -80,7 +83,7 @@ export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start
           <View style={styles.foot}>
             <View style={styles.copy}>
               <Text style={styles.eyebrow}>{eyebrow}</Text>
-              <Text style={styles.title}>Let’s cruise.</Text>
+              <Text style={styles.title}>{heroLine}</Text>
               <Text style={styles.cue} numberOfLines={1}>{cueLabel}</Text>
             </View>
             <View style={styles.play}>

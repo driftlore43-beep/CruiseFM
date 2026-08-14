@@ -6,6 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { getSavedPlatform } from '@/utils/musicPlatform';
 import { connectSpotify, isSpotifyConnected } from '@/utils/spotify';
+import { useSessionKind, words } from '@/utils/sessionKind';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -23,6 +24,10 @@ const SPOTIFY_GREEN = '#1DB954';
 export function ConnectSpotifyCard() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
+  // ABOVE the `return null` below, not down in the JSX: this component bails
+  // out early once connected, so a hook called in the markup would run on some
+  // renders and not others — React counts hooks and throws on the mismatch.
+  const w = words(useSessionKind());
 
   useFocusEffect(
     useCallback(() => {
@@ -60,7 +65,7 @@ export function ConnectSpotifyCard() {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={cs.title}>Connect Spotify</Text>
-        <Text style={cs.sub}>See what’s playing and control it right from your drive.</Text>
+        <Text style={cs.sub}>See what’s playing and control it {w.controlsWhere}.</Text>
         {/* Honest about the developer-mode ceiling (stranger walkthrough,
             28.07): a failed sign-in should read as a known limit, not a
             broken app. */}

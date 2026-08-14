@@ -73,6 +73,46 @@ better than the mirror ball did.
 
 ---
 
+## What would actually get these rejected
+
+Screenshot rejections are much rarer than binary ones — both rejections so far
+were the app itself, not the listing — but these are the real ones, in order of
+how likely they are to bite.
+
+**1. The app has to be visibly in use (Guideline 2.3.3).** Apple's wording:
+*"Screenshots should show the app in use, and not merely the title art, login
+page, or splash screen."* Marketing frames and headlines are normal and every
+large app uses them; what gets flagged is when the slide becomes ART INSTEAD OF
+THE APP. The two shapes to avoid are a phone shrunk small enough that the
+interface is unreadable, and one image split across two slides — on its own,
+half a phone with no legible UI is exactly what that rule is for.
+
+The test: cover the caption. Can you still tell what the app does from what is
+left? If not, make the phone bigger.
+
+**2. Content you don't have the rights to.** The current set has no song
+titles, no artist names and no album covers, because it was shot with nothing
+connected. KEEP IT THAT WAY. Dropping a real album cover into the vinyl or CD
+slide to make it look richer is the obvious improvement and the one that can be
+rejected *and* draw a complaint from a rights holder.
+
+**3. Showing what the submitted build doesn't have (2.3.1).** The screenshots
+must match the BINARY you send, not the newer preview version on your own
+phone. Those two have drifted apart before, so check it deliberately.
+
+**4. Other platforms (2.3.10).** No Android imagery, no "also on Google Play",
+no non-Apple device frames. iPhone frames are fine and standard.
+
+**5. Promotional text.** No "Free", no "#1", no "Download now", no prices in
+the images. Prices vary by storefront and change, so a price claim in a
+screenshot is inaccurate metadata waiting to happen.
+
+**If you ever add an App Preview VIDEO**, the rules are much stricter than for
+stills: the footage has to be captured from the device itself, not composed in
+a design tool. Nothing here applies that constraint to static screenshots.
+
+---
+
 ## Copy: one thing that must stay true
 
 **Nothing may claim the visuals react to the music.** They don't — neither

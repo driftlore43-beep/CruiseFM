@@ -82,7 +82,14 @@ All three must report zero errors.
 - [ ] **Screenshots show what the app actually is today.** They went stale once
       already — a 23.07 set was still advertising Sound Waves, a mode deleted
       on 25.07. Re-shoot with `scratchpad/store/shot.mjs` whenever the modes or
-      the station names change.
+      the station names change. They must also match the BINARY being sent, not
+      the newer preview build on the owner's phone.
+- [ ] **Screenshots show the app IN USE, and carry nothing borrowed.** The two
+      rejection risks in a stylised set: a phone shrunk until the interface is
+      unreadable (Guideline 2.3.3 — "not merely the title art"), and any album
+      cover, song title or artist name, which the current set deliberately has
+      none of because it was shot with no music connected. Full brief and
+      colours: `docs/launch/screenshot-brief.md`.
 - [ ] **Notes for Review** explain anything a reviewer can't discover alone:
       that no sign-in is required, that music playback needs the user's own
       Spotify or Apple Music, and — since build 7 — that the app deliberately

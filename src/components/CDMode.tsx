@@ -376,9 +376,15 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   useEffect(() => { if (visible) getStationPlaylist(station.id).then(setLinked); }, [visible, station.id]);
 
   // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
+  // Declared above the chrome fade, which holds its countdown while a
+  // finger is winding the disc.
+  const [scrubbing, setScrubbing] = useState(false);
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
     // BOTH orientations now — portrait rests the same way (useRestScene).
     active: visible, playing, sheetOpen: showMood || showPicker,
+    // Winding the deck holds the countdown without waking anything —
+    // the scene must not slide while a finger is on it.
+    hold: scrubbing,
   });
   const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
   // The scene re-centres itself once the controls have gone. MEASURED rather
@@ -408,7 +414,6 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   // turn = five seconds, exactly the vinyl convention; a still, quick touch
   // is play/pause, matching a tap on the record. The disc claims its touches
   // outright — on the platter, the disc IS the control.
-  const [scrubbing, setScrubbing] = useState(false);
   // How far the wind has moved the song, in seconds — shown in the same
   // centre pill the record uses, so a turn reads identically on both
   // spinning objects (owner, 30.07).
@@ -425,6 +430,35 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   /** Read inside the disc's responder, which is built once. */
   const restedRef = useRef(false);
   restedRef.current = chromeRested;
+  /**
+   * WAKE ON THE NEXT TICK, so a touch that turns out to be a scrub can take
+   * it back.
+   *
+   * Owner, 18.08: "could we have the vinyl and CD not have the controls come
+   * back in when I try to scrub. It tends to move back up and then it acts
+   * like the page wants to move down." Both halves are one cause. The root's
+   * touch sniffer woke the chrome on ANY touch, and waking slides the scene
+   * back to its awake position — under the finger, mid-gesture. The object
+   * then moves relative to the thumb, which the drag classifier reads as
+   * downward travel, so the card starts to dismiss.
+   *
+   * The sniffer sits on the ROOT and capture runs top-down, so it always
+   * fires before the object's own responder is granted — there is no way to
+   * ask "did this land on the record?" at that moment. Deferring by a tick
+   * puts the decision after the negotiation: the responder's grant cancels
+   * it, and a gesture that turns out to be a plain TAP wakes on release
+   * instead. So a tap on the deck still brings the controls back; a DRAG on
+   * it winds the song and leaves them alone, which is what was asked for.
+   */
+  const wakePendingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestWake = () => {
+    if (wakePendingRef.current) clearTimeout(wakePendingRef.current);
+    wakePendingRef.current = setTimeout(() => { wakePendingRef.current = null; wakeChrome(); }, 0);
+  };
+  const cancelWake = () => {
+    if (wakePendingRef.current) { clearTimeout(wakePendingRef.current); wakePendingRef.current = null; }
+  };
+
   /**
    * The deck comes forward while it is being wound, and goes back when it is
    * let go. Driven from the SCRUB STATE rather than from each branch of the
@@ -529,6 +563,8 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
           if (lastAngleRef.current !== null) lastAngleRef.current = angleAt(pageX, pageY);
         });
         tapStartRef.current = Date.now();
+        // This touch belongs to the deck now — see requestWake.
+        cancelWake();
         scrubHaptics.reset();
         dragRef.current = null;
         progressBaseRef.current = readAnim(progress);
@@ -598,12 +634,12 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
         // through scrub.end — that always seeks, and seeking to a stale
         // position on every play/pause stutters the song. togglePlay flips
         // `playing`, and the clock effect re-syncs.
-        // A tap while the controls are away only brings them back — the root
-        // sniffer has already done that by now. Without this, the tap meant to
-        // wake the deck would pause the music instead.
-        if (kind === null && !restedRef.current && Date.now() - tapStartRef.current < 450) {
+        // A TAP is not a wind: it hands the wake back (the grant cancelled
+        // it). While the controls are away that is all it does — the tap that
+        // brings them back must not also pause the music.
+        if (kind === null && Date.now() - tapStartRef.current < 450) {
           scrubPillAnim.setValue(0);
-          togglePlayRef.current();
+          if (restedRef.current) wakeChrome(); else togglePlayRef.current();
           return;
         }
         if (kind === null) { scrubPillAnim.setValue(0); return; } // slow press, no wind
@@ -757,7 +793,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
       <Animated.View
         style={[{ flex: 1, backgroundColor: '#04040c' }, { transform: [{ translateY: slideY }] }]}
         {...dismissPan.panHandlers}
-        onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
+        onStartShouldSetResponderCapture={() => { requestWake(); return false; }}>
 
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ scale: scrubFocus.backdropScale }] }]}>
           <StationBackdrop station={station} blurRadius={3} />

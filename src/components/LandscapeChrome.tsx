@@ -49,13 +49,24 @@ export const LS_CHROME_CLEAR = 178;
 // the song and reach skip, short enough that the drive is mostly pure scene.
 const REST_MS = 6000;
 
-export function useChromeFade({ active, playing, sheetOpen }: {
+export function useChromeFade({ active, playing, sheetOpen, hold = false }: {
   /** Fade only runs while this is true. Portrait AND landscape now — the
    *  resting grammar is the same on both axes; see useRestScene. */
   active: boolean;
   playing: boolean;
   /** A sheet on top means the user is mid-task — never rest under one. */
   sheetOpen: boolean;
+  /**
+   * A gesture is in progress on the SCENE itself — winding the record, the
+   * disc. Holds off the rest without waking anything.
+   *
+   * It cannot go through `sheetOpen`, which looks like the same idea: that
+   * flag re-runs the effect below, and the effect calls `wake()`, so feeding
+   * a scrub into it would bring the controls back — the exact thing the
+   * caller is trying to avoid. Resting mid-scrub is just as bad in the other
+   * direction: the scene slides while a finger is on it.
+   */
+  hold?: boolean;
 }) {
   const chrome = useRef(new Animated.Value(1)).current;
   const [rested, setRested] = useState(false);
@@ -64,8 +75,8 @@ export function useChromeFade({ active, playing, sheetOpen }: {
   // The wake is handed to a PanResponder capture callback that is created
   // once, so it must read the CURRENT gate through refs — a stale closure
   // here would rest the chrome from a paused drive's old state.
-  const gate = useRef({ active, playing, sheetOpen });
-  gate.current = { active, playing, sheetOpen };
+  const gate = useRef({ active, playing, sheetOpen, hold });
+  gate.current = { active, playing, sheetOpen, hold };
 
   /** `arriving` = the phone has just been turned into landscape (or a mode
    *  opened already sideways), as opposed to a tap waking a rested deck. The
@@ -86,18 +97,37 @@ export function useChromeFade({ active, playing, sheetOpen }: {
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
+    arm();
+  }, []);
+
+  /** Start the rest countdown, if the moment allows one. Factored out of
+   *  `wake` so a scrub can re-arm it on release without also bringing the
+   *  chrome back up. */
+  const arm = useCallback(() => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     const g = gate.current;
     // Only rests during playback — hiding the play button from someone who
     // just paused is rude (the Mirror Ball lesson, verbatim).
-    if (g.active && g.playing && !g.sheetOpen) {
-      timer.current = setTimeout(() => {
-        setRested(true);
-        Animated.timing(chrome, {
-          toValue: 0, duration: 1100, easing: Easing.out(Easing.quad), useNativeDriver: true,
-        }).start();
-      }, REST_MS);
-    }
+    if (!g.active || !g.playing || g.sheetOpen || g.hold) return;
+    timer.current = setTimeout(() => {
+      setRested(true);
+      Animated.timing(chrome, {
+        toValue: 0, duration: 1100, easing: Easing.out(Easing.quad), useNativeDriver: true,
+      }).start();
+    }, REST_MS);
   }, []);
+
+  /**
+   * A scrub starting cancels the countdown; a scrub ending restarts it — but
+   * only if the chrome is currently UP. Resting is something the app does to
+   * an untouched screen, and the value must not move under a finger.
+   */
+  const restedRef = useRef(rested);
+  restedRef.current = rested;
+  useEffect(() => {
+    if (hold) { if (timer.current) { clearTimeout(timer.current); timer.current = null; } return; }
+    if (!restedRef.current) arm();
+  }, [hold, arm]);
 
   // Distinguishes "just turned sideways" from "playback state changed while
   // already sideways" — this effect re-runs for both, and only the first

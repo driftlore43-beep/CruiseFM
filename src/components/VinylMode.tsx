@@ -730,6 +730,9 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
     // BOTH orientations now — portrait rests the same way (useRestScene).
     active: visible, playing, sheetOpen: showMood || showPicker,
+    // Winding the deck holds the countdown without waking anything —
+    // the scene must not slide while a finger is on it.
+    hold: isScrubbing,
   });
   const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
   // The scene re-centres itself once the controls have gone. MEASURED rather
@@ -784,6 +787,35 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   /** Read inside the record's responder, which is built once. */
   const restedRef = useRef(false);
   restedRef.current = chromeRested;
+  /**
+   * WAKE ON THE NEXT TICK, so a touch that turns out to be a scrub can take
+   * it back.
+   *
+   * Owner, 18.08: "could we have the vinyl and CD not have the controls come
+   * back in when I try to scrub. It tends to move back up and then it acts
+   * like the page wants to move down." Both halves are one cause. The root's
+   * touch sniffer woke the chrome on ANY touch, and waking slides the scene
+   * back to its awake position — under the finger, mid-gesture. The object
+   * then moves relative to the thumb, which the drag classifier reads as
+   * downward travel, so the card starts to dismiss.
+   *
+   * The sniffer sits on the ROOT and capture runs top-down, so it always
+   * fires before the object's own responder is granted — there is no way to
+   * ask "did this land on the record?" at that moment. Deferring by a tick
+   * puts the decision after the negotiation: the responder's grant cancels
+   * it, and a gesture that turns out to be a plain TAP wakes on release
+   * instead. So a tap on the deck still brings the controls back; a DRAG on
+   * it winds the song and leaves them alone, which is what was asked for.
+   */
+  const wakePendingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestWake = () => {
+    if (wakePendingRef.current) clearTimeout(wakePendingRef.current);
+    wakePendingRef.current = setTimeout(() => { wakePendingRef.current = null; wakeChrome(); }, 0);
+  };
+  const cancelWake = () => {
+    if (wakePendingRef.current) { clearTimeout(wakePendingRef.current); wakePendingRef.current = null; }
+  };
+
   /**
    * The deck comes forward while it is being wound, and goes back when it is
    * let go. Driven from the SCRUB STATE rather than from each branch of the
@@ -878,6 +910,9 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         accumulatedRotation.current = spinCurrentRef.current * 360;
         lastAngle.current = _getAngleFromCenter(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
         scrubHaptics.reset();
+        // This touch belongs to the deck now — see requestWake. A tap gives
+        // the wake back on release; a wind keeps the controls away.
+        cancelWake();
         // The scrub does NOT begin here — until the drag is judged this might
         // be a tap or a pull-down, and neither should wind the record.
       },
@@ -948,7 +983,13 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           // A tap while the controls are away only brings them back — the root
           // sniffer has already done that by now. Without this, the tap meant
           // to wake the deck would pause the music instead.
-          if (!restedRef.current && Date.now() - tapStartRef.current < 450) togglePlayRef.current();
+          // A TAP is not a wind: it hands the wake back. While the controls
+          // are away that is all it does — the tap that brings them back must
+          // not also pause the music.
+          if (Date.now() - tapStartRef.current < 450) {
+            if (restedRef.current) wakeChrome();
+            else togglePlayRef.current();
+          }
           return;
         }
         scrubFadeTimerRef.current = setTimeout(() => {
@@ -1346,7 +1387,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       <Animated.View
         style={[fs.container, { transform: [{ translateY: slideY }] }]}
         {...dismissPan.panHandlers}
-        onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
+        onStartShouldSetResponderCapture={() => { requestWake(); return false; }}>
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ scale: scrubFocus.backdropScale }] }]}>
           <StationBackdrop station={station} blurRadius={2.5} />
         </Animated.View>

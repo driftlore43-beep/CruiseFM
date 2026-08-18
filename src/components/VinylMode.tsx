@@ -24,7 +24,7 @@ import { PlatformIcon } from '@/components/icons/PlatformIcon';
 // scrub plumbing, so it went on seeking Spotify while Apple Music played —
 // the record turned, the bar moved, and the song snapped back (owner, 04.08).
 // CD works because it goes through useTrackClock. Same router for both now.
-import { seekActive } from '@/utils/useTrackClock';
+import { seekActive, shouldKeepCoasting } from '@/utils/useTrackClock';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
@@ -87,7 +87,10 @@ const VINYL_ACCENTS: Record<string, string> = {
 
 /** '#RRGGBB' → 'rgba(r,g,b,a)' — for animated colour interpolation. */
 /** See MAX_COAST_MS in useTrackClock — the deck keeps its own clock, and
- *  needs the same bound on how far one reading may be extrapolated. */
+ *  needs the same bound on how far one reading may be extrapolated. It also
+ *  needs the same correction: a coast that STOPS at the cap froze the deck's
+ *  readout for the rest of the drive the moment the signal dipped, so it
+ *  re-arms instead and only holds after a long silence (shouldKeepCoasting). */
 const VINYL_MAX_COAST_MS = 30000;
 
 function withAlpha(hex: string, a: number): string {
@@ -764,6 +767,9 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const activeTrackRef    = useRef(activeTrack);
   const playingRef        = useRef(false);
   const scrubStartPosRef  = useRef(0);
+  /** When the music service last told us where the song was. Null in demo
+   *  mode, which has no service to lose touch with. */
+  const lastSyncAtRef     = useRef<number | null>(null);
   // Grain under the thumb, shared with the CD so the two can't drift apart.
   const scrubHaptics = useRef(createScrubHaptics()).current;
   const progressBarWidthRef = useRef(300);
@@ -1232,11 +1238,19 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     const reachesEnd = span >= remaining;
     progressAnimRef.current = Animated.timing(progress, { toValue: (posMs + span) / trackMs, duration: span, easing: Easing.linear, useNativeDriver: false });
     progressAnimRef.current.start(({ finished }) => {
-      // Reaching the CAP is not the track ending — only advance the demo deck
-      // when the song genuinely ran out.
-      if (finished && reachesEnd && !realTrackRef.current) {
-        setActiveTrack((t) => { const n = Math.min(VINYL_TRACKS.length - 1, t + 1); if (n === t) setPlaying(false); return n; });
+      if (!finished) return;
+      if (reachesEnd) {
+        // The song genuinely ran out — only then does the demo deck advance.
+        if (!realTrackRef.current) {
+          setActiveTrack((t) => { const n = Math.min(VINYL_TRACKS.length - 1, t + 1); if (n === t) setPlaying(false); return n; });
+        }
+        return;
       }
+      // Only the cap. Carry on from here while the music is still going and
+      // the last reading is recent enough to believe.
+      if (!playingRef.current) return;
+      if (!shouldKeepCoasting(Date.now(), lastSyncAtRef.current)) return;
+      _restartProgressFrom(posMs + span, trackMs);
     });
   };
 
@@ -1257,6 +1271,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     progress.setValue(pct);
     progressValue.current = pct;
     setCurrentTimeMs(Math.round(base));
+    lastSyncAtRef.current = t.syncedAt;
     if (running) _restartProgressFrom(base, t.durationMs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, playing, musicSwitching, spotify.track?.isPlaying, spotify.track?.progressMs, spotify.track?.syncedAt, spotify.track?.title]);

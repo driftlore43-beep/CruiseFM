@@ -18,6 +18,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useDsegFont } from '@/components/StationIdentity';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 import { stationDial } from '@/constants/stations';
 import { Cruise, Fonts } from '@/constants/theme';
 import { saveCustomStation, updateCustomStation, type CustomStation } from '@/utils/customStations';
@@ -37,14 +39,17 @@ const ICONS = [
 ] as const;
 
 // Neutral glass wash — a faint light-catch from the top-left, same finish as
-// the app's other cards. Replaces the old blue tint so the sheet reads as
-// clear glass over the deep-navy background.
-const GLASS_WASH = ['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.03)'] as const;
-
+// the app's other cards. On paper the same wash has to be INK rather than
+// white: a white gradient over an off-white sheet is nothing at all, so the
+// inputs and icon tiles would lose their faces entirely.
 function CardWash({ radius }: { radius: number }) {
+  const p = usePalette();
+  const colors = p.mode === 'light'
+    ? ([p.ink(0.05), p.ink(0.015)] as const)
+    : (['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.03)'] as const);
   return (
     <LinearGradient
-      colors={GLASS_WASH}
+      colors={colors}
       start={{ x: 0, y: 0 }} end={{ x: 0.9, y: 1 }}
       style={[StyleSheet.absoluteFill, { borderRadius: radius }]}
       pointerEvents="none"
@@ -126,6 +131,8 @@ type Props = {
 
 export function CreateStationModal({ visible, onClose, onCreated, existingCount, maxFree, isPro, editing, onUpdated }: Props) {
   const insets = useSafeAreaInsets();
+  const pal = usePalette();
+  const styles = useStyles(makeStyles);
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
 
   const [name, setName] = useState('');
@@ -262,7 +269,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Good Vibes"
-                placeholderTextColor={Cruise.textMuted}
+                placeholderTextColor={pal.ink(0.42)}
                 value={name}
                 onChangeText={(t) => { setName(t); setError(''); }}
                 maxLength={32}
@@ -277,7 +284,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Windows down, nothing to worry about"
-                placeholderTextColor={Cruise.textMuted}
+                placeholderTextColor={pal.ink(0.42)}
                 value={tagline}
                 onChangeText={setTagline}
                 maxLength={60}
@@ -294,7 +301,10 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
                   style={[styles.iconBtn, selectedIcon === icon && { borderColor: selectedPalette.color, backgroundColor: selectedPalette.iconBg }]}
                   onPress={() => !atLimit && setSelectedIcon(icon)}>
                   {selectedIcon !== icon && <CardWash radius={12} />}
-                  <MaterialCommunityIcons name={icon as any} size={22} color="#fff" />
+                  {/* The selected tile is filled with the station's own dark
+                      iconBg, so its glyph stays white in both themes; an
+                      unselected tile is the sheet, so it takes the page ink. */}
+                  <MaterialCommunityIcons name={icon as any} size={22} color={selectedIcon === icon ? '#fff' : pal.text} />
                 </Pressable>
               ))}
             </View>
@@ -322,12 +332,12 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
                     {photo
                       ? <ExpoImage source={photo.image} contentFit="cover" style={StyleSheet.absoluteFill} />
                       : null}
-                    <View style={styles.photoBtnInner}>
+                    <View style={[styles.photoBtnInner, !!photo && styles.photoBtnScrim]}>
                       <MaterialCommunityIcons
                         name={picking ? 'progress-clock' : photo ? 'image-edit-outline' : 'image-plus'}
-                        size={20} color="#fff"
+                        size={20} color={photo ? '#fff' : pal.text}
                       />
-                      <Text style={styles.photoBtnText}>
+                      <Text style={[styles.photoBtnText, !photo && { color: pal.text }]}>
                         {picking ? 'Opening…' : photo ? 'Change photo' : 'Add a photo'}
                       </Text>
                     </View>
@@ -386,7 +396,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
                   <MaterialCommunityIcons name={selectedIcon as any} size={20} color={selectedPalette.color} />
                 </View>
                 <View style={styles.previewCtrlSlot}>
-                  <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.28)" />
+                  <Ionicons name="chevron-forward" size={16} color={pal.ink(0.28)} />
                 </View>
               </View>
             </View>
@@ -427,16 +437,32 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * THE SHEET GOES LIGHT WITH THE PAGES (owner, 18.08: "the create station tab
+ * in light mode should also be switched to light mode"). It was the last
+ * screen still hardcoded — a deep-navy sheet with white type sliding up over
+ * a paper-coloured Stations page.
+ *
+ * Every dark value below is the literal it replaces, so nothing about the app
+ * at night can have moved. Two things could NOT simply be tokenised, because
+ * they were tuned for black and mean the opposite on paper:
+ *
+ *   - the SAVE BUTTON, which is the app's primary pill: a solid fill in the
+ *     opposite of the page. White on paper is not a button, so it inverts.
+ *   - the selected swatch's RING, which is white specifically because it sits
+ *     on the sheet rather than on the colour. On paper the sheet is the pale
+ *     thing, so the ring has to be the ink.
+ */
+const makeStyles = (p: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: p.mode === 'light' ? 'rgba(40,36,28,0.32)' : 'rgba(0,0,0,0.6)',
   },
   sheet: {
-    // Near-black deep navy, matching the modes' backdrop — the glass cards
-    // inside read as clear panels over it.
-    backgroundColor: '#060812',
+    // Night: the near-black deep navy of the modes' backdrop, so the glass
+    // cards inside read as clear panels over it. Day: the page's own paper.
+    backgroundColor: p.mode === 'light' ? p.panel : '#060812',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -444,37 +470,37 @@ const styles = StyleSheet.create({
     maxHeight: SCREEN_H * 0.9,
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: p.ink(0.12),
   },
   handle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: p.ink(0.2),
     alignSelf: 'center',
     marginBottom: 16,
   },
   sheetTitle: {
-    color: Cruise.textPrimary,
+    color: p.text,
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 16,
   },
   limitBanner: {
-    backgroundColor: 'rgba(245,158,11,0.12)',
+    backgroundColor: p.mode === 'light' ? 'rgba(168,94,6,0.10)' : 'rgba(245,158,11,0.12)',
     borderRadius: 10,
     padding: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.3)',
+    borderColor: p.mode === 'light' ? 'rgba(168,94,6,0.32)' : 'rgba(245,158,11,0.3)',
   },
   limitText: {
-    color: Cruise.amber,
+    color: p.amber,
     fontSize: 13,
     lineHeight: 18,
   },
   label: {
-    color: Cruise.textMuted,
+    color: p.ink(0.5),
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.5,
@@ -484,13 +510,13 @@ const styles = StyleSheet.create({
   inputWrap: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: p.ink(0.14),
     overflow: 'hidden',
   },
   input: {
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: Cruise.textPrimary,
+    color: p.text,
     fontSize: 15,
   },
   inputDisabled: {
@@ -509,27 +535,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: p.ink(0.12),
   },
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   photoBtn: {
     flex: 1, height: 62, borderRadius: 14, overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: p.ink(0.06),
+    borderWidth: 1, borderColor: p.ink(0.14),
     justifyContent: 'center',
   },
-  photoBtnSet: { borderColor: 'rgba(255,255,255,0.30)' },
-  // Sits over the photo once there is one, so the label stays readable
-  // whatever they picked — the same problem the modes solve with a scrim.
+  photoBtnSet: { borderColor: p.ink(0.30) },
   photoBtnInner: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: 'rgba(6,8,18,0.42)',
   },
+  // Only once there is a photo underneath. It keeps the label readable
+  // whatever they picked — the same problem the modes solve with a scrim —
+  // but painted over an empty button it is just a dark bar on the sheet.
+  photoBtnScrim: { backgroundColor: 'rgba(6,8,18,0.42)' },
   photoBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   photoClear: { paddingHorizontal: 14, paddingVertical: 12 },
-  photoClearText: { color: 'rgba(255,255,255,0.55)', fontSize: 14, fontWeight: '600' },
-  photoHint: { color: 'rgba(255,255,255,0.42)', fontSize: 12, marginTop: 8, marginBottom: 2 },
+  photoClearText: { color: p.ink(0.55), fontSize: 14, fontWeight: '600' },
+  photoHint: { color: p.ink(0.42), fontSize: 12, marginTop: 8, marginBottom: 2 },
   paletteRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -547,18 +574,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   // Inset -4 into the row's 10pt gap, so the ring clears its neighbours by 6.
+  // It sits on the SHEET, not on the swatch, so it is whatever the sheet is
+  // not — ink on paper, white on black.
   paletteRing: {
     position: 'absolute',
     top: -4, left: -4, right: -4, bottom: -4,
     borderRadius: 20,
     borderWidth: 2.5,
-    borderColor: '#fff',
+    borderColor: p.mode === 'light' ? p.text : '#fff',
   },
   paletteTick: {
     position: 'absolute',
     // A tick as well as a ring: with 25 swatches on screen, a ring alone still
     // makes you hunt for which one is lit (owner, 11.08). Its colour flips on
-    // pale swatches — that is what ringOn is for now.
+    // pale swatches — that is what ringOn is for now. It sits ON the swatch,
+    // so it takes no notice of the theme.
     textShadowColor: 'rgba(0,0,0,0.45)',
     textShadowRadius: 3,
   },
@@ -566,7 +596,7 @@ const styles = StyleSheet.create({
   // Column widths and type sizes are copied from stations.tsx on purpose —
   // if they drift the preview stops being a preview.
   previewLabel: {
-    color: 'rgba(255,255,255,0.32)',
+    color: p.ink(0.32),
     fontSize: 9.5, fontWeight: '800', letterSpacing: 2,
     marginTop: 24, marginBottom: 8,
   },
@@ -575,53 +605,59 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderColor: p.ink(0.10),
   },
   previewNumCol: { width: 64, alignItems: 'flex-end', justifyContent: 'center' },
-  previewNum: { fontSize: 16, color: 'rgba(255,255,255,0.42)' },
+  previewNum: { fontSize: 16, color: p.ink(0.42) },
   previewName: {
     flexShrink: 1,
-    color: 'rgba(255,255,255,0.94)',
+    color: p.ink(0.94),
     fontSize: 17, fontWeight: '600', letterSpacing: 0,
   },
+  // Pale blue — a colour tuned for black, and invisible on paper, so the
+  // light side is the same hue deepened rather than a different one.
   mineChip: {
-    borderWidth: 1, borderColor: 'rgba(180,195,255,0.45)',
+    borderWidth: 1,
+    borderColor: p.mode === 'light' ? 'rgba(58,74,138,0.55)' : 'rgba(180,195,255,0.45)',
     borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
   },
-  mineChipText: { color: '#cdd8ff', fontSize: 8.5, fontWeight: '800', letterSpacing: 1 },
+  mineChipText: {
+    color: p.mode === 'light' ? '#3a4a8a' : '#cdd8ff',
+    fontSize: 8.5, fontWeight: '800', letterSpacing: 1,
+  },
   previewTrail: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 10 },
   previewIconSlot: { width: 28, alignItems: 'center' },
   previewCtrlSlot: { width: 16, alignItems: 'center' },
   // The tagline doesn't appear on the dial (it lives on the station's own
   // page), so it sits under the row as a caption rather than inside it.
   previewTagline: {
-    color: Cruise.textSecondary,
+    color: p.ink(0.6),
     fontSize: 12,
     marginTop: 8,
     paddingLeft: 80,
   },
   errorText: {
-    color: '#e05578',
+    color: p.mode === 'light' ? '#B02A4C' : '#e05578',
     fontSize: 13,
     marginTop: 10,
   },
-  // The app's primary button is a solid white pill with dark type (same as
-  // the Refer-a-Friend card and every other confirm). The old version was a
-  // slab in whatever colour the user had just picked, which made the CTA
-  // change identity as you scrolled the swatches.
+  // The app's primary button is a solid pill in the OPPOSITE of the page,
+  // with type in the page's own colour. The old version was a slab in
+  // whatever colour the user had just picked, which made the CTA change
+  // identity as you scrolled the swatches.
   saveBtn: {
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: 24,
     marginBottom: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: p.mode === 'light' ? p.text : '#FFFFFF',
   },
   saveBtnDisabled: {
     opacity: 0.5,
   },
   saveBtnText: {
-    color: '#0a0a10',
+    color: p.mode === 'light' ? p.panel : '#0a0a10',
     fontSize: 16,
     fontWeight: '700',
   },

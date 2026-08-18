@@ -78,5 +78,60 @@ console.log('\n  the cap is in a sane band:');
 check('at least 4 polls of slack', CAP >= 4 * 5000, true);
 check('under a minute of possible error', CAP <= 60000, true);
 
+// ── AND WHAT HAPPENS WHEN THE CAP IS REACHED ──────────────────────────────
+// The cap on its own was wrong, and the owner caught it (18.08): "sometimes
+// the time at the start stays on 1:19 even when I scrub the bar." Reproduced
+// in the web build by telling a stubbed service to go quiet mid-song — the bar
+// coasted its 30 seconds and then FROZE for the rest of the drive, because a
+// fresh reading was the only thing that ever restarted it.
+//
+// Silence has two meanings and this is the rule that tells them apart. A
+// service that SAID it stopped is handled elsewhere (the clock will not start
+// until isPlaying confirms); a service we merely cannot REACH is a patchy
+// signal, which on a drive is ordinary, and the music is still playing.
+const jsm = /const MAX_SILENCE_MS = (\d+);/.exec(src);
+if (!jsm) { console.log('  FAIL MAX_SILENCE_MS is gone from useTrackClock'); process.exit(1); }
+const SILENCE = Number(jsm[1]);
+
+const modJs = ts.transpileModule(src, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+}).outputText;
+const mod = { exports: {} };
+// The module runs a `getSavedPlatform().then(...)` at import to cache the
+// platform, so the stub has to return something thenable rather than a bare
+// function — otherwise the file cannot even be loaded.
+const stub = () => new Proxy({}, {
+  get: () => () => ({ then: () => ({ catch: () => {} }), catch: () => {} }),
+});
+new Function('module', 'exports', 'require', modJs)(mod, mod.exports, stub);
+const { shouldKeepCoasting } = mod.exports;
+if (typeof shouldKeepCoasting !== 'function') {
+  console.log('  FAIL shouldKeepCoasting is not exported'); process.exit(1);
+}
+
+console.log(`\n  the coast re-arms while the service is only briefly quiet (limit ${SILENCE / 1000}s):`);
+const NOW = 1_700_000_000_000;
+check('a reading from a moment ago', shouldKeepCoasting(NOW, NOW - 200), true);
+check('one missed poll', shouldKeepCoasting(NOW, NOW - 5000), true);
+check('past the cap but still recent', shouldKeepCoasting(NOW, NOW - 31000), true);
+check('a minute of silence — keep going', shouldKeepCoasting(NOW, NOW - 60000), true);
+check('exactly the limit — still going', shouldKeepCoasting(NOW, NOW - SILENCE), true);
+check('past the limit — hold', shouldKeepCoasting(NOW, NOW - SILENCE - 1), false);
+check('a five-minute outage — hold', shouldKeepCoasting(NOW, NOW - 300000), false);
+
+// THE DEMO BAR HAS NO SERVICE TO LOSE TOUCH WITH. Companion mode and the
+// decks' own demo tapes have no reading at all, so they must simply run —
+// this is the case that made the vinyl and cassette decks stop dead too.
+console.log('\n  no reading at all means the demo bar, which just runs:');
+check('null', shouldKeepCoasting(NOW, null), true);
+check('undefined', shouldKeepCoasting(NOW, undefined), true);
+
+// The band the limit has to sit in. Too short and an ordinary tunnel freezes
+// the readout; too long and the bar walks through a song that has since ended
+// and been replaced, which is a worse claim than plainly stopping.
+console.log('\n  the silence limit is in a sane band:');
+check('more than a dozen missed polls', SILENCE >= 12 * 5000, true);
+check('shorter than a typical song', SILENCE <= 210000, true);
+
 console.log(fails === 0 ? '\n  ALL PASS' : `\n  ${fails} FAILED`);
 process.exit(fails === 0 ? 0 : 1);

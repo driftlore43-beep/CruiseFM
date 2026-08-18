@@ -25,7 +25,7 @@ import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 // Platform-routed, not Spotify's own — same fault Vinyl had (04.08), found
 // by grepping for the rest rather than waiting for it to be reported.
-import { seekActive } from '@/utils/useTrackClock';
+import { seekActive, shouldKeepCoasting } from '@/utils/useTrackClock';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
@@ -39,6 +39,10 @@ import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/Lands
 import { SeekBar } from '@/components/SeekBar';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
+/** See MAX_COAST_MS in useTrackClock — the deck keeps its own clock, and needs
+ *  the same bound on how far one reading may be extrapolated. */
+const CASSETTE_MAX_COAST_MS = 30000;
 
 // ── Warm palette ──────────────────────────────────────────────────────────────
 const C = {
@@ -730,6 +734,12 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
   // Ref shadows so startReels/stopReels always read latest values without stale closures
   const progressValue   = useRef(0);
+  /** Is the music really going? Read inside animation callbacks, which are
+   *  built once and would otherwise close over the first render's value. */
+  const playingRef      = useRef(false);
+  /** When the service last told us where the song was — null in demo mode,
+   *  which has no service to lose touch with. */
+  const lastSyncAtRef   = useRef<number | null>(null);
   const activeTrackRef  = useRef(activeTrack);
 
   // ── Real-track layer — same contract as VinylMode: true duration from
@@ -764,6 +774,46 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
   const station      = resolveAnyStation(activeId);
 
+  /**
+   * Wind the tape forward from a known position.
+   *
+   * THE SAME BOUND THE OTHER TWO CLOCKS CARRY, and the same correction. The
+   * deck used to animate straight to the END of the song, so when readings
+   * stopped arriving — dropped signal, or the music paused somewhere we cannot
+   * see — the counter walked on over silence (the bug the owner filmed on
+   * 14.08). Capping it fixed that and introduced the opposite one: a coast
+   * that STOPS at the cap freezes the readout for the rest of the drive
+   * (18.08). So it re-arms, and only holds after a genuinely long silence.
+   * See MAX_COAST_MS / shouldKeepCoasting in useTrackClock.
+   */
+  const windFrom = (posMs: number, trackMs: number) => {
+    const remaining = trackMs - posMs;
+    if (remaining <= 0) return;
+    const span = Math.min(remaining, CASSETTE_MAX_COAST_MS);
+    const reachesEnd = span >= remaining;
+    progressAnimRef.current = Animated.timing(progress, {
+      toValue: (posMs + span) / trackMs, duration: span, easing: Easing.linear, useNativeDriver: false,
+    });
+    progressAnimRef.current.start(({ finished }) => {
+      if (!finished) return;
+      if (reachesEnd) {
+        // Demo tape advances itself; a real track ends on Spotify's side and
+        // the next poll re-syncs us onto whatever plays next.
+        if (!realTrackRef.current) {
+          setActiveTrack((t) => {
+            const next = Math.min(SIDE_A_TRACKS.length - 1, t + 1);
+            if (next === t) setPlaying(false);
+            return next;
+          });
+        }
+        return;
+      }
+      if (!playingRef.current) return;
+      if (!shouldKeepCoasting(Date.now(), lastSyncAtRef.current)) return;
+      windFrom(posMs + span, trackMs);
+    });
+  };
+
   // ── Start secondary animations (tape flow, glow, progress) ──────────────────
   const startReels = () => {
     tapeFlow.setValue(0);
@@ -772,21 +822,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     );
     tapeFlowLoop.current.start();
 
-    const remaining = (1 - progressValue.current) * trackMsRef.current;
-    progressAnimRef.current = Animated.timing(progress, {
-      toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false,
-    });
-    progressAnimRef.current.start(({ finished }) => {
-      // Demo tape advances itself; a real track ends on Spotify's side and
-      // the next poll re-syncs us onto whatever plays next.
-      if (finished && !realTrackRef.current) {
-        setActiveTrack((t) => {
-          const next = Math.min(SIDE_A_TRACKS.length - 1, t + 1);
-          if (next === t) setPlaying(false);
-          return next;
-        });
-      }
-    });
+    windFrom(progressValue.current * trackMsRef.current, trackMsRef.current);
   };
 
   const stopReels = () => {
@@ -795,6 +831,8 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
     tapeFlow.stopAnimation();
   };
+
+  useEffect(() => { playingRef.current = live; }, [live]);
 
   useEffect(() => {
     if (live) { startReels(); } else { stopReels(); }
@@ -808,19 +846,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     progress.setValue(0);
     progressValue.current = 0;
     if (playing) {
-      const demoMs = parseTrackMs(SIDE_A_TRACKS[activeTrack].duration);
-      progressAnimRef.current = Animated.timing(progress, {
-        toValue: 1, duration: demoMs, easing: Easing.linear, useNativeDriver: false,
-      });
-      progressAnimRef.current.start(({ finished }) => {
-        if (finished && !realTrackRef.current) {
-          setActiveTrack((t) => {
-            const next = Math.min(SIDE_A_TRACKS.length - 1, t + 1);
-            if (next === t) setPlaying(false);
-            return next;
-          });
-        }
-      });
+      windFrom(0, parseTrackMs(SIDE_A_TRACKS[activeTrack].duration));
     }
   }, [activeTrack]);
 
@@ -837,15 +863,8 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     const pct = base / t.durationMs;
     progress.setValue(pct);
     progressValue.current = pct;
-    if (running) {
-      const remaining = t.durationMs - base;
-      if (remaining > 0) {
-        progressAnimRef.current = Animated.timing(progress, {
-          toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false,
-        });
-        progressAnimRef.current.start();
-      }
-    }
+    lastSyncAtRef.current = t.syncedAt;
+    if (running) windFrom(base, t.durationMs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, playing, musicSwitching, spotify.track?.isPlaying, spotify.track?.progressMs, spotify.track?.syncedAt, spotify.track?.title]);
 
@@ -944,13 +963,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     end: (pct: number) => {
       progressValue.current = pct;
       if (realTrackRef.current) seekActive(pct * trackMsRef.current);
-      const remaining = (1 - pct) * trackMsRef.current;
-      if (playing && remaining > 0) {
-        progressAnimRef.current = Animated.timing(progress, {
-          toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false,
-        });
-        progressAnimRef.current.start();
-      }
+      if (playing) windFrom(pct * trackMsRef.current, trackMsRef.current);
     },
   };
 

@@ -63,6 +63,53 @@ export type ScrubApi = {
  */
 const MAX_COAST_MS = 30000;
 
+/**
+ * AND HOW LONG WE KEEP COASTING IN THE DARK — because the cap above, on its
+ * own, was wrong, and the owner caught it: "sometimes the time at the start
+ * stays on 1:19 even when I scrub the bar."
+ *
+ * MEASURED (18.08, web build, a stubbed service told to go quiet mid-song):
+ * the signal drops at 0:41, the bar coasts its 30 seconds to 1:12, and then
+ * FREEZES THERE FOR THE REST OF THE DRIVE while the music plays on. Nothing
+ * restarts it, because the only thing that ever did was a fresh reading.
+ *
+ * The mistake was treating one silence as though it were another. There are
+ * two, and they mean opposite things:
+ *
+ *   the service SAID it stopped  — already handled, and properly: the clock
+ *                                  refuses to run at all until `isPlaying`
+ *                                  confirms, and the poll adopts a real pause
+ *                                  after two idle answers.
+ *   we could not REACH it        — a patchy signal, which on a drive is the
+ *                                  normal case. Spotify's own app is still
+ *                                  playing locally. Here the bar holding is a
+ *                                  lie in the other direction, and a worse one,
+ *                                  because the error grows without bound and
+ *                                  reads as the app having died.
+ *
+ * So a coast now RE-ARMS while the last thing we heard was "playing" — the
+ * 30-second chunk stays, because it costs nothing and any fresh reading still
+ * lands immediately. What stops it is a genuinely long silence: past this, the
+ * song has probably ended and moved on, and a bar walking through a track that
+ * is no longer playing is worse than one that has plainly stopped. Thirty
+ * missed polls is an outage, not a hiccup, and it is shorter than most songs,
+ * so we hold before the bar can wrap onto a track we know nothing about.
+ */
+const MAX_SILENCE_MS = 150000;
+
+/**
+ * Keep going, or hold? Exported because everything it decides ends in the app
+ * making a claim about where the song is, so the rule should be readable and
+ * testable rather than buried in an animation callback.
+ *
+ * No reading at all means the demo bar, which has no service to lose touch
+ * with — it simply runs.
+ */
+export function shouldKeepCoasting(now: number, lastReadingAt: number | null | undefined): boolean {
+  if (lastReadingAt == null) return true;
+  return now - lastReadingAt <= MAX_SILENCE_MS;
+}
+
 export function useTrackClock(opts: {
   visible: boolean;
   playing: boolean;
@@ -108,13 +155,21 @@ export function useTrackClock(opts: {
       toValue: (clamped + span) / dur, duration: span, easing: Easing.linear, useNativeDriver: false,
     });
     anim.current.start(({ finished }) => {
-      // Stopping at the cap is NOT the track ending: wrapping to 0 there would
-      // restart the song's bar from the beginning while it plays on.
-      if (!finished || !reachesEnd) return;
-      progress.setValue(0);
-      // Demo mode loops forever; with Spotify the next poll re-syncs us onto
-      // the following song anyway.
-      if (playingRef.current) startFrom(0);
+      if (!finished) return;
+      if (reachesEnd) {
+        // The track really ran out. Demo mode loops forever; with Spotify the
+        // next poll re-syncs us onto the following song anyway.
+        progress.setValue(0);
+        if (playingRef.current) startFrom(0);
+        return;
+      }
+      // Only the CAP was reached, which is not the track ending — wrapping to
+      // 0 here would restart the bar while the song plays on. Carry on from
+      // where we are, unless the service has been silent long enough that we
+      // no longer believe our own position. See MAX_SILENCE_MS.
+      if (!playingRef.current) return;
+      if (!shouldKeepCoasting(Date.now(), trackRef.current?.syncedAt)) return;
+      startFrom(clamped + span);
     });
   };
 

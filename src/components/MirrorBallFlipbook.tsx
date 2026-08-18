@@ -186,13 +186,24 @@ export function buildFlipbook(size: number, eq: [string, string, string]): FlipT
         // narrow: widening the highlight with a single lobe tinted half the
         // surface at the same time, and a ball that is broadly blue is a
         // coloured sphere, not a mirrored one.
+        //
+        // The bright lobe went 15 → 10 for the owner's "lighten up the mirror
+        // ball, it can look a bit dim sometimes" (18.08). WIDENING THE LOBE IS
+        // THE KNOB THAT WORKS, and lifting the floor is the one that does not:
+        // raising the ambient alone moved the median but flattened the ball
+        // (measured — >200 share fell 4.1% to 0.6%, and the dark mirrors went
+        // with it, which is the cue that sells chrome). More mirrors CATCHING
+        // a lamp brightens the ball and widens the gap between a lit mirror
+        // and its neighbour at the same time. It also answers the "sometimes"
+        // directly: the lit band is wider, so fewer moments of the turn are
+        // dim ones.
         let flare = 0;                                   // brightness
         let cLobe = 0, flareHue = 0, flareSat = 0;       // colour
         for (let i = 0; i < LAMPS.length; i++) {
           const L = LAMPS[i];
           const dot = rx * L.d[0] + ry * L.d[1] + rz * L.d[2];
           if (dot <= 0) continue;
-          const wide = Math.pow(dot, 15) * L.power;
+          const wide = Math.pow(dot, 10) * L.power;
           if (wide > flare) flare = wide;
           const narrow = Math.pow(dot, 28) * L.power;
           if (narrow > cLobe) { cLobe = narrow; flareHue = i; flareSat = L.sat; }
@@ -216,7 +227,14 @@ export function buildFlipbook(size: number, eq: [string, string, string]): FlipT
         // sliding over a still grid, and a bright resting surface swallowed
         // it (rounds 6 and 13). The flipbook's motion IS the grid, so the
         // old ceiling no longer binds and the mirrors can look polished.
-        const t = Math.max(0, Math.min(1, 0.18 + lambert * 0.34 + spread * 0.80 + flare * 1.20));
+        //
+        // `lambert` is deliberately a SMALL term. A mirror is not diffuse: its
+        // brightness is what it REFLECTS, which is `spread`, not how much
+        // light happens to fall on it. Leaning on lambert is what left one
+        // whole side of the ball near-black, as though it were a matte sphere,
+        // when a real mirror ball's far side still throws the room back at
+        // you.
+        const t = Math.max(0, Math.min(1, 0.34 + lambert * 0.22 + spread * 0.80 + flare * 1.20));
 
         // Colour arrives as LIGHT: only a mirror actually catching a coloured
         // lamp carries a cast, so bare silver always shows between them.
@@ -257,7 +275,7 @@ export function buildFlipbook(size: number, eq: [string, string, string]): FlipT
           // A bright mirror sits fully opaque and a dull one lets the dark
           // body through, which widens the gap between the two — that
           // contrast is what reads as polished metal rather than paint.
-          op: Math.min(1, (0.44 + 0.62 * t) * (0.78 + 0.22 * depth)),
+          op: Math.min(1, (0.56 + 0.50 * t) * (0.82 + 0.18 * depth)),
         });
       }
     }

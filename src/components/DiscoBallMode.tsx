@@ -514,7 +514,7 @@ function KeySpecular({ size, lit }: { size: number; lit: Animated.Value }) {
 const MirrorBall = memo(function MirrorBall({ size, eq, spin, pulse, lit, spotPan }: { size: number; eq: [string, string, string]; spin: Animated.Value; pulse: Animated.Value; lit: Animated.Value; spotPan: Animated.Value }) {
   const flip = useMemo(() => buildFlipbook(size, eq), [size, eq]);
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#0b0b0c' }}>
+    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#141417' }}>
       {/* The moving layer: light travelling across the surface as it turns.
           Held right back under the flipbook — it exists to move light over
           a STATIC grid, and over mirrors that already carry their own it
@@ -561,8 +561,8 @@ const MirrorBall = memo(function MirrorBall({ size, eq, spin, pulse, lit, spotPa
           <RadialGradient id="dbShade" cx="0.36" cy="0.3" r="0.9">
             <Stop offset="0" stopColor="#ffffff" stopOpacity="0.03" />
             <Stop offset="0.4" stopColor="#ffffff" stopOpacity="0.01" />
-            <Stop offset="0.78" stopColor="#040404" stopOpacity="0.34" />
-            <Stop offset="1" stopColor="#020202" stopOpacity="0.78" />
+            <Stop offset="0.78" stopColor="#040404" stopOpacity="0.24" />
+            <Stop offset="1" stopColor="#020202" stopOpacity="0.60" />
           </RadialGradient>
           {/* Rim light picks up the room, so it may be mood-coloured — it is
               a thin falloff at the silhouette, not a wash over the face. */}

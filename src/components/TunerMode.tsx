@@ -9,7 +9,7 @@ import {
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Line, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModeSheet } from '@/components/ModeSheet';
-import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
+import { DECK_FRAC, LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
@@ -411,7 +411,7 @@ function BandSwitch({ band, accent, onPick }: { band: Band; accent: string; onPi
   );
 }
 
-function TunerReadout({ width, accent, band, freq, lock, playing, title, artist, hasTrack, onBand, compact = false }: {
+function TunerReadout({ width, accent, band, freq, lock, playing, title, artist, hasTrack, onBand, compact = false, wide = false }: {
   width: number; accent: string; band: Band; freq: number; lock: number; playing: boolean;
   title: string; artist: string; hasTrack: boolean; onBand: (b: Band) => void;
   /** Landscape: the panel's HEIGHT is fixed by its dot sizes, not its width,
@@ -419,6 +419,23 @@ function TunerReadout({ width, accent, band, freq, lock, playing, title, artist,
    *  gaps instead — about 40pt, which is what the readout + dial + hint stack
    *  needs to fit a 393pt-tall screen. */
   compact?: boolean;
+  /**
+   * WIDE AND SHORT, for landscape — owner, 18.08: "the tuner mode in
+   * landscape should extend rather stay in the small box."
+   *
+   * The box was small because of HEIGHT, not width. Portrait stacks four rows
+   * — lamp, song, status, frequency — and that stack is taller than a 393pt
+   * screen once the dial and the hint are under it, so the panel had been
+   * shrunk to 44% of the screen to fit. Shrinking a panel to make a stack fit
+   * is treating the symptom: it left a wide pane with a small box floating in
+   * the middle of it, and the panel still ran off the top.
+   *
+   * A real head unit in a wide slot does not stack; it puts the frequency
+   * beside the rest. So the frequency moves into its own right-hand column,
+   * which halves the height and spends the width — and the panel can then
+   * fill its pane, which is what "extend" means here.
+   */
+  wide?: boolean;
 }) {
   const onAir = playing && lock > 0.9;
 
@@ -435,7 +452,9 @@ function TunerReadout({ width, accent, band, freq, lock, playing, title, artist,
   }, [onAir]);
 
   const PAD = 22;
-  const inner = width - PAD * 2;
+  // How wide the song line may run. In the wide layout the frequency column
+  // sits beside it, so the text has to give that space up or it would set the
+  // row's width and push the frequency off the panel.
   const padV = compact ? 14 : 26;
   const rowGap = compact ? 14 : 24;
 
@@ -444,16 +463,34 @@ function TunerReadout({ width, accent, band, freq, lock, playing, title, artist,
   // a row with the lamp. Sharing left it about ten characters wide, which is
   // what kept the title small; full width buys both bigger dots AND more of
   // the name visible before it has to scroll.
-  const TITLE = { dot: 3.5, gap: 1.15 };
+  // Wide trims both the song and the frequency a little, and every point it
+  // saves goes to the song's window: at the full portrait sizes the panel had
+  // room for about seven characters beside the frequency, so even "CRUISE FM"
+  // had to scroll. The frequency stays the biggest thing on the panel, which
+  // is what a head unit looks like.
+  const TITLE = wide ? { dot: 3.1, gap: 1.0 } : { dot: 3.5, gap: 1.15 };
   const ART = { dot: 2.1, gap: 0.78 };
   const SMALL = { dot: 1.7, gap: 0.62 };
-  const BIG = { dot: 4.6, gap: 1.5 };
+  const BIG = wide ? { dot: 4.0, gap: 1.3 } : { dot: 4.6, gap: 1.5 };
+
+  // MEASURED, NOT GUESSED. A constant sized for AM's "AM 810" is 40pt too
+  // narrow for FM's "FM 94.70", and the song line does not shrink — it has an
+  // explicit width, so the row simply overflowed and the frequency printed
+  // straight over the title (caught on the render, FM band). The frequency's
+  // width is knowable, so take it.
+  const FREQ_GAP = 20;
+  const freqW = dmWidth(band, BIG.dot, BIG.gap)
+    + FREQ_GAP
+    + dmWidth(BAND_CFG[band].label(freq), BIG.dot, BIG.gap);
+  const textW = width - PAD * 2 - (wide ? freqW + 24 : 0);
 
   const lampOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
 
-  return (
-    <View style={[fs.lcd, { width, borderColor: accent + '2E', paddingVertical: padV }]}>
-      {/* Row 1 — the ON AIR lamp, on its own line above the song */}
+  // The lamp, the song and the status lamps — the panel's left-hand business,
+  // and in portrait simply the top of the stack.
+  const songBlock = (
+    <>
+      {/* The ON AIR lamp, on its own line above the song */}
       <Animated.View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', opacity: onAir ? lampOpacity : 0.34 }}>
         <View style={[fs.lamp, {
           backgroundColor: onAir ? ON_AIR_RED : 'rgba(255,255,255,0.22)',
@@ -462,26 +499,69 @@ function TunerReadout({ width, accent, band, freq, lock, playing, title, artist,
         <DotMatrixText text="ON AIR" dot={LAMP.dot} gap={LAMP.gap} color={onAir ? '#FF6B5A' : '#9AA3B8'} dim={false} />
       </Animated.View>
 
-      {/* Row 2 — what's playing, across the full panel */}
+      {/* What's playing, across the panel's full text width */}
       <View style={{ marginTop: compact ? 10 : 18, gap: compact ? 7 : 11 }}>
-        <DmLine text={hasTrack ? title : 'CRUISE FM'} width={inner} dot={TITLE.dot} gap={TITLE.gap} color={accent} align="left" />
+        <DmLine text={hasTrack ? title : 'CRUISE FM'} width={textW} dot={TITLE.dot} gap={TITLE.gap} color={accent} align="left" />
         {hasTrack && !!artist && (
-          <DmLine text={artist} width={inner} dot={ART.dot} gap={ART.gap} color={accent} dim={false} align="left" />
+          <DmLine text={artist} width={textW} dot={ART.dot} gap={ART.gap} color={accent} dim={false} align="left" />
         )}
       </View>
+    </>
+  );
 
-      {/* Row 2 — band button and the status lamps of a real receiver */}
-      <View style={[fs.lcdRow, { marginTop: rowGap }]}>
-        <BandSwitch band={band} accent={accent} onPick={onBand} />
-        <DotMatrixText text="STEREO" dot={SMALL.dot} gap={SMALL.gap} color="#FFA24B" dim opacity={onAir ? 1 : 0.32} />
-        <DotMatrixText text="TUNED" dot={SMALL.dot} gap={SMALL.gap} color={accent} dim opacity={0.3 + lock * 0.7} />
-      </View>
+  /** Band button and the status lamps of a real receiver. */
+  const statusRow = (
+    <View style={[fs.lcdRow, { marginTop: wide ? 12 : rowGap }]}>
+      <BandSwitch band={band} accent={accent} onPick={onBand} />
+      <DotMatrixText text="STEREO" dot={SMALL.dot} gap={SMALL.gap} color="#FFA24B" dim opacity={onAir ? 1 : 0.32} />
+      <DotMatrixText text="TUNED" dot={SMALL.dot} gap={SMALL.gap} color={accent} dim opacity={0.3 + lock * 0.7} />
+    </View>
+  );
 
-      {/* Row 3 — band and frequency, the biggest thing on the panel */}
-      <View style={[fs.lcdRow, { alignItems: 'flex-end', marginTop: compact ? 10 : 16 }]}>
-        <DotMatrixText text={band} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
-        <DotMatrixText text={BAND_CFG[band].label(freq)} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
+  // Band and frequency — the biggest thing on the panel. Under the rest in
+  // portrait, beside it in a wide slot.
+  const readout = wide ? (
+    // Its own column, so it needs a real gap rather than the stacked row's
+    // space-between — with nothing to spread against, AM and 810 ran together
+    // into "AM810".
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: FREQ_GAP }}>
+      <DotMatrixText text={band} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
+      <DotMatrixText text={BAND_CFG[band].label(freq)} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
+    </View>
+  ) : (
+    <View style={[fs.lcdRow, { alignItems: 'flex-end', marginTop: compact ? 10 : 16 }]}>
+      <DotMatrixText text={band} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
+      <DotMatrixText text={BAND_CFG[band].label(freq)} dot={BIG.dot} gap={BIG.gap} color={accent} dim opacity={0.55 + lock * 0.45} />
+    </View>
+  );
+
+  if (wide) {
+    return (
+      <View style={[fs.lcd, { width, borderColor: accent + '2E', paddingVertical: padV }]}>
+        {/* Song on the left, frequency on the right, and the status lamps on
+            their own full-width row underneath — which is also where a real
+            receiver puts them, beside nothing and reading straight across.
+            Squeezing AM/FM, STEREO and TUNED into the left-hand column was
+            the first attempt and they overlapped: three items on a
+            space-between row need the panel's whole width, not a third of
+            it. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 24 }}>
+          {/* minWidth 0 is load-bearing on a flex row: without it the song
+              line sets the row's minimum width and pushes the frequency off
+              the panel's right edge instead of shrinking. */}
+          <View style={{ flex: 1, minWidth: 0 }}>{songBlock}</View>
+          {readout}
+        </View>
+        {statusRow}
       </View>
+    );
+  }
+
+  return (
+    <View style={[fs.lcd, { width, borderColor: accent + '2E', paddingVertical: padV }]}>
+      {songBlock}
+      {statusRow}
+      {readout}
     </View>
   );
 }
@@ -864,14 +944,20 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
           <Animated.View
             style={[StyleSheet.absoluteFill, { justifyContent: 'center' }, deckScene]}
             {...pan.panHandlers}>
-            {/* The readout is sized DOWN for landscape, not up: its height
-                scales with its width, and at 460 wide the readout + dial +
-                hint stack was taller than a 393pt screen, clipping the hint
-                off the bottom and pushing ON AIR under the back chevron. */}
+            {/* The readout FILLS ITS PANE. It used to be sized DOWN for
+                landscape — 44% of the screen — because its height scales with
+                its width, and the readout + dial + hint stack was taller than
+                a 393pt screen. That fixed the overflow by shrinking the one
+                thing the user came to look at, and left a small box adrift in
+                a wide pane (owner, 18.08). The `wide` layout puts the
+                frequency beside the song instead of under it, which halves
+                the height, so the panel can take the pane the docked chrome
+                leaves it. */}
             <View style={{ alignItems: 'center' }}>
               <TunerReadout
-                width={Math.min(winW * 0.44, 400)}
+                width={Math.min(winW * (1 - DECK_FRAC) - 36, 560)}
                 compact
+                wide
                 accent={accent}
                 band={band}
                 onBand={pickBand}

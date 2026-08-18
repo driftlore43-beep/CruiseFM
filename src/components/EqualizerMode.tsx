@@ -647,7 +647,14 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               opacity: an invisible play button is still a play button, so a
               tap meant to wake the controls would toggle playback instead. */}
           <Animated.View
-            style={{ width: '100%', alignItems: 'center', opacity: chrome }}
+            /* THE WRAPPER MUST BE TRANSPARENT TO LAYOUT. This container
+               stretches its children, and the song block relies on that —
+               it is full width with its text pushed to the left edge. Giving
+               the wrapper `alignItems: 'center'` shrank the block to its own
+               content and centred it, so the song titles moved to the middle
+               of the screen (owner, 18.08, on the Equalizer and the
+               cassette). Match the parent's alignment or impose none. */
+            style={{ alignSelf: 'stretch', opacity: chrome }}
             pointerEvents={chromeRested ? 'none' : 'auto'}>
 
           {/* Song title when connected, else the mood's own line — never a fake track */}

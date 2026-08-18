@@ -263,7 +263,7 @@ function EmptySlotRow({ onPress }: { onPress: () => void }) {
  * list looking exactly like everything else — just with their MINE chip.
  */
 function StationRow({
-  station, dial, tuned, locked, lcd, last, onAir, onPress,
+  station, dial, tuned, locked, lcd, last, onAir, featured, onPress,
 }: {
   station: Station | CustomStation;
   dial: { band: Band; label: string };
@@ -273,11 +273,21 @@ function StationRow({
   /** Last row in its group — no hairline under it. */
   last?: boolean;
   /**
-   * Broadcasting right now. PRESENTATION ONLY — an off-air station is still
-   * fully playable, because a listener who wants Night Run at two in the
-   * afternoon must never be told no. See constants/schedule.ts.
+   * Broadcasting right now — drives the dimming ONLY. PRESENTATION ONLY: an
+   * off-air station is still fully playable, because a listener who wants
+   * Night Run at two in the afternoon must never be told no. See
+   * constants/schedule.ts.
    */
   onAir?: boolean;
+  /**
+   * The one station on air this hour — the app's own broadcast, and the only
+   * row that wears the chip. Deliberately NOT the same claim as `onAir`:
+   * several windows overlap at any moment (at 22:24 Downtown, Tunnel and
+   * Night Run are all open), and badging all of them made the page contradict
+   * its own hero, which has always announced exactly one station under ON AIR
+   * THIS HOUR (owner, 18.08: "can we have only 1 FM station on air").
+   */
+  featured?: boolean;
   onPress?: () => void;
 }) {
   const day = useDaylight();
@@ -325,8 +335,11 @@ function StationRow({
           else entirely (owner, 13.08: "I can't tell which station is selected
           and which is currently live"). A word cannot be mistaken for the
           needle, and amber is the dial's own lit colour, used by the band
-          letters directly above. */}
-      {onAir && (
+          letters directly above.
+
+          It marks ONE row, not every open window — a chip that four stations
+          wear at once is a decoration rather than a signal. */}
+      {featured && (
         <View style={styles.airChip}>
           <Text style={styles.airChipText}>ON AIR</Text>
         </View>
@@ -457,14 +470,14 @@ export default function StationsScreen() {
             station={station}
             dial={dial}
             tuned={station.id === tunedId}
-            // `: true` is the Rain Drive case, and it is the fix for a real
-            // ambiguity (owner, 13.08: "rain drive and downtown FM are both
-            // bolded so it looks like they're both live"). A built-in that is
-            // not SCHEDULED is one that broadcasts round the clock, so it was
-            // sitting at full strength beside dimmed neighbours with no chip
-            // to explain why — which reads as live, because on paper full
-            // strength IS bold. It genuinely is on air, so it says so.
+            // Two different claims, deliberately kept apart. `onAir` only
+            // decides whether the row sits back: a station keeping hours that
+            // is outside them is quiet, and `: true` is the Rain Drive case —
+            // it broadcasts round the clock, so it is never the dim one.
+            // `featured` is the single station the app is putting on air this
+            // hour, which is what the hero announces and what the chip marks.
             onAir={isScheduled(station.id) ? live.includes(station.id) : true}
+            featured={station.id === onAirStation.id}
             lcd={lcd}
             // Never the last row of the band any more: either YOUR STATIONS
             // follows, or the empty slot does.
@@ -494,14 +507,14 @@ export default function StationsScreen() {
             station={station}
             dial={dial}
             tuned={station.id === tunedId}
-            // `: true` is the Rain Drive case, and it is the fix for a real
-            // ambiguity (owner, 13.08: "rain drive and downtown FM are both
-            // bolded so it looks like they're both live"). A built-in that is
-            // not SCHEDULED is one that broadcasts round the clock, so it was
-            // sitting at full strength beside dimmed neighbours with no chip
-            // to explain why — which reads as live, because on paper full
-            // strength IS bold. It genuinely is on air, so it says so.
+            // Two different claims, deliberately kept apart. `onAir` only
+            // decides whether the row sits back: a station keeping hours that
+            // is outside them is quiet, and `: true` is the Rain Drive case —
+            // it broadcasts round the clock, so it is never the dim one.
+            // `featured` is the single station the app is putting on air this
+            // hour, which is what the hero announces and what the chip marks.
             onAir={isScheduled(station.id) ? live.includes(station.id) : true}
+            featured={station.id === onAirStation.id}
             locked={!isPro}
             lcd={lcd}
             last={i === fmBand.length - 1}

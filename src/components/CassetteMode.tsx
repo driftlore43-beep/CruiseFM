@@ -1157,7 +1157,14 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
               off once it is invisible, or the tap meant to bring the controls
               back would press whatever button it landed on. */}
           <Animated.View
-            style={{ alignItems: 'center', alignSelf: 'stretch', opacity: chrome }}
+            /* THE WRAPPER MUST BE TRANSPARENT TO LAYOUT. This container
+               stretches its children, and the song block relies on that —
+               it is full width with its text pushed to the left edge. Giving
+               the wrapper `alignItems: 'center'` shrank the block to its own
+               content and centred it, so the song titles moved to the middle
+               of the screen (owner, 18.08, on the Equalizer and the
+               cassette). Match the parent's alignment or impose none. */
+            style={{ alignSelf: 'stretch', opacity: chrome }}
             pointerEvents={chromeRested ? 'none' : 'auto'}>
           {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>

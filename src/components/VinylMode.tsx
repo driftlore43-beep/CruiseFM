@@ -25,7 +25,7 @@ import { PlatformIcon } from '@/components/icons/PlatformIcon';
 // the record turned, the bar moved, and the song snapped back (owner, 04.08).
 // CD works because it goes through useTrackClock. Same router for both now.
 import { seekActive, shouldKeepCoasting } from '@/utils/useTrackClock';
-import { useMusicPlayback } from '@/utils/useMusicPlayback';
+import { useMusicPlayback, nextRepeat } from '@/utils/useMusicPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PreviewGate } from '@/components/PreviewGate';
@@ -702,20 +702,20 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   // See utils/confirmedPlaying for why, and for the clip that proved it.
   const live = confirmedPlaying(playing, spotify.track, musicSwitching);
 
-  // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
-  useEffect(() => {
-    if (!spotify.connected) return;
-    setShuffle(spotify.shuffleOn);
-    setRepeat(spotify.repeatMode !== 'off');
-  }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
+  // Shuffle and repeat are READ STRAIGHT OFF THE PLAYER, not mirrored into
+  // local state. Each mode used to keep its own copy and sync it in an effect
+  // — eight copies of the same two lines, and the copy is what let the button
+  // disagree with the music. The player already flips optimistically and holds
+  // its answer against a stale poll, so there is nothing left for a mirror to
+  // do but drift.
+  const shuffle = spotify.shuffleOn;
+  const repeat = spotify.repeatMode;
   const [activeId,      setActiveId]      = useState(stationId ?? 'night-run');
   const [activeTrack,   setActiveTrack]   = useState(0);
   const [platform,      setPlatform]      = useState<{ id: PlatformId; name: string; color: string } | null>(null);
   const [isScrubbing,   setIsScrubbing]   = useState(false);
   const [scrubDir,      setScrubDir]      = useState<'fwd' | 'bwd' | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
-  const [shuffle,       setShuffle]       = useState(false);
-  const [repeat,        setRepeat]        = useState(false);
   const [showTracks,    setShowTracks]    = useState(false);
   const [linked,        setLinked]        = useState<LinkedPlaylist | null>(null);
   const [showPicker,    setShowPicker]    = useState(false);
@@ -1395,7 +1395,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
           {/* Controls */}
           <View style={fs.controls}>
-            <TouchableOpacity onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <TouchableOpacity onPress={() => spotify.shuffle(!shuffle)} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Ionicons name="shuffle" size={26} color={shuffle ? (station.eqColors?.[1] ?? V.gold) : '#ffffff'} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { setActiveTrack((t) => Math.max(0, t - 1)); spotify.prev(); }} style={fs.skipBtn} activeOpacity={0.75}>
@@ -1420,8 +1420,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             <TouchableOpacity onPress={() => { setActiveTrack((t) => Math.min(VINYL_TRACKS.length - 1, t + 1)); spotify.next(); }} style={fs.skipBtn} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-next" size={48} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'track' : 'off'); }} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <MaterialCommunityIcons name={repeat ? 'repeat-once' : 'repeat'} size={26} color={repeat ? (station.eqColors?.[1] ?? V.gold) : '#ffffff'} />
+            <TouchableOpacity onPress={() => spotify.repeat(nextRepeat(repeat))} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <MaterialCommunityIcons name={repeat === 'track' ? 'repeat-once' : 'repeat'} size={26} color={repeat !== 'off' ? (station.eqColors?.[1] ?? V.gold) : '#ffffff'} />
             </TouchableOpacity>
           </View>
 

@@ -20,7 +20,7 @@ import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
-import { useMusicPlayback } from '@/utils/useMusicPlayback';
+import { useMusicPlayback, nextRepeat } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
@@ -515,13 +515,14 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
   const spotify = useMusicPlayback(visible);
 
-  const [shuffle, setShuffle] = useState(false);
-  const [repeat, setRepeat] = useState(false);
-  useEffect(() => {
-    if (!spotify.connected) return;
-    setShuffle(spotify.shuffleOn);
-    setRepeat(spotify.repeatMode !== 'off');
-  }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
+  // Shuffle and repeat are READ STRAIGHT OFF THE PLAYER, not mirrored into
+  // local state. Each mode used to keep its own copy and sync it in an effect
+  // — eight copies of the same two lines, and the copy is what let the button
+  // disagree with the music. The player already flips optimistically and holds
+  // its answer against a stale poll, so there is nothing left for a mirror to
+  // do but drift.
+  const shuffle = spotify.shuffleOn;
+  const repeat = spotify.repeatMode;
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   // The SCENE waits for the service's own verdict; the transport keeps the
   // optimistic `playing`, because a button that hesitates reads as broken.
@@ -1023,7 +1024,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
           {/* Controls */}
           <View style={fs.controls}>
-            <TouchableOpacity onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <TouchableOpacity onPress={() => spotify.shuffle(!shuffle)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Ionicons name="shuffle" size={24} color={shuffle ? eq[1] : 'rgba(255,255,255,0.85)'} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { resetTrack(); spotify.prev(); }} activeOpacity={0.75}>
@@ -1042,8 +1043,8 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             <TouchableOpacity onPress={() => { resetTrack(); spotify.next(); }} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-next" size={44} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'track' : 'off'); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <MaterialCommunityIcons name={repeat ? 'repeat-once' : 'repeat'} size={24} color={repeat ? eq[1] : 'rgba(255,255,255,0.85)'} />
+            <TouchableOpacity onPress={() => spotify.repeat(nextRepeat(repeat))} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <MaterialCommunityIcons name={repeat === 'track' ? 'repeat-once' : 'repeat'} size={24} color={repeat !== 'off' ? eq[1] : 'rgba(255,255,255,0.85)'} />
             </TouchableOpacity>
           </View>
 

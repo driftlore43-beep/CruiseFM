@@ -28,7 +28,7 @@ import { FloatingNotes } from '@/components/FloatingNotes';
 import { ModeSheet } from '@/components/ModeSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
-import { useMusicPlayback } from '@/utils/useMusicPlayback';
+import { useMusicPlayback, nextRepeat } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { AmbientGlow } from '@/components/AmbientGlow';
@@ -261,8 +261,6 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   // See utils/confirmedPlaying for why, and for the clip that proved it.
   const live = confirmedPlaying(playing, spotify.track, musicSwitching);
   const [activeStation, setActiveStation] = useState(stationId ?? 'night-run');
-  const [shuffle,       setShuffle]       = useState(false);
-  const [repeat,        setRepeat]        = useState(false);
   const [showMood,      setShowMood]      = useState(false);
   const [showPicker,    setShowPicker]    = useState(false);
   const [linked,        setLinked]        = useState<LinkedPlaylist | null>(null);
@@ -348,12 +346,14 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
-  // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
-  useEffect(() => {
-    if (!spotify.connected) return;
-    setShuffle(spotify.shuffleOn);
-    setRepeat(spotify.repeatMode !== 'off');
-  }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
+  // Shuffle and repeat are READ STRAIGHT OFF THE PLAYER, not mirrored into
+  // local state. Each mode used to keep its own copy and sync it in an effect
+  // — eight copies of the same two lines, and the copy is what let the button
+  // disagree with the music. The player already flips optimistically and holds
+  // its answer against a stale poll, so there is nothing left for a mirror to
+  // do but drift.
+  const shuffle = spotify.shuffleOn;
+  const repeat = spotify.repeatMode;
 
   // Progress rides the shared track clock — real Spotify position when
   // connected, the classic 4-minute demo loop otherwise.
@@ -646,7 +646,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           <View style={fs.controls}>
             <TouchableOpacity
               style={fs.shuffleRepeatBtn}
-              onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }}
+              onPress={() => spotify.shuffle(!shuffle)}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Ionicons name="shuffle" size={26} color={shuffle ? (currentStation.eqColors?.[1] ?? '#7B38E0') : '#ffffff'} />
             </TouchableOpacity>
@@ -679,9 +679,9 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
             <TouchableOpacity
               style={fs.shuffleRepeatBtn}
-              onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'track' : 'off'); }}
+              onPress={() => spotify.repeat(nextRepeat(repeat))}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <MaterialCommunityIcons name={repeat ? 'repeat-once' : 'repeat'} size={26} color={repeat ? (currentStation.eqColors?.[1] ?? '#7B38E0') : '#ffffff'} />
+              <MaterialCommunityIcons name={repeat === 'track' ? 'repeat-once' : 'repeat'} size={26} color={repeat !== 'off' ? (currentStation.eqColors?.[1] ?? '#7B38E0') : '#ffffff'} />
             </TouchableOpacity>
           </View>
 

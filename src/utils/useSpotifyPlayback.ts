@@ -59,6 +59,52 @@ export function backButtonAction(
 
 export type RepeatMode = 'off' | 'context' | 'track';
 
+
+/**
+ * The next repeat setting when the button is pressed: off → the playlist →
+ * this song → off.
+ *
+ * IT USED TO BE A TWO-STATE BUTTON OVER A THREE-STATE FEATURE, and that is
+ * why repeat did not work on a station's playlist (owner, 18.08). Every mode
+ * sent `'track'`, so the only repeat you could reach was repeat-ONE — which on
+ * a station whose whole point is its playlist means the playlist stops. And
+ * the button flattened Spotify's three states into a boolean, so a player
+ * genuinely set to repeat the playlist showed the repeat-one icon, and there
+ * was no press that could get back to it.
+ *
+ * Repeating the PLAYLIST comes first because it is the one people mean.
+ */
+export function nextRepeat(mode: RepeatMode): RepeatMode {
+  return mode === 'off' ? 'context' : mode === 'context' ? 'track' : 'off';
+}
+
+/** A setting we have asked for and not yet seen confirmed. */
+export type PendingToggle<T> = { want: T; until: number } | null;
+
+/** How long we hold a pressed toggle against the player's own reading. Long
+ *  enough for Spotify to catch up, short enough to give in quickly. */
+export const TOGGLE_GUARD_MS = 6000;
+
+/**
+ * Should the player's reported setting be believed, or is it older than the
+ * button press it contradicts?
+ *
+ * Pressing shuffle flips the button and sends the command, and the chase
+ * re-polls 220ms later — long before Spotify has necessarily applied it. That
+ * reading carries the OLD setting, and believing it drops the button straight
+ * back, so from the outside the button simply does not take. Same shape as the
+ * seek that sprang back (10.08), same answer: disbelieve a reading that
+ * disagrees until one AGREES, or until the guard expires — so a command that
+ * genuinely failed cannot leave the button lying for the rest of the drive.
+ *
+ * Pure and exported because it decides whether a control tells the truth.
+ */
+export function acceptReported<T>(pending: PendingToggle<T>, reported: T, now: number): boolean {
+  if (!pending) return true;                 // nothing outstanding
+  if (reported === pending.want) return true; // it landed
+  return now > pending.until;                 // gave up waiting
+}
+
 export type NowPlaying = {
   title: string;
   artist: string;
@@ -207,10 +253,14 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
             isPlaying: data.is_playing ?? true,
           });
         }
-        // Keep the shuffle/repeat buttons honest with Spotify's real state.
+        // Keep the shuffle/repeat buttons honest with Spotify's real state —
+        // but not with a reading that predates the button being pressed. See
+        // pendingToggleRef.
         if (data) {
-          setShuffleOn(!!data.shuffle_state);
-          if (data.repeat_state) setRepeatMode(data.repeat_state as RepeatMode);
+          const sh = !!data.shuffle_state;
+          if (settled(pendingShuffleRef, sh)) setShuffleOn(sh);
+          const rp = data.repeat_state as RepeatMode | undefined;
+          if (rp && settled(pendingRepeatRef, rp)) setRepeatMode(rp);
         }
         // Which playlist is really playing? Follow the player's context so
         // the pill updates when the music source changes under us.
@@ -310,6 +360,28 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
     chaseRef.current = [];
     chaseFromRef.current = null;
   };
+  /**
+   * A shuffle or repeat change we have asked for but not yet seen confirmed.
+   *
+   * WHY IT EXISTS (owner, 18.08: "make sure the shuffle and the repeat buttons
+   * work"). Pressing one flips the button at once and sends the command — and
+   * `after()` then re-polls at 220ms, long before Spotify has necessarily
+   * applied it. That poll reports the OLD setting, the poll is believed, and
+   * the button drops back. From the outside the button simply does not take.
+   *
+   * It is the same shape as the seek that sprang back (10.08) and it has the
+   * same answer: hold what we asked for, and disbelieve any reading that
+   * disagrees until one AGREES — or until the guard expires, so a command that
+   * genuinely failed cannot leave the button lying for the rest of the drive.
+   */
+  const pendingShuffleRef = useRef<PendingToggle<boolean>>(null);
+  const pendingRepeatRef = useRef<PendingToggle<RepeatMode>>(null);
+  const settled = <T,>(ref: { current: PendingToggle<T> }, reported: T): boolean => {
+    const ok = acceptReported(ref.current, reported, Date.now());
+    if (ok) ref.current = null;
+    return ok;
+  };
+
   const after = (watchTrack = false) => {
     clearChase();
     chaseFromRef.current = watchTrack ? (trackRef.current?.uri ?? null) : null;
@@ -361,8 +433,43 @@ export function useSpotifyPlayback(visible: boolean, opts?: { pollMs?: number })
       skipPrev().catch(() => {});
       after(true);
     },
-    // Optimistic local flip; the API call + next poll settle the truth.
-    shuffle: (state: boolean) => { ping(); setShuffleOn(state); spotifySetShuffle(state).catch(() => {}); after(); },
-    repeat: (mode: RepeatMode) => { ping(); setRepeatMode(mode); spotifySetRepeat(mode).catch(() => {}); after(); },
+    /**
+     * Optimistic local flip, held against stale polls (see pendingShuffleRef),
+     * and TAKEN BACK if Spotify actually refuses.
+     *
+     * spotifyFetch folds every failure into null — no active device, a
+     * restriction on the current context, a timeout — and swallowing that left
+     * the button showing a setting the music was not using. Now the button
+     * returns to where it was, which at least tells the truth about what
+     * happened.
+     */
+    shuffle: (state: boolean) => {
+      ping();
+      const was = shuffleOn;
+      setShuffleOn(state);
+      // Nobody connected a service, so there is nothing to command and nothing
+      // that can refuse — the flip is the whole of it, exactly as before. Only
+      // a real connection makes a promise worth taking back.
+      if (!connected) return;
+      pendingShuffleRef.current = { want: state, until: Date.now() + TOGGLE_GUARD_MS };
+      spotifySetShuffle(state)
+        .then((ok) => { if (!ok) { pendingShuffleRef.current = null; setShuffleOn(was); } })
+        .catch(() => { pendingShuffleRef.current = null; setShuffleOn(was); });
+      after();
+    },
+    repeat: (mode: RepeatMode) => {
+      ping();
+      const was = repeatMode;
+      setRepeatMode(mode);
+      // Nobody connected a service, so there is nothing to command and nothing
+      // that can refuse — the flip is the whole of it, exactly as before. Only
+      // a real connection makes a promise worth taking back.
+      if (!connected) return;
+      pendingRepeatRef.current = { want: mode, until: Date.now() + TOGGLE_GUARD_MS };
+      spotifySetRepeat(mode)
+        .then((ok) => { if (!ok) { pendingRepeatRef.current = null; setRepeatMode(was); } })
+        .catch(() => { pendingRepeatRef.current = null; setRepeatMode(was); });
+      after();
+    },
   };
 }

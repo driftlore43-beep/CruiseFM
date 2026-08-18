@@ -8,6 +8,10 @@ import { useAppleMusicPlayback } from './useAppleMusicPlayback';
 import { useSpotifyPlayback } from './useSpotifyPlayback';
 
 export type { NowPlaying, RepeatMode } from './useSpotifyPlayback';
+// Re-exported from the switchboard so the modes never reach past it into one
+// service's file — the rule that stopped scrub silently breaking on Apple
+// Music (04.08).
+export { nextRepeat } from './useSpotifyPlayback';
 
 /**
  * The music switchboard.

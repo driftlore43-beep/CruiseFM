@@ -574,12 +574,42 @@ export async function seekTo(positionMs: number) {
   return spotifyFetch(`/me/player/seek?position_ms=${Math.max(0, Math.round(positionMs))}`, 'PUT');
 }
 
-export async function setShuffle(state: boolean) {
-  return spotifyFetch(`/me/player/shuffle?state=${state ? 'true' : 'false'}`, 'PUT');
+/**
+ * A player command that reports whether it actually worked.
+ *
+ * `spotifyFetch` cannot answer this, and the reason is a trap worth naming:
+ * it folds a **204 No Content** into `null` alongside every failure — and 204
+ * is exactly what Spotify returns when one of these commands SUCCEEDS. So a
+ * caller checking its result for truthiness reads every success as a failure.
+ * (Caught on 18.08 while wiring the shuffle button to revert on refusal; the
+ * revert would have fired on every working press.)
+ *
+ * These endpoints have no body worth reading, so the honest return is the
+ * status: true if Spotify accepted it, false if it refused, timed out, or
+ * there was no active device to command.
+ */
+async function spotifyCommand(endpoint: string, method = 'PUT'): Promise<boolean> {
+  const token = await getAccessToken();
+  if (!token) return false;
+  try {
+    const res = await timedFetch(`https://api.spotify.com/v1${endpoint}`, {
+      method,
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    if (res.ok && restrictedCache) setRestricted(false);
+    if (res.status === 403) { classify403(res); return false; }
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
-export async function setRepeat(state: 'off' | 'context' | 'track') {
-  return spotifyFetch(`/me/player/repeat?state=${state}`, 'PUT');
+export async function setShuffle(state: boolean): Promise<boolean> {
+  return spotifyCommand(`/me/player/shuffle?state=${state ? 'true' : 'false'}`);
+}
+
+export async function setRepeat(state: 'off' | 'context' | 'track'): Promise<boolean> {
+  return spotifyCommand(`/me/player/repeat?state=${state}`);
 }
 
 export async function skipNext() {

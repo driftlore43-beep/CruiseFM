@@ -26,7 +26,7 @@ import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/u
 // Platform-routed, not Spotify's own — same fault Vinyl had (04.08), found
 // by grepping for the rest rather than waiting for it to be reported.
 import { seekActive, shouldKeepCoasting } from '@/utils/useTrackClock';
-import { useMusicPlayback } from '@/utils/useMusicPlayback';
+import { useMusicPlayback, nextRepeat } from '@/utils/useMusicPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PreviewGate } from '@/components/PreviewGate';
@@ -668,17 +668,17 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   // See utils/confirmedPlaying for why, and for the clip that proved it.
   const live = confirmedPlaying(playing, spotify.track, musicSwitching);
 
-  // Reflect Spotify's real shuffle/repeat when connected — honest buttons.
-  useEffect(() => {
-    if (!spotify.connected) return;
-    setShuffle(spotify.shuffleOn);
-    setRepeat(spotify.repeatMode !== 'off');
-  }, [spotify.connected, spotify.shuffleOn, spotify.repeatMode]);
+  // Shuffle and repeat are READ STRAIGHT OFF THE PLAYER, not mirrored into
+  // local state. Each mode used to keep its own copy and sync it in an effect
+  // — eight copies of the same two lines, and the copy is what let the button
+  // disagree with the music. The player already flips optimistically and holds
+  // its answer against a stale poll, so there is nothing left for a mirror to
+  // do but drift.
+  const shuffle = spotify.shuffleOn;
+  const repeat = spotify.repeatMode;
   const [activeId,    setActiveId]    = useState(stationId ?? 'night-run');
   const [activeTrack, setActiveTrack] = useState(1);   // A2 default (index 1)
   const [platform,    setPlatform]    = useState<{ id: PlatformId; name: string; color: string } | null>(null);
-  const [shuffle,     setShuffle]     = useState(false);
-  const [repeat,      setRepeat]      = useState(false);
   const [elapsedTxt,  setElapsedTxt]  = useState('00:00');
   const [showMood,    setShowMood]    = useState(false);
   const [showPicker,  setShowPicker]  = useState(false);
@@ -1156,7 +1156,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
           {/* Controls */}
           <View style={fs.controls}>
             <TouchableOpacity
-              onPress={() => { const ns = !shuffle; setShuffle(ns); if (spotify.connected) spotify.shuffle(ns); }}
+              onPress={() => spotify.shuffle(!shuffle)}
               style={fs.shuffleRepeatBtn}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Ionicons name="shuffle" size={26} color={shuffle ? (currentEq?.[1] ?? '#C8860A') : '#ffffff'} />
@@ -1192,10 +1192,10 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => { const nr = !repeat; setRepeat(nr); if (spotify.connected) spotify.repeat(nr ? 'track' : 'off'); }}
+              onPress={() => spotify.repeat(nextRepeat(repeat))}
               style={fs.shuffleRepeatBtn}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <MaterialCommunityIcons name={repeat ? 'repeat-once' : 'repeat'} size={26} color={repeat ? (currentEq?.[1] ?? '#C8860A') : '#ffffff'} />
+              <MaterialCommunityIcons name={repeat === 'track' ? 'repeat-once' : 'repeat'} size={26} color={repeat !== 'off' ? (currentEq?.[1] ?? '#C8860A') : '#ffffff'} />
             </TouchableOpacity>
           </View>
 

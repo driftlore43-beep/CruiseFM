@@ -42,7 +42,22 @@ const MODE_LOOK: Record<string, { icon: string | null }> = {
 // Free modes first, the same shelf order as the Modes tab.
 const SHELF = [...MODE_CATALOG].sort((a, b) => Number(a.pro) - Number(b.pro));
 
-export function ModeSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+export function ModeSheet({ visible, onClose, onPick, currentId, title = 'CHANGE MODE', extraBottom = 0 }: {
+  visible: boolean;
+  onClose: () => void;
+  /**
+   * Where the choice goes. By default it switches the RUNNING drive's visual,
+   * which is what the in-drive pill wants. The home card passes its own
+   * handler because there is no drive yet — it is choosing the look a drive
+   * is about to open with, so `np.setMode` would have nothing to set.
+   */
+  onPick?: (mode: string) => void;
+  /** Ticked in the shelf when there is no session to read it from. */
+  currentId?: string;
+  title?: string;
+  /** Extra room at the foot — the tab bar floats over this sheet on a page. */
+  extraBottom?: number;
+}) {
   // While this sheet is up, the card's dismiss gesture stands down (04.08).
   useSheetOpen(visible);
   const insets = useSafeAreaInsets();
@@ -63,7 +78,7 @@ export function ModeSheet({ visible, onClose }: { visible: boolean; onClose: () 
     ]).start();
   }, [visible]);
 
-  const activeId = np.session?.mode;
+  const activeId = np.session?.mode ?? currentId;
 
   return (
     <>
@@ -76,10 +91,10 @@ export function ModeSheet({ visible, onClose }: { visible: boolean; onClose: () 
 
       <Animated.View
         pointerEvents={visible ? 'auto' : 'none'}
-        style={[s.sheet, { paddingBottom: insets.bottom + 18, transform: [{ translateY: y }] }]}>
+        style={[s.sheet, { paddingBottom: insets.bottom + 18 + extraBottom, transform: [{ translateY: y }] }]}>
         <View style={s.handle} />
         <View style={s.header}>
-          <Text style={[s.title, { fontFamily: Fonts.mono }]}>CHANGE MODE</Text>
+          <Text style={[s.title, { fontFamily: Fonts.mono }]}>{title}</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={s.closeBtn}>
             <Ionicons name="close" size={16} color="rgba(255,255,255,0.7)" />
           </TouchableOpacity>
@@ -99,7 +114,7 @@ export function ModeSheet({ visible, onClose }: { visible: boolean; onClose: () 
               <TouchableOpacity
                 key={m.id}
                 activeOpacity={0.85}
-                onPress={() => { np.setMode(m.id); onClose(); }}
+                onPress={() => { if (onPick) onPick(m.id); else np.setMode(m.id); onClose(); }}
                 style={[s.chip, active && s.chipActive]}>
                 {look.icon
                   ? <MaterialCommunityIcons name={look.icon as any} size={17} color={active ? '#0a0a10' : '#fff'} />

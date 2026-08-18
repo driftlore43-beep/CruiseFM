@@ -31,6 +31,7 @@ try {
   process.exit(2);
 }
 const BASE = (process.env.BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
+import { visibleClicker } from './visible.mjs';
 const b = await chromium.launch({ args:['--no-sandbox'] });
 const problems = [];
 for (const MODE of ['Vinyl','CD']) {
@@ -44,9 +45,7 @@ for (const MODE of ['Vinyl','CD']) {
   if (await skip.count()) { await skip.click({force:true}); await p.waitForTimeout(2500); }
   await p.getByText('MODES',{exact:true}).last().click({force:true});
   await p.waitForTimeout(2000);
-  const card = p.getByText(MODE,{exact:true}).first();
-  await card.scrollIntoViewIfNeeded(); await p.waitForTimeout(400);
-  await card.click({timeout:20000}); await p.waitForTimeout(2500);
+  await visibleClicker(p)(MODE); await p.waitForTimeout(2500);
   await p.getByText('Night Run AM',{exact:true}).last().click({timeout:20000});
   await p.waitForTimeout(3000);
   await p.mouse.click(40,118); await p.waitForTimeout(1200);

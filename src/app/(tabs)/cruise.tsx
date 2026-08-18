@@ -3,7 +3,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { AlreadyPlayingCard } from '@/components/AlreadyPlayingCard';
+import { AlreadyPlayingCard, startAdoptedDrive } from '@/components/AlreadyPlayingCard';
+import { ModeSheet } from '@/components/ModeSheet';
+import { StationSheet } from '@/components/StationSheet';
 import { ConnectMusicCard } from '@/components/ConnectMusicCard';
 import { ConnectSpotifyCard } from '@/components/ConnectSpotifyCard';
 import { SpotifyNudgeCard } from '@/components/SpotifyNudgeCard';
@@ -71,6 +73,18 @@ export default function CruiseScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const np = useNowPlaying();
+  /**
+   * Choosing a mood and a look for music that is already playing, when the
+   * app cannot tell which station owns it. Held HERE rather than in the card
+   * because both sheets are absolutely positioned: inside the ScrollView they
+   * would be placed against the scroll content and land off-screen.
+   *
+   * ONE object with an explicit step, not two independent flags. StationSheet
+   * calls `onClose()` immediately after `onPick()`, so a close handler that
+   * simply cancels wipes the choice the pick just made and the second sheet
+   * never opens — which looks exactly like a sheet that failed to render.
+   */
+  const [adopt, setAdopt] = useState<{ mode: string; station: string | null } | null>(null);
   const { isPro } = useEntitlements();
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   // One smart hero: it becomes your last cruise if you have one, otherwise
@@ -179,6 +193,7 @@ export default function CruiseScreen() {
           track={spotify.track}
           contextUri={spotify.contextUri}
           contextName={spotify.contextName}
+          onAsk={(mode) => setAdopt({ mode, station: null })}
         />
         <HeadingAnywhereCard onAnswered={setKind} />
 
@@ -270,6 +285,35 @@ export default function CruiseScreen() {
           setSelectedStation(null);
         }}
         isPro={isPro}
+      />
+
+      {/* Cruising with music that is already on: the mood, then the look —
+          the same order the Modes tab asks in, so the pair is always chosen
+          the same way round. Siblings of the ScrollView, never inside it. */}
+      <StationSheet
+        visible={!!adopt && adopt.station === null}
+        /* Cancel ONLY if nothing was chosen — the sheet closes itself on pick,
+           and the updater form keeps the two in the right order. */
+        onClose={() => setAdopt((a) => (a && a.station === null ? null : a))}
+        onPick={(stationId) => setAdopt((a) => (a ? { ...a, station: stationId } : a))}
+        currentId={lastCruise?.stationId}
+        modeLabel={spotify.track?.title}
+      />
+      <ModeSheet
+        visible={!!adopt && adopt.station !== null}
+        onClose={() => setAdopt(null)}
+        currentId={adopt?.mode}
+        title="PICK A LOOK"
+        /* The floating tab bar hangs over this sheet on a page — without the
+           clearance the chip row sits UNDERNEATH it and cannot be tapped at
+           all. In a drive there is no tab bar, which is why the caller
+           supplies this rather than the sheet assuming one. */
+        extraBottom={TAB_SAFE_INSET}
+        onPick={(mode) => {
+          const stationId = adopt?.station;
+          setAdopt(null);
+          if (stationId) startAdoptedDrive(np, stationId, mode);
+        }}
       />
     </View>
   );

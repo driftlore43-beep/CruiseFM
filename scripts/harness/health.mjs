@@ -17,6 +17,8 @@ try {
 }
 const BASE = (process.env.BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
 
+import { visibleClicker } from './visible.mjs';
+
 const errors = [];
 const steps = [];
 const b = await chromium.launch({ args: ['--no-sandbox'], executablePath: process.env.CHROMIUM_PATH || undefined });
@@ -41,6 +43,9 @@ const has = async (t) => {
 };
 /** Navigation is judged by the route, which cannot be faked by a stale tab. */
 const at = (route) => p.url().replace(/[?#].*$/, '').endsWith(route);
+
+const clickVisible = visibleClicker(p);
+
 /** Tap, then prove something changed — never just "it didn't throw". */
 async function step(name, act, expect) {
   try {
@@ -117,7 +122,7 @@ await step('modes: the mood sheet opens on a mode',
   async () => {
     await tapTab('MODES');
     await p.waitForTimeout(1800);
-    await p.getByText('Equalizer', { exact: true }).first().click({ force: true });
+    await clickVisible('Equalizer');
   },
   // The sheet's own heading — "Night Run AM" would be true from the Stations
   // tab sitting mounted behind it.

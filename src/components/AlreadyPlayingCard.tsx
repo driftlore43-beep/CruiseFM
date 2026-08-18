@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -26,10 +26,18 @@ import type { NowPlaying } from '@/utils/useMusicPlayback';
  * answer for — someone with music already going, who wants the visual, and
  * whose only route in was to have their song replaced.
  *
- * WHICH STATION: if the playlist that is playing is one a station is linked
- * to, that station, because that is the true answer rather than a guess.
- * Otherwise the hour's own pick, which is what the home page would have
- * offered anyway. The MODE is the last one they drove in.
+ * WHICH STATION — AND WHO DECIDES. If the playlist that is playing is one a
+ * station is linked to, that station, because it is the true answer: one tap
+ * and the drive opens. Otherwise WE ARE GUESSING, and the card asks instead
+ * (owner, 18.08: "for a solo song that is playing, not associated with a
+ * playlist, allow the user to choose the station and [the mode]"). A solo
+ * track, an album, the radio, or a playlist no station owns all land here —
+ * one rule, "ask when we do not know", rather than a special case for each.
+ *
+ * The button says which it is going to be: a play triangle starts something,
+ * a chevron opens a chooser. A control that sometimes starts a drive and
+ * sometimes asks a question, behind the same glyph, is the kind of thing this
+ * app keeps taking out.
  *
  * IT NEVER APPEARS DURING A DRIVE, and it never appears without a real song —
  * a card that says "I hear this" when it hears nothing is exactly the kind of
@@ -40,15 +48,41 @@ import type { NowPlaying } from '@/utils/useMusicPlayback';
  * and no station match — it falls through to the hour's station. That is the
  * honest outcome rather than a guess dressed up as a match.
  */
-export function AlreadyPlayingCard({ track, contextUri, contextName }: {
+/**
+ * Open a drive around music that is ALREADY playing, without starting or
+ * changing anything. Shared, because the card takes this path itself when it
+ * knows the station, and the page takes it after asking when it doesn't —
+ * two callers, one definition, so they cannot drift.
+ */
+export function startAdoptedDrive(
+  np: ReturnType<typeof useNowPlaying>, stationId: string, mode: string,
+): void {
+  recordDriveStart(stationId, undefined, mode).catch(() => {});
+  np.open(mode, stationId, { adopt: true });
+}
+
+export function AlreadyPlayingCard({ track, contextUri, contextName, onAsk }: {
   track: NowPlaying | null;
   contextUri: string | null;
   contextName: string | null;
+  /**
+   * Ask the PAGE to run the station/mode chooser.
+   *
+   * The sheets cannot live in here: this card sits inside the page's
+   * ScrollView, and an absolutely-positioned sheet is placed against its
+   * nearest positioned ancestor — so it landed somewhere down the scroll
+   * content instead of over the screen, mounted and invisible. They are
+   * rendered as siblings of the ScrollView instead, which is exactly how the
+   * Modes tab does it.
+   */
+  onAsk: (defaultMode: string) => void;
 }) {
   const ap = useStyles(make_ap);
   const pal = usePalette();
   const np = useNowPlaying();
-  const [pick, setPick] = useState<{ stationId: string; mode: string } | null>(null);
+  // `stationId` is null when nothing owns this music — the signal that the
+  // card must ask rather than act.
+  const [pick, setPick] = useState<{ stationId: string | null; mode: string } | null>(null);
 
   // Worked out on focus rather than on tap: the button should name the
   // station it is about to open, not surprise you with one.
@@ -60,7 +94,7 @@ export function AlreadyPlayingCard({ track, contextUri, contextName }: {
           stationForPlaylist(contextUri),
           resolveCruiseToStart(),
         ]);
-        if (active) setPick({ stationId: linked ?? defaultStationForNow(), mode: last.mode });
+        if (active) setPick({ stationId: linked, mode: last.mode });
       })();
       return () => { active = false; };
     }, [contextUri]),
@@ -70,16 +104,15 @@ export function AlreadyPlayingCard({ track, contextUri, contextName }: {
   // already running.
   if (np.session || !track || track.isPlaying === false || !pick) return null;
 
-  const station = resolveAnyStation(pick.stationId);
+  const known = pick.stationId !== null;
+  const station = known ? resolveAnyStation(pick.stationId as string) : null;
 
-  const go = () => {
-    recordDriveStart(pick.stationId, undefined, pick.mode).catch(() => {});
-    // `adopt`: open the session and leave the music completely alone.
-    np.open(pick.mode, pick.stationId, { adopt: true });
-  };
 
   return (
-    <Pressable style={ap.card} onPress={go}>
+    <Pressable
+      style={ap.card}
+      onPress={() => (known ? startAdoptedDrive(np, pick.stationId as string, pick.mode)
+                            : onAsk(pick.mode))}>
       <View style={ap.iconRing}>
         <MaterialCommunityIcons name="ear-hearing" size={19} color={pal.text} />
       </View>
@@ -92,12 +125,16 @@ export function AlreadyPlayingCard({ track, contextUri, contextName }: {
             music is not the playlist they thought it was — which is the thing
             that prompted this card. */}
         <Text style={ap.sub} numberOfLines={2}>
-          {contextName ? `${contextName} · keep it playing on ${station.name}`
-                       : `Keep it playing on ${station.name}`}
+          {station
+            ? (contextName ? `${contextName} · keep it playing on ${station.name}`
+                           : `Keep it playing on ${station.name}`)
+            : 'Keep it playing — pick a mood and a look'}
         </Text>
       </View>
       <View style={ap.go}>
-        <MaterialCommunityIcons name="play" size={18} color={pal.mode === 'light' ? pal.panel : '#0a0a12'} />
+        {known
+          ? <MaterialCommunityIcons name="play" size={18} color={pal.mode === 'light' ? pal.panel : '#0a0a12'} />
+          : <Ionicons name="chevron-forward" size={17} color={pal.mode === 'light' ? pal.panel : '#0a0a12'} />}
       </View>
     </Pressable>
   );

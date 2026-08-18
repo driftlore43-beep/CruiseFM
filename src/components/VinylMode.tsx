@@ -11,6 +11,7 @@ import { OWNER_MODE } from '@/constants/config';
 import { Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
+import { useScrubFocus } from '@/utils/useScrubFocus';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
@@ -772,6 +773,28 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const lastSyncAtRef     = useRef<number | null>(null);
   // Grain under the thumb, shared with the CD so the two can't drift apart.
   const scrubHaptics = useRef(createScrubHaptics()).current;
+  const scrubFocus = useScrubFocus();
+  /**
+   * The deck comes forward while it is being wound, and goes back when it is
+   * let go. Driven from the SCRUB STATE rather than from each branch of the
+   * gesture: the responder has three ways out (release, terminate, and a drag
+   * that turns out to be a dismiss) and hooking each one is how the three
+   * quietly drift apart. Every one of them already sets this flag.
+   */
+  const wasScrubbingRef = useRef(false);
+  useEffect(() => {
+    if (isScrubbing) {
+      scrubFocus.begin();
+      scrubHaptics.grab();
+      wasScrubbingRef.current = true;
+      return;
+    }
+    scrubFocus.end();
+    // Only on the way DOWN from a real scrub — otherwise the mode taps out a
+    // haptic simply for mounting.
+    if (wasScrubbingRef.current) { scrubHaptics.release(); wasScrubbingRef.current = false; }
+  }, [isScrubbing]);
+
   const progressBarWidthRef = useRef(300);
   const spinCurrentRef    = useRef(0);
   const pbHandlerRef      = useRef({ onGrant: (_x: number) => {}, onMove: (_x: number) => {}, onRelease: () => {} });
@@ -1311,8 +1334,18 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         style={[fs.container, { transform: [{ translateY: slideY }] }]}
         {...dismissPan.panHandlers}
         onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
-        <StationBackdrop station={station} blurRadius={2.5} />
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ scale: scrubFocus.backdropScale }] }]}>
+          <StationBackdrop station={station} blurRadius={2.5} />
+        </Animated.View>
         <ModeScrim station={station} />
+        {/* The background falls away while the deck is being wound — see
+            useScrubFocus for why this is a veil and a small push rather than
+            the blur that was asked for. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: '#04040a', opacity: scrubFocus.veilOpacity }]}
+        />
+
         <LinearGradient
           colors={['transparent', (station.eqColors?.[1] ?? V.gold) + '26', 'transparent']}
           locations={[0, 0.5, 1]}
@@ -1358,6 +1391,14 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           )}
 
           <Animated.View style={[fs.turntableWrap, isLandscape && { flex: 1, justifyContent: 'center' }, deckScene]}>
+            {/* A SECOND wrapper, not another entry in deckScene's transform
+                array: two style objects each carrying `transform` do not
+                merge, the later one replaces the earlier, so the deck's
+                landscape glide and this scale have to live on separate
+                views. Scaling about the object's own centre also leaves the
+                gesture maths alone — `measure` reports the untransformed
+                box, and a centred scale does not move the centre. */}
+            <Animated.View style={{ transform: [{ scale: scrubFocus.objectScale }] }}>
             <TurntableHero
               platSize={platSize} spin={spin} tonearmAnim={tonearmVal} glowOpacity={glowOpacity}
               ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={spin} playing={live}
@@ -1367,6 +1408,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
               albumArt={spotify.track?.albumArt ?? null}
               progressAnim={progress}
             />
+            </Animated.View>
           </Animated.View>
 
           {!isLandscape && (

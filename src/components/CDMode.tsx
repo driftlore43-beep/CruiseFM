@@ -16,6 +16,7 @@ import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/Lands
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
+import { useScrubFocus } from '@/utils/useScrubFocus';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
@@ -413,6 +414,28 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   const lastAngleRef = useRef<number | null>(null);
   const tapStartRef = useRef(0);
   const scrubHaptics = useRef(createScrubHaptics()).current;
+  const scrubFocus = useScrubFocus();
+  /**
+   * The deck comes forward while it is being wound, and goes back when it is
+   * let go. Driven from the SCRUB STATE rather than from each branch of the
+   * gesture: the responder has three ways out (release, terminate, and a drag
+   * that turns out to be a dismiss) and hooking each one is how the three
+   * quietly drift apart. Every one of them already sets this flag.
+   */
+  const wasScrubbingRef = useRef(false);
+  useEffect(() => {
+    if (scrubbing) {
+      scrubFocus.begin();
+      scrubHaptics.grab();
+      wasScrubbingRef.current = true;
+      return;
+    }
+    scrubFocus.end();
+    // Only on the way DOWN from a real scrub — otherwise the mode taps out a
+    // haptic simply for mounting.
+    if (wasScrubbingRef.current) { scrubHaptics.release(); wasScrubbingRef.current = false; }
+  }, [scrubbing]);
+
   const durMsRef = useRef(1);
   durMsRef.current = Math.max(1, durationMs);
   // togglePlay is defined further down; the responder is built once, so it
@@ -723,8 +746,18 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
         {...dismissPan.panHandlers}
         onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
 
-        <StationBackdrop station={station} blurRadius={3} />
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ scale: scrubFocus.backdropScale }] }]}>
+          <StationBackdrop station={station} blurRadius={3} />
+        </Animated.View>
         <ModeScrim station={station} />
+        {/* The background falls away while the deck is being wound — see
+            useScrubFocus for why this is a veil and a small push rather than
+            the blur that was asked for. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: '#04040a', opacity: scrubFocus.veilOpacity }]}
+        />
+
 
         {!isLandscape && (
         <View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
@@ -749,7 +782,18 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
             <Animated.View style={deckScene}>
             <View style={fs.caseShadow} {...discPan.panHandlers}>
               <JewelCase size={caseSize}>
-                <CDDisc size={discSize} spin={spin} albumArt={spotify.track?.albumArt ?? null} />
+                {/* THE DISC LEANS IN, NOT THE CASE. The case already runs to
+                    97% of the window, so scaling it only sliced its own
+                    corners off against the screen edges; the disc sits at 85%
+                    of the case and has somewhere to go, and a disc lifting
+                    toward you inside its case is the better picture anyway.
+                    Scaling about its own centre leaves the gesture alone —
+                    `measure` reports the untransformed box, and a centred
+                    scale does not move the centre the angles are taken
+                    from. */}
+                <Animated.View style={{ transform: [{ scale: scrubFocus.objectScale }] }}>
+                  <CDDisc size={discSize} spin={spin} albumArt={spotify.track?.albumArt ?? null} />
+                </Animated.View>
               </JewelCase>
             </View>
             </Animated.View>

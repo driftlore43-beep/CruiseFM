@@ -47,6 +47,14 @@ export type ScrubHaptics = {
   turn: (deltaDeg: number) => void;
   /** Call on grant and on release, so a new gesture starts on a crisp detent. */
   reset: () => void;
+  /** The moment the deck is taken hold of. A single firmer impact under the
+   *  detents — picking something up feels different from dragging it, and
+   *  without it the grain fades in from nothing and the gesture has no
+   *  beginning. */
+  grab: () => void;
+  /** And the moment it is let go. Lighter than the grab: putting something
+   *  down should not feel like picking it up. */
+  release: () => void;
 };
 
 export function createScrubHaptics(): ScrubHaptics {
@@ -83,6 +91,19 @@ export function createScrubHaptics(): ScrubHaptics {
     reset() {
       accumDeg = 0;
       lastAt = 0;
+    },
+
+    grab() {
+      // Medium, so it reads through whatever detents follow immediately. It
+      // also RESETS the rate gate, or a grab landing inside the 55ms window
+      // would swallow the first detent of the new gesture.
+      accumDeg = 0;
+      lastAt = Date.now();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    },
+
+    release() {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     },
   };
 }

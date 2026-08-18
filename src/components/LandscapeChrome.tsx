@@ -50,7 +50,8 @@ export const LS_CHROME_CLEAR = 178;
 const REST_MS = 6000;
 
 export function useChromeFade({ active, playing, sheetOpen }: {
-  /** Fade only runs while this is true (mode visible AND in landscape). */
+  /** Fade only runs while this is true. Portrait AND landscape now — the
+   *  resting grammar is the same on both axes; see useRestScene. */
   active: boolean;
   playing: boolean;
   /** A sheet on top means the user is mid-task — never rest under one. */
@@ -115,7 +116,7 @@ export function useChromeFade({ active, playing, sheetOpen }: {
     if (!active) {
       if (timer.current) { clearTimeout(timer.current); timer.current = null; }
       setRested(false);
-      // Portrait parks it at 1 so nothing downstream sees a half-docked value.
+      // Inactive parks it at 1 so nothing downstream sees a half-docked value.
       chrome.setValue(1);
       wasActive.current = false;
       return;
@@ -151,6 +152,46 @@ export function useChromeFade({ active, playing, sheetOpen }: {
  * the scene stayed shrunk and pushed left forever. Always render the style;
  * never write `isLandscape ? deckScene : null` again.
  */
+/**
+ * The scene's shift while the PORTRAIT chrome is away.
+ *
+ * Owner, 18.08: "create a feature where the visual modes can stand alone and
+ * leave out the controls… like how it works for the landscape mode, where
+ * after 6 seconds the controls disappear and the mode moves more centre."
+ *
+ * Landscape already rests: the deck panel slides off and the scene glides to
+ * the middle of the screen it now has to itself. This is the same move on the
+ * other axis.
+ *
+ * `shift` is MEASURED by the mode, not guessed, and it is the exact distance
+ * that puts the object's centre on the content box's centre — see
+ * `restShiftFor`. A shared constant cannot do this: the bottom stack is a
+ * different height in every mode (a song block, sometimes a seek bar,
+ * transport, pills, and some of those come and go with the track), so one
+ * number would leave half of them visibly off-centre.
+ */
+export function useRestScene(chrome: Animated.Value, shift: number, active = true) {
+  return useMemo(() => ({
+    transform: [{
+      translateY: chrome.interpolate({
+        inputRange: [0, 1], outputRange: [active ? shift : 0, 0],
+      }),
+    }],
+  }), [chrome, shift, active]);
+}
+
+/**
+ * How far the scene has to move to sit in the middle of its container.
+ *
+ * Both boxes come from onLayout, so this is the real rendered geometry rather
+ * than an assumption about how tall a transport row is. Zero until both have
+ * been measured, which means the very first frame never jumps.
+ */
+export function restShiftFor(contentH: number, sceneY: number, sceneH: number): number {
+  if (!contentH || !sceneH) return 0;
+  return contentH / 2 - (sceneY + sceneH / 2);
+}
+
 export function useDeckScene(chrome: Animated.Value, winW: number, scale = 0.86, active = true) {
   return useMemo(() => ({
     transform: [

@@ -8,7 +8,7 @@ import {
 import Svg, { Circle, Defs, Ellipse, Line, LinearGradient as SvgGradient, Mask, Rect, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
+import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { STATIONS } from '@/constants/stations';
@@ -478,12 +478,19 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
 
   // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
-    active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
+    // BOTH orientations now — portrait rests the same way (useRestScene).
+    active: visible, playing, sheetOpen: showMood || showPicker,
   });
   // Slide only — shrinking a full-bleed scene would reveal its edges. The
   // sun (drawn at centre) lands at the left pane's centre while the panel
   // is docked, and glides back to true centre at rest.
   const deckScene = useDeckScene(chrome, winW, 1, isLandscape);
+  // The scene re-centres itself once the controls have gone. MEASURED rather
+  // than assumed, so each mode's own deliberate offsets survive — see
+  // restShiftFor in LandscapeChrome.
+  const [contentH, setContentH] = useState(0);
+  const [sceneBox, setSceneBox] = useState({ y: 0, h: 0 });
+  const restScene = useRestScene(chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape);
 
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
   const { progress, elapsedMs, durationMs, scrub } = useTrackClock({
@@ -635,30 +642,39 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
         )}
 
         {!isLandscape && (
-        <View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
+        <Animated.View style={{ opacity: chrome, position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
-        </View>
+        </Animated.View>
         )}
 
         {!isLandscape && (
-        <View style={[fs.topBar, { top: topPad + 14 }]}>
+        <Animated.View style={[fs.topBar, { top: topPad + 14 }, { opacity: chrome }]}>
           <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>HORIZON</Text>
-        </View>
+        </Animated.View>
         )}
 
         {/* Content */}
         {!isLandscape && (
-        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>
-          <View style={{ paddingHorizontal: 32, paddingBottom: 10, alignItems: 'center' }}>
+        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}
+          onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
+          <Animated.View style={{ opacity: chrome, paddingHorizontal: 32, paddingBottom: 10, alignItems: 'center' }}>
             <StationIdentity station={station} />
-          </View>
+          </Animated.View>
 
           {/* The scene itself is the full-bleed layer above; this slot just
               holds the column's shape and carries the floating notes. */}
-          <View style={{ flex: 1 }}>
+          <View
+            style={{ flex: 1 }}
+            onLayout={(e) => setSceneBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
             <FloatingNotes playing={live} color={eq[1]} />
           </View>
 
+          {/* EVERYTHING BELOW THE SCENE RESTS TOGETHER. pointerEvents goes
+              off once it is invisible, or the tap meant to bring the controls
+              back would press whatever button it landed on. */}
+          <Animated.View
+            style={{ alignSelf: 'stretch', opacity: chrome }}
+            pointerEvents={chromeRested ? 'none' : 'auto'}>
           {/* Song title / mood line */}
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
             {hasTrack
@@ -713,6 +729,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             track={spotify.track}
             station={station}
           />
+          </Animated.View>
         </View>
         )}
 
@@ -737,7 +754,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
           />
         )}
 
-        {!isLandscape && <ModeCloseButton onPress={handleClose} />}
+        {!isLandscape && <ModeCloseButton onPress={handleClose} chrome={chrome} rested={chromeRested} />}
 
         <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} hero={false} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />

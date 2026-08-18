@@ -9,7 +9,7 @@ import {
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Line, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModeSheet } from '@/components/ModeSheet';
-import { DECK_FRAC, LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
+import { DECK_FRAC, LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
@@ -891,7 +891,8 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
   // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
-    active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
+    // BOTH orientations now — portrait rests the same way (useRestScene).
+    active: visible, playing, sheetOpen: showMood || showPicker,
   });
   // Slide only, no scale: the dial is a full-width INSTRUMENT and shrinking
   // it just makes the frequencies unreadable. Sliding puts the needle at the
@@ -899,6 +900,12 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   // rest; the dial simply continues behind the panel, which is what a real
   // head unit's scale does anyway.
   const deckScene = useDeckScene(chrome, winW, 1, isLandscape);
+  // The scene re-centres itself once the controls have gone. MEASURED rather
+  // than assumed, so each mode's own deliberate offsets survive — see
+  // restShiftFor in LandscapeChrome.
+  const [contentH, setContentH] = useState(0);
+  const [sceneBox, setSceneBox] = useState({ y: 0, h: 0 });
+  const restScene = useRestScene(chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape);
 
   // Real song when connected, else the mood's own line — never a fake track.
   const hasTrack = !!spotify.track;
@@ -1022,7 +1029,13 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
-      <Animated.View style={[{ flex: 1, backgroundColor: '#05060f' }, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
+      <Animated.View
+        style={[{ flex: 1, backgroundColor: '#05060f' }, { transform: [{ translateY: slideY }] }]}
+        {...dismissPan.panHandlers}
+        /* Passive touch sniffer — never claims the gesture, just brings the
+           rested chrome back. Must sit on the root so it sees taps on the
+           dial, the buttons and the empty scene alike. */
+        onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
 
         {/* Locked station scene, darkened; mood tint follows the needle */}
         <StationBackdrop station={lockedStation} blurRadius={2.5} />
@@ -1044,23 +1057,27 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
         />
 
         {/* Drag pill */}
-        <View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
+        <Animated.View style={{ opacity: chrome, position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
-        </View>
+        </Animated.View>
 
         {/* Top bar */}
-        <View style={[fs.topBar, { top: topPad + 14 }]}>
+        <Animated.View style={[fs.topBar, { top: topPad + 14 }, { opacity: chrome }]}>
           <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>TUNER</Text>
-        </View>
+        </Animated.View>
 
         {/* Content */}
-        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}>
-          <View style={{ paddingHorizontal: 32, paddingBottom: 10, alignItems: 'center' }}>
+        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: Math.max(insets.bottom, 24) + 16 }}
+          onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
+          <Animated.View style={{ opacity: chrome, paddingHorizontal: 32, paddingBottom: 10, alignItems: 'center' }}>
             <StationIdentity station={lockedStation} />
-          </View>
+          </Animated.View>
 
           {/* ── The dial — drag anywhere in this zone to tune ── */}
-          <View style={{ flex: 1, justifyContent: 'center' }} {...pan.panHandlers}>
+          <Animated.View
+            style={[{ flex: 1, justifyContent: 'center' }, restScene]}
+            onLayout={(e) => setSceneBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}
+            {...pan.panHandlers}>
 
             {/* The head-unit display */}
             <View style={{ alignItems: 'center' }}>
@@ -1087,7 +1104,14 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             </View>
 
             <Text style={[fs.dragHint, { fontFamily: Fonts.mono }]}>tap am / fm  ·  drag to tune</Text>
-          </View>
+          </Animated.View>
+
+          {/* EVERYTHING BELOW THE DIAL RESTS TOGETHER. pointerEvents goes
+              off once it is invisible, or the tap meant to bring the controls
+              back would press whatever button it landed on. */}
+          <Animated.View
+            style={{ alignSelf: 'stretch', opacity: chrome }}
+            pointerEvents={chromeRested ? 'none' : 'auto'}>
 
           {/* With a song on the display there's nothing to repeat here — the
               mood line only appears when there's no track to show. */}
@@ -1143,9 +1167,10 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             track={spotify.track}
             station={lockedStation}
           />
+          </Animated.View>
         </View>
 
-        <ModeCloseButton onPress={handleClose} />
+        <ModeCloseButton onPress={handleClose} chrome={chrome} rested={chromeRested} />
 
         <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />

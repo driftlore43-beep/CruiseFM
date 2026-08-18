@@ -35,7 +35,7 @@ import { AmbientGlow } from '@/components/AmbientGlow';
 import { ModeActionRow } from '@/components/ModeActionRow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
-import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
+import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
 import { SeekBar } from '@/components/SeekBar';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -969,9 +969,16 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
   // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
-    active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
+    // BOTH orientations now — portrait rests the same way (useRestScene).
+    active: visible, playing, sheetOpen: showMood || showPicker,
   });
   const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
+  // The scene re-centres itself once the controls have gone. MEASURED rather
+  // than assumed, so each mode's own deliberate offsets survive — see
+  // restShiftFor in LandscapeChrome.
+  const [contentH, setContentH] = useState(0);
+  const [sceneBox, setSceneBox] = useState({ y: 0, h: 0 });
+  const restScene = useRestScene(chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape);
 
   // Glow: 0.3 → 0.6 range, gentle amber pulse
 
@@ -1095,7 +1102,13 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   // ── Portrait ───────────────────────────────────────────────────────────────
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent>
-      <Animated.View style={[fs.container, { backgroundColor: C.bg, transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
+      <Animated.View
+        style={[fs.container, { backgroundColor: C.bg, transform: [{ translateY: slideY }] }]}
+        {...dismissPan.panHandlers}
+        /* Passive touch sniffer — never claims the gesture, just brings the
+           rested chrome back. Must sit on the root so it sees taps on the
+           shell, the buttons and the empty scene alike. */
+        onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
         {background}
         <GrainOverlay />
 
@@ -1107,33 +1120,45 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
         />
 
         {/* Floating chrome */}
-        <View style={[fs.floatingTop, { top: topPad + 8, zIndex: 10 }]}>
+        <Animated.View style={[fs.floatingTop, { top: topPad + 8, zIndex: 10, opacity: chrome }]}>
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
-        </View>
+        </Animated.View>
 
         {/* Mode name — top-left corner tag, same treatment as every other mode */}
-        <View style={{ position: 'absolute', top: topPad + 14, left: 20, zIndex: 10 }} pointerEvents="none">
+        <Animated.View style={{ opacity: chrome, position: 'absolute', top: topPad + 14, left: 20, zIndex: 10 }} pointerEvents="none">
           <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', letterSpacing: 3, fontFamily: Fonts.mono }}>CASSETTE</Text>
-        </View>
+        </Animated.View>
 
-        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: bottomPad }}>
+        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: bottomPad }}
+          onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
 
           {/* Header — small top-center, Spotify style */}
-          <View style={fs.header}>
+          <Animated.View style={[fs.header, { opacity: chrome }]}>
             <StationIdentity station={station} />
-          </View>
+          </Animated.View>
 
           {/* Cassette hero — flex:1 so it grows to fill available space */}
-          <View style={[fs.cassetteWrap, { flex: 1 }]}>
+          <Animated.View
+            style={[fs.cassetteWrap, { flex: 1 }, restScene]}
+            onLayout={(e) => setSceneBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
             {/* Notes BEHIND the shell. Drawn after it they landed on the
                 plastic — between the reels, on the top edge — and on a
                 physical object that reads as dirt rather than atmosphere. */}
             <FloatingNotes playing={live} color={neonColor} />
-            <TouchableOpacity onPress={togglePlay} activeOpacity={0.92}>
+            {/* A tap while the controls are away only brings them back — the
+                root sniffer has already done that. Without the guard, the tap
+                meant to wake the deck would pause the music instead. */}
+            <TouchableOpacity onPress={() => { if (!chromeRested) togglePlay(); }} activeOpacity={0.92}>
               <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} />
             </TouchableOpacity>
-          </View>
+          </Animated.View>
 
+          {/* EVERYTHING BELOW THE SCENE RESTS TOGETHER. pointerEvents goes
+              off once it is invisible, or the tap meant to bring the controls
+              back would press whatever button it landed on. */}
+          <Animated.View
+            style={{ alignItems: 'center', alignSelf: 'stretch', opacity: chrome }}
+            pointerEvents={chromeRested ? 'none' : 'auto'}>
           {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
             {spotify.track
@@ -1208,10 +1233,11 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             track={spotify.track}
             station={station}
           />
+          </Animated.View>
 
         </View>
 
-        <ModeCloseButton onPress={handleClose} />
+        <ModeCloseButton onPress={handleClose} chrome={chrome} rested={chromeRested} />
 
         <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />

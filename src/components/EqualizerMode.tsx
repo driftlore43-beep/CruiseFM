@@ -33,7 +33,7 @@ import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { AmbientGlow } from '@/components/AmbientGlow';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
-import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
+import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { MarqueeText } from '@/components/MarqueeText';
@@ -376,13 +376,20 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   // The landscape rest-and-wake cycle (L3). Inactive in portrait, where the
   // controls stay put — only the sideways scene earns the fade.
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
-    active: visible && isLandscape,
+    // BOTH orientations now. Landscape has rested since July; portrait does
+    // the same thing on the other axis — see useRestScene.
+    active: visible,
     playing,
     sheetOpen: showMood || showPicker,
   });
   // 0.62: the meter is full-width, so the generic 0.86 would poke under the
   // docked panel.
   const deckScene = useDeckScene(chrome, winW, 0.68, isLandscape);
+  // Measured, not guessed: where the scene sits inside the content box, and
+  // how tall that box is, together give the exact distance to the middle.
+  const [contentH, setContentH] = useState(0);
+  const [sceneBox, setSceneBox] = useState({ y: 0, h: 0 });
+  const restScene = useRestScene(chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape);
 
   useEffect(() => {
     if (visible) getStationPlaylist(activeStation).then(setLinked);
@@ -539,7 +546,13 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" onRequestClose={() => {}} statusBarTranslucent>
-      <Animated.View style={[fs.container, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
+      <Animated.View
+        style={[fs.container, { transform: [{ translateY: slideY }] }]}
+        {...dismissPan.panHandlers}
+        /* Passive touch sniffer — never claims the gesture, just brings the
+           rested chrome back. Must sit on the root so it sees taps on the
+           scene, the buttons and the empty backdrop alike. */
+        onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
 
         {background}
 
@@ -591,30 +604,34 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
         </Animated.View>
 
         {/* Drag pill — swipe down hint */}
-        <View style={{ position: 'absolute', top: topPad + 6, left: 0, right: 0, alignItems: 'center', zIndex: 25 }} pointerEvents="none">
+        <Animated.View style={{ position: 'absolute', top: topPad + 6, left: 0, right: 0, alignItems: 'center', zIndex: 25, opacity: chrome }} pointerEvents="none">
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' }} />
-        </View>
+        </Animated.View>
 
         {/* Mode name — top-left corner tag, same treatment as every other mode */}
-        <View style={{ position: 'absolute', top: topPad + 14, left: 20, zIndex: 10 }} pointerEvents="none">
+        <Animated.View style={{ position: 'absolute', top: topPad + 14, left: 20, zIndex: 10, opacity: chrome }} pointerEvents="none">
           <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', letterSpacing: 3, fontFamily: Fonts.mono }}>EQUALIZER</Text>
-        </View>
+        </Animated.View>
 
         {/* Close button — fixed top right, always visible */}
 
         {/* Content */}
-        <View style={[fs.content, { paddingTop: topPad + 52, paddingBottom: bottomPad }]}>
+        <View
+          style={[fs.content, { paddingTop: topPad + 52, paddingBottom: bottomPad }]}
+          onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
 
           {/* Station — small top-center label, Spotify "Playing From Playlist" style */}
-          <View style={fs.identity}>
+          <Animated.View style={[fs.identity, { opacity: chrome }]}>
             <StationIdentity station={currentStation} />
-          </View>
+          </Animated.View>
 
           {/* Flexible spacer — pushes the whole player cluster to the bottom,
               leaving the upper half as the mood image. */}
           <View style={{ flex: 1 }} pointerEvents="none" />
 
-          <View style={fs.vizSection}>
+          <Animated.View
+            style={[fs.vizSection, restScene]}
+            onLayout={(e) => setSceneBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
             <Bars
               values={fsValues}
               barW={FS_BAR_W}
@@ -622,7 +639,16 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
             />
             <FloatingNotes playing={live} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
-          </View>
+          </Animated.View>
+
+          {/* THE BOTTOM STACK, in one wrapper. It fades and stops taking
+              touches together, and its measured height is what tells the
+              scene how far to move. `pointerEvents` matters as much as the
+              opacity: an invisible play button is still a play button, so a
+              tap meant to wake the controls would toggle playback instead. */}
+          <Animated.View
+            style={{ width: '100%', alignItems: 'center', opacity: chrome }}
+            pointerEvents={chromeRested ? 'none' : 'auto'}>
 
           {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
@@ -694,10 +720,11 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             track={spotify.track}
             station={currentStation}
           />
+          </Animated.View>
 
         </View>
 
-        <ModeCloseButton onPress={handleClose} />
+        <ModeCloseButton onPress={handleClose} chrome={chrome} rested={chromeRested} />
 
         <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />

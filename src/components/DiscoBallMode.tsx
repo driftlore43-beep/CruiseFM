@@ -23,7 +23,7 @@ import { useMusicPlayback, nextRepeat } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
-import { LandscapeChrome, useDeckScene, useIsoLayoutEffect } from '@/components/LandscapeChrome';
+import { LandscapeChrome, restShiftFor, useDeckScene, useIsoLayoutEffect, useRestScene } from '@/components/LandscapeChrome';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
@@ -1387,12 +1387,13 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
     // Only ever rests during playback: a paused drive is one you are looking
     // at, and hiding the play button from someone who just paused is rude.
     //
-    // ...and only SIDEWAYS. Portrait resting was this mode's own invention
-    // and no other mode does it, so the Mirror Ball was the one screen where
-    // the controls vanished while you were holding the phone normally
-    // (owner, 30.07). The landscape deck still docks and rests — that is the
-    // agreed grammar and every mode shares it.
-    if (playing && !sheetOpen && isLandscape) {
+    // BOTH ORIENTATIONS AGAIN. Portrait resting started here and was gated to
+    // landscape on 30.07 for a good reason at the time — no other mode did
+    // it, so this was the one screen where the controls vanished while you
+    // held the phone normally. Every mode does it now (owner, 18.08: "the
+    // visual modes can stand alone… like how it works for the landscape
+    // mode"), so the exception has gone the other way.
+    if (playing && !sheetOpen) {
       restTimer.current = setTimeout(() => {
         setChromeRested(true);
         Animated.timing(chrome, {
@@ -1436,6 +1437,13 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   }, []);
 
   const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
+  // Where the ball's box sits inside the content box, and how tall that box
+  // is: together, the exact distance to the middle once the controls have
+  // gone. Measuring the BOX rather than the ball is deliberate — the ball is
+  // deliberately offset high inside it, and that offset should survive.
+  const [contentH, setContentH] = useState(0);
+  const [sceneBox, setSceneBox] = useState({ y: 0, h: 0 });
+  const restScene = useRestScene(chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape);
 
   const hasTrack = !!spotify.track;
   const title = spotify.track?.title ?? station.tagline;
@@ -1535,7 +1543,9 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         </Animated.View>
         )}
 
-        <View style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : Math.max(insets.bottom, 24) + 16 }}>
+        <View
+          style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : Math.max(insets.bottom, 24) + 16 }}
+          onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
           {!isLandscape && (
           <Animated.View style={{ alignItems: 'center', paddingHorizontal: 32, paddingBottom: 10, opacity: chrome }} pointerEvents="none">
             <StationIdentity station={station} />
@@ -1550,7 +1560,9 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
               seek bar and play disc. */}
           {/* paddingBottom lifts the ball off dead centre — it hangs from
               above, so sitting high is what reads right (owner, 30.07). */}
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? ballSize * 0.16 : ballSize * 0.30 }}>
+          <Animated.View
+            style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? ballSize * 0.16 : ballSize * 0.30 }, restScene]}
+            onLayout={(e) => setSceneBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
             <Animated.View style={[{ alignItems: 'center' }, deckScene]}>
               <View style={{ width: 2, height: ballSize * 0.22, backgroundColor: 'rgba(255,255,255,0.25)' }} />
               <View style={{ width: 14, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: -3 }} />
@@ -1574,7 +1586,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
                 <MirrorBall size={ballSize} eq={eq} spin={spin} pulse={pulse} lit={live} spotPan={spotPan} />
               </View>
             </Animated.View>
-          </View>
+          </Animated.View>
 
           {/* Everything below the ball rests together. pointerEvents goes off
               once it's invisible so the first tap only wakes it — you can't

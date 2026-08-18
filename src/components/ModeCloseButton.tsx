@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet } from 'react-native';
+import { Animated, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
@@ -9,17 +9,34 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
  * on a gesture landing. Top-right, high z-index so it sits above everything —
  * even the handoff panel.
  */
-export function ModeCloseButton({ onPress }: { onPress: () => void }) {
+export function ModeCloseButton({ onPress, chrome, rested = false }: {
+  onPress: () => void;
+  /**
+   * Fades with the rest of the controls when a mode goes to rest, so the
+   * scene really is standing alone — a lone chevron over an otherwise empty
+   * picture is the one thing that would still say "app". Omit it and the
+   * button behaves exactly as it always has, which is what the modes that
+   * do not rest still want.
+   */
+  chrome?: Animated.Value;
+  /** Rested means invisible, and an invisible button must not be pressable:
+   *  the tap that is meant to bring the controls back would otherwise close
+   *  the mode instead. */
+  rested?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onPress}
       hitSlop={14}
-      style={[st.btn, { top: Math.max(insets.top, 18) + 4 }]}>
+      pointerEvents={rested ? 'none' : 'auto'}
+      style={[st.btn, { top: Math.max(insets.top, 18) + 4 }, chrome ? { opacity: chrome } : null]}>
       <Ionicons name="chevron-down" size={22} color="rgba(255,255,255,0.9)" />
-    </Pressable>
+    </AnimatedPressable>
   );
 }
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const st = StyleSheet.create({
   btn: {

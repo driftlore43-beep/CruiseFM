@@ -12,7 +12,7 @@ import Svg, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
+import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
@@ -377,9 +377,16 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
 
   // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
-    active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
+    // BOTH orientations now — portrait rests the same way (useRestScene).
+    active: visible, playing, sheetOpen: showMood || showPicker,
   });
   const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
+  // The scene re-centres itself once the controls have gone. MEASURED rather
+  // than assumed, so each mode's own deliberate offsets survive — see
+  // restShiftFor in LandscapeChrome.
+  const [contentH, setContentH] = useState(0);
+  const [sceneBox, setSceneBox] = useState({ y: 0, h: 0 });
+  const restScene = useRestScene(chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape);
 
   const wrap01 = (v: number) => ((v % 1) + 1) % 1;
   const readAnim = (a: Animated.Value) => (a as unknown as { __getValue?: () => number }).__getValue?.() ?? 0;
@@ -415,6 +422,9 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   const tapStartRef = useRef(0);
   const scrubHaptics = useRef(createScrubHaptics()).current;
   const scrubFocus = useScrubFocus();
+  /** Read inside the disc's responder, which is built once. */
+  const restedRef = useRef(false);
+  restedRef.current = chromeRested;
   /**
    * The deck comes forward while it is being wound, and goes back when it is
    * let go. Driven from the SCRUB STATE rather than from each branch of the
@@ -588,7 +598,10 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
         // through scrub.end — that always seeks, and seeking to a stale
         // position on every play/pause stutters the song. togglePlay flips
         // `playing`, and the clock effect re-syncs.
-        if (kind === null && Date.now() - tapStartRef.current < 450) {
+        // A tap while the controls are away only brings them back — the root
+        // sniffer has already done that by now. Without this, the tap meant to
+        // wake the deck would pause the music instead.
+        if (kind === null && !restedRef.current && Date.now() - tapStartRef.current < 450) {
           scrubPillAnim.setValue(0);
           togglePlayRef.current();
           return;
@@ -760,25 +773,28 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
 
 
         {!isLandscape && (
-        <View style={{ position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
+        <Animated.View style={{ opacity: chrome, position: 'absolute', top: topPad + 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 }} pointerEvents="none">
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
-        </View>
+        </Animated.View>
         )}
 
         {!isLandscape && (
-        <View style={[fs.topBar, { top: topPad + 14 }]}>
+        <Animated.View style={[fs.topBar, { top: topPad + 14 }, { opacity: chrome }]}>
           <Text style={[fs.modeLabel, { fontFamily: Fonts.mono }]}>CD</Text>
-        </View>
+        </Animated.View>
         )}
 
-        <View style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : Math.max(insets.bottom, 24) + 16 }}>
+        <View style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : Math.max(insets.bottom, 24) + 16 }}
+          onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
           {!isLandscape && (
-          <View style={{ paddingHorizontal: 32, paddingBottom: 10, alignItems: 'center' }}>
+          <Animated.View style={{ opacity: chrome, paddingHorizontal: 32, paddingBottom: 10, alignItems: 'center' }}>
             <StationIdentity station={station} />
-          </View>
+          </Animated.View>
           )}
 
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Animated.View
+            style={[{ flex: 1, alignItems: 'center', justifyContent: 'center' }, restScene]}
+            onLayout={(e) => setSceneBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
             <Animated.View style={deckScene}>
             <View style={fs.caseShadow} {...discPan.panHandlers}>
               <JewelCase size={caseSize}>
@@ -797,7 +813,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
               </JewelCase>
             </View>
             </Animated.View>
-          </View>
+          </Animated.View>
 
           {/* Wind marker — the record's pill, in the station's own colour
               rather than the vinyl's gold, so it belongs to this deck. */}
@@ -811,7 +827,12 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
           </Animated.View>
 
           {!isLandscape && (
-          <>
+          /* EVERYTHING BELOW THE SCENE RESTS TOGETHER. pointerEvents goes
+             off once it is invisible, or the tap meant to bring the controls
+             back would press whatever button it landed on. */
+          <Animated.View
+            style={{ alignSelf: 'stretch', opacity: chrome }}
+            pointerEvents={chromeRested ? 'none' : 'auto'}>
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
             {hasTrack
               ? <MarqueeText text={title} style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: 0 }} />
@@ -862,7 +883,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
             track={spotify.track}
             station={station}
           />
-          </>
+          </Animated.View>
           )}
         </View>
 
@@ -887,7 +908,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
           />
         )}
 
-        {!isLandscape && <ModeCloseButton onPress={handleClose} />}
+        {!isLandscape && <ModeCloseButton onPress={handleClose} chrome={chrome} rested={chromeRested} />}
 
         <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={eq[1]} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />

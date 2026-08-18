@@ -16,7 +16,7 @@ import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { ModeScrim } from '@/components/ModeScrim';
-import { LandscapeChrome, useChromeFade, useDeckScene } from '@/components/LandscapeChrome';
+import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
@@ -728,9 +728,16 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
   // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
   const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
-    active: visible && isLandscape, playing, sheetOpen: showMood || showPicker,
+    // BOTH orientations now — portrait rests the same way (useRestScene).
+    active: visible, playing, sheetOpen: showMood || showPicker,
   });
   const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
+  // The scene re-centres itself once the controls have gone. MEASURED rather
+  // than assumed, so each mode's own deliberate offsets survive — see
+  // restShiftFor in LandscapeChrome.
+  const [contentH, setContentH] = useState(0);
+  const [sceneBox, setSceneBox] = useState({ y: 0, h: 0 });
+  const restScene = useRestScene(chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape);
 
   // ── Real-track layer ────────────────────────────────────────────────────────
   // With Spotify connected the deck runs on the REAL song: true duration,
@@ -774,6 +781,9 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   // Grain under the thumb, shared with the CD so the two can't drift apart.
   const scrubHaptics = useRef(createScrubHaptics()).current;
   const scrubFocus = useScrubFocus();
+  /** Read inside the record's responder, which is built once. */
+  const restedRef = useRef(false);
+  restedRef.current = chromeRested;
   /**
    * The deck comes forward while it is being wound, and goes back when it is
    * let go. Driven from the SCRUB STATE rather than from each branch of the
@@ -935,7 +945,10 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         // registering as scrubs).
         if (kind === null) {
           scrubIndicatorAnim.setValue(0);
-          if (Date.now() - tapStartRef.current < 450) togglePlayRef.current();
+          // A tap while the controls are away only brings them back — the root
+          // sniffer has already done that by now. Without this, the tap meant
+          // to wake the deck would pause the music instead.
+          if (!restedRef.current && Date.now() - tapStartRef.current < 450) togglePlayRef.current();
           return;
         }
         scrubFadeTimerRef.current = setTimeout(() => {
@@ -1370,27 +1383,35 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
         {/* Floating header */}
         {!isLandscape && (
-        <View style={[fs.floatingTop, { top: topPad + 4, zIndex: 10 }]}>
+        <Animated.View style={[fs.floatingTop, { top: topPad + 4, zIndex: 10, opacity: chrome }]} pointerEvents="none">
           <View style={fs.dragPill} />
-        </View>
+        </Animated.View>
         )}
 
         {/* Mode name — top-left corner tag, same treatment as every other mode */}
         {!isLandscape && (
-        <View style={{ position: 'absolute', top: topPad + 14, left: 20, zIndex: 10 }} pointerEvents="none">
+        <Animated.View style={{ opacity: chrome, position: 'absolute', top: topPad + 14, left: 20, zIndex: 10 }} pointerEvents="none">
           <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', letterSpacing: 3, fontFamily: Fonts.mono }}>VINYL</Text>
-        </View>
+        </Animated.View>
         )}
 
-        <View style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : bottomPad, alignItems: 'center' }}>
+        <View style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : bottomPad, alignItems: 'center' }}
+          onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
 
           {!isLandscape && (
-          <View style={fs.header}>
+          <Animated.View style={[fs.header, { opacity: chrome }]}>
             <StationIdentity station={station} />
-          </View>
+          </Animated.View>
           )}
 
-          <Animated.View style={[fs.turntableWrap, isLandscape && { flex: 1, justifyContent: 'center' }, deckScene]}>
+          {/* restScene is a SEPARATE view from deckScene: two style objects
+              each carrying `transform` do not merge, the later one replaces
+              the earlier, so the landscape glide and the portrait re-centring
+              cannot share one. */}
+          <Animated.View
+            style={[fs.turntableWrap, restScene]}
+            onLayout={(e) => setSceneBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
+          <Animated.View style={[{ width: '100%', alignItems: 'center' }, isLandscape && { flex: 1, justifyContent: 'center' }, deckScene]}>
             {/* A SECOND wrapper, not another entry in deckScene's transform
                 array: two style objects each carrying `transform` do not
                 merge, the later one replaces the earlier, so the deck's
@@ -1410,9 +1431,15 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             />
             </Animated.View>
           </Animated.View>
+          </Animated.View>
 
           {!isLandscape && (
-          <>
+          /* EVERYTHING BELOW THE SCENE RESTS TOGETHER. pointerEvents goes
+             off once it is invisible, or the tap meant to bring the controls
+             back would press whatever button it landed on. */
+          <Animated.View
+            style={{ alignSelf: 'stretch', alignItems: 'center', opacity: chrome }}
+            pointerEvents={chromeRested ? 'none' : 'auto'}>
           {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
             {spotify.track
@@ -1477,7 +1504,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             station={station}
           />
 
-          </>
+          </Animated.View>
           )}
         </View>
 
@@ -1507,7 +1534,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
           />
         )}
 
-        {!isLandscape && <ModeCloseButton onPress={handleClose} />}
+        {!isLandscape && <ModeCloseButton onPress={handleClose} chrome={chrome} rested={chromeRested} />}
 
         <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={station.eqColors?.[1] ?? V.gold} />
         <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />

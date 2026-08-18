@@ -96,6 +96,28 @@ export async function getStationPlaylistSlots(stationId: string): Promise<Slots>
   return (await readAll())[stationId] ?? {};
 }
 
+/**
+ * Which station owns this playlist — the reverse lookup.
+ *
+ * For the home card that offers to cruise with whatever is ALREADY playing
+ * (owner, 18.08). If the music going is a playlist one of her stations is
+ * linked to, that station is the honest answer; anything else falls back to
+ * whatever is on air, which the caller decides.
+ *
+ * Matched against the slot the uri's OWN service owns, not the currently
+ * selected one — the question is "whose playlist is this", and a uri answers
+ * that by itself.
+ */
+export async function stationForPlaylist(uri: string | null | undefined): Promise<string | null> {
+  if (!uri) return null;
+  const platform = platformOfUri(uri);
+  const all = await readAll();
+  for (const [stationId, slots] of Object.entries(all)) {
+    if (slots[platform]?.uri === uri) return stationId;
+  }
+  return null;
+}
+
 export async function setStationPlaylist(stationId: string, playlist: LinkedPlaylist): Promise<void> {
   const all = await readAll();
   const slots = all[stationId] ?? {};

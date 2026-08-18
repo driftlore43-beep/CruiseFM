@@ -14,7 +14,7 @@ import {
   isApplePlaylist,
   startApplePlaylist,
 } from '@/utils/appleMusic';
-import { getPlaybackState, isRestrictedAccount, isSpotifyConnected, pause as pauseSpotify, startPlayback, type StartResult } from '@/utils/spotify';
+import { getPlaybackState, isRestrictedAccount, isSpotifyConnected, pause as pauseSpotify, probePlaybackState, startPlayback, type StartResult } from '@/utils/spotify';
 import { openInSpotify } from '@/utils/spotifyHandoff';
 import { getStationPlaylist } from '@/utils/stationPlaylists';
 
@@ -28,6 +28,24 @@ import { getStationPlaylist } from '@/utils/stationPlaylists';
  *
  * Returns the verdict so the UI can narrate; null means "didn't need to try".
  */
+/**
+ * What to do about music that may already be going.
+ *
+ * Pure, and exported, because it decides whether the app throws away the song
+ * someone is in the middle of. `playingUri`/`isPlaying` are what the service
+ * reports; `undefined` means it did not answer usefully, in which case the
+ * only safe move is to start the playlist properly.
+ */
+export function startActionFor(
+  playingUri: string | null | undefined,
+  isPlaying: boolean | undefined,
+  targetUri: string,
+): 'leave' | 'resume' | 'start' {
+  if (playingUri === undefined) return 'start';   // no usable answer
+  if (playingUri !== targetUri) return 'start';   // a different playlist
+  return isPlaying ? 'leave' : 'resume';
+}
+
 async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean }): Promise<StartResult | null> {
   try {
     const linked = await getStationPlaylist(stationId);
@@ -91,6 +109,44 @@ async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean 
     // reports there is no device to play on. The "waking Spotify" notice
     // still appears immediately, so the wait is explained rather than blank.
     if (connected && !restricted) {
+      /**
+       * ALREADY LISTENING TO THIS? THEN DON'T TOUCH IT.
+       *
+       * Owner, 18.08: "when I'm already playing music from Spotify and I
+       * already know what playlist it belongs in, I click the right playlist
+       * but then the music changes. It would be nice for the music to
+       * continue playing — unless it's a different playlist, and then it
+       * should change."
+       *
+       * Exactly right, and the cause is that `PUT /me/player/play` with a
+       * context_uri starts that context FROM THE TOP. Handing Spotify the
+       * playlist it is already playing therefore throws away wherever you had
+       * got to, which from the outside looks like the app skipping your song
+       * for no reason.
+       *
+       * Three cases, and they are genuinely different:
+       *   same playlist, playing  → say nothing and leave it alone
+       *   same playlist, paused   → resume IN PLACE (no uri: passing one
+       *                             would restart it, which is the same bug)
+       *   a different playlist    → change it, which is what was asked for
+       *
+       * Costs one extra request at drive start — the same one the poll makes
+       * every five seconds anyway — and only on the path that was about to
+       * make a much more expensive one.
+       */
+      const probe = await probePlaybackState();
+      const action = startActionFor(
+        probe.kind === 'state' ? (probe.data?.context?.uri ?? null) : undefined,
+        probe.kind === 'state' ? !!probe.data?.is_playing : undefined,
+        linked.uri,
+      );
+      if (action === 'leave') return 'playing';
+      if (action === 'resume') {
+        const resumed = await startPlayback();
+        if (resumed === 'playing') return 'playing';
+        // Resuming in place failed (a device dropped off between the probe
+        // and the call) — fall through and start it properly.
+      }
       const r = await startPlayback(linked.uri);
       // Allowlist rejection discovered mid-drive falls through to handoff —
       // and so does a dead/slow network ('error'): opening the playlist in
@@ -171,7 +227,9 @@ type NowPlayingCtx = {
   /** Start (or replace) a session and show its fullscreen. Pass
    * `{ preview: true }` for a free-user taste of a locked mode, or
    * `{ paused: true }` to open idle until the user presses play. */
-  open: (mode: string, stationId?: string, opts?: { preview?: boolean; paused?: boolean }) => void;
+  /** `adopt`: open around music that is ALREADY playing, without starting or
+   *  changing anything — the "I can hear this" card's whole purpose. */
+  open: (mode: string, stationId?: string, opts?: { preview?: boolean; paused?: boolean; adopt?: boolean }) => void;
   /** Keep the session (and the music) but drop to the mini-player. */
   minimize: () => void;
   /** Bring the fullscreen back for the current session. */
@@ -341,7 +399,7 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     }
   }, [reportStartResult]);
 
-  const open = useCallback((mode: string, stationId: string = 'night-run', opts?: { preview?: boolean; paused?: boolean }) => {
+  const open = useCallback((mode: string, stationId: string = 'night-run', opts?: { preview?: boolean; paused?: boolean; adopt?: boolean }) => {
     // iPod mode was retired — any old saved iPod cruise resumes in Equalizer.
     const m = mode === 'ipod' ? 'equalizer' : mode;
     // The player itself is the lock: ANY doorway that opens a premium mode
@@ -350,12 +408,19 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     const preview = !!opts?.preview || (!isProRef.current && isProMode(m));
     setSession({ mode: m, stationId, preview });
     setExpanded(true);
-    setPlaying(!opts?.paused);
+    // `adopt` means the music is ALREADY playing and the whole point is to
+    // leave it exactly where it is, so the transport opens as playing even
+    // though nothing was started.
+    setPlaying(opts?.adopt ? true : !opts?.paused);
     setHandoff(false); // fresh drive; playStationMusic re-flags it if handed off
     // Every drive tries to get its station's own playlist going. A paused
     // open leaves Spotify alone until the user presses play. Previews may
     // resume whatever the user was listening to — any song works for a taste.
-    if (!opts?.paused) startStationMusic(stationId, { resumeAny: preview });
+    //
+    // AN ADOPTED DRIVE TOUCHES NOTHING. It is opened from the home card that
+    // says "this is playing — cruise with it", so starting the station's own
+    // playlist would be the exact thing that card exists to avoid.
+    if (!opts?.paused && !opts?.adopt) startStationMusic(stationId, { resumeAny: preview });
   }, [startStationMusic]);
 
   const minimize = useCallback(() => setExpanded(false), []);

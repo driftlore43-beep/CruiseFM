@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 
+import { AlreadyPlayingCard } from '@/components/AlreadyPlayingCard';
 import { ConnectMusicCard } from '@/components/ConnectMusicCard';
 import { ConnectSpotifyCard } from '@/components/ConnectSpotifyCard';
 import { SpotifyNudgeCard } from '@/components/SpotifyNudgeCard';
@@ -170,6 +171,15 @@ export default function CruiseScreen() {
           {greetingFor(new Date().getHours(), !!lastCruise)},{'\n'}{driverName}
         </Text>
 
+        {/* ABOVE THE HERO, because it is the alternative to it: the hero
+            offers to start something, this offers to keep what is already
+            going, and someone with music on wants the second one. Owner's
+            words were "something at the top". */}
+        <AlreadyPlayingCard
+          track={spotify.track}
+          contextUri={spotify.contextUri}
+          contextName={spotify.contextName}
+        />
         <HeadingAnywhereCard onAnswered={setKind} />
 
         <HeroCard

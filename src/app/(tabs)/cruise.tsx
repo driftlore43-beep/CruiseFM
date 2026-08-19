@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { AlreadyPlayingCard, startAdoptedDrive } from '@/components/AlreadyPlayingCard';
+import { AppStoreUpdateCard } from '@/components/AppStoreUpdateCard';
 import { ModeSheet } from '@/components/ModeSheet';
 import { StationSheet } from '@/components/StationSheet';
 import { ConnectMusicCard } from '@/components/ConnectMusicCard';
@@ -207,6 +208,13 @@ export default function CruiseScreen() {
             offers to start something, this offers to keep what is already
             going, and someone with music on wants the second one. Owner's
             words were "something at the top". */}
+        {/* A binary update, not an OTA one — the one gap OTA can never
+            close, since it can only carry JS/assets onto a build already on
+            the phone. Sits above the hero, same shelf as AlreadyPlayingCard,
+            because "you're behind" outranks "start a drive" without
+            blocking it — it's a dismissible card, not a wall. */}
+        <AppStoreUpdateCard />
+
         <AlreadyPlayingCard
           track={spotify.track}
           contextUri={spotify.contextUri}

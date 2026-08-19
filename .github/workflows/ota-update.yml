@@ -262,8 +262,18 @@ jobs:
           eas build --platform ios --profile ${{ env.BUILD_PROFILE }} \
             --auto-submit-with-profile ${{ env.BUILD_PROFILE }} \
             --non-interactive --no-wait
-          echo "::notice::Build queued, and it will submit itself to App Store Connect when it finishes."
-          echo "::notice::Watch it at https://expo.dev/accounts/driftlore/projects/CruiseFM/builds"
+          echo "::notice::Build queued. Watch it at https://expo.dev/accounts/driftlore/projects/CruiseFM/builds"
+          # DO NOT TRUST --auto-submit TO HAVE WORKED. On 19.08 build 30 was
+          # started with the flag above, finished cleanly, and 38 minutes later
+          # diagnose still reported "no submission recorded against this build";
+          # running `submit` mode by hand uploaded it in 15 seconds. The likely
+          # reason is `--no-wait` on the line above: the CLI exits the moment
+          # the build is queued, so nothing is left attached to start the
+          # submission when it finishes. Unproven, and not worth guessing at —
+          # the reliable move is to check.
+          echo "::notice::WHEN IT FINISHES: run this workflow again in 'diagnose' mode and read the"
+          echo "::notice::'submitted to App Store Connect' line. If it says no submission is recorded,"
+          echo "::notice::run it once more in 'submit' mode — that takes the newest finished build."
 
       # ── Submit ──────────────────────────────────────────────────────────
       # For a build that already finished without being submitted — which is

@@ -47,8 +47,8 @@ import Svg, { Defs, Ellipse, RadialGradient, Rect, Stop } from 'react-native-svg
  *  key light, the CD's cast shadow, the cassette's bevels), so every shadow
  *  falls down and to the right. Fractions of the object's own size, so one
  *  set of numbers serves every screen. */
-const DX = 0.013;
-const DY = 0.020;
+const DX = 0.006;
+const DY = 0.012;
 /**
  * How far the hug reaches past the object's edge. TIGHT — it is there to give
  * the edge form, not to ground the object; the pool below does that.
@@ -72,9 +72,15 @@ const PEAK = 0.5;
  * Fractions of the object's own size: how far below the edge the pool
  * reaches, and how wide it is relative to the object.
  */
-const POOL_DROP = 0.085;
-const POOL_WIDTH = 0.52;
-const POOL_PEAK = 0.46;
+const POOL_DROP = 0.05;
+// A FRACTION OF THE WIDTH, USED AS A RADIUS — so anything at or above 0.5
+// makes the pool WIDER THAN THE OBJECT, which is the whole of what went wrong
+// (owner, 19.08: "it's much further from the disc… not next to it, not far
+// away"). At 0.52 the pool's radius came out 184px against a record radius of
+// 177: it stuck out past the disc on both sides instead of tucking under it.
+// Keep it well below 0.5.
+const POOL_WIDTH = 0.36;
+const POOL_PEAK = 0.44;
 /** Stacked outlines in the rectangle's halo. Enough that the steps are not
  *  countable; each is one cheap static path, drawn once and never animated. */
 const RINGS = 14;

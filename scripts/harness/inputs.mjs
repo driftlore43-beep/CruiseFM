@@ -84,10 +84,31 @@ const read = (p) => p.evaluate(() => {
     g: Math.round(fg.g * fg.a + bg.g * (1 - fg.a)),
     b: Math.round(fg.b * fg.a + bg.b * (1 - fg.a)), a: 1,
   });
+  // REACHABLE ONLY. Expo Router keeps every tab mounted and the sheets park
+  // rather than unmount, so the document holds fields belonging to screens
+  // you are not on — the first run reported SIX fields on a page that has
+  // one, and failed on them. A parked field renders under a
+  // `pointer-events: none` ancestor, exactly like the parked mode chips.
+  const reachable = (el) => {
+    for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (cs.pointerEvents === 'none' || cs.visibility === 'hidden' || cs.display === 'none') return false;
+      if (parseFloat(cs.opacity || '1') < 0.05) return false;
+    }
+    return true;
+  };
+  // TEXT FIELDS ONLY. React Native Web renders a <Switch> as an
+  // <input type="checkbox">, and the Profile page's five toggles stay mounted
+  // behind the settings page — so the first runs reported SIX fields on a page
+  // that has one, and failed on the contrast of a checkbox, which has no text
+  // to read. This file's whole claim is about things you type into.
+  const TEXTY = new Set(['', 'text', 'search', 'url', 'email', 'password', 'tel', 'number']);
   const out = [];
   for (const i of document.querySelectorAll('input, textarea')) {
+    if (i.tagName === 'INPUT' && !TEXTY.has((i.getAttribute('type') || '').toLowerCase())) continue;
     const r = i.getBoundingClientRect();
     if (r.width < 4 || r.height < 4) continue;
+    if (!reachable(i)) continue;
     const cs = getComputedStyle(i);
     // Composite the real ground behind it.
     let n = i, bg = null;

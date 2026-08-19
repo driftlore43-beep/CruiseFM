@@ -32,6 +32,7 @@ import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
+import { CastShadow } from '@/components/CastShadow';
 import { ModeActionRow } from '@/components/ModeActionRow';
 import { SeekCar } from '@/components/SeekBar';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
@@ -531,7 +532,14 @@ function TurntableHero({
   const rayPivot = recSize / 2 - rayLen / 2;
 
   return (
-    <View style={{ width: platSize, height: platSize }}>
+    // overflow visible is LOAD-BEARING: the cast shadow is deliberately
+    // bigger than this box, and a clipped shadow is a rectangle with a
+    // straight edge, which is worse than none.
+    <View style={{ width: platSize, height: platSize, overflow: 'visible' }}>
+      {/* What the record throws onto the scene behind it. First child, so it
+          sits under everything; oversized canvas, because a shadow falls
+          beside the thing casting it. See CastShadow. */}
+      <CastShadow width={platSize} height={platSize} radius={platSize / 2} />
       <SparkleField size={platSize} />
       {/* Platter disc — pan responder applied here for record scrub */}
       <View {...panHandlers} style={[th.platter, { width: platSize, height: platSize, borderRadius: platSize / 2, position: 'absolute', top: 0, left: 0 }]}>

@@ -32,6 +32,7 @@ import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
+import { CastShadow } from '@/components/CastShadow';
 import { ModeActionRow } from '@/components/ModeActionRow';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
@@ -458,7 +459,18 @@ function CassetteBody({
   );
 
   return (
-    <View style={{ width: size, height: H, alignItems: 'center', justifyContent: 'center' }}>
+    // overflow visible is LOAD-BEARING: the cast shadow is deliberately
+    // bigger than this box, and a clipped shadow is a rectangle with a
+    // straight edge, which is worse than none.
+    <View style={{ width: size, height: H, alignItems: 'center', justifyContent: 'center', overflow: 'visible' }}>
+      {/* What the shell throws onto the scene behind it. Sized off the SHELL,
+          not the canvas — the body is inset 8 units inside the viewBox, and a
+          halo drawn around the canvas would float clear of the object. See
+          CastShadow. */}
+      <CastShadow
+        x={8 * scale} y={8 * scale}
+        width={324 * scale} height={194 * scale} radius={10 * scale}
+      />
       {/* ── Behind the tape: shell body, internals, the tape path ── */}
       <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`} style={StyleSheet.absoluteFill}>
         <Defs>

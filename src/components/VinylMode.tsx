@@ -81,9 +81,11 @@ const VINYL_ACCENTS: Record<string, string> = {
   // NO sunset entry (owner, 04.08): the amber override read as mustard on
   // device — the ring now falls through to eqColors[1], the same peachy
   // accent slot every other mode wears for Sunset.
+  // NO night-run entry either (owner, 19.08): the station went teal, and a
+  // hardcoded deep blue here is the same mistake Sunset's amber was — the
+  // accent slot already holds the colour every other mode wears.
   'mountain-pass':  '#FFFFFF', // crisp white
   'cars-coffee':    '#8B5A2B', // coffee brown
-  'night-run':      '#2B4CFF', // deep blue
   'coastal':        '#FF7A3C', // golden-hour orange (matches the warm moods)
 };
 

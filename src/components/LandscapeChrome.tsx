@@ -315,6 +315,14 @@ export function LandscapeChrome({
         <View style={[st.panelInner, { paddingRight: sideR, paddingTop: top + 8, paddingBottom: bottom + 6 }]}>
           <StationIdentity station={station} align="left" compact />
 
+          {/* TWO spacers, not one (owner, 19.08, against Apple's landscape
+              player: "currently it's small and sits at the bottom… keep the
+              bottom pills at the bottom"). With a single spacer above it the
+              whole song block, seek bar and transport were shoved into the
+              foot of the panel under a tall empty gap. Balanced spacers float
+              that block in the middle of the space between the station
+              caption and the pills, which stay pinned to the bottom because
+              they sit outside the lower spacer. */}
           <View style={{ flex: 1 }} />
 
           <View>
@@ -332,7 +340,7 @@ export function LandscapeChrome({
 
           <View style={st.transport}>
             <TouchableOpacity onPress={onPrev} activeOpacity={0.75} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <MaterialCommunityIcons name="skip-previous" size={36} color="#fff" />
+              <MaterialCommunityIcons name="skip-previous" size={44} color="#fff" />
             </TouchableOpacity>
             <TouchableOpacity onPress={onPlayPause} style={st.playBtn} activeOpacity={0.9}>
               {playing ? (
@@ -341,13 +349,15 @@ export function LandscapeChrome({
                   <View style={st.pauseBar} />
                 </View>
               ) : (
-                <MaterialCommunityIcons name="play" size={32} color="#0a0a12" style={{ marginLeft: 2 }} />
+                <MaterialCommunityIcons name="play" size={38} color="#0a0a12" style={{ marginLeft: 3 }} />
               )}
             </TouchableOpacity>
             <TouchableOpacity onPress={onNext} activeOpacity={0.75} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <MaterialCommunityIcons name="skip-next" size={36} color="#fff" />
+              <MaterialCommunityIcons name="skip-next" size={44} color="#fff" />
             </TouchableOpacity>
           </View>
+
+          <View style={{ flex: 1 }} />
 
           <ModeActionRow
             onChangeMood={onChangeMood}
@@ -385,20 +395,24 @@ const st = StyleSheet.create({
   },
   panelInner: { flex: 1, paddingLeft: 24 },
 
-  title: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 0 },
-  artist: { color: 'rgba(255,255,255,0.55)', fontSize: 13.5, fontWeight: '500', marginTop: 2 },
-  seekWrap: { marginTop: 10 },
+  // THE SONG LEADS in landscape. The panel is wider than a portrait column
+  // and was setting the title at portrait size, so it read as a caption
+  // rather than the thing the screen is about (owner, 19.08: "enlarge the
+  // title and the artist name").
+  title: { color: '#fff', fontSize: 27, fontWeight: '800', letterSpacing: 0 },
+  artist: { color: 'rgba(255,255,255,0.55)', fontSize: 16, fontWeight: '500', marginTop: 3 },
+  seekWrap: { marginTop: 14 },
 
   transport: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 26, marginTop: 8, marginBottom: 14,
+    gap: 30, marginTop: 14, marginBottom: 4,
   },
   playBtn: {
-    width: 58, height: 58, borderRadius: 29, backgroundColor: '#fff',
+    width: 68, height: 68, borderRadius: 34, backgroundColor: '#fff',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 10,
   },
-  pauseBar: { width: 7, height: 24, borderRadius: 2, backgroundColor: '#0a0a12' },
+  pauseBar: { width: 8, height: 28, borderRadius: 2, backgroundColor: '#0a0a12' },
 
   // ModeActionRow's own styles carry portrait spacing — zeroed for the panel.
   pillsOverride: { marginTop: 0, paddingHorizontal: 0, alignSelf: 'stretch', justifyContent: 'center' },

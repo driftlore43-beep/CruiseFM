@@ -36,21 +36,28 @@ export const STATIONS: Station[] = [
     tagline: 'Empty expressways. Blue-lit dashboards.',
     tags: ['dark vibes', 'neon nights'],
     premium: false,
-    // JET BLUE, station-wide (owner, 31.07). It was cyan → periwinkle →
-    // magenta, and the magenta was the loud one: eqColors[2] lands on the
-    // equalizer's bar tops and the whole outer edge of the Circular EQ ring,
-    // so a station whose own photograph is a blue night city was reading
-    // violet everywhere. Every colour on the station moves together — a blue
-    // mode over a purple card is worse than either.
-    gradientColors: ['#04102e', '#12358f', '#000000'],
-    cardGradient: ['#2465e0', '#1b3f9e', '#122456'],
+    // TEAL, station-wide, TAKEN FROM THE PHOTOGRAPH (owner, 19.08: "have the
+    // accents on night run station a teal colour from the background image").
+    // Not picked by eye — the picture was measured: weighting every pixel by
+    // saturation x brightness, as scripts/marketing/tints.py does, 83% of its
+    // colour sits between hue 180 and 195 and the weighted mean is 182. So
+    // the photograph is teal and the accents were jet blue at hue 218, which
+    // is the same mismatch the 31.07 round fixed one step short of: it moved
+    // magenta -> blue when the picture was never blue either.
+    //
+    // The anchors below are sampled rather than invented — the lit neon in
+    // the shot averages rgb(95,181,200) and its deep tones rgb(22,90,99).
+    // Every colour on the station still moves together (31.07's rule): a teal
+    // mode over a blue card would be worse than either.
+    gradientColors: ['#03151c', '#0d5f70', '#000000'],
+    cardGradient: ['#1f9fb0', '#166f80', '#0d3a45'],
     iconName: 'weather-night',
-    eqColors: ['#C6ECFF', '#2E7DFF', '#1340E6'],
-    glowColor: '#12358f',
+    eqColors: ['#BDF1F5', '#19C6D4', '#0B6577'],
+    glowColor: '#0d5f70',
     image: require('../../assets/stations/night-run.jpg'),
     imageBlur: require('../../assets/stations/blur/night-run.jpg'),
     icon: 'weather-night',
-    iconBg: '#0e2a70',
+    iconBg: '#0a4a58',
     bestTime: 'Late night',
     duration: '2 hr mix',
     trackCount: 24,

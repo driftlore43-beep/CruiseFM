@@ -76,7 +76,7 @@ export function StationIdentity({
 
   return (
     <View style={{ alignItems, gap: 3 }}>
-      {eyebrow != null && <Text style={[st.eyebrow, day && st.eyebrowDay]}>{eyebrow}</Text>}
+      {eyebrow != null && <Text style={[st.eyebrow, compact && st.eyebrowCompact, day && st.eyebrowDay]}>{eyebrow}</Text>}
       <View style={st.row}>
         <Text style={[st.dial, compact && st.dialCompact, day && st.dialDay, { fontFamily: dseg }]}>
           {dial.label}
@@ -89,13 +89,19 @@ export function StationIdentity({
 
 const st = StyleSheet.create({
   eyebrow: { color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+  // COMPACT is the landscape deck's only caller, and there the station's name
+  // is a caption at the top of a panel whose subject is the SONG — so it
+  // steps back to let the title lead (owner, 19.08: "slightly make the top
+  // text smaller"). It used to shrink nothing but the dial: `nameCompact` was
+  // byte-identical to `name`.
+  eyebrowCompact: { fontSize: 9, letterSpacing: 1.7 },
   row: { flexDirection: 'row', alignItems: 'baseline', gap: 8, minWidth: 0 },
   // The number sits a step quieter than the name — it's the station's dial
   // position, not its title.
   dial: { color: 'rgba(255,255,255,0.6)', fontSize: 12, letterSpacing: 0.5 },
   dialCompact: { fontSize: 11 },
   name: { color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2, flexShrink: 1 },
-  nameCompact: { fontSize: 15 },
+  nameCompact: { fontSize: 13.5 },
   // Daylight: the quiet steps go to full strength. Half-opacity white on a
   // photograph is the first thing the sun takes.
   eyebrowDay: { color: 'rgba(255,255,255,0.88)' },

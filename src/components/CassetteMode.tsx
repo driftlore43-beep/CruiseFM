@@ -448,7 +448,14 @@ function CassetteBody({
             measured before and after, the gap was 13.7 then 14.1. The cause
             was the rainbow SHEEN above — see the note there. Kept because it
             is correct, not because it moved the number.) */}
-        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill="#17100a" fillOpacity={0.97} />
+        {/* Lifted from #17100a, which was near-black and made the two reels the
+            darkest thing on the screen — so the cast shadow had nothing to
+            read against and the whole deck sat heavy (owner, 19.08: "lift the
+            darkness of the cassette mode, it reduces the effects of the
+            shadowing"). Still unmistakably wound tape, just not a hole. The
+            OPACITY is untouched at 0.97: that one is physical, you cannot see
+            the road through wound tape. */}
+        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill="#3a2a18" fillOpacity={0.97} />
         <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill={color} fillOpacity={0.10} />
         {winds.map((r, i) => (
           <SvgCircle key={i} cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.075} strokeWidth={0.7} />

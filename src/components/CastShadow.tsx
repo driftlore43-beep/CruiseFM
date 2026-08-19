@@ -47,12 +47,34 @@ import Svg, { Defs, Ellipse, RadialGradient, Rect, Stop } from 'react-native-svg
  *  key light, the CD's cast shadow, the cassette's bevels), so every shadow
  *  falls down and to the right. Fractions of the object's own size, so one
  *  set of numbers serves every screen. */
-const DX = 0.022;
-const DY = 0.034;
-/** How far the halo reaches past the object's edge. */
-const SPREAD = 0.1;
-/** Darkest point of the halo, sitting right against the edge. */
-const PEAK = 0.55;
+const DX = 0.013;
+const DY = 0.020;
+/**
+ * How far the hug reaches past the object's edge. TIGHT — it is there to give
+ * the edge form, not to ground the object; the pool below does that.
+ */
+const SPREAD = 0.045;
+/** Darkest point of the hug, sitting right against the edge. */
+const PEAK = 0.5;
+
+/**
+ * THE POOL — the shadow the object drops onto the scene below it, and the
+ * thing that actually makes it sit ON something (owner, 19.08: "tweak it so
+ * it sits slightly under").
+ *
+ * IT IS A SEPARATE SHAPE, and it has to be. The first attempt at her note
+ * just pushed the hug downward, on the reasoning that a ring offset down is a
+ * shadow underneath. It is not, and the measurement said so plainly: the band
+ * just below the cassette came out LIGHTER, not darker. A hug has a
+ * transparent core — see rule (3) — so moving it down moves the hole down
+ * with it, and the hole lands exactly where the shadow was wanted.
+ *
+ * Fractions of the object's own size: how far below the edge the pool
+ * reaches, and how wide it is relative to the object.
+ */
+const POOL_DROP = 0.085;
+const POOL_WIDTH = 0.52;
+const POOL_PEAK = 0.46;
 /** Stacked outlines in the rectangle's halo. Enough that the steps are not
  *  countable; each is one cheap static path, drawn once and never animated. */
 const RINGS = 14;
@@ -88,8 +110,12 @@ export const CastShadow = memo(function CastShadow({
   // The canvas is the object plus its reach in every direction, then shifted
   // so the object still sits where it did.
   const w = width + pad * 2;
-  const h = height + pad * 2;
+  // Room below for the pool as well as the hug — a clipped pool would end in
+  // a straight line, which is the one thing a shadow must never do.
+  const h = height + pad + Math.max(pad, size * POOL_DROP * 1.5);
   const round = radius >= Math.min(width, height) / 2 - 0.5;
+  const poolDrop = size * POOL_DROP;
+  const poolPeak = POOL_PEAK;
 
   // Where the object's own edge falls, as a percentage of the gradient's
   // radius. GET THIS WRONG BY A FACTOR OF TWO — `(width / w) * 50`, which
@@ -131,6 +157,21 @@ export const CastShadow = memo(function CastShadow({
       pointerEvents="none"
       style={{ position: 'absolute', left: x - pad + dx, top: y - pad + dy, width: w, height: h }}>
       <Svg width={w} height={h} style={StyleSheet.absoluteFill}>
+        <Defs>
+          {/* Soft in every direction, so it never shows an edge of its own. */}
+          <RadialGradient id={`${uid}Pool`} cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#000000" stopOpacity={`${poolPeak}`} />
+            <Stop offset="55%" stopColor="#000000" stopOpacity={`${poolPeak * 0.62}`} />
+            <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Ellipse
+          cx={pad + width / 2}
+          cy={pad + height - poolDrop * 0.12}
+          rx={width * POOL_WIDTH}
+          ry={poolDrop}
+          fill={`url(#${uid}Pool)`}
+        />
         {round ? (
           <>
             <Defs>

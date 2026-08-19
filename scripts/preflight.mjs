@@ -52,11 +52,30 @@ try {
   const cfg = JSON.parse(raw.slice(raw.indexOf('{')));
   ios = cfg.ios ?? {};
 
+  // THEY ARE ALLOWED TO DIVERGE, in one direction and for one reason.
+  //
+  // Apple requires a HIGHER CFBundleShortVersionString than the last approved
+  // version for every submission — 1.3.0 was approved, so even a build whose
+  // only purpose is new screenshots has to call itself 1.3.1 (19.08: "Invalid
+  // Pre-Release Train… must contain a higher version than that of the
+  // previously approved version"). The RUNTIME version answers a different
+  // question — can this binary run that JS bundle — so it must move only when
+  // native code does, and moving it strands every installed build with no
+  // updates until it installs another.
+  //
+  // Divergence is therefore opt-in and named: `runtimeHeldAt` in
+  // preflight-allow.json. A native change forces the runtime up, which no
+  // longer matches that field, and this fails until a human either sets them
+  // equal again or proves a build from the new commit launches.
+  const held = allow.runtimeHeldAt;
   if (cfg.version && cfg.runtimeVersion && cfg.version === cfg.runtimeVersion) {
     ok('version / runtimeVersion', `both ${cfg.version}`);
+  } else if (cfg.runtimeVersion && cfg.runtimeVersion === held) {
+    ok('version / runtimeVersion',
+      `version ${cfg.version}, runtime held at ${held} — Apple wants a new version string, the native side has not moved`);
   } else {
     fail('version / runtimeVersion',
-      `version ${cfg.version} vs runtimeVersion ${cfg.runtimeVersion} — this repo pins them equal (30.07)`);
+      `version ${cfg.version} vs runtimeVersion ${cfg.runtimeVersion} — set them equal, or name the held runtime in preflight-allow.json (currently ${held ?? 'unset'})`);
   }
 } catch (e) {
   fail('expo config introspect', `could not read the resolved config: ${String(e).slice(0, 120)}`);

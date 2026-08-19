@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Animated, Easing, Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MarqueeText } from '@/components/MarqueeText';
 import { ModeActionRow } from '@/components/ModeActionRow';
 import { useDaylight } from '@/context/MotionContext';
 import { SeekBar } from '@/components/SeekBar';
@@ -326,7 +327,14 @@ export function LandscapeChrome({
           <View style={{ flex: 1 }} />
 
           <View>
-            <Text style={st.title} numberOfLines={1}>{track?.title ?? tagline}</Text>
+            {/* MARQUEE, not a truncation (owner, 19.08: long titles "only
+                work on portrait mode… it needs to work for landscape mode
+                and across all modes"). The panel is narrower than a portrait
+                column, so it is the place a long title is MOST likely to run
+                out of room — and it was the one title in the app still set
+                as a plain clipped line. Every mode goes through this
+                component, so they are all fixed at once. */}
+            <MarqueeText text={track?.title ?? tagline} style={st.title} />
             {!!track && <Text style={[st.artist, day && { color: 'rgba(255,255,255,0.92)' }]} numberOfLines={1}>{track.artist}</Text>}
           </View>
 
@@ -340,7 +348,7 @@ export function LandscapeChrome({
 
           <View style={st.transport}>
             <TouchableOpacity onPress={onPrev} activeOpacity={0.75} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <MaterialCommunityIcons name="skip-previous" size={44} color="#fff" />
+              <MaterialCommunityIcons name="skip-previous" size={48} color="#fff" />
             </TouchableOpacity>
             <TouchableOpacity onPress={onPlayPause} style={st.playBtn} activeOpacity={0.9}>
               {playing ? (
@@ -349,11 +357,11 @@ export function LandscapeChrome({
                   <View style={st.pauseBar} />
                 </View>
               ) : (
-                <MaterialCommunityIcons name="play" size={38} color="#0a0a12" style={{ marginLeft: 3 }} />
+                <MaterialCommunityIcons name="play" size={44} color="#0a0a12" style={{ marginLeft: 4 }} />
               )}
             </TouchableOpacity>
             <TouchableOpacity onPress={onNext} activeOpacity={0.75} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <MaterialCommunityIcons name="skip-next" size={44} color="#fff" />
+              <MaterialCommunityIcons name="skip-next" size={48} color="#fff" />
             </TouchableOpacity>
           </View>
 
@@ -403,16 +411,20 @@ const st = StyleSheet.create({
   artist: { color: 'rgba(255,255,255,0.55)', fontSize: 16, fontWeight: '500', marginTop: 3 },
   seekWrap: { marginTop: 14 },
 
+  // SIZED FOR A THUMB AT THE WHEEL (owner, 19.08: "increase the size of the
+  // play buttons, a bit more so it's easy for drivers to push"). 80 is also
+  // exactly the portrait play circle, so the control is the same target
+  // whichever way the phone is held — it was the smaller of the two.
   transport: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 30, marginTop: 14, marginBottom: 4,
+    gap: 32, marginTop: 14, marginBottom: 4,
   },
   playBtn: {
-    width: 68, height: 68, borderRadius: 34, backgroundColor: '#fff',
+    width: 80, height: 80, borderRadius: 40, backgroundColor: '#fff',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 10,
   },
-  pauseBar: { width: 8, height: 28, borderRadius: 2, backgroundColor: '#0a0a12' },
+  pauseBar: { width: 9, height: 32, borderRadius: 2, backgroundColor: '#0a0a12' },
 
   // ModeActionRow's own styles carry portrait spacing — zeroed for the panel.
   pillsOverride: { marginTop: 0, paddingHorizontal: 0, alignSelf: 'stretch', justifyContent: 'center' },

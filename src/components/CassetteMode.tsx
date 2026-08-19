@@ -587,9 +587,13 @@ function CassetteBody({
           <SvgRect x={30} y={24} width={280} height={13} rx={4} fill={color} fillOpacity={0.60} />
           <SvgRect x={30} y={24} width={280} height={40} rx={4} fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={1} />
           <SvgText x={40} y={34} fill="#0d1020" fontSize={7} fontWeight="800" fontFamily={Fonts.mono} letterSpacing={1.6}>A · STEREO · C90</SvgText>
-          <SvgText x={40} y={52} fill="#0d1020" fontSize={11} fontWeight="800" fontFamily={Fonts.mono}>
-            {songName.length > 22 ? songName.slice(0, 21) + '…' : songName}
-          </SvgText>
+          {/* The title itself is NOT drawn here — it is an RN overlay below,
+              so a long one can reel across the inlay instead of being cut at
+              21 characters (owner, 19.08). SVG text has no marquee: it cannot
+              be clipped and panned without animating an SVG prop, which is a
+              JS-thread re-render of the whole shell every frame — the
+              architecture this app has spent weeks removing. */
+          }
           <SvgText x={300} y={60} fill="#0d1020" fillOpacity={0.66} fontSize={7} fontWeight="700" fontFamily={Fonts.mono} textAnchor="end">{artist}</SvgText>
           {/* embossed markings + running time */}
           {/* No counter on the tape. A real cassette hasn't got one — the
@@ -614,6 +618,31 @@ function CassetteBody({
         <Screw cx={314} cy={186} angle={-8} />
         <Screw cx={170} cy={16} r={2.8} angle={40} />
       </Svg>
+
+      {/* The inlay's song title, in real text so it can pan. Positioned in
+          the SVG's own units x scale, so it tracks the shell at any size and
+          in either orientation: the label runs x 30..310, the title's
+          baseline sat at y 52 at font size 11. The window stops short of the
+          artist, which is right-anchored on the line below. */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: 40 * scale,
+          top: 40.8 * scale,
+          width: 260 * scale,
+        }}>
+        <MarqueeText
+          text={songName}
+          style={{
+            color: '#0d1020',
+            fontSize: 11 * scale,
+            lineHeight: 14 * scale,
+            fontWeight: '800',
+            fontFamily: Fonts.mono,
+          }}
+        />
+      </View>
     </View>
   );
 }

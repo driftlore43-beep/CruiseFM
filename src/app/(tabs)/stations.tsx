@@ -21,7 +21,7 @@ import { stationImageSource } from '@/utils/stationImage';
 import { recordDriveStart } from '@/utils/driveStats';
 import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
 import { usePalette, useStyles } from '@/context/AppearanceContext';
-import type { Palette } from '@/utils/appearance';
+import { readableOn, type Palette } from '@/utils/appearance';
 
 const FREE_CUSTOM_LIMIT = 3;
 const SCREEN_H = Dimensions.get('window').height;
@@ -297,7 +297,14 @@ function StationRow({
   const styles = useStyles(makeStyles);
   const pal = usePalette();
   const mine = !!custom;
-  const accent = station.eqColors?.[1] ?? (custom?.color ?? Cruise.amber);
+  // THROUGH readableOn, because this colour is drawn as a MARK on the page's
+  // own ground rather than on artwork — and a station's palette is tuned for
+  // a dark mode, not for paper. Mountain Pass's eqColors are literally three
+  // whites, so in the light theme its icon was measurably invisible: 0.58 of
+  // a luminance level away from the empty row beside it, against 7.3 and 7.9
+  // for its neighbours. readableOn deepens only what is too pale and keeps
+  // the hue, so every other station is untouched (14.08's rule).
+  const accent = readableOn(station.eqColors?.[1] ?? (custom?.color ?? Cruise.amber), pal.mode);
   // Icon: built-ins store an MCI glyph name; custom stations store either an
   // MCI name (new) or an emoji (old ones).
   const iconName = mine ? custom!.icon : (station as Station).iconName;

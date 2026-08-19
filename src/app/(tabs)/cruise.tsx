@@ -21,6 +21,7 @@ import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
 import { useStyles } from '@/context/AppearanceContext';
+import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import type { Palette } from '@/utils/appearance';
 import { RECOMMENDED_IDS, STATIONS, type Station } from '@/constants/stations';
 import {
@@ -152,9 +153,16 @@ export default function CruiseScreen() {
 
   const handleStartDrive = () => launchCruise(heroCruise);
 
-  // The "NOW PLAYING" header follows the live drive if there is one, otherwise
-  // it previews tonight's pick — never a stale hardcoded name.
-  const nowStation = np.session ? stationById(np.session.stationId) : heroStation;
+  // The "NOW PLAYING" header belongs to a DRIVE, and only to a drive.
+  //
+  // It used to appear whenever the music service reported anything playing —
+  // and with no session there is no station to name, so it fell back to the
+  // hero's suggestion and announced a station that was not on (owner, 19.08:
+  // "sometimes the top now playing section plays when no station is really
+  // playing"). Music playing outside a drive already has an honest home
+  // directly below: the "I can hear …" card, which names the real song and
+  // offers to wrap a station around it.
+  const nowStation = np.session ? stationById(np.session.stationId) : null;
 
   return (
     <View style={styles.safe}>
@@ -165,14 +173,14 @@ export default function CruiseScreen() {
           { paddingTop: insets.top + 18, paddingBottom: TAB_SAFE_INSET + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}>
-        {/* Shown whenever there is a drive open or music genuinely playing —
-            and its bars move only while the audio does. Opening a station or
-            mode card creates the session, so the meter is up and running for
-            the whole drive and rests the moment it's paused. */}
-        {(!!np.session || !!spotify.track?.isPlaying) && (
+        {/* Only while a station is on, and its bars move only while the audio
+            genuinely does — `confirmedPlaying` waits for the service's own
+            verdict rather than trusting the transport's optimism, the same
+            rule every mode's scene follows. */}
+        {!!nowStation && (
           <EqualizerHeader
             stationName={nowStation.name}
-            live={!!spotify.track?.isPlaying || (!!np.session && np.playing)}
+            live={confirmedPlaying(np.playing, spotify.track, np.musicSwitching)}
             accent={nowStation.eqColors?.[1]}
           />
         )}

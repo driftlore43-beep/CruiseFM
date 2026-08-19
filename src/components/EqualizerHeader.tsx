@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
-import { Cruise } from '@/constants/theme';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import { readableOn, type Palette } from '@/utils/appearance';
 
 // Each bar has its own height range, animation speed and phase offset.
 // Colors go violet → violet-blue across the 8 bars for a spectrum look.
@@ -18,6 +19,10 @@ const BAR_CONFIGS = [
 
 /** Height the bars settle at when nothing is playing — a row of dots. */
 const REST_H = 3;
+
+/** The bar's own shape carries no colour of its own — the station's accent
+ *  arrives as a prop — so it stays outside the themed stylesheet. */
+const BAR_STYLE = { width: 3, borderRadius: 2 } as const;
 
 /**
  * One bar.
@@ -84,7 +89,7 @@ function EqBar({
 
   return (
     <Animated.View
-      style={[styles.bar, { height: maxH, backgroundColor: color, transform: [{ translateY }, { scaleY }] }]}
+      style={[BAR_STYLE, { height: maxH, backgroundColor: color, transform: [{ translateY }, { scaleY }] }]}
     />
   );
 }
@@ -102,11 +107,17 @@ export function EqualizerHeader({
   accent?: string;
 }) {
   // WHETHER this renders is the caller's decision (there is nothing to report
-  // with no drive and no playback, and idle it used to read "TONIGHT'S PICK /
-  // <station>" — which the hero directly below says twice over in bigger
-  // type). What it reports is decided here: the label and the motion both
-  // follow the audio, so an open-but-paused drive reads as paused instead of
-  // dancing over silence.
+  // with no drive, and idle it used to read "TONIGHT'S PICK / <station>" —
+  // which the hero directly below says twice over in bigger type). What it
+  // reports is decided here: the label and the motion both follow the audio,
+  // so an open-but-paused drive reads as paused instead of dancing over
+  // silence.
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
+  // The bars stand on the PAGE, not on artwork, so a station whose palette is
+  // white — Mountain Pass is literally three whites — drew an invisible meter
+  // in the light theme. Same rule as the dial's icons (14.08).
+  const barColor = accent ? readableOn(accent, pal.mode) : undefined;
   return (
     <View style={styles.container}>
       <View style={styles.labelGroup}>
@@ -115,14 +126,14 @@ export function EqualizerHeader({
       </View>
       <View style={styles.equalizerRow}>
         {BAR_CONFIGS.map((cfg, i) => (
-          <EqBar key={i} {...cfg} color={accent ?? cfg.color} live={live} />
+          <EqBar key={i} {...cfg} color={barColor ?? cfg.color} live={live} />
         ))}
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (p: Palette) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -137,21 +148,23 @@ const styles = StyleSheet.create({
     gap: 3,
     height: 26,
   },
-  bar: {
-    width: 3,
-    borderRadius: 2,
-  },
   labelGroup: {
     gap: 3,
   },
   label: {
-    color: Cruise.textMuted,
+    // THE STATION'S NAME WAS WHITE ON PAPER (owner, 19.08). This component
+    // was written before the light theme and never converted, so both lines
+    // were hardcoded dark-theme literals — and `Cruise.textPrimary` is
+    // #FFFFFF, i.e. the name simply vanished into the page. The dark side of
+    // each token below is byte-identical to what it replaces, per the rule
+    // in utils/appearance.ts.
+    color: p.mode === 'dark' ? '#505068' : p.ink(0.55),
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 2.5,
   },
   sublabel: {
-    color: Cruise.textPrimary,
+    color: p.text,
     fontSize: 14,
     fontWeight: '600',
   },

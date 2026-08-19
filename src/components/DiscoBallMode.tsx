@@ -1125,9 +1125,19 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   // ball along feels like winding the track on. Only horizontal drags are
   // claimed; a downward swipe on the ball still dismisses the mode.
   const [scrubbing, setScrubbing] = useState(false);
+  const scrubbingRef = useRef(false);
+  scrubbingRef.current = scrubbing;
   const spinBaseRef = useRef(0);        // spin value when the finger landed
   const progressBaseRef = useRef(0);    // song position when the finger landed
   const scrubPctRef = useRef(0);        // latest scrubbed position
+
+  // The responder above is built ONCE, so everything it reaches for must be a
+  // ref — a captured value would stay on the first render's copy for the
+  // component's whole life (the stale-closure trap this file already records
+  // for `winH` and the dismiss close).
+  const cancelWakeRef = useRef<() => void>(() => {});
+  const finishBallRef = useRef<(g: { dx: number; dy: number; vy: number }) => void>(() => {});
+  const chromeRestedRef = useRef(false);
 
   const wrap01 = (v: number) => ((v % 1) + 1) % 1;
   const readAnim = (a: Animated.Value) => (a as unknown as { __getValue?: () => number }).__getValue?.() ?? 0;
@@ -1141,49 +1151,89 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
     ? wrap01(phaseRef.current + (Date.now() - runStartRef.current) / BALL_SPIN_MS)
     : wrap01(phaseRef.current));
 
+  /**
+   * The ball owns its touches, and sorts them into three outcomes.
+   *
+   * It used to decline the touch on START and only claim a clearly sideways
+   * MOVE, which had two consequences the owner hit on 19.08 — "the mirror
+   * ball just keeps animating when i swipe across it. It doesn't pause when
+   * you tap on it either."
+   *
+   *   TAP had no handler at all. The record and the disc both toggle play
+   *   when you tap them; declining the start meant the ball never saw a tap,
+   *   so the one deck you cannot tap to pause was this one.
+   *
+   *   SWIPE was fighting the wake. The root sniffer woke the chrome on ANY
+   *   touch, and waking slides the scene back to its awake position — under
+   *   the finger, mid-gesture — so the ball moved relative to the thumb and
+   *   read as animating on its own rather than tracking the drag. That is
+   *   exactly the fault fixed for Vinyl and CD on 18.08 (deferred wake +
+   *   cancelWake once the deck claims the touch); this mode was missed.
+   *
+   * So the responder claims on start and classifies, the same way the disc
+   * does: within ~35 degrees of straight down is a pull-down to dismiss,
+   * anything else winds, and no travel at all is a tap.
+   */
+  const TAP_SLOP = 12;
+  const gestureRef = useRef<'none' | 'wind' | 'dismiss'>('none');
+
   const ballPan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
+      onStartShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
-        progressBaseRef.current = readAnim(progress);
-        scrubPctRef.current = progressBaseRef.current;
-        scrub.begin();
-        setScrubbing(true);
-        // Where the turn currently sits, so the ball carries on from its
-        // present angle instead of jumping. Synchronous — no native read.
-        const at = readPhase();
-        spinBaseRef.current = at;
-        phaseRef.current = at;
-        turningRef.current = false;
-        spin.stopAnimation();
-        spin.setValue(at);
+        gestureRef.current = 'none';
+        // This touch belongs to the ball now, so the deferred wake must not
+        // fire and slide the scene out from under it. A tap hands the wake
+        // back on release.
+        cancelWakeRef.current();
+        // Deliberately NOT scrub.begin() — a tap must never pass through the
+        // scrub, because ending one ALWAYS seeks, which would stutter the
+        // song on every play/pause. The wind branch below starts it instead.
       },
       onPanResponderMove: (_, g) => {
-        const size = ballSizeRef.current;
-        if (size <= 0) return;
-        // The surface tracks the finger 1:1 — drag a ball-width, turn a
-        // ball-width. Wrapped, because the scroll only has one texture
-        // width to play with.
-        const at = wrap01(spinBaseRef.current + g.dx / size);
-        spin.setValue(at);
-        phaseRef.current = at;   // so the turn resumes from where the finger left it
-        // A ball-width of drag covers a fifth of the song: fast enough to
-        // cross a track in a few swipes, slow enough to land on a chorus.
-        const pct = Math.max(0, Math.min(1, progressBaseRef.current + g.dx / (size * 5)));
-        scrubPctRef.current = pct;
-        scrub.move(pct);
+        if (gestureRef.current === 'none') {
+          if (Math.abs(g.dx) < 6 && Math.abs(g.dy) < 6) return;
+          if (g.dy > 0 && Math.abs(g.dy) > Math.abs(g.dx) * 1.4) {
+            gestureRef.current = 'dismiss';
+          } else {
+            gestureRef.current = 'wind';
+            progressBaseRef.current = readAnim(progress);
+            scrubPctRef.current = progressBaseRef.current;
+            scrub.begin();
+            setScrubbing(true);
+            // Where the turn currently sits, so the ball carries on from its
+            // present angle instead of jumping. Synchronous — no native read.
+            const at = readPhase();
+            spinBaseRef.current = at;
+            phaseRef.current = at;
+            turningRef.current = false;
+            spin.stopAnimation();
+            spin.setValue(at);
+          }
+        }
+        if (gestureRef.current === 'dismiss') {
+          if (g.dy > 0) slideY.setValue(g.dy);
+          return;
+        }
+        if (gestureRef.current === 'wind') {
+          const size = ballSizeRef.current;
+          if (size <= 0) return;
+          // The surface tracks the finger 1:1 — drag a ball-width, turn a
+          // ball-width. Wrapped, because the scroll only has one texture
+          // width to play with.
+          const at = wrap01(spinBaseRef.current + g.dx / size);
+          spin.setValue(at);
+          phaseRef.current = at;   // so the turn resumes from where the finger left it
+          // A ball-width of drag covers a fifth of the song: fast enough to
+          // cross a track in a few swipes, slow enough to land on a chorus.
+          const pct = Math.max(0, Math.min(1, progressBaseRef.current + g.dx / (size * 5)));
+          scrubPctRef.current = pct;
+          scrub.move(pct);
+        }
       },
-      onPanResponderRelease: () => {
-        scrub.end(scrubPctRef.current);
-        setScrubbing(false);
-      },
-      onPanResponderTerminate: () => {
-        scrub.end(scrubPctRef.current);
-        setScrubbing(false);
-      },
+      onPanResponderRelease: (_, g) => finishBallRef.current(g),
+      onPanResponderTerminate: (_, g) => finishBallRef.current(g),
     }),
   ).current;
 
@@ -1393,7 +1443,9 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
     // held the phone normally. Every mode does it now (owner, 18.08: "the
     // visual modes can stand alone… like how it works for the landscape
     // mode"), so the exception has gone the other way.
-    if (playing && !sheetOpen) {
+    // Winding holds the countdown: the controls must not fade out from under
+    // a gesture in progress. finishBall re-arms it on release.
+    if (playing && !sheetOpen && !scrubbingRef.current) {
       restTimer.current = setTimeout(() => {
         setChromeRested(true);
         Animated.timing(chrome, {
@@ -1402,6 +1454,64 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
       }, CHROME_REST_MS);
     }
   };
+
+  /**
+   * WAKE ON THE NEXT TICK, NOT THIS ONE.
+   *
+   * The sniffer that wakes the chrome is `onStartShouldSetResponderCapture`
+   * on the ROOT, and capture runs top-down — so it always fires before the
+   * ball's own responder has been granted, i.e. at a moment when there is no
+   * way to ask "did this touch land on the ball?". Deferring by a tick puts
+   * the answer after responder negotiation (which is synchronous inside the
+   * touch dispatch), so the ball can take the wake back with `cancelWake`.
+   * A gesture that turns out to be a plain TAP hands it back on release.
+   */
+  const wakePendingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * THROUGH A REF, because the wake is deferred and `wakeChrome` closes over
+   * `playing`. Tapping the ball to pause schedules the wake and THEN flips
+   * the play state, so a timeout holding the scheduling render's copy re-arms
+   * the rest countdown believing the drive is still playing — and the
+   * controls fade out on someone who has just paused, which is precisely
+   * what that countdown refuses to do. Reading the live one at fire time
+   * makes the order of the timeout and the re-render stop mattering.
+   */
+  const wakeChromeRef = useRef<(arriving?: boolean) => void>(() => {});
+  wakeChromeRef.current = wakeChrome;
+  const requestWake = () => {
+    if (wakePendingRef.current) clearTimeout(wakePendingRef.current);
+    wakePendingRef.current = setTimeout(() => { wakePendingRef.current = null; wakeChromeRef.current(); }, 0);
+  };
+  const cancelWake = () => {
+    if (wakePendingRef.current) { clearTimeout(wakePendingRef.current); wakePendingRef.current = null; }
+  };
+
+  /** Where a touch on the ball ends up: dismissed, wound, or play/pause. */
+  const finishBall = (g: { dx: number; dy: number; vy: number }) => {
+    const kind = gestureRef.current;
+    gestureRef.current = 'none';
+    if (kind === 'dismiss') { settleDismiss(g); return; }
+    if (kind === 'wind') {
+      scrub.end(scrubPctRef.current);
+      setScrubbing(false);
+      wakeChrome();   // re-arms the rest countdown that scrubbing held off
+      return;
+    }
+    // A TAP, judged in PIXELS rather than degrees: near the ball's centre a
+    // wobble is many degrees but almost no travel, which is why the record
+    // measures its tap the same way.
+    if (Math.abs(g.dx) < TAP_SLOP && Math.abs(g.dy) < TAP_SLOP) {
+      // While the controls are away the first tap only brings them back —
+      // waking a deck must not also pause the song (18.08).
+      const wasRested = chromeRestedRef.current;
+      requestWake();
+      if (!wasRested) togglePlay();
+    }
+  };
+
+  cancelWakeRef.current = cancelWake;
+  finishBallRef.current = finishBall;
+  chromeRestedRef.current = chromeRested;
 
   useEffect(() => {
     if (!visible) return;
@@ -1475,7 +1585,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
            it just notices that a finger landed anywhere on the screen and
            brings the rested controls back. Must sit on the root so it sees
            taps on the ball, the buttons and the empty dark alike. */
-        onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
+        onStartShouldSetResponderCapture={() => { requestWake(); return false; }}>
 
         {/* THE ROOM IS DARK (owner, 29.07). Every mirror ball worth copying is
             photographed in a black room, and that is not decoration — a beam

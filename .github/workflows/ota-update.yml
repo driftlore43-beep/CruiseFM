@@ -259,9 +259,29 @@ jobs:
         run: |
           set -euo pipefail
           echo "Starting a ${{ env.BUILD_PROFILE }} build for iOS from $(git rev-parse --short HEAD)."
+          # WHY THE OUTPUT IS CAPTURED: when the account's build quota is spent,
+          # eas-cli prints the explanation and THEN fails with a bare
+          # "Error: build command failed." — so the useful line is the one
+          # above the error and is easy to scroll past. On 19.08 a fully green
+          # sweep died here on "This account has used its iOS builds from the
+          # Free plan this month". Say so plainly instead of leaving the next
+          # person to diagnose the code.
+          set +e
           eas build --platform ios --profile ${{ env.BUILD_PROFILE }} \
             --auto-submit-with-profile ${{ env.BUILD_PROFILE }} \
-            --non-interactive --no-wait
+            --non-interactive --no-wait 2>&1 | tee /tmp/easbuild.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" -ne 0 ]; then
+            if grep -qi 'from the Free plan this month\|build quota\|used its .* builds' /tmp/easbuild.log; then
+              echo "::error::THE BUILD QUOTA IS SPENT, the code is fine. This account's iOS builds"
+              echo "::error::for the month are used up. Either wait for the reset date printed above,"
+              echo "::error::or lift it with a paid Expo plan at"
+              echo "::error::https://expo.dev/accounts/driftlore/settings/billing"
+              echo "::error::Note a failed attempt still increments the remote build number."
+            fi
+            exit "$code"
+          fi
           echo "::notice::Build queued. Watch it at https://expo.dev/accounts/driftlore/projects/CruiseFM/builds"
           # DO NOT TRUST --auto-submit TO HAVE WORKED. On 19.08 build 30 was
           # started with the flag above, finished cleanly, and 38 minutes later

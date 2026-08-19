@@ -28,6 +28,8 @@
 //    sits across the top of the picture.
 import fs from 'node:fs';
 
+import { answerOffAir } from './visible.mjs';
+
 let chromium;
 try {
   ({ chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright'));
@@ -101,6 +103,9 @@ for (const [file, mode, station] of SHOTS) {
     // click sat there until it timed out. The sheet renders after the page, so
     // its copy is the later one in the document.
     await p.getByText(station, { exact: true }).last().click({ timeout: 20000 });
+    // Most of these stations keep hours, so at most times of day the drive
+    // does not open until the off-air ask is answered.
+    await answerOffAir(p);
     // Let the mode settle AND the wake hint retire itself.
     await p.waitForTimeout(14000);
     // Wake the chrome without touching the object — see trap 2.

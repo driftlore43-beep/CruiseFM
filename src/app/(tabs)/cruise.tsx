@@ -22,6 +22,8 @@ import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
 import { useStyles } from '@/context/AppearanceContext';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
+import { needsOffAirAsk } from '@/constants/schedule';
+import { OffAirAsk } from '@/components/OffAirAsk';
 import type { Palette } from '@/utils/appearance';
 import { RECOMMENDED_IDS, STATIONS, type Station } from '@/constants/stations';
 import {
@@ -86,6 +88,7 @@ export default function CruiseScreen() {
    * never opens — which looks exactly like a sheet that failed to render.
    */
   const [adopt, setAdopt] = useState<{ mode: string; station: string | null } | null>(null);
+  const [askOffAir, setAskOffAir] = useState(false);
   const { isPro } = useEntitlements();
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   // One smart hero: it becomes your last cruise if you have one, otherwise
@@ -151,7 +154,14 @@ export default function CruiseScreen() {
     ? `${heroStation.name} · ${MODE_LABELS[heroCruise.mode] ?? 'Equalizer'} mode`
     : heroStation.name;
 
-  const handleStartDrive = () => launchCruise(heroCruise);
+  // The hero resumes the LAST cruise, which may well name a station that is
+  // off air now — so it asks, exactly as the station page does (owner,
+  // 19.08). A first-time user's hero is the hour's own pick, so it is always
+  // on air and this never fires for them.
+  const handleStartDrive = () => {
+    if (needsOffAirAsk(heroCruise.stationId)) { setAskOffAir(true); return; }
+    launchCruise(heroCruise);
+  };
 
   // The "NOW PLAYING" header belongs to a DRIVE, and only to a drive.
   //
@@ -293,6 +303,14 @@ export default function CruiseScreen() {
           setSelectedStation(null);
         }}
         isPro={isPro}
+      />
+
+      <OffAirAsk
+        stationId={askOffAir ? heroCruise.stationId : null}
+        stationName={heroStation.name}
+        accent={heroStation.eqColors?.[1] ?? '#8A7CFF'}
+        onCancel={() => setAskOffAir(false)}
+        onPlay={() => { setAskOffAir(false); launchCruise(heroCruise); }}
       />
 
       {/* Cruising with music that is already on: the mood, then the look —

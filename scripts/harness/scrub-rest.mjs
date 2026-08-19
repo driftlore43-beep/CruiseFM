@@ -31,7 +31,7 @@ try {
   process.exit(2);
 }
 const BASE = (process.env.BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
-import { visibleClicker } from './visible.mjs';
+import { answerOffAir, visibleClicker } from './visible.mjs';
 const b = await chromium.launch({ args:['--no-sandbox'] });
 const problems = [];
 for (const MODE of ['Vinyl','CD']) {
@@ -47,6 +47,7 @@ for (const MODE of ['Vinyl','CD']) {
   await p.waitForTimeout(2000);
   await visibleClicker(p)(MODE); await p.waitForTimeout(2500);
   await p.getByText('Night Run AM',{exact:true}).last().click({timeout:20000});
+  await answerOffAir(p);
   await p.waitForTimeout(3000);
   await p.mouse.click(40,118); await p.waitForTimeout(1200);
 

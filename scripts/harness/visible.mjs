@@ -51,3 +51,20 @@ export function visibleClicker(page) {
     await target.click({ timeout });
   };
 }
+
+/**
+ * Answer the off-air ask, if it appeared.
+ *
+ * Since 19.08 a station that keeps hours and is outside them asks "… is off
+ * air — play anyway?" before the drive opens. Every harness that starts a
+ * drive from the mood sheet meets it, and WHETHER it appears depends on the
+ * clock — so a harness that ignores it passes in the evening and fails all
+ * afternoon, which is the worst kind of flake. Shared rather than copied, so
+ * the four callers cannot drift apart.
+ */
+export async function answerOffAir(page, choice = 'Play anyway') {
+  await page.waitForTimeout(900);
+  const ask = page.getByText(choice, { exact: true });
+  if (await ask.count()) { await ask.last().click({ force: true }); return true; }
+  return false;
+}

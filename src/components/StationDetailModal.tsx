@@ -21,7 +21,8 @@ import * as Haptics from 'expo-haptics';
 import { stationDial, type Station } from '@/constants/stations';
 import { useDsegFonts } from '@/components/StationIdentity';
 import { isCustomStation, type CustomStation } from '@/utils/customStations';
-import { backOnLabel, isOnAir } from '@/constants/schedule';
+import { backOnLabel, isOnAir, needsOffAirAsk } from '@/constants/schedule';
+import { OffAirAsk } from '@/components/OffAirAsk';
 import { Cruise } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
 import { StationBackdrop } from '@/components/StationBackdrop';
@@ -211,6 +212,14 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   closeRef.current = handleClose;
 
   const selectedIsLocked = !isPro && !!MODES.find((m) => m.id === selectedMode)?.pro;
+  // Set when an off-air station is about to start — see OffAirAsk.
+  const [askOffAir, setAskOffAir] = useState(false);
+
+  function beginDrive() {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Locked mode selected? Launch it anyway as a free preview.
+    onStartDrive(selectedMode, selectedIsLocked);
+  }
 
   function handleStartDrive() {
     // Strict rule: no playlist, no drive. Starting anyway used to inherit
@@ -221,9 +230,15 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
       setShowPicker(true);
       return;
     }
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Locked mode selected? Launch it anyway as a free preview.
-    onStartDrive(selectedMode, selectedIsLocked);
+    // Off air? Say so before starting, rather than printing BACK AT 5PM and
+    // opening it anyway (owner, 19.08). Never a refusal — the mood is one
+    // more tap away.
+    if (station && needsOffAirAsk(station.id)) {
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setAskOffAir(true);
+      return;
+    }
+    beginDrive();
   }
 
   if (!station) return null;
@@ -522,6 +537,16 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
             }}
           />
         )}
+
+        {/* Off-air ask — rendered LAST so it covers the sheet, and as an
+            in-page overlay rather than a Modal (this is already inside one). */}
+        <OffAirAsk
+          stationId={askOffAir ? station.id : null}
+          stationName={station.name}
+          accent={stationAccent}
+          onCancel={() => setAskOffAir(false)}
+          onPlay={() => { setAskOffAir(false); beginDrive(); }}
+        />
       </Animated.View>
     </Modal>
   );

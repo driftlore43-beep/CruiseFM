@@ -17,7 +17,7 @@ try {
 }
 const BASE = (process.env.BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
 
-import { visibleClicker } from './visible.mjs';
+import { answerOffAir, visibleClicker } from './visible.mjs';
 
 const errors = [];
 const steps = [];
@@ -132,7 +132,12 @@ await step('modes: the mood sheet opens on a mode',
 // contains this station's name, and .first() on a loose match picks one that
 // is not the row.
 await step('mood sheet starts a drive',
-  () => p.getByText('Night Run AM', { exact: true }).first().click({ force: true }),
+  async () => {
+    await p.getByText('Night Run AM', { exact: true }).first().click({ force: true });
+    // Night Run keeps hours, so for most of the day picking it raises the
+    // off-air ask before the drive opens. See answerOffAir.
+    await answerOffAir(p);
+  },
   () => has('YOU’RE LISTENING TO'));
 await step('in-drive: change-mode sheet',
   // No scrollIntoViewIfNeeded: inside the mode's own modal it does not resolve

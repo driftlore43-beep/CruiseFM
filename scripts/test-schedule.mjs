@@ -72,6 +72,16 @@ check('night-run back at 8pm', S.backOnLabel('night-run', wedAfternoon) === 'Bac
 check('cars-coffee back Saturday', S.backOnLabel('cars-coffee', wedAfternoon) === 'Back Saturday',
   S.backOnLabel('cars-coffee', wedAfternoon));
 check('on-air station has no back label', S.backOnLabel('daylight', wedAfternoon) === null);
+// PART-WAY THROUGH A MINUTE. The label used to be worked out as now + a
+// ROUNDED gap in minutes, so 04:38:57 to a 5pm start rounded down to 741 and
+// landed back on 16:59:57 — "Back at 4pm" for a station that comes on at
+// five. Any call with seconds on the clock could hit it, which is every real
+// one. The hour must come from the schedule, not from the arithmetic.
+for (const sec of [0, 1, 29, 30, 57, 59]) {
+  const t = new Date(2026, 7, 12, 4, 38, sec);
+  check(`sunset back at 5pm at 04:38:${String(sec).padStart(2, '0')}`,
+    S.backOnLabel('sunset', t) === 'Back at 5pm', S.backOnLabel('sunset', t));
+}
 check('clock: midnight', S.clockLabel(0) === 'midnight');
 check('clock: noon', S.clockLabel(12) === 'noon');
 check('clock: 5am', S.clockLabel(5) === '5am');

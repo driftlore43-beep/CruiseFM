@@ -5,9 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { ModeThumb, type ModeThumbId } from '@/components/ModeThumb';
+import { OffAirAsk } from '@/components/OffAirAsk';
 import { StationSheet } from '@/components/StationSheet';
 import { defaultStationForNow, loadLastCruise, saveLastCruise } from '@/utils/lastCruise';
 import { recordDriveStart } from '@/utils/driveStats';
+import { needsOffAirAsk } from '@/constants/schedule';
+import { resolveAnyStation } from '@/utils/customStations';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
@@ -155,6 +158,10 @@ export default function ModesScreen() {
   // station, or the hour's own pick on a first run, so the common case is one
   // extra tap on something already highlighted.
   const [pending, setPending] = useState<{ mode: string; locked: boolean } | null>(null);
+  // An off-air station picked in the mood sheet, waiting on the ask. It
+  // carries its OWN copy of the mode: StationSheet closes itself the instant
+  // it picks, which clears `pending`, so leaning on that would lose the mode.
+  const [askOffAir, setAskOffAir] = useState<{ stationId: string; mode: string; locked: boolean } | null>(null);
   const [lastStation, setLastStation] = useState<string>(defaultStationForNow());
   useEffect(() => {
     loadLastCruise().then((c) => { if (c?.stationId) setLastStation(c.stationId); }).catch(() => {});
@@ -166,6 +173,15 @@ export default function ModesScreen() {
 
   function start(stationId: string) {
     if (!pending) return;
+    // Off air? Ask before starting (owner, 19.08) — never a refusal.
+    if (needsOffAirAsk(stationId)) {
+      setAskOffAir({ stationId, mode: pending.mode, locked: pending.locked });
+      return;
+    }
+    launch(stationId, pending.mode, pending.locked);
+  }
+
+  function launch(stationId: string, mode: string, locked: boolean) {
     // A real drive, exactly like the Stations page. It used to open PAUSED,
     // which made sense while tapping a mode meant "let me look at this one" —
     // but since the mood sheet landed (03.08) you pick a mode AND a station
@@ -179,11 +195,11 @@ export default function ModesScreen() {
     // Found 13.08 building the stub, which is what made the omission visible:
     // the drive ended and there was nothing to print. A preview is still a
     // taste and still doesn't count.
-    if (!pending.locked) {
-      saveLastCruise({ stationId, mode: pending.mode });
-      recordDriveStart(stationId, undefined, pending.mode);
+    if (!locked) {
+      saveLastCruise({ stationId, mode });
+      recordDriveStart(stationId, undefined, mode);
     }
-    np.open(pending.mode, stationId, { preview: pending.locked });
+    np.open(mode, stationId, { preview: locked });
     setLastStation(stationId);
     setPending(null);
   }
@@ -224,6 +240,18 @@ export default function ModesScreen() {
         currentId={lastStation}
         modeLabel={MODES.find((m) => m.id === pending?.mode)?.title}
         extraBottom={np.session ? 76 : 0}
+      />
+
+      <OffAirAsk
+        stationId={askOffAir?.stationId ?? null}
+        stationName={askOffAir ? resolveAnyStation(askOffAir.stationId).name : ''}
+        accent={askOffAir ? (resolveAnyStation(askOffAir.stationId).eqColors?.[1] ?? '#8A7CFF') : '#8A7CFF'}
+        onCancel={() => setAskOffAir(null)}
+        onPlay={() => {
+          const a = askOffAir;
+          setAskOffAir(null);
+          if (a) launch(a.stationId, a.mode, a.locked);
+        }}
       />
     </View>
   );

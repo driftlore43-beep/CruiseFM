@@ -223,7 +223,37 @@ export function backOnLabel(stationId: string, now: Date = new Date()): string |
     const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][then.getDay()];
     return `Back ${dayName}`;
   }
-  return `Back at ${clockLabel(then.getHours())}`;
+  // THE HOUR COMES FROM THE SCHEDULE, NOT FROM now + minutes — the same trap
+  // `upNext` records, in a smaller disguise. `minutesUntilOnAir` rounds to
+  // whole minutes, so at 04:38:57 the gap to a 5pm start rounds DOWN to 741
+  // and adding it back lands on 16:59:57, i.e. the label read "Back at 4pm"
+  // for a station that comes on at five. Any call made part-way through a
+  // minute could hit it. A start hour is a fact about the schedule and cannot
+  // be off by one.
+  return `Back at ${clockLabel(nextOnAirHour(stationId, now))}`;
+}
+
+/**
+ * Should starting this station ask first?
+ *
+ * Owner, 19.08: "it says back at 'certain time' but you're still allowed to
+ * play the station. I suggest to keep them locked." She is right that the
+ * page was contradicting itself — a label that says a station is shut, over a
+ * button that opens it anyway, is a promise the app does not keep.
+ *
+ * The answer she picked is an ASK rather than a lock, and the distinction is
+ * the whole point: the windows deliberately overlap only three or four at a
+ * time, so a true lock would put six or seven of the ten stations out of
+ * reach at any given moment and somebody who loves Sunset AM could reach it
+ * for one hour a day. The schedule now means something, and the mood is still
+ * one extra tap away. The rule at the top of this file therefore still holds:
+ * off air is presentation, not permission.
+ *
+ * Only stations that KEEP hours can be off air — a round-the-clock station
+ * and the driver's own creations never ask.
+ */
+export function needsOffAirAsk(stationId: string, now: Date = new Date()): boolean {
+  return isScheduled(stationId) && !isOnAir(stationId, now);
 }
 
 /** "On air now" or "Back at 8pm" — the one line a station page prints. */

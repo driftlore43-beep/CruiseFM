@@ -106,7 +106,10 @@ function AccountBody() {
             value={loaded ? name : ''}
             onChangeText={commit}
             placeholder={DEFAULT_DRIVER_NAME}
-            placeholderTextColor="rgba(255,255,255,0.35)"
+            // Themed: this page goes light, and white at 35% is invisible on
+            // paper (19.08). PlaylistSheet keeps its white one on purpose —
+            // that sheet is dark glass in both themes.
+            placeholderTextColor={pal.ink(0.4)}
             style={styles.nameInput}
             maxLength={24}
             returnKeyType="done"

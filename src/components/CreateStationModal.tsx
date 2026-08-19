@@ -467,6 +467,15 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 12,
+    // IT HAS TO BE ABLE TO SHRINK. `maxHeight` is a CAP, not a size: with the
+    // keyboard up, KeyboardAvoidingView pads the backdrop, and a sheet whose
+    // natural height still exceeds what is left simply overflows — upward,
+    // because the backdrop is bottom-aligned. Measured with the window cut to
+    // what an iPhone leaves above the keyboard, the name field sat at top
+    // -142, i.e. off the screen entirely (owner, 19.08: "when I typed the bar
+    // goes missing"). flexShrink lets it give way to the container, and the
+    // ScrollView inside then scrolls instead of pushing the top off.
+    flexShrink: 1,
     maxHeight: SCREEN_H * 0.9,
     borderWidth: 1,
     borderBottomWidth: 0,

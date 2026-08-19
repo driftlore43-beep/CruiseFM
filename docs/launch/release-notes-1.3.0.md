@@ -1,64 +1,67 @@
-# What's New — 1.3.0 (build 29)
+# What's New — 1.3.0
 
 Paste the block below into App Store Connect → the 1.3.0 version → **What's New
 in This Version**. Written for the person downloading it, not for us: no build
 numbers, no library names, nothing they cannot see.
 
-Apple shows roughly the **first three lines** before "more", so the new feature
-leads and the fixes follow.
+Apple shows roughly the **first three lines** before "more", so the two biggest
+things lead and the rest follows.
+
+## Why this covers so much
+
+The public is still on **1.2.0**. A 1.3.0 binary was built on 14 August and
+never submitted, so everything from that release AND everything since arrives
+together in this one. The notes have to carry both — they are not a diff
+against the version nobody received.
 
 ---
 
 ## Use this
 
 ```
-Your own photo behind your own station.
+Your own photo behind your own station, and a light theme for driving
+in the sun.
 
-Make a station, give it a picture from your camera roll, and frame it
-exactly how you like — it sits behind every visual mode while you drive.
+Make a station, give it a picture from your camera roll and frame it
+how you like — it sits behind every visual mode. And the whole app now
+has a light look for bright days; the drives themselves stay dark.
 
 Also in this update:
-• Spotify and Apple Music playlists are now saved separately for each
+• The dial is alive — stations come on air at different times of day,
+  and the app tells you what's on next
+• Every session leaves a ticket behind: where you listened, for how
+  long, and what played
+• Tell the app whether you're driving or just listening, and it counts
+  things properly and calls them by the right name
+• Spotify and Apple Music playlists are saved separately for each
   station, so trying the other service no longer loses your choices
-• Skip and pause respond faster, and the progress bar no longer runs
-  ahead of the music when Spotify has gone to sleep
+• Shuffle and repeat work properly, skip and pause respond faster, and
+  the progress bar no longer runs ahead of music that has stopped
+• Long song titles now scroll everywhere, including sideways
 • A new Y2K share card, alongside Snapshot and Ticket
-• Eight more station colours, including earth tones and a pearl white
-• Smoother visuals throughout, clearer type, and a good number of
-  small fixes
+• Eight more station colours, bigger controls in landscape, and a good
+  number of small fixes
 ```
 
 ## Shorter, if you prefer
 
 ```
 Your own photo behind your own station — pick one from your camera roll
-and frame it exactly how you like.
+and frame it how you like. There's a light theme for bright days, the
+dial now changes through the day as stations come on air, and every
+session leaves a ticket behind.
 
-Spotify and Apple Music playlists are now saved separately for each
-station. Playback responds faster, the progress bar no longer runs ahead
-of the music, and there's a new Y2K share card.
+Playback is quicker and steadier, long titles scroll, and there's a new
+Y2K share card.
 ```
 
----
+## Promotional text
 
-## Why these and not the rest
+The one field that can be changed without a review, so it is where the
+newest thing belongs.
 
-44 commits went into this build. Most of them are invisible — the brand
-document, the performance work, the honesty fixes under the transport — and a
-release note listing everything reads as noise. What is here is what a user
-would actually notice:
-
-| In the notes | Why |
-|---|---|
-| Your own photo | The headline. It is the only genuinely new thing you can *do*. |
-| Per-service playlists | Fixes a real loss of work — people were losing linked playlists by trying the other service. |
-| Faster skip/pause, honest progress bar | The most-felt fix. The bar used to run on over silence and then snap back. |
-| Y2K card | Visible, fun, and it gives the update something to look at. |
-| Station colours | Small but immediately visible to anyone who makes a station. |
-
-**Deliberately not mentioned:** the notification permission route (most people
-have not been asked yet), the type change (they will feel it, not read about
-it), and everything internal.
-
-**Nothing here overclaims.** Worth keeping that way — the visuals are not
-audio-reactive and the notes do not say they are.
+```
+Ten moods, not ten genres. Now with a light theme for bright days, your
+own photos behind your own stations, and a dial that changes through
+the day.
+```

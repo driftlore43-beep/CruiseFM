@@ -28,7 +28,7 @@
 //    sits across the top of the picture.
 import fs from 'node:fs';
 
-import { answerOffAir } from './visible.mjs';
+import { answerOffAir, visibleClicker } from './visible.mjs';
 
 let chromium;
 try {
@@ -89,10 +89,13 @@ for (const [file, mode, station] of SHOTS) {
     // Scroll first: the later cards sit below the fold, and force:true does
     // NOT scroll — it clicked the floating tab bar instead and never opened
     // the sheet at all.
-    const card = p.getByText(mode, { exact: true }).first();
-    await card.scrollIntoViewIfNeeded();
-    await p.waitForTimeout(400);
-    await card.click({ timeout: 20000 });
+    // REACHABLE, not merely first. The home page keeps a mode picker and a
+    // mood picker mounted off-screen, so several cards' names exist two or
+    // three times in the document; `.first()` started aiming at a parked chip,
+    // which has pointer-events none and can never be clicked, so the click sat
+    // there until it timed out (19.08 — the same trap the other harnesses were
+    // fixed for, and this file was missed).
+    await visibleClicker(p)(mode);
     await p.waitForTimeout(3000);
     // NO force here. force skips the actionability wait, and that includes
     // "has the element stopped moving" — so the row's position was read while
@@ -130,10 +133,39 @@ if (wanted('stations')) {
   try {
     await tapTab(p, 'STATIONS');
     await p.waitForTimeout(3000);
-    await p.evaluate(() => {
-      const d = [...document.querySelectorAll('div')].find((e) => e.scrollHeight > e.clientHeight + 200);
-      if (d) d.scrollTop = d.scrollHeight;
+    // THE DIAL'S OWN SCROLLER, named rather than guessed. Expo Router keeps
+    // every tab mounted, so the home page is also scrollable and is the FIRST
+    // such element in the document — "the first scrollable div" scrolled that
+    // instead, left the dial at the top, and produced a slide that was not the
+    // stations page at all. Identify it by what it contains.
+    const scrolled = await p.evaluate(() => {
+      // INNERMOST, not first and not any match. Naming the page's own heading
+      // is still not enough: the tabs sit inside a wrapper that is itself
+      // scrollable and contains every page's text, so it matches too — and
+      // scrolling THAT slid the whole stations page up and out of frame,
+      // leaving the home page's parked sheet in the shot. The dial's own
+      // ScrollView is the shortest of the matches.
+      const all = [...document.querySelectorAll('div')]
+        .filter((e) => e.scrollHeight > e.clientHeight + 200 && /Now tuning/.test(e.innerText || ''));
+      if (!all.length) return false;
+      const d = all.reduce((a, b) => (b.scrollHeight < a.scrollHeight ? b : a));
+      d.scrollTop = d.scrollHeight;
+      return true;
     });
+    if (!scrolled) throw new Error('could not find the dial\'s scroller');
+    await p.waitForTimeout(600);
+    // Prove it is the dial we are photographing: the last row of the FM band
+    // has to be on screen, or the scroll went somewhere else again.
+    const lastRow = await p.evaluate(() => {
+      for (const e of document.querySelectorAll('*')) {
+        if (e.children.length === 0 && (e.textContent || '').trim() === 'Tunnel FM') {
+          const r = e.getBoundingClientRect();
+          if (r.top > 0 && r.bottom < window.innerHeight) return true;
+        }
+      }
+      return false;
+    });
+    if (!lastRow) throw new Error('the dial is not in frame — the scroll hit the wrong element');
     await p.waitForTimeout(2000);
     await p.screenshot({ path: `${OUT}/03-stations-dial.jpg`, quality: 92, type: 'jpeg' });
     console.log('  shot 03-stations-dial  (the dial at full scroll)');

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -152,6 +152,32 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
   // transform on the sheet stops iOS Safari from focusing the text inputs.
   const [settled, setSettled] = useState(false);
 
+  // OWN KEYBOARD TRACKING, NOT `KeyboardAvoidingView`. That component works
+  // by measuring its OWN frame via onLayout and computing padding from
+  // there — and its frame is exactly what's unreliable here: this sheet
+  // sits inside a Modal (its own native window) AND inside an Animated.View
+  // that is mid-transform while it slides in, and either one is enough for
+  // KeyboardAvoidingView's internal measurement to land on a stale or wrong
+  // number. That is the believable shape of "the tab keeps missing" coming
+  // back after the ScrollView fix (19.08) already addressed the other half
+  // of the same report — a genuinely different failure with the same
+  // symptom, on a path this component can't verify from a browser.
+  //
+  // Keyboard show/hide notifications are OS-level events, delivered to every
+  // listener regardless of which window or transform sits between the input
+  // and the app root — so reading the keyboard's own reported height and
+  // applying it directly as marginBottom sidesteps the measurement
+  // entirely, rather than trusting a component known to be flaky inside
+  // Modals. `flexShrink` (on the sheet and its ScrollView, 20.08) is what
+  // then lets the sheet actually give up that space instead of overflowing.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const show = Keyboard.addListener('keyboardWillShow', (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+
   const atLimit = !editing && !isPro && existingCount >= maxFree;
 
   function handleShow() {
@@ -243,14 +269,18 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
       animationType="none"
       onRequestClose={() => handleHide(onClose)}
       onShow={handleShow}>
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => handleHide(onClose)} />
         <Animated.View
           style={[
             styles.sheet,
             { paddingBottom: insets.bottom + 16 },
+            // Lifts the sheet clear of the keyboard — see the keyboardHeight
+            // effect above for why this is done by hand rather than left to
+            // KeyboardAvoidingView. flexShrink on the sheet (and its
+            // ScrollView, below) is what lets it actually give up the space
+            // rather than push its own top off the screen.
+            keyboardHeight > 0 && { marginBottom: keyboardHeight },
             !settled && { transform: [{ translateY: slideY }] },
           ]}>
           <View style={styles.handle} />
@@ -427,7 +457,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
             </Pressable>
           </ScrollView>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
 
       {/* Framing. A second Modal over this one is fine — the create sheet is a
           page-level modal, not one opened from inside a running drive, so the

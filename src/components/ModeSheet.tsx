@@ -11,6 +11,8 @@ import { Fonts } from '@/constants/theme';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useSheetOpen } from '@/context/NowPlayingContext';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -79,13 +81,21 @@ export function ModeSheet({ visible, onClose, onPick, currentId, title = 'CHANGE
   }, [visible]);
 
   const activeId = np.session?.mode ?? currentId;
+  const s = useStyles(makeStyles);
+  const pal = usePalette();
+  // The selected chip is the app's primary pill: a solid fill in the OPPOSITE
+  // of the page. On paper that means a dark pill with light type — a white
+  // pill on near-white paper is not a button (the same call the create
+  // sheet's save button makes).
+  const onChip = pal.mode === 'light' ? '#F6F4EF' : '#0a0a10';
+  const offChip = pal.text;
 
   return (
     <>
       {/* Dim backdrop — tap to dismiss */}
       <Animated.View
         pointerEvents={visible ? 'auto' : 'none'}
-        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: fade }]}>
+        style={[StyleSheet.absoluteFill, { backgroundColor: pal.mode === 'light' ? 'rgba(40,36,28,0.32)' : 'rgba(0,0,0,0.55)', opacity: fade }]}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
       </Animated.View>
 
@@ -96,7 +106,7 @@ export function ModeSheet({ visible, onClose, onPick, currentId, title = 'CHANGE
         <View style={s.header}>
           <Text style={[s.title, { fontFamily: Fonts.mono }]}>{title}</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={s.closeBtn}>
-            <Ionicons name="close" size={16} color="rgba(255,255,255,0.7)" />
+            <Ionicons name="close" size={16} color={pal.ink(0.7)} />
           </TouchableOpacity>
         </View>
 
@@ -117,11 +127,11 @@ export function ModeSheet({ visible, onClose, onPick, currentId, title = 'CHANGE
                 onPress={() => { if (onPick) onPick(m.id); else np.setMode(m.id); onClose(); }}
                 style={[s.chip, active && s.chipActive]}>
                 {look.icon
-                  ? <MaterialCommunityIcons name={look.icon as any} size={17} color={active ? '#0a0a10' : '#fff'} />
-                  : <MirrorBallGlyph size={17} color={active ? '#0a0a10' : '#ffffff'} />}
+                  ? <MaterialCommunityIcons name={look.icon as any} size={17} color={active ? onChip : offChip} />
+                  : <MirrorBallGlyph size={17} color={active ? onChip : offChip} />}
                 <Text style={[s.chipLabel, active && s.chipLabelActive]}>{m.label}</Text>
-                {active && <Ionicons name="checkmark" size={13} color="#0a0a10" />}
-                {locked && !active && <MaterialCommunityIcons name="lock" size={12} color="rgba(255,255,255,0.55)" />}
+                {active && <Ionicons name="checkmark" size={13} color={onChip} />}
+                {locked && !active && <MaterialCommunityIcons name="lock" size={12} color={pal.ink(0.55)} />}
               </TouchableOpacity>
             );
           })}
@@ -131,26 +141,27 @@ export function ModeSheet({ visible, onClose, onPick, currentId, title = 'CHANGE
   );
 }
 
-const s = StyleSheet.create({
+/** Themed 19.08 alongside StationSheet — see the note there. */
+const makeStyles = (p: Palette) => StyleSheet.create({
   sheet: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
-    backgroundColor: '#0d0d16',
+    backgroundColor: p.mode === 'light' ? p.panel : '#0d0d16',
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    borderTopWidth: 1, borderColor: p.ink(0.10),
     paddingTop: 10,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: p.mode === 'light' ? 0.18 : 0.5, shadowRadius: 20, elevation: 20,
     zIndex: 200,
   },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', alignSelf: 'center', marginBottom: 12 },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: p.ink(0.22), alignSelf: 'center', marginBottom: 12 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 22, marginBottom: 14,
   },
-  title: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '800', letterSpacing: 3 },
+  title: { color: p.ink(0.7), fontSize: 11, fontWeight: '800', letterSpacing: 3 },
   closeBtn: {
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: p.ink(0.08),
     alignItems: 'center', justifyContent: 'center',
   },
   row: { paddingHorizontal: 18, gap: 10, paddingVertical: 4 },
@@ -161,13 +172,13 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 16, paddingVertical: 12,
     borderRadius: 22, overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: p.ink(0.06),
+    borderWidth: 1, borderColor: p.ink(0.14),
   },
   chipActive: {
-    backgroundColor: '#ffffff',
-    borderColor: '#ffffff',
+    backgroundColor: p.mode === 'light' ? p.text : '#ffffff',
+    borderColor: p.mode === 'light' ? p.text : '#ffffff',
   },
-  chipLabel: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
-  chipLabelActive: { color: '#0a0a10' },
+  chipLabel: { color: p.text, fontSize: 13.5, fontWeight: '700' },
+  chipLabelActive: { color: p.mode === 'light' ? '#F6F4EF' : '#0a0a10' },
 });

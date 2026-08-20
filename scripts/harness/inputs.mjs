@@ -17,6 +17,18 @@
 //     bottom-aligned, the overflow went off the TOP. Measured: the name field
 //     at top -142, entirely off screen. The fix is flexShrink on the sheet.
 //
+//     BUT KNOW WHAT THIS CANNOT SEE. The same report came back on 1.3.1 with
+//     the fix shipped, and this file passed both before and after the real
+//     cause was found — the ScrollView INSIDE the sheet had no style, so in
+//     React Native it takes its content height and refuses to shrink, and
+//     that height became a floor the sheet could not go under. Two reasons
+//     the browser misses it: `KeyboardAvoidingView` here is `Platform.OS ===
+//     'ios' ? 'padding' : undefined`, so on web it is inert, and react-native
+//     -web resolves flex through CSS, where a scroller shrinks without being
+//     told to. So a pass here is evidence about CONTRAST and about gross
+//     layout, and NOT proof that a sheet survives a real keyboard. Check that
+//     on a phone.
+//
 // (2) CAN YOU READ WHAT YOU TYPED, in both themes? A hardcoded white on a
 //     themed page is invisible on paper and throws nothing — the same silent
 //     failure the contrast sweep exists for. Placeholders count: they are the

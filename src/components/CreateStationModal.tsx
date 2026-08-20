@@ -262,7 +262,20 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
             </View>
           )}
 
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {/* THE SHEET CANNOT SHRINK UNLESS THIS DOES TOO, which is why the
+              19.08 fix did not hold on a real phone. `flexShrink` on the
+              sheet lets it give way to the keyboard, but a ScrollView with no
+              style takes its CONTENT height and refuses to shrink — so the
+              content height became a floor, the sheet stayed too tall for
+              what the keyboard left, and being bottom-anchored it overflowed
+              upward and took the name field off the top of the screen with
+              it (owner again, 19.08, on 1.3.1: "the tab keeps missing").
+              Both levels have to be allowed to shrink, not just the outer
+              one; then this scrolls instead of pushing the top away. */}
+          <ScrollView
+            style={{ flexShrink: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled">
             <Text style={styles.label}>Name</Text>
             <View style={[styles.inputWrap, atLimit && styles.inputDisabled]}>
               <CardWash radius={12} />

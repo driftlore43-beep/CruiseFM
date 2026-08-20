@@ -9,6 +9,8 @@ import { useDsegFont } from '@/components/StationIdentity';
 import { STATIONS, stationDial } from '@/constants/stations';
 import { Fonts, TAB_SAFE_INSET } from '@/constants/theme';
 import { customToStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import { readableOn, type Palette } from '@/utils/appearance';
 
 type Row = { id: string; name: string; tagline: string; accent: string; icon: string; band: 'AM' | 'FM'; dial: string; mine: boolean };
 
@@ -56,6 +58,8 @@ export function StationSheet({
   const insets = useSafeAreaInsets();
   const { height: winH } = useWindowDimensions();
   const seg7 = useDsegFont();
+  const s = useStyles(makeStyles);
+  const pal = usePalette();
   // Parked off-screen using the LIVE window height, not a module-load
   // constant: if that constant is ever wrong the sheet stays parked below the
   // screen while its backdrop still swallows every touch, which reads as the
@@ -97,26 +101,29 @@ export function StationSheet({
 
   const row = (r: Row) => {
     const active = r.id === currentId;
+    // The station's colour is not a palette token, so on paper a near-white
+    // station would vanish as a mark — same rule as the Stations dial.
+    const accent = readableOn(r.accent, pal.mode);
     return (
       <TouchableOpacity
         key={r.id}
         activeOpacity={0.8}
         onPress={() => { onPick(r.id); onClose(); }}
-        style={[s.row, active && s.rowActive, active && { borderColor: `${r.accent}99` }]}>
+        style={[s.row, active && s.rowActive, active && { borderColor: `${accent}99` }]}>
         {/* Tuned marker: the same language as the Stations page — a bar down
             the left edge in the station's own colour. It used to be a solid
             white fill over the whole row, which buried the tagline (white at
             42% on white is invisible) and made the selected station the one
             you could read least. */}
-        {active && <View style={[s.marker, { backgroundColor: r.accent }]} />}
+        {active && <View style={[s.marker, { backgroundColor: accent }]} />}
         <Text style={[s.dial, { fontFamily: seg7 }, active && s.dialActive]}>{r.dial}</Text>
         <View style={s.rowText}>
           <Text style={[s.name, active && s.nameActive]} numberOfLines={1}>{r.name}</Text>
           <Text style={[s.tagline, active && s.taglineActive]} numberOfLines={1}>{r.tagline}</Text>
         </View>
         {active
-          ? <Ionicons name="checkmark" size={16} color={r.accent} />
-          : <MaterialCommunityIcons name={r.icon as any} size={18} color={r.accent} />}
+          ? <Ionicons name="checkmark" size={16} color={accent} />
+          : <MaterialCommunityIcons name={r.icon as any} size={18} color={accent} />}
       </TouchableOpacity>
     );
   };
@@ -141,7 +148,7 @@ export function StationSheet({
     <>
       <Animated.View
         pointerEvents={visible ? 'auto' : 'none'}
-        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: fade }]}>
+        style={[StyleSheet.absoluteFill, { backgroundColor: pal.mode === 'light' ? 'rgba(40,36,28,0.32)' : 'rgba(0,0,0,0.55)', opacity: fade }]}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
       </Animated.View>
 
@@ -154,7 +161,7 @@ export function StationSheet({
             {modeLabel ? `MOOD FOR ${modeLabel.toUpperCase()}` : 'CHOOSE A MOOD'}
           </Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={s.closeBtn}>
-            <Ionicons name="close" size={16} color="rgba(255,255,255,0.7)" />
+            <Ionicons name="close" size={16} color={pal.ink(0.7)} />
           </TouchableOpacity>
         </View>
 
@@ -171,31 +178,45 @@ export function StationSheet({
   );
 }
 
-const s = StyleSheet.create({
+/**
+ * Themed on 19.08 — this and ModeSheet were the last two screens still
+ * hardcoded for a dark app, so on paper the mood picker came up as a black
+ * slab over a light page (owner, with a screenshot: "can the tab that lets me
+ * choose the station, change to light mode?").
+ *
+ * Every value keeps the dark side it always had; only the light side is new.
+ * Two things are NOT simply tokenised, because they were tuned against black:
+ *   - the BACKDROP, a warm ink on paper rather than plain black, matching the
+ *     create sheet so the two agree with each other.
+ *   - the ACCENT marks, which come from the STATION rather than the palette,
+ *     so they go through `readableOn` for the same reason the Stations dial
+ *     does: a station whose colour is nearly white is invisible on a pale row.
+ */
+const makeStyles = (p: Palette) => StyleSheet.create({
   sheet: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
-    backgroundColor: '#0d0d16',
+    backgroundColor: p.mode === 'light' ? p.panel : '#0d0d16',
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    borderTopWidth: 1, borderColor: p.ink(0.10),
     paddingTop: 10,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: p.mode === 'light' ? 0.18 : 0.5, shadowRadius: 20, elevation: 20,
     zIndex: 200,
   },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)', alignSelf: 'center', marginBottom: 12 },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: p.ink(0.22), alignSelf: 'center', marginBottom: 12 },
   headerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 22, marginBottom: 10,
   },
-  title: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '800', letterSpacing: 3 },
+  title: { color: p.ink(0.7), fontSize: 11, fontWeight: '800', letterSpacing: 3 },
   closeBtn: {
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: p.ink(0.08),
     alignItems: 'center', justifyContent: 'center',
   },
   list: { paddingHorizontal: 16, paddingBottom: 8 },
   band: {
-    color: 'rgba(255,255,255,0.38)', fontSize: 10, fontWeight: '800', letterSpacing: 3,
+    color: p.ink(0.38), fontSize: 10, fontWeight: '800', letterSpacing: 3,
     marginTop: 12, marginBottom: 6, marginLeft: 6,
   },
   // Dark glass rows; the ticked one is a solid white pill with dark type —
@@ -204,20 +225,20 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 14, paddingVertical: 12,
     borderRadius: 14, marginBottom: 6,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: p.ink(0.05),
+    borderWidth: 1, borderColor: p.ink(0.10),
     // The marker is an absolutely-positioned edge bar, so the row has to clip
     // it to its own corner radius.
     overflow: 'hidden',
   },
-  rowActive: { backgroundColor: 'rgba(255,255,255,0.11)' },
+  rowActive: { backgroundColor: p.ink(0.11) },
   marker: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
   // Fixed width so every name starts at the same x, like the Stations page.
-  dial: { width: 54, color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: '700' },
-  dialActive: { color: '#ffffff' },
+  dial: { width: 54, color: p.ink(0.55), fontSize: 13, fontWeight: '700' },
+  dialActive: { color: p.text },
   rowText: { flex: 1, minWidth: 0 },
-  name: { color: '#fff', fontSize: 14.5, fontWeight: '700' },
-  nameActive: { color: '#ffffff' },
-  tagline: { color: 'rgba(255,255,255,0.42)', fontSize: 11.5, marginTop: 1 },
-  taglineActive: { color: 'rgba(255,255,255,0.66)' },
+  name: { color: p.text, fontSize: 14.5, fontWeight: '700' },
+  nameActive: { color: p.text },
+  tagline: { color: p.ink(0.42), fontSize: 11.5, marginTop: 1 },
+  taglineActive: { color: p.ink(0.66) },
 });

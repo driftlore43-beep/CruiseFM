@@ -1,6 +1,8 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { Platform } from 'react-native';
 
+import GLYPHS from '@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json';
+
 import { STATIONS, stationDial } from '@/constants/stations';
 import { primaryOnAir, upNext, clockLabel } from '@/constants/schedule';
 import { resolveAnyStation, cachedCustomStations, loadCustomStations } from '@/utils/customStations';
@@ -51,8 +53,20 @@ export type WidgetStation = {
   tagline: string;
   /** "92.1 FM" / "810 AM" — set in the app's own seven-segment face. */
   dial: string;
-  /** MaterialCommunityIcons glyph name; the extension carries the same font. */
+  /** MaterialCommunityIcons glyph name — kept for reference and debugging. */
   icon: string;
+  /**
+   * THE ICON ITSELF, already resolved to its character.
+   *
+   * The widget draws it with the same MaterialCommunityIcons font the app
+   * uses, and a font renders a CHARACTER, not a name — so the name has to
+   * become a codepoint somewhere. That somewhere is here, because the
+   * glyphmap is a JS file we already ship and turning Swift into a second
+   * place that has to know the mapping is how the two drift apart. An
+   * unknown name resolves to an empty string, which draws nothing rather
+   * than the hollow box a bad codepoint would.
+   */
+  iconChar: string;
   /** Deep → mid → black, the station's own card ramp. */
   colors: [string, string, string];
   accent: string;
@@ -88,6 +102,16 @@ export type WidgetSnapshot = {
 
 export const WIDGET_SNAPSHOT_VERSION = 1;
 
+/**
+ * A MaterialCommunityIcons glyph name as the character the font draws.
+ * Unknown names give '' — a widget with no icon is tidy; a widget with a
+ * hollow replacement box looks broken.
+ */
+export function glyphChar(name: string): string {
+  const code = (GLYPHS as Record<string, number>)[name];
+  return typeof code === 'number' ? String.fromCodePoint(code) : '';
+}
+
 /** How far ahead the timeline is written. A widget reloads long before this
  *  runs out; a day is simply more than enough that it never shows empty. */
 const TIMELINE_HOURS = 24;
@@ -115,12 +139,14 @@ export function toWidgetStation(id: string): WidgetStation {
   const s = resolveAnyStation(id);
   const known = STATIONS.some((x) => x.id === s.id);
   const dial = stationDial(s.id, known ? s.premium : false);
+  const icon = s.iconName ?? s.icon;
   return {
     id: s.id,
     name: s.name,
     tagline: s.tagline,
     dial: `${dial.label} ${dial.band}`,
-    icon: s.iconName ?? s.icon,
+    icon,
+    iconChar: glyphChar(icon),
     colors: s.cardGradient,
     // The accent slot every mode wears — eqColors[1] where a station has a
     // ramp, its mid gradient stop otherwise. Same rule as the app itself, so

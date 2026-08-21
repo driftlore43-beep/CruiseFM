@@ -39,6 +39,11 @@ const W = (() => {
   const js = compile(`${ROOT}/src/utils/widgetData.ts`);
   const m = { exports: {} };
   const req = (name) => {
+    if (name === '@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json')
+      // Dual-shaped on purpose: Metro hands a JSON default import back as the
+      // object itself, while this CommonJS transpile reaches for `.default`.
+      // Standing in for only one of those would test the stub, not the code.
+      { const map = { 'music-note': 983943 }; map.default = map; return map; }
     if (name === 'expo-modules-core') return { requireOptionalNativeModule: () => null };
     if (name === 'react-native') return { Platform: { OS: 'ios' } };
     if (name === '@/constants/schedule') return schedule;
@@ -121,6 +126,12 @@ console.log('\n  a widget can draw every entry:');
   const bad = line.filter((e) => !e.name || !e.dial || !e.icon || !e.accent || e.colors?.length !== 3);
   check('every entry carries name, dial, icon, accent and a 3-stop ramp', bad.length === 0,
     bad.map((b) => b.id).join(' '));
+  // The widget draws a CHARACTER, not a name — resolved here so Swift never
+  // needs a second copy of the glyph table (see glyphChar).
+  check('the icon arrives already resolved to its character',
+    line.every((e) => e.iconChar === '\u{F0387}'), JSON.stringify(line[0]?.iconChar));
+  check('an unknown glyph name draws nothing rather than a hollow box',
+    W.glyphChar('not-a-real-icon') === '');
 }
 
 console.log('\n  the snapshot:');

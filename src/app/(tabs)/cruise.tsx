@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -39,6 +39,7 @@ import {
   customToStation, loadCustomStations, resolveAnyStation, type CustomStation,
 } from '@/utils/customStations';
 import { requestCreateStation } from '@/utils/createStationRequest';
+import { consumeDriveRequest } from '@/utils/driveRequest';
 import { loadSessionKind, setSessionKind, words, type SessionKind } from '@/utils/sessionKind';
 import { DEFAULT_DRIVER_NAME, getDriverName } from '@/utils/driverName';
 
@@ -77,6 +78,10 @@ export default function CruiseScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const np = useNowPlaying();
+  // The focus callback is memoised, so anything it calls must be read through
+  // a ref rather than captured (the stale-closure rule this repo keeps).
+  const npRef = useRef(np);
+  npRef.current = np;
   /**
    * Choosing a mood and a look for music that is already playing, when the
    * app cannot tell which station owns it. Held HERE rather than in the card
@@ -112,6 +117,14 @@ export default function CruiseScreen() {
     useCallback(() => {
       let active = true;
       setFocused(true);
+      // A widget tap arrives as a request rather than an open call, because
+      // the deck's host is mounted in this layout and not at the root where
+      // the link lands (see utils/driveRequest). Consumed FIRST, so the drive
+      // starts before this page spends a frame refreshing things the driver
+      // is about to be taken away from. Reading it takes it, so a later
+      // return to this tab cannot start a second drive.
+      const wanted = consumeDriveRequest();
+      if (wanted) npRef.current.open(wanted.mode, wanted.stationId);
       setTonightPick(stationById(defaultStationForNow()));
       setStatsKey((k) => k + 1);
       getDriverName().then((n) => { if (active) setDriverName(n); });

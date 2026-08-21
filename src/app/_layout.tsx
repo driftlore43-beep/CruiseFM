@@ -21,6 +21,7 @@ import { setPlatformSkipped } from '@/utils/musicPlatform';
 import { claimFounderIfEligible } from '@/utils/founder';
 import { AutoUpdateHost } from '@/components/AutoUpdateHost';
 import { NotificationHost } from '@/components/NotificationHost';
+import { WidgetSyncHost } from '@/components/WidgetSyncHost';
 import { NotifyPrompt } from '@/components/NotifyPrompt';
 
 // Stamp launch-week devices as Founders (fire-and-forget, idempotent).
@@ -60,6 +61,7 @@ function AppShell() {
           a real absence, and never during a drive or over a sheet. */}
       <AutoUpdateHost />
       <NotificationHost />
+      <WidgetSyncHost />
       <NotifyPrompt />
       {/* Last child, so it covers everything including the platform sheet. */}
       <BrandIntro onDone={() => setIntroDone(true)} />

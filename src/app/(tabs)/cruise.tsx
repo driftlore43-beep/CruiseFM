@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { AlreadyPlayingCard, startAdoptedDrive } from '@/components/AlreadyPlayingCard';
 import { AppStoreUpdateCard } from '@/components/AppStoreUpdateCard';
+import { RateCard } from '@/components/RateCard';
 import { ModeSheet } from '@/components/ModeSheet';
 import { StationSheet } from '@/components/StationSheet';
 import { ConnectMusicCard } from '@/components/ConnectMusicCard';
@@ -257,6 +258,12 @@ export default function CruiseScreen() {
           {/* Only ever appears once someone has actually listened a couple of
               times, and never again after they make one — see the component. */}
           <MakeStationCard />
+          {/* BELOW THE HERO ON PURPOSE. The cards above it are things the
+              driver needs (a binary update, music already playing, the
+              driving question); asking for a rating is something WE want, so
+              it must never sit between someone and Start Drive. Asked once,
+              after three real sessions — see utils/rateApp. */}
+          <RateCard />
         </View>
 
         {/* YOUR stations come before ours. This is the whole point of the

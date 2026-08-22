@@ -540,8 +540,21 @@ function TurntableHero({
     <View style={{ width: platSize, height: platSize, overflow: 'visible' }}>
       {/* What the record throws onto the scene behind it. First child, so it
           sits under everything; oversized canvas, because a shadow falls
-          beside the thing casting it. See CastShadow. */}
-      <CastShadow width={platSize} height={platSize} radius={platSize / 2} />
+          beside the thing casting it. See CastShadow.
+
+          SIZED TO THE RECORD, NOT THE PLATTER BOX, and that distinction is
+          the whole of what looked wrong (owner, 23.08: "the shadow looks too
+          awkward south… make sure it lies behind/beneath the disc"). The box
+          is `platSize`; the disc actually drawn in it is `recSize`, i.e.
+          86.5% of that. Casting at the box's size made the shadow a disc
+          ~13% WIDER than the record — so its edge stood outside the record
+          all the way round, reading as a second dark disc behind rather than
+          as shade under this one, and worst at the foot where the pool is.
+          It is inset by half the difference so the two are concentric. */}
+      <CastShadow
+        width={recSize} height={recSize} radius={recSize / 2}
+        x={(platSize - recSize) / 2} y={(platSize - recSize) / 2}
+      />
       <SparkleField size={platSize} />
       {/* Platter disc — pan responder applied here for record scrub */}
       <View {...panHandlers} style={[th.platter, { width: platSize, height: platSize, borderRadius: platSize / 2, position: 'absolute', top: 0, left: 0 }]}>

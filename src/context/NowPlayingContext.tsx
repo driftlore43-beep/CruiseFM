@@ -14,7 +14,7 @@ import {
   isApplePlaylist,
   startApplePlaylist,
 } from '@/utils/appleMusic';
-import { getPlaybackState, isRestrictedAccount, isSpotifyConnected, pause as pauseSpotify, probePlaybackState, startPlayback, type StartResult } from '@/utils/spotify';
+import { getPlaybackState, isRestrictedAccount, isSpotifyConnected, looksOffline, pause as pauseSpotify, probePlaybackState, startPlayback, type StartResult } from '@/utils/spotify';
 import { openInSpotify } from '@/utils/spotifyHandoff';
 import { getStationPlaylist } from '@/utils/stationPlaylists';
 
@@ -160,10 +160,19 @@ async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean 
       // user to go and open Spotify themselves, which is precisely the
       // errand worth removing. Deep-linking the playlist wakes the app AND
       // starts the right music in one tap.
-      if (r !== 'restricted' && r !== 'error' && r !== 'no-device') return r;
+      // OFFLINE FALLS THROUGH TOO, and it is the case that matters most for
+      // someone with downloaded music: a `spotify:` link is a local URL
+      // scheme, so it needs no signal at all. With no connection we cannot
+      // TELL Spotify what to play over its Web API, but we can still hand it
+      // the playlist and let it play from the phone — which is exactly what
+      // the owner expected to happen in the car.
+      if (r !== 'restricted' && r !== 'error' && r !== 'no-device' && r !== 'offline') return r;
     }
 
-    return (await openInSpotify(linked.uri)) ? 'handoff' : 'error';
+    // If even the hand-off fails there is nothing left to try, and the honest
+    // reason matters: offline is not Spotify being unresponsive.
+    if (await openInSpotify(linked.uri)) return 'handoff';
+    return looksOffline() ? 'offline' : 'error';
   } catch {
     return null; // never let a playback hiccup break the drive
   }
@@ -183,6 +192,10 @@ const START_NOTICES: Record<StartResult, string | null> = {
   'handoff': null,
   'no-playlist': "This station doesn't have its own playlist yet. Tap Add Playlist to give it one — every drive here will play it.",
   'error': "Spotify didn't respond. Check the Spotify app is open and logged in, then press play to retry.",
+  // NOT "Spotify didn't respond" — offline, Spotify is fine and so is the
+  // login, and telling someone to check both is advice that cannot help.
+  // It also says what DOES still work, because most of the app does.
+  'offline': "You're offline, so Cruise FM can't control Spotify — that part needs a connection. Play your downloaded music in Spotify and cruise on; the visuals work without signal.",
 };
 
 /** The default companion note on every start attempt — Spotify only hands

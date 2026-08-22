@@ -132,11 +132,24 @@ export async function exchangeCodeForToken(code: string, codeVerifier: string): 
       code_verifier: codeVerifier,
     });
 
-    const res = await fetch(discovery.tokenEndpoint, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-    });
+    // NOT timedFetch, deliberately — this is the auth path and a 4s cap on
+    // it would be a behaviour change on something critical. But it must still
+    // report reachability, because for a CONNECTED driver with no signal this
+    // is the first thing that fails: the token refresh happens before any
+    // playback call, so without this the app cannot tell "offline" from
+    // "never signed in".
+    let res: Response;
+    try {
+      res = await fetch(discovery.tokenEndpoint, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      });
+      noteReachable();
+    } catch (e) {
+      noteUnreachable();
+      throw e;
+    }
 
     const data = await res.json();
     if (!data.access_token) return false;
@@ -160,11 +173,24 @@ async function refreshAccessToken(): Promise<string | null> {
       client_id:     CLIENT_ID,
     });
 
-    const res = await fetch(discovery.tokenEndpoint, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-    });
+    // NOT timedFetch, deliberately — this is the auth path and a 4s cap on
+    // it would be a behaviour change on something critical. But it must still
+    // report reachability, because for a CONNECTED driver with no signal this
+    // is the first thing that fails: the token refresh happens before any
+    // playback call, so without this the app cannot tell "offline" from
+    // "never signed in".
+    let res: Response;
+    try {
+      res = await fetch(discovery.tokenEndpoint, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      });
+      noteReachable();
+    } catch (e) {
+      noteUnreachable();
+      throw e;
+    }
 
     const data = await res.json();
     if (!data.access_token) return null;
@@ -297,10 +323,47 @@ async function classify403Detailed(
 // Spotify calls sit between "user pressed play" and music/handoff; an
 // unanswered request should give up fast so the fallback path can run.
 const FETCH_TIMEOUT_MS = 4000;
+/**
+ * WHETHER THE PHONE CAN REACH SPOTIFY AT ALL.
+ *
+ * Owner, offline in the car with downloaded music: "I thought Cruise FM can
+ * work without wifi." The visuals do. Spotify's CONTROL does not, and cannot
+ * — `api.spotify.com` is a cloud service, so telling Spotify what to play is
+ * a network call even when the music itself is already on the phone. What was
+ * wrong was not the failure, it was the EXPLANATION: every one of these folds
+ * into the same "Spotify didn't respond — check the app is open and logged
+ * in", which is advice that cannot possibly help someone whose Spotify is
+ * open, logged in, and simply has no signal.
+ *
+ * NO NETWORK MODULE NEEDED, which is why this ships over the air. A request
+ * that never reaches a server fails differently from one that comes back with
+ * a status, and `timedFetch` is the single choke point every Spotify call
+ * goes through — so recording it here is enough to tell "you are offline"
+ * from "Spotify said no".
+ *
+ * It is deliberately a RECENCY check rather than a latch: signal comes and
+ * goes constantly in a car, and a stale "you were offline a minute ago" would
+ * be its own lie.
+ */
+let lastNetworkFailureAt = 0;
+
+/** A request never reached a server. */
+function noteUnreachable(): void { lastNetworkFailureAt = Date.now(); }
+/** A request came back — whatever it said, the phone has a connection. */
+function noteReachable(): void { lastNetworkFailureAt = 0; }
+
+/** True if a Spotify request recently failed to reach a server at all. */
+export function looksOffline(withinMs = 30_000): boolean {
+  return lastNetworkFailureAt !== 0 && Date.now() - lastNetworkFailureAt < withinMs;
+}
+
 function timedFetch(url: string, init?: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
+  return fetch(url, { ...init, signal: ctrl.signal })
+    .then((res) => { noteReachable(); return res; })
+    .catch((e) => { noteUnreachable(); throw e; })
+    .finally(() => clearTimeout(t));
 }
 
 // ── Playback controls ────────────────────────────────────────────────────────
@@ -481,6 +544,8 @@ export type StartResult =
   | 'waking'
   | 'playing'
   | 'no-device'
+  /** The phone cannot reach Spotify at all — no signal, not a Spotify fault. */
+  | 'offline'
   | 'premium-required'
   | 'restricted'      // account not on the dev-mode allowlist
   | 'handoff'         // playlist handed to the Spotify app (set by the caller)
@@ -503,15 +568,18 @@ export async function startPlayback(
   try {
     return await startPlaybackInner(contextUri, offset);
   } catch {
-    // Timed out / offline mid-sequence — report error so the caller can
-    // fall back (e.g. hand the playlist to the Spotify app) without waiting.
-    return 'error';
+    // Timed out or dropped mid-sequence. Either way the caller falls back to
+    // handing the playlist to the Spotify app; saying WHICH it was is what
+    // lets the notice give advice that can actually help.
+    return looksOffline() ? 'offline' : 'error';
   }
 }
 
 async function startPlaybackInner(contextUri?: string, offset?: { uri: string }): Promise<StartResult> {
+  // With no signal this is the FIRST thing to fail: refreshing the token is
+  // itself a network call, so offline the drive never even reaches Spotify.
   const token = await getAccessToken();
-  if (!token) return 'error';
+  if (!token) return looksOffline() ? 'offline' : 'error';
 
   const headers = {
     'Authorization': `Bearer ${token}`,

@@ -21,6 +21,8 @@ import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useMusicPlayback, nextRepeat } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
+import { createScrubHaptics } from '@/utils/scrubHaptics';
+import { useScrubFocus } from '@/utils/useScrubFocus';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { LandscapeChrome, restShiftFor, useDeckScene, useIsoLayoutEffect, useRestScene } from '@/components/LandscapeChrome';
@@ -1131,6 +1133,38 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const progressBaseRef = useRef(0);    // song position when the finger landed
   const scrubPctRef = useRef(0);        // latest scrubbed position
 
+  /**
+   * WINDING THE BALL NOW FEELS AND READS LIKE WINDING THE RECORD (owner,
+   * 23.08). Three things the disc and the record already had and this did
+   * not: grain under the thumb, a "+7s" marker so you can see what the wind
+   * is doing to the song, and the scene pulling focus while it happens.
+   *
+   * All three are the SHARED implementations rather than new ones — the point
+   * is that the three spinning objects feel like the same instrument, and a
+   * second copy of any of this is how they drift apart.
+   */
+  const [scrubDeltaSec, setScrubDeltaSec] = useState(0);
+  const scrubPillAnim = useRef(new Animated.Value(0)).current;
+  const scrubPillTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrubHaptics = useRef(createScrubHaptics()).current;
+  const scrubFocus = useScrubFocus();
+  /** Last dx, so each frame can report how far the surface actually turned. */
+  const lastDxRef = useRef(0);
+  /** Duration read inside the responder, which is built once. */
+  const durMsRef = useRef(0);
+  durMsRef.current = durationMs || 0;
+
+  /** Show the marker, and fade it a second after the wind stops — the same
+   *  timing the record and the disc use. */
+  const flashScrubPill = () => {
+    scrubPillAnim.setValue(1);
+    if (scrubPillTimer.current) clearTimeout(scrubPillTimer.current);
+    scrubPillTimer.current = setTimeout(() => {
+      Animated.timing(scrubPillAnim, { toValue: 0, duration: 320, useNativeDriver: true }).start();
+    }, 1000);
+  };
+  useEffect(() => () => { if (scrubPillTimer.current) clearTimeout(scrubPillTimer.current); }, []);
+
   // The responder above is built ONCE, so everything it reaches for must be a
   // ref — a captured value would stay on the first render's copy for the
   // component's whole life (the stale-closure trap this file already records
@@ -1202,6 +1236,13 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             scrubPctRef.current = progressBaseRef.current;
             scrub.begin();
             setScrubbing(true);
+            // The scene pulls focus and the thumb gets something to hold.
+            scrubFocus.begin();
+            scrubHaptics.grab();
+            scrubHaptics.reset();   // start the grain on a crisp detent
+            lastDxRef.current = g.dx;
+            setScrubDeltaSec(0);
+            flashScrubPill();
             // Where the turn currently sits, so the ball carries on from its
             // present angle instead of jumping. Synchronous — no native read.
             const at = readPhase();
@@ -1230,6 +1271,22 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
           const pct = Math.max(0, Math.min(1, progressBaseRef.current + g.dx / (size * 5)));
           scrubPctRef.current = pct;
           scrub.move(pct);
+          // WHAT THE WIND IS DOING TO THE SONG, in the marker the record and
+          // the disc already use. Needs a real duration — with no track there
+          // is no "+7s" to state, and inventing one would be the kind of
+          // claim this app keeps removing.
+          if (durMsRef.current > 0) {
+            setScrubDeltaSec(Math.round(((pct - progressBaseRef.current) * durMsRef.current) / 1000));
+            flashScrubPill();
+          }
+          // GRAIN, measured the way the disc measures it: a detent belongs to
+          // how far the SURFACE turned, not to how far the finger moved, so
+          // the drag is converted to degrees of ball first. A ball-width of
+          // travel is one full turn, which is the same rate the wind already
+          // uses for the song.
+          const dxStep = g.dx - lastDxRef.current;
+          lastDxRef.current = g.dx;
+          scrubHaptics.turn((dxStep / size) * 360);
         }
       },
       onPanResponderRelease: (_, g) => finishBallRef.current(g),
@@ -1492,8 +1549,13 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
     gestureRef.current = 'none';
     if (kind === 'dismiss') { settleDismiss(g); return; }
     if (kind === 'wind') {
+      // scrub.end SEEKS — this is what actually moves the song, and it routes
+      // by platform through seekActive, so it works on Apple Music too.
       scrub.end(scrubPctRef.current);
       setScrubbing(false);
+      scrubFocus.end();
+      scrubHaptics.release();
+      scrubHaptics.reset();
       wakeChrome();   // re-arms the rest countdown that scrubbing held off
       return;
     }
@@ -1597,9 +1659,15 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             temperature; the dark falls off from behind the ball outwards, so
             the middle of the screen still has some depth to it rather than
             being flat black. */}
-        <View style={[StyleSheet.absoluteFill, { opacity: 0.16 }]} pointerEvents="none">
+        {/* The room falls away while the ball is being wound — see
+            useScrubFocus for why this is a push and a veil rather than a
+            blur (animating blurRadius re-blurs the photograph on the main
+            thread every frame, which is what got the app killed once). */}
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { opacity: 0.16, transform: [{ scale: scrubFocus.backdropScale }] }]}
+          pointerEvents="none">
           <StationBackdrop station={station} blurRadius={2.5} />
-        </View>
+        </Animated.View>
         {/* Explicit width/height, not just absoluteFill: an Svg with no size
             falls back to an intrinsic one and the wash lands as a black box
             in the top-left corner. */}
@@ -1631,6 +1699,25 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         {/* The vignette sits over the room but under the chrome: the studio
             darkens toward its corners, the scene keeps its depth, the type
             stays on top of everything. */}
+        {/* The veil that makes the ball the only lit thing while it is wound. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: '#04040a', opacity: scrubFocus.veilOpacity }]}
+        />
+
+        {/* HOW FAR THE WIND HAS MOVED THE SONG. Same pill, same wording and
+            same 1s fade as the record and the disc, in the STATION's colour
+            rather than the vinyl's gold so it belongs to this deck (the
+            31.07 call). Only ever shown with a real duration behind it. */}
+        <Animated.View pointerEvents="none" style={[fs.scrubPillWrap, { opacity: scrubPillAnim }]}>
+          <View style={[fs.scrubPill, { borderColor: eq[1] + '80' }]}>
+            <Ionicons name={scrubDeltaSec >= 0 ? 'play-forward' : 'play-back'} size={14} color={eq[1]} />
+            <Text style={[fs.scrubPillText, { color: eq[1] }]}>
+              {scrubDeltaSec >= 0 ? `+${scrubDeltaSec}s` : `${scrubDeltaSec}s`}
+            </Text>
+          </View>
+        </Animated.View>
+
         <Vignette winW={winW} winH={winH} />
 
         {/* Glitter over everything in the room (under the chrome): the
@@ -1674,6 +1761,12 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: isLandscape ? ballSize * 0.16 : ballSize * 0.30 }, restScene]}
             onLayout={(e) => setSceneBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
             <Animated.View style={[{ alignItems: 'center' }, deckScene]}>
+              {/* A WRAPPER, not another transform on the view above. In React
+                  Native a later `transform` in a style array REPLACES an
+                  earlier one rather than composing with it, and `deckScene`
+                  already owns one (the landscape glide) — so scaling there
+                  would silently undock the ball whenever it was wound. */}
+              <Animated.View style={{ alignItems: 'center', transform: [{ scale: scrubFocus.objectScale }] }}>
               <View style={{ width: 2, height: ballSize * 0.22, backgroundColor: 'rgba(255,255,255,0.25)' }} />
               <View style={{ width: 14, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)', marginBottom: -3 }} />
               {/* A ball-sized anchor box — the bloom/ray layers below position
@@ -1695,6 +1788,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
                 </Animated.View>
                 <MirrorBall size={ballSize} eq={eq} spin={spin} pulse={pulse} lit={live} spotPan={spotPan} />
               </View>
+              </Animated.View>
             </Animated.View>
           </Animated.View>
 
@@ -1822,6 +1916,13 @@ const fs = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   modeLabel: { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', letterSpacing: 3 },
+  scrubPillWrap: { position: 'absolute', left: 0, right: 0, top: '42%', alignItems: 'center', zIndex: 200 },
+  scrubPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    backgroundColor: 'rgba(0,0,0,0.78)', borderRadius: 20,
+    paddingHorizontal: 18, paddingVertical: 9, borderWidth: 1,
+  },
+  scrubPillText: { fontSize: 11, fontWeight: '700', letterSpacing: 2.5 },
   time: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
   controls: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

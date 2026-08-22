@@ -1,6 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
 
 import { usePalette, useStyles } from '@/context/AppearanceContext';
@@ -48,6 +49,66 @@ import type { NowPlaying } from '@/utils/useMusicPlayback';
  * and no station match — it falls through to the hour's station. That is the
  * honest outcome rather than a guess dressed up as a match.
  */
+/**
+ * THE LITTLE BARS THAT SAY "THIS IS LIVE".
+ *
+ * The card claims to be hearing something; three bars moving is the cheapest
+ * possible proof, and it is the app's own language — the home header has used
+ * the same meter since 02.08.
+ *
+ * SAME TECHNIQUE AS THAT HEADER, and for the reason recorded there rather
+ * than by preference: React Native's own `Animated` on the NATIVE driver,
+ * transforming `scaleY` — never `height`, which is a layout property and so
+ * cannot leave the JS thread, and never Reanimated, which measurably did not
+ * animate on the owner's device while looking perfect in a browser. The bar
+ * is drawn at full height and squashed, so it needs a paired `translateY` of
+ * half the difference to keep its foot on the baseline (RN has no
+ * transform-origin).
+ */
+const BARS = [
+  { maxH: 13, duration: 460, delay: 0 },
+  { maxH: 18, duration: 560, delay: 90 },
+  { maxH: 10, duration: 500, delay: 40 },
+];
+const BAR_REST = 3;
+
+function LiveBar({ maxH, duration, delay, live }: {
+  maxH: number; duration: number; delay: number; live: boolean;
+}) {
+  const v = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!live) {
+      v.stopAnimation();
+      Animated.timing(v, { toValue: 0, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+      return;
+    }
+    // The delay runs ONCE, before the loop. Inside it, every bar would pause
+    // at the bottom of each cycle and the three would breathe in unison.
+    const anim = Animated.sequence([
+      Animated.delay(delay),
+      Animated.loop(Animated.sequence([
+        Animated.timing(v, { toValue: 1, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [live, delay, duration, v]);
+
+  return (
+    <Animated.View
+      style={{
+        width: 3, height: maxH, borderRadius: 1.5, backgroundColor: '#fff',
+        transform: [
+          { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [(maxH - BAR_REST) / 2, 0] }) },
+          { scaleY: v.interpolate({ inputRange: [0, 1], outputRange: [BAR_REST / maxH, 1] }) },
+        ],
+      }}
+    />
+  );
+}
+
 /**
  * Open a drive around music that is ALREADY playing, without starting or
  * changing anything. Shared, because the card takes this path itself when it
@@ -113,22 +174,57 @@ export function AlreadyPlayingCard({ track, contextUri, contextName, onAsk }: {
       style={ap.card}
       onPress={() => (known ? startAdoptedDrive(np, pick.stationId as string, pick.mode)
                             : onAsk(pick.mode))}>
-      <View style={ap.iconRing}>
-        <MaterialCommunityIcons name="ear-hearing" size={19} color={pal.text} />
+      {/* THE COVER OF WHAT IS ACTUALLY PLAYING. The card asserts it can hear
+          something; showing the record it is hearing is the difference
+          between a notice and a moment. Album art already reaches us on both
+          services — Spotify sends it, Apple Music's comes from the public
+          catalogue lookup — and when it doesn't, the ear icon stands in
+          rather than a grey square pretending to be artwork. */}
+      <View style={ap.art}>
+        {track.albumArt
+          ? <ExpoImage source={{ uri: track.albumArt }} contentFit="cover" style={StyleSheet.absoluteFill} />
+          : <View style={ap.artFallback}>
+              <MaterialCommunityIcons name="ear-hearing" size={19} color={pal.text} />
+            </View>}
+        {/* The bars sit ON the cover, over a scrim that runs the width of the
+            tile — a bare white bar can land on a pale album and vanish. */}
+        <View style={ap.barsScrim} pointerEvents="none">
+          <View style={ap.bars}>
+            {BARS.map((b, i) => <LiveBar key={i} {...b} live />)}
+          </View>
+        </View>
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={ap.title} numberOfLines={1}>
-          I can hear {track.title}
-        </Text>
+        {/* EYEBROW + NAME, the app's own grammar — the same shape as YOU'RE
+            LISTENING TO over a station, or TONIGHT'S PICK over the hero. It
+            is here for a plain reason: "I can hear Wake Me Up When September
+            Ends" does not fit on a phone, and putting the claim in a small
+            line above hands the whole width to the thing worth reading. */}
+        <Text style={ap.eyebrow}>I CAN HEAR</Text>
+        {/* TWO LINES. A song title is the one thing on this card worth reading in
+            full, and plenty of them do not fit a phone's width beside a cover
+            and a button — "Wake Me Up When September Ends" is the owner's own
+            example and it clipped at one line. The card grows by a line only
+            when it has to. */}
+        <Text style={ap.title} numberOfLines={2}>{track.title}</Text>
         {/* THE PLAYLIST LEADS when we know it. Naming it is the difference
             between a guess and a fact, and it is how someone spots that their
             music is not the playlist they thought it was — which is the thing
             that prompted this card. */}
+        {/* THE ARTIST LEADS THE SUB-LINE. It belongs to the song, which is
+            what someone is reacting to when they glance at this — and the
+            playlist keeps its place directly after, because naming it is
+            still the difference between a guess and a fact, and it is how
+            someone spots that their music is not the playlist they thought
+            it was. That was the thing that prompted this card. */}
         <Text style={ap.sub} numberOfLines={2}>
-          {station
-            ? (contextName ? `${contextName} · keep it playing on ${station.name}`
-                           : `Keep it playing on ${station.name}`)
-            : 'Keep it playing — pick a mood and a look'}
+          {[
+            track.artist || null,
+            station
+              ? (contextName ? `${contextName} — keep it playing on ${station.name}`
+                             : `Keep it playing on ${station.name}`)
+              : 'Keep it playing — pick a mood and a look',
+          ].filter(Boolean).join(' · ')}
         </Text>
       </View>
       <View style={ap.go}>
@@ -154,6 +250,26 @@ const make_ap = (p: Palette) => StyleSheet.create({
     backgroundColor: p.ink(0.05),
     borderWidth: 1,
     borderColor: p.ink(0.14),
+  },
+  art: {
+    width: 54, height: 54, borderRadius: 12, overflow: 'hidden',
+    backgroundColor: p.ink(0.06),
+    borderWidth: 1, borderColor: p.ink(0.12),
+  },
+  artFallback: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  // Anchored to the foot of the tile so the bars stand on its bottom edge.
+  barsScrim: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 26,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.34)',
+  },
+  bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, paddingLeft: 7, paddingBottom: 6 },
+  eyebrow: {
+    color: p.ink(0.5), fontSize: 8.5, fontWeight: '800', letterSpacing: 1.4,
+    marginBottom: 2,
   },
   iconRing: {
     width: 40, height: 40, borderRadius: 20,

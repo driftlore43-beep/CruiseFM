@@ -210,17 +210,68 @@ export async function getAppleUserPlaylists(): Promise<LinkedPlaylist[]> {
  * 'playing' | 'no-device' | 'error'. Apple has no device-handoff concept —
  * playback happens on this phone — so 'no-device' never occurs.
  */
+/**
+ * THE LAST QUEUE THIS APP HANDED TO THE MUSIC APP.
+ *
+ * Remembered so a failed resume can be recovered without every caller having
+ * to know which station's playlist is loaded. See `recoverApplePlayback`.
+ */
+let lastQueuedUri: string | null = null;
+export function lastAppleQueueUri(): string | null { return lastQueuedUri; }
+
 export async function startApplePlaylist(uri?: string): Promise<'playing' | 'error'> {
   if (!bridge) return 'error';
   try {
     if (uri && isApplePlaylist(uri)) {
       await bridge.playPlaylist(applePlaylistId(uri));
+      lastQueuedUri = uri;
     } else {
       await bridge.play();
     }
     return 'playing';
   } catch {
     return 'error';
+  }
+}
+
+/**
+ * PUT THE QUEUE BACK AND CARRY ON FROM WHERE IT STOPPED.
+ *
+ * Reported by a listener on 23.08: "after pausing the song through the app it
+ * completely freezes trying to play it again and it desyncs from Apple Music…
+ * most of the time the music won't play from the app itself and you have to
+ * keep going back to Apple Music to play it again."
+ *
+ * WHAT WE KNOW FROM THE CODE, without being able to reproduce it here (no
+ * device, and Swift cannot be built from this environment): the whole path is
+ * silent when it fails. The native `play()` is `try? await player.play()`,
+ * which throws away the error, and `applePlay` swallows it again on this
+ * side — so if `SystemMusicPlayer` refuses to resume, the app has no idea and
+ * simply appears frozen. `currentEntry` returning nil makes it worse, because
+ * that blanks the deck's track entirely, which is the "desync".
+ *
+ * THE RECOVERY IS WHAT THE LISTENER DOES BY HAND. Going back to the Music app
+ * and pressing play works because it gives the system player a queue again.
+ * This does the same thing from here: re-queue the playlist the app itself
+ * last started, then seek back to where the song was, so the fix is invisible
+ * rather than a restart from the top.
+ *
+ * Returns false when there is nothing to recover WITH — no bridge, or the app
+ * never queued anything this session (music started from the Music app), in
+ * which case re-queueing would be taking over playback we were never driving.
+ */
+export async function recoverApplePlayback(resumeAtMs: number | null): Promise<boolean> {
+  if (!bridge || !lastQueuedUri) return false;
+  try {
+    await bridge.playPlaylist(applePlaylistId(lastQueuedUri));
+    // Re-queueing starts the playlist at its first track, so without this the
+    // recovery would silently throw away where they were.
+    if (resumeAtMs != null && resumeAtMs > 1500) {
+      await bridge.seekTo(resumeAtMs);
+    }
+    return true;
+  } catch {
+    return false;
   }
 }
 

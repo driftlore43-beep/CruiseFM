@@ -17,6 +17,7 @@ import {
   appleSetRepeat,
   appleSetShuffle,
   getAppleNowPlaying,
+  recoverApplePlayback,
   isAppleMusicConnected,
 } from './appleMusic';
 import { backButtonAction, type NowPlaying, type RepeatMode } from './useSpotifyPlayback';
@@ -33,6 +34,11 @@ import { backButtonAction, type NowPlaying, type RepeatMode } from './useSpotify
  * speaker (so no wake nudge, no start-result reporting), and no playlist
  * "context" to chase — the queue is ours.
  */
+/** How long to give the system player before deciding the resume did not
+ *  take. Long enough that a slow start is not mistaken for a failure, short
+ *  enough that a driver does not sit looking at a dead button. */
+const RESUME_CHECK_MS = 1600;
+
 export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number }) {
   const [connected, setConnected] = useState(false);
   const [track, setTrack] = useState<NowPlaying | null>(null);
@@ -171,6 +177,40 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
   const ping = useActivityPing();
   const after = () => setTimeout(() => refreshRef.current(), 500);
 
+  /**
+   * DID THE MUSIC ACTUALLY START? (listener report, 23.08: "after pausing the
+   * song through the app it completely freezes trying to play it again… most
+   * of the time the music won't play from the app itself and you have to keep
+   * going back to Apple Music to play it again.")
+   *
+   * Every layer of the play path swallows its own failure — the native call is
+   * a `try?`, and applePlay catches on this side — so when the system player
+   * refuses to resume, nothing anywhere knows. This asks, once, shortly after,
+   * and if the music genuinely did not start it puts the queue back and
+   * carries on from where the song was. That is exactly what the listener does
+   * by hand when he goes back to the Music app.
+   *
+   * GUARDED so it can never fight the user. It gives up if they touched the
+   * transport again in the meantime (a play immediately followed by a pause
+   * must stay paused), if the screen has gone, or if the app never queued
+   * anything itself — in which case the music belongs to the Music app and
+   * taking it over would be worse than the bug.
+   */
+  const verifyResume = () => {
+    const askedAt = Date.now();
+    const resumeAt = trackRef.current?.progressMs ?? null;
+    setTimeout(async () => {
+      if (cancelledRef.current) return;
+      // Someone pressed something else since — their intent wins.
+      if (lastControlRef.current !== askedAt) return;
+      const entry = await getAppleNowPlaying().catch(() => null);
+      if (cancelledRef.current || lastControlRef.current !== askedAt) return;
+      if (entry?.isPlaying) return;                 // it started; nothing to do
+      const ok = await recoverApplePlayback(resumeAt);
+      if (ok && !cancelledRef.current) after();
+    }, RESUME_CHECK_MS);
+  };
+
   return {
     available: appleMusicAvailable(),
     connected,
@@ -184,7 +224,7 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
     // Controls are optimistic: fire, then re-read so the display catches up.
     // Playback is local, so these land far faster than Spotify's remote calls
     // and need none of its waking machinery.
-    play: () => { ping(); lastControlRef.current = Date.now(); applePlay(); after(); },
+    play: () => { ping(); lastControlRef.current = Date.now(); applePlay(); after(); verifyResume(); },
     pause: () => { ping(); lastControlRef.current = Date.now(); applePause(); after(); },
     next: () => { ping(); lastControlRef.current = Date.now(); appleNext(); after(); },
     // Restart-then-previous, same rule and same window as Spotify's — see the

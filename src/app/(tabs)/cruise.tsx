@@ -36,10 +36,8 @@ import {
 } from '@/utils/lastCruise';
 import { recordDriveStart } from '@/utils/driveStats';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
-import {
-  customToStation, loadCustomStations, resolveAnyStation, type CustomStation,
-} from '@/utils/customStations';
-import { requestCreateStation } from '@/utils/createStationRequest';
+import { customToStation, loadCustomStations, resolveAnyStation, type CustomStation, isCustomStation } from '@/utils/customStations';
+import { requestCreateStation, requestEditStation } from '@/utils/createStationRequest';
 import { consumeDriveRequest } from '@/utils/driveRequest';
 import { loadSessionKind, setSessionKind, words, type SessionKind } from '@/utils/sessionKind';
 import { DEFAULT_DRIVER_NAME, getDriverName } from '@/utils/driverName';
@@ -331,6 +329,19 @@ export default function CruiseScreen() {
           setSelectedStation(null);
         }}
         isPro={isPro}
+        // EDITING REACHES THE HOME SHELF NOW. Until today the menu only
+        // existed when a station was opened from the Stations page, so a
+        // driver who reached one of their own stations from here had no way
+        // to change its colour at all — which is exactly how a listener came
+        // to report editing as a missing feature (23.08) when it was built.
+        // The sheet lives on the Stations page, so this hands over the same
+        // way the "make a station" invitation does.
+        onEdit={selectedStation && isCustomStation(selectedStation) ? () => {
+          const id = selectedStation.id;
+          setSelectedStation(null);
+          requestEditStation(id);
+          router.push('/stations');
+        } : undefined}
       />
 
       <OffAirAsk

@@ -16,7 +16,7 @@ import { STATIONS, stationDial, type Band, type Station } from '@/constants/stat
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { deleteCustomStation, isCustomStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
 import { clockLabel, isScheduled, onAirNow, upNext } from '@/constants/schedule';
-import { consumeCreateRequest } from '@/utils/createStationRequest';
+import { consumeCreateRequest, consumeEditRequest } from '@/utils/createStationRequest';
 import { stationImageSource } from '@/utils/stationImage';
 import { recordDriveStart } from '@/utils/driveStats';
 import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
@@ -423,6 +423,18 @@ export default function StationsScreen() {
     // Someone pressed "make a station" on the home page and was sent here.
     // Reading the request clears it, so arriving again later is quiet.
     if (consumeCreateRequest()) setShowCreate(true);
+    // ...or pressed Edit on one of their own stations from the home shelf,
+    // where the sheet does not live. Resolved against the freshly loaded list
+    // rather than a captured one, so a cold arrival still finds the station.
+    const editId = consumeEditRequest();
+    if (editId) {
+      loadCustomStations()
+        .then((list) => {
+          const found = list.find((c) => c.id === editId);
+          if (found) { setEditingStation(found); setShowCreate(true); }
+        })
+        .catch(() => {});
+    }
     const tick = setInterval(() => {
       setOnAirStation(stationById(defaultStationForNow()));
       setLive(onAirNow());

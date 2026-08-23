@@ -355,7 +355,8 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
             style={[styles.menuBtn, { top: topPad }]}
             onPress={() => { setShowMenu((v) => !v); setConfirmDelete(false); }}
             hitSlop={12}>
-            <Ionicons name="ellipsis-horizontal" size={16} color="rgba(255,255,255,0.85)" />
+            <MaterialCommunityIcons name="pencil-outline" size={15} color="#fff" />
+            <Text style={styles.menuBtnLabel}>Edit</Text>
           </Pressable>
         )}
         {showMenu && (
@@ -578,13 +579,20 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
   // Right-hand side: the left slot belongs to the back button now.
+  // A NAMED BUTTON, NOT A BARE '...'. A listener who wanted to change his
+  // station's colour reported it as missing (23.08) — it was there the whole
+  // time, behind a 16pt ellipsis that reads as decoration. A glyph asks you
+  // to guess; a word does not. Kept small and dark so it still sits quietly
+  // over the station's photograph.
   menuBtn: {
     position: 'absolute', right: 20, zIndex: 10,
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    height: 34, paddingHorizontal: 12, borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)',
   },
+  menuBtnLabel: { color: '#fff', fontSize: 12.5, fontWeight: '700' },
   menuBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 19 },
   menuSheet: {
     position: 'absolute', right: 20, zIndex: 20,

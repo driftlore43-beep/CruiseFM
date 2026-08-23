@@ -13,6 +13,8 @@
  * takes it.
  */
 let pending = false;
+/** A station the driver asked to EDIT from somewhere other than Stations. */
+let pendingEdit: string | null = null;
 
 /** Ask the Stations page to open the create sheet when it next appears. */
 export function requestCreateStation(): void {
@@ -23,5 +25,25 @@ export function requestCreateStation(): void {
 export function consumeCreateRequest(): boolean {
   const was = pending;
   pending = false;
+  return was;
+}
+
+/**
+ * Ask the Stations page to open the EDIT sheet for this station.
+ *
+ * Same reasoning as the create request, and the same reason it is needed: the
+ * sheet lives on the Stations page and only there, so the home shelf cannot
+ * open it directly. Until now the home shelf simply did not offer editing at
+ * all — a listener reported changing a station's colour as a missing feature
+ * (23.08) when it existed, just not from where he was standing.
+ */
+export function requestEditStation(id: string): void {
+  pendingEdit = id;
+}
+
+/** The station to edit, once. Reading it takes it. */
+export function consumeEditRequest(): string | null {
+  const was = pendingEdit;
+  pendingEdit = null;
   return was;
 }

@@ -572,11 +572,23 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
         // The scrub does NOT begin here. Until the drag has been judged this
         // might be a tap or a pull-down, and neither should wind the song or
         // raise the scrub pill.
-        const at = readPhase();
-        phaseRef.current = at;
-        turningRef.current = false;
-        spin.stopAnimation();
-        spin.setValue(at);
+        // THE DISC IS NOT STOPPED HERE, and that is the whole of the fix
+        // (owner, 23.08: "I tap near the CD and the disc stops spinning and
+        // it looks like the song has stopped… I have to tap it again to make
+        // it spin and then the music actually pauses").
+        //
+        // This runs on EVERY touch, including the tap that only means "bring
+        // the controls back". Stopping the spin here froze the disc while the
+        // music played on — and nothing restarted it, because the spin effect
+        // only re-runs when `playing` or `scrubbing` changes and a wake-tap
+        // changes neither. The next tap then flipped `playing`, which re-ran
+        // the effect (the disc moved) AND paused the song: the two tap
+        // behaviours arrived one tap late, for ever.
+        //
+        // The mirror ball never had this because it takes the spin over only
+        // once it knows the gesture is a wind. Same rule here now — see the
+        // 'scrub' branch in onPanResponderMove.
+        phaseRef.current = readPhase();
         lastAngleRef.current = angleAt(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
       },
       onPanResponderMove: (evt, g) => {
@@ -591,6 +603,16 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
             dragRef.current = 'dismiss';
           } else {
             dragRef.current = 'scrub';
+            // NOW the disc belongs to the finger — freeze the running spin and
+            // anchor it where it actually is. Doing this on grant instead is
+            // what froze the disc on a plain tap.
+            {
+              const at = readPhase();
+              phaseRef.current = at;
+              turningRef.current = false;
+              spin.stopAnimation();
+              spin.setValue(at);
+            }
             scrub.begin();
             setScrubbing(true);
             setScrubDeltaSec(0);

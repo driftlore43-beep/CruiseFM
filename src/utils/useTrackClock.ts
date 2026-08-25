@@ -18,14 +18,21 @@ let cachedPlatform: string | null = null;
 getSavedPlatform().then((p) => { cachedPlatform = p; }).catch(() => {});
 
 export function seekActive(ms: number): void {
+  // THE RE-READ HAPPENS ON BOTH BRANCHES, and it has to. It used to sit after
+  // the Apple branch's `return`, so the cache was only ever refreshed by a
+  // Spotify seek — meaning a listener who chose Apple Music and later switched
+  // to Spotify kept seeking Apple Music for the rest of the session. Same
+  // symptom as the 04.08 bug this function was written to fix (the record
+  // turns, the bar moves, the song does not), reached from the other side.
+  //
+  // Fired first and NOT awaited: a seek happens on release and cannot wait on
+  // storage, so this scrub uses the cache it has and the next one is correct.
+  getSavedPlatform().then((p) => { cachedPlatform = p; }).catch(() => {});
   if (appleMusicAvailable() && cachedPlatform === 'appleMusic') {
     appleSeekTo(ms).catch(() => {});
     return;
   }
   seekTo(ms).catch(() => {});
-  // Re-read in the background so a platform switch mid-session lands on the
-  // next scrub rather than never.
-  getSavedPlatform().then((p) => { cachedPlatform = p; }).catch(() => {});
 }
 import type { NowPlaying } from './useMusicPlayback';
 

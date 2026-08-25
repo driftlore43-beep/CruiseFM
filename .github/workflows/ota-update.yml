@@ -123,7 +123,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22, NOT 20, and the reason is external to this repo: eas-cli is
+          # installed at `latest`, and 22.4.0 pulled in a dependency requiring
+          # Node >= 22. On 25.08 that broke the job before a single check of
+          # ours ran — "The engine node is incompatible with this module" —
+          # which reads like a repo failure and is not one. React Native and
+          # metro both accept ^22.13.0 (they publish
+          # ^20.19.4 || ^22.13.0 || ^24.3.0 || >= 25.0.0), so this stays inside
+          # what the project itself supports.
+          node-version: 22
           cache: npm
 
       - uses: expo/expo-github-action@v8

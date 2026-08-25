@@ -189,10 +189,49 @@ reports of it being picked up during publishing even though it shouldn't be.
 
 Two things become possible here that never could on the PC:
 
-- The **iPhone Simulator** (free, part of Xcode) — a working iPhone on the
-  screen, so layouts can be checked without touching the real phone. This is
-  the one outstanding item from the original launch checklist.
+- The **iPhone (and iPad) Simulator** (free, part of Xcode) — a working phone
+  or tablet on the screen, so layouts can be checked without touching a real
+  device.
 - Building and submitting to Apple locally, though the EAS cloud builds you
   already use work fine and need no setup at all.
 
 Neither is needed to ship updates.
+
+### Checking the iPad — a working iPad on the screen, for free
+
+You don't own an iPad, and one reported the app looking cut off. This is how
+to see it for yourself without buying one.
+
+**1. Install the full Xcode app.** What you installed earlier (Command Line
+Tools) is just enough for `git`; it doesn't include the Simulator. Open the
+**App Store** app, search **Xcode**, press **Get**. It's a big download —
+7–12 GB — so start it and go do something else; it can take 30–60 minutes on
+a normal connection. No Apple Developer *paid* account needed, it's free.
+
+**2. Open Xcode once.** After it installs, open it from Launchpad. It'll ask
+to install "additional components" — say yes, wait for that too, then you can
+close Xcode again. This step only happens once, ever.
+
+**3. Add an iPad to the Simulator.** Open the **Simulator** app directly
+(`Cmd + Space`, type `Simulator`). If nothing opens on screen, or it opens an
+iPhone: go to the menu bar → **File → Open Simulator → iOS → iPad Pro 12.9"**
+(or any iPad in that list — pick a couple, sizes vary and that's the point of
+checking).
+
+**4. Run the app into it.** In Terminal, in the project folder:
+```
+npx eas-cli env:pull --environment preview
+npx expo start
+```
+Once it's running, press **`i`** — it opens straight into whichever Simulator
+window is already on screen, iPad included.
+
+**What you're looking for:** whether the app fills the iPad's screen properly
+or sits in a small letterboxed rectangle in the middle (that's iOS running it
+in "iPhone compatibility mode" — expected right now, since the app was only
+ever built and tested for iPhone). Cut-off text, buttons you can't reach, or
+anything genuinely broken (not just "smaller than the screen") is the useful
+kind of report to bring back here.
+
+When you're done, delete the `.env.local` file `env:pull` created (see above)
+— same reason as always, it shouldn't be sitting around or picked up later.

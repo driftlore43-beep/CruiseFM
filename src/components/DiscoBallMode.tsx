@@ -24,7 +24,6 @@ import { useTrackClock } from '@/utils/useTrackClock';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
 import { useScrubFocus } from '@/utils/useScrubFocus';
 import { useNowPlaying } from '@/context/NowPlayingContext';
-import { useMotion } from '@/context/MotionContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { LandscapeChrome, restShiftFor, useDeckScene, useIsoLayoutEffect, useRestScene } from '@/components/LandscapeChrome';
 import { PreviewGate } from '@/components/PreviewGate';
@@ -1103,11 +1102,6 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   const repeat = spotify.repeatMode;
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
-  // The ROOM around the ball — beams, glitter, fireflies, dust, the bloom it
-  // throws — is atmosphere and stands down with it. The ball itself and the
-  // light ON its surface stay: an unlit ball is what PAUSED looks like, and
-  // that state already means something else.
-  const { atmosphere } = useMotion();
   // The SCENE waits for the service's own verdict; the transport keeps the
   // optimistic `playing`, because a button that hesitates reads as broken.
   // See utils/confirmedPlaying for why, and for the clip that proved it.
@@ -1694,7 +1688,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
             reflections, so they cannot have a life of their own. Two copies a
             screen apart make the wrap seamless: as one leaves to the right the
             other is already arriving. */}
-        {atmosphere && <DustField count={14} eq={eq} live={live} winW={winW} winH={winH} />}
+        <DustField count={14} eq={eq} live={live} winW={winW} winH={winH} />
 
         {/* The static diagonal streaks that used to hang here are gone
             (owner, 01.08: "awkward light streak on the right hand side").
@@ -1729,8 +1723,8 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
         {/* Glitter over everything in the room (under the chrome): the
             specks must sparkle in the corners too, so they sit above the
             vignette rather than being dimmed by it. */}
-        {atmosphere && <GlitterField eq={eq} lit={live} winW={winW} winH={winH} />}
-        {atmosphere && <Fireflies eq={eq} live={live} winW={winW} winH={winH} />}
+        <GlitterField eq={eq} lit={live} winW={winW} winH={winH} />
+        <Fireflies eq={eq} live={live} winW={winW} winH={winH} />
 
         {/* Drag pill + mode label + centred header are portrait furniture —
             in landscape LandscapeChrome carries the identity at top-left. */}
@@ -1780,7 +1774,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
                   Also the scrub target: swipe left/right anywhere on the ball. */}
               <View style={{ width: ballSize, height: ballSize }} {...ballPan.panHandlers}>
                 {/* The rays first, so the ball draws over their roots. */}
-                {atmosphere && <LightRays size={ballSize} eq={eq} winW={winW} winH={winH} lit={live} />}
+                <LightRays size={ballSize} eq={eq} winW={winW} winH={winH} lit={live} />
                 {/* Bloom is light LEAVING the ball, so it fades out with the
                     music exactly as the flashes do. `MirrorBeams` used to draw
                     here too and is GONE (owner, 02.08: "the light rays that
@@ -1790,7 +1784,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
                     light is the cast reflections now, which is what a mirror
                     ball actually throws. */}
                 <Animated.View style={[StyleSheet.absoluteFill, { opacity: live }]} pointerEvents="none">
-                  {atmosphere && <BallBloom size={ballSize} color={bloomColor} pulse={pulse} />}
+                  <BallBloom size={ballSize} color={bloomColor} pulse={pulse} />
                 </Animated.View>
                 <MirrorBall size={ballSize} eq={eq} spin={spin} pulse={pulse} lit={live} spotPan={spotPan} />
               </View>

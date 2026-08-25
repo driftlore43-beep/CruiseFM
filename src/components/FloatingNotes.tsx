@@ -3,7 +3,6 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { useAppActive } from '@/utils/useAppActive';
-import { useMotion } from '@/context/MotionContext';
 
 /**
  * Floating music notes that drift up and away from a mode's visual while
@@ -105,20 +104,13 @@ export function FloatingNotes({
   const box = useRef({ w: 0, h: 0 });
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const appActive = useAppActive();
-  // ATMOSPHERE OFF MEANS OFF. Drifting notes are the room, not the mode, and
-  // until 25.08 they ignored the setting entirely — only AmbientGlow read it,
-  // so "off = clean scene" was true of the haze and of nothing else (owner,
-  // with a recording: "some atmospheric pulse happens even when the atmosphere
-  // button is off"). Gated HERE rather than at six call sites, the same way
-  // AmbientGlow does it, so a seventh mode cannot forget.
-  const { atmosphere } = useMotion();
 
   const drop = useCallback((id: number) => {
     setNotes((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
   useEffect(() => {
-    if (!playing || !appActive || !atmosphere) { setNotes([]); return; }
+    if (!playing || !appActive) { setNotes([]); return; }
 
     const spawn = () => {
       const { w, h } = box.current;
@@ -153,7 +145,7 @@ export function FloatingNotes({
     // call site, so they are deliberately not dependencies — including the
     // array would restart the spawner on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, appActive, atmosphere, scrubbing, scrubDir, emitter, ringRadius, spawnMs]);
+  }, [playing, appActive, scrubbing, scrubDir, emitter, ringRadius, spawnMs]);
 
   return (
     <View

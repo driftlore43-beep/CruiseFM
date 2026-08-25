@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-import { getAtmosphere, getAutoDim, getDataSaver, getDaylight, getSoftAtmosphere, setAtmosphereStored, setAutoDimStored, setDataSaverStored, setDaylightStored, setSoftAtmosphereStored } from '@/utils/motionSettings';
+import { getAtmosphere, getAutoDim, getDataSaver, getDaylight, getSoftAtmosphere, getVinylClassic, setAtmosphereStored, setAutoDimStored, setDataSaverStored, setDaylightStored, setSoftAtmosphereStored, setVinylClassicStored } from '@/utils/motionSettings';
 
 type MotionCtx = {
   /** When true, motion backgrounds are forced to stills everywhere. */
@@ -18,6 +18,9 @@ type MotionCtx = {
   /** High-contrast pass for driving in sun. Default OFF. See motionSettings. */
   daylight: boolean;
   setDaylight: (value: boolean) => void;
+  /** The Vinyl deck without its ring, rays and specks. Default OFF. */
+  vinylClassic: boolean;
+  setVinylClassic: (value: boolean) => void;
 };
 
 const Ctx = createContext<MotionCtx>({
@@ -26,6 +29,7 @@ const Ctx = createContext<MotionCtx>({
   atmosphere: true, setAtmosphere: () => {},
   softAtmosphere: true, setSoftAtmosphere: () => {},
   daylight: false, setDaylight: () => {},
+  vinylClassic: false, setVinylClassic: () => {},
 });
 
 export function MotionProvider({ children }: { children: ReactNode }) {
@@ -34,6 +38,7 @@ export function MotionProvider({ children }: { children: ReactNode }) {
   const [atmosphere, setAT] = useState(true);
   const [softAtmosphere, setSA] = useState(true);
   const [daylight, setDL] = useState(false);
+  const [vinylClassic, setVC] = useState(false);
 
   useEffect(() => {
     getDataSaver().then(setDS);
@@ -41,6 +46,7 @@ export function MotionProvider({ children }: { children: ReactNode }) {
     getAtmosphere().then(setAT);
     getSoftAtmosphere().then(setSA);
     getDaylight().then(setDL);
+    getVinylClassic().then(setVC);
   }, []);
 
   const setDataSaver = (value: boolean) => {
@@ -68,8 +74,13 @@ export function MotionProvider({ children }: { children: ReactNode }) {
     setDaylightStored(value);
   };
 
+  const setVinylClassic = (value: boolean) => {
+    setVC(value);
+    setVinylClassicStored(value);
+  };
+
   return (
-    <Ctx.Provider value={{ dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere, daylight, setDaylight }}>
+    <Ctx.Provider value={{ dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere, daylight, setDaylight, vinylClassic, setVinylClassic }}>
       {children}
     </Ctx.Provider>
   );

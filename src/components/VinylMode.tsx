@@ -13,6 +13,7 @@ import { STATIONS } from '@/constants/stations';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
 import { useScrubFocus } from '@/utils/useScrubFocus';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
+import { useMotion } from '@/context/MotionContext';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { ModeScrim } from '@/components/ModeScrim';
@@ -488,7 +489,7 @@ function Tonearm({
 
 // ── Fullscreen turntable hero ─────────────────────────────────────────────────
 function TurntableHero({
-  platSize, spin, tonearmAnim, glowOpacity, ringShimmer, raysSpin, labelRotate, playing, panHandlers, scrubbing, scrubDir, accent = V.gold, labelText = 'NIGHT RUN FM', albumArt = null, progressAnim,
+  platSize, spin, tonearmAnim, glowOpacity, ringShimmer, raysSpin, labelRotate, playing, panHandlers, scrubbing, scrubDir, accent = V.gold, labelText = 'NIGHT RUN FM', albumArt = null, progressAnim, classic = false,
 }: {
   platSize: number;
   spin: Animated.AnimatedInterpolation<string>;
@@ -496,6 +497,11 @@ function TurntableHero({
   glowOpacity: Animated.AnimatedInterpolation<number>;
   ringShimmer: Animated.Value;
   raysSpin: Animated.AnimatedInterpolation<string>;
+  /** Classic Vinyl: the turntable without its neon layer — no ring, no rays,
+   *  no specks. See getVinylClassic. The record, arm, grooves and album art
+   *  are untouched, and the station's colour still reaches the rim and the
+   *  arm, so the deck still reads as the mood it belongs to. */
+  classic?: boolean;
   labelRotate: Animated.AnimatedInterpolation<string>;
   playing: boolean;
   panHandlers: any;
@@ -555,12 +561,13 @@ function TurntableHero({
         width={recSize} height={recSize} radius={recSize / 2}
         x={(platSize - recSize) / 2} y={(platSize - recSize) / 2}
       />
-      <SparkleField size={platSize} />
+      {!classic && <SparkleField size={platSize} />}
       {/* Platter disc — pan responder applied here for record scrub */}
       <View {...panHandlers} style={[th.platter, { width: platSize, height: platSize, borderRadius: platSize / 2, position: 'absolute', top: 0, left: 0 }]}>
         <VinylDisc size={recSize} spin={spin} accent={accent} />
       </View>
       {/* Disco light rays — rotate at half record speed */}
+      {!classic && (
       <Animated.View style={{
         position: 'absolute',
         width: recSize, height: recSize,
@@ -581,9 +588,11 @@ function TurntableHero({
           }} />
         ))}
       </Animated.View>
+      )}
       {/* Single thick pulsing mood ring — color interpolated, not opacity.
           pointerEvents none is LOAD-BEARING: this view covers the whole
           record, and without it every tap/scrub on the vinyl died here. */}
+      {!classic && (
       <Animated.View pointerEvents="none" style={{
         position: 'absolute',
         width: recSize + 20, height: recSize + 20, borderRadius: (recSize + 20) / 2,
@@ -594,6 +603,7 @@ function TurntableHero({
         }),
         top: (platSize - recSize - 20) / 2, left: (platSize - recSize - 20) / 2,
       }} />
+      )}
       {/* Center label — independent spin, sits above the record */}
       {(() => {
         // Well over true-to-life (real label ≈ 33%) — the album art is the
@@ -720,6 +730,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const isLandscape = winW > winH;
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
+  // Classic Vinyl: the deck without its neon layer. See getVinylClassic.
+  const { vinylClassic } = useMotion();
   const spotify = useMusicPlayback(visible);
   // The SCENE waits for the service's own verdict; the transport keeps the
   // optimistic `playing`, because a button that hesitates reads as broken.
@@ -1176,18 +1188,24 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   useEffect(() => {
     if (live) {
       spinUp();
+      // NOT STARTED IN CLASSIC, and that is a real saving rather than tidiness:
+      // this animates borderColor, which cannot take the native driver, so it
+      // is JS-thread work every frame for the whole drive — and in Classic the
+      // ring it drives is not on screen at all.
+      if (!vinylClassic) {
       shimmerLoopRef.current = Animated.loop(Animated.sequence([
         Animated.timing(ringShimmer, { toValue: 1.0, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
         Animated.timing(ringShimmer, { toValue: 0.6, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
       ]));
       shimmerLoopRef.current.start();
+      }
     } else {
       coastToStop();
       shimmerLoopRef.current?.stop();
       ringShimmer.setValue(0.6);
     }
     return () => { stopSpin(); shimmerLoopRef.current?.stop(); };
-  }, [live]);
+  }, [live, vinylClassic]);
 
   // Safety net — restart spin if it stopped unexpectedly. Stops dead when the
   // app is backgrounded: a repeating timer is one of the things iOS kills a
@@ -1486,7 +1504,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             <Animated.View style={{ transform: [{ scale: scrubFocus.objectScale }] }}>
             <TurntableHero
               platSize={platSize} spin={spin} tonearmAnim={tonearmVal} glowOpacity={glowOpacity}
-              ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={spin} playing={live}
+              ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={spin} playing={live} classic={vinylClassic}
               panHandlers={recordPanRef.panHandlers} scrubbing={isScrubbing} scrubDir={scrubDir}
               accent={VINYL_ACCENTS[station.id] ?? station.eqColors?.[1] ?? V.gold}
               labelText={station.name.toUpperCase()}

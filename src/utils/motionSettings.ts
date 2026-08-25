@@ -115,3 +115,36 @@ export async function setDaylightStored(value: boolean): Promise<void> {
     // ignore
   }
 }
+
+const VINYL_CLASSIC_KEY = 'cruise_vinyl_classic';
+
+/**
+ * Classic Vinyl = the turntable without its neon layer.
+ *
+ * The Vinyl deck's hardware is carefully observed — the tonearm is drawn from
+ * a reference photograph, the label is the real album art, the record casts a
+ * real shadow — and on top of that sit a thick pulsing ring in the station's
+ * colour, eight rotating light rays and a field of gold specks. None of those
+ * exist on a turntable, and a listener asked for the option of the plain thing
+ * (Ethan, 23.08: "from an arcade holographic style to something more like the
+ * MD app").
+ *
+ * Default OFF, so nobody's deck changes unless they choose it. The station's
+ * colour still reaches the rim, the grooves and the arm, so a Classic deck
+ * still reads as the mood it belongs to.
+ */
+export async function getVinylClassic(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(VINYL_CLASSIC_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function setVinylClassicStored(value: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(VINYL_CLASSIC_KEY, value ? 'true' : 'false');
+  } catch {
+    // ignore
+  }
+}

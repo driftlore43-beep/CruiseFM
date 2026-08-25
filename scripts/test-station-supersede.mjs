@@ -39,7 +39,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  *  whole point. */
 const SERVICE_MS = 2500;
 
-function mount() {
+function mount({ platform = 'spotify' } = {}) {
   const js = ts.transpileModule(fs.readFileSync(SRC, 'utf8'), {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
@@ -102,11 +102,14 @@ function mount() {
     if (name === '@/utils/driveStats') return {
       noteDriveMode: async () => {}, recordDriveEnd: async () => null,
     };
-    if (name === '@/utils/musicPlatform') return { getSavedPlatform: async () => 'spotify' };
+    if (name === '@/utils/musicPlatform') return { getSavedPlatform: async () => platform };
     if (name === '@/utils/appleMusic') return {
-      appleMusicAvailable: () => false, applePause: async () => {}, applePlay: async () => {},
-      isAppleMusicConnected: async () => false, isApplePlaylist: () => false,
-      startApplePlaylist: async () => 'playing',
+      appleMusicAvailable: () => platform === 'appleMusic',
+      applePause: slow('applePause'),
+      applePlay: slow('applePlay'),
+      isAppleMusicConnected: async () => platform === 'appleMusic',
+      isApplePlaylist: (uri) => String(uri).startsWith('applemusic:'),
+      startApplePlaylist: slow('appleStart', 'playing'),
     };
     if (name === '@/utils/spotify') return {
       getPlaybackState: async () => null,
@@ -119,7 +122,10 @@ function mount() {
     };
     if (name === '@/utils/spotifyHandoff') return { openInSpotify: async () => {} };
     if (name === '@/utils/stationPlaylists') return {
-      getStationPlaylist: async (id) => ({ uri: `spotify:playlist:${id}`, name: id }),
+      getStationPlaylist: async (id) => ({
+        uri: platform === 'appleMusic' ? `applemusic:playlist:${id}` : `spotify:playlist:${id}`,
+        name: id,
+      }),
     };
     return new Proxy({}, { get: () => () => {} });
   };
@@ -201,6 +207,25 @@ console.log('\n  and landing back where you started changes nothing:');
   await sleep(600);
   check('retuning to the station already playing is ignored',
     calls.length === 0, JSON.stringify(calls));
+}
+
+// EVERY USER IS ON APPLE MUSIC (owner, 25.08), and this branch asked Spotify
+// to stop and never Apple Music — so the beat of silence a station change is
+// built around had never happened for anyone actually using the app. The old
+// playlist just played on while the new one was queued over the top.
+console.log('\n  the breath silences whichever service is playing:');
+{
+  const { calls, api } = mount({ platform: 'appleMusic' });
+  api().open('tuner', 'night-run', { paused: true });
+  await sleep(50);
+  calls.length = 0;
+
+  api().setStationId('sunset');
+  await sleep(400);            // inside the breath, before the new music starts
+  check('Apple Music is asked to stop', calls.includes('applePause'),
+    JSON.stringify(calls));
+  check('and Spotify is not — it is not the one playing',
+    !calls.includes('pause'), JSON.stringify(calls));
 }
 
 console.log(fails ? `\n  ${fails} failure(s)\n`

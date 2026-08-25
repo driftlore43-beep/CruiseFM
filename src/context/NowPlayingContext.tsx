@@ -432,9 +432,30 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
       });
     };
     if (opts?.breath) {
-      isSpotifyConnected()
-        .then((c) => { if (c) return pauseSpotify().catch(() => {}); })
-        .catch(() => {});
+      // THE BEAT OF SILENCE, ON WHICHEVER SERVICE IS ACTUALLY PLAYING.
+      //
+      // This asked Spotify to stop and never Apple Music, so for an Apple
+      // listener — which since 25.08 is every listener — the old playlist
+      // simply played on for 900ms and the new one was queued over the top.
+      // The "retuning a radio, not a hard cut" behaviour this branch exists
+      // for had therefore never happened for anyone using the app.
+      //
+      // Routed by the same test the notice branch above uses, so the two
+      // cannot disagree about who is listening. Deliberately NOT awaited: the
+      // 900ms timer has to start now either way, or the breath becomes 900ms
+      // plus however long the platform lookup takes.
+      //
+      // Deliberately NOT guarded by `superseded()` either. At the moment it
+      // fires this pause belongs to the change being made, not to one already
+      // left behind — silencing the outgoing station is right even if a thumb
+      // moves on a moment later.
+      (async () => {
+        if (appleMusicAvailable() && (await getSavedPlatform()) === 'appleMusic') {
+          if (await isAppleMusicConnected()) await applePause();
+          return;
+        }
+        if (await isSpotifyConnected()) await pauseSpotify();
+      })().catch(() => {});
       setTimeout(kick, 900);
     } else {
       kick();

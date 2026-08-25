@@ -238,7 +238,7 @@ export default function ProfileScreen() {
   const pal = usePalette();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere, daylight, setDaylight } = useMotion();
+  const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere, daylight, setDaylight, vinylClassic, setVinylClassic } = useMotion();
   const { devFreePreview, setDevFreePreview, isPro } = useEntitlements();
   const { name: platformName, color: rawPlatformColor, id: platformId, refresh: refreshPlatform } = useMusicPlatformInfo();
   // The platform's name is set IN its brand colour on this row, and some brand
@@ -516,6 +516,29 @@ export default function ProfileScreen() {
             />
           </View>
           )}
+
+          {/* Classic Vinyl — the turntable without its neon layer. A listener
+              asked for the plain thing (Ethan, 23.08); default OFF, so nobody's
+              deck changes unless they choose it. Deliberately does NOT touch
+              the haze or the fireflies — those are the room, and the two
+              Atmosphere rows above already own them. */}
+          <View style={[styles.settingsRow, styles.settingsBorder]}>
+            <View style={styles.platformRowLeft}>
+              <IconChip icon="record-player" size={34} />
+              <View style={styles.settingsTextBlock}>
+                <Text style={styles.settingsLabel}>Classic Vinyl</Text>
+                <Text style={styles.dataSaverSub}>Just the record and the arm · no glow or sparkles</Text>
+              </View>
+            </View>
+            <Switch
+              value={vinylClassic}
+              onValueChange={setVinylClassic}
+              trackColor={{ false: pal.ink(0.2), true: Cruise.violet }}
+              thumbColor="#fff"
+              ios_backgroundColor={pal.ink(0.2)}
+              {...({ activeThumbColor: '#fff' } as object)}
+            />
+          </View>
 
           {/* Music Platform row */}
           <Pressable

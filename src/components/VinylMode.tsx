@@ -1,7 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import Svg, { Circle as SvgCircle, G, Path, Rect as SvgRect } from 'react-native-svg';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import Svg, { Circle as SvgCircle, Defs, Ellipse as SvgEllipse, G, LinearGradient as SvgLinearGradient, Path, RadialGradient, Rect as SvgRect, Stop } from 'react-native-svg';
 import {
   Animated, Dimensions, Easing, Image, Modal, PanResponder, ScrollView, StyleSheet,
   Text, TouchableOpacity, useWindowDimensions, View,
@@ -50,6 +50,11 @@ const V = {
   bg:            '#0d0d0d',
   record:        '#0a0a0a',
   platter:       '#181818',
+  /** Classic Vinyl's material: an opaque black pressing with grey grooves,
+   *  rather than the clear accent-tinted disc the glow look uses. */
+  pressing:      '#0a0a0c',
+  groove:        '#6e6e78',
+  grooveBand:    '#3a3a40',
   platBorder:    '#2e2e2e',
   label:         '#8B0000',
   labelBorder:   '#6B0000',
@@ -139,7 +144,11 @@ function SparkleField({ size }: { size: number }) {
 }
 
 // ── Vinyl disc — clean bold design ───────────────────────────────────────────
-function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: number; spin: Animated.AnimatedInterpolation<string>; accent?: string; showLabel?: boolean }) {
+function VinylDisc({ size, spin, accent = V.gold, showLabel = false, classic = false }: { size: number; spin: Animated.AnimatedInterpolation<string>; accent?: string; showLabel?: boolean; classic?: boolean }) {
+  // Gradient ids must be unique per instance: duplicate ids across separate
+  // <Svg> roots make one of them render blank, which this repo has been bitten
+  // by three times (the share card, the mirror ball's glints, GlassPane).
+  const uid = useId().replace(/:/g, '');
   // A touch over true-to-life (real label ≈ 33%) — matches the fullscreen deck.
   const cSize = Math.min(135, size * 0.40);
   const cR    = cSize / 2;
@@ -170,15 +179,15 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
         {/* Clear pressing — glassy tint, sunlit accent rim, pressed grooves */}
         <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
           {/* Glass body — barely-there so the scene glows through */}
-          <SvgCircle cx={cx} cy={cx} r={r - 1} fill="rgba(255,255,255,0.08)" />
+          <SvgCircle cx={cx} cy={cx} r={r - 1} fill={classic ? V.pressing : 'rgba(255,255,255,0.08)'} />
           {/* Sunlit rim — bright accent edge with a soft inner falloff */}
           <SvgCircle cx={cx} cy={cx} r={r - 2} fill="none" stroke={accent} strokeWidth={2.6} />
           <SvgCircle cx={cx} cy={cx} r={r - 5.5} fill="none" stroke={accent} strokeOpacity={0.35} strokeWidth={5} />
           {/* Outer groove band catching the light */}
-          <SvgCircle cx={cx} cy={cx} r={r * 0.82} fill="none" stroke={accent} strokeOpacity={0.10} strokeWidth={r * 0.22} />
+          <SvgCircle cx={cx} cy={cx} r={r * 0.82} fill="none" stroke={classic ? V.grooveBand : accent} strokeOpacity={0.10} strokeWidth={r * 0.22} />
           {/* Fine pressed grooves */}
           {[0.56, 0.62, 0.68, 0.73, 0.78, 0.86, 0.90].map((f, i) => (
-            <SvgCircle key={i} cx={cx} cy={cx} r={r * f} fill="none" stroke={accent} strokeOpacity={i % 2 ? 0.24 : 0.14} strokeWidth={0.8} />
+            <SvgCircle key={i} cx={cx} cy={cx} r={r * f} fill="none" stroke={classic ? V.groove : accent} strokeOpacity={i % 2 ? 0.24 : 0.14} strokeWidth={0.8} />
           ))}
           {/* Pressing marks — asymmetric surface texture, brighter than the
               grooves, so the spin reads at a glance instead of only the
@@ -214,17 +223,62 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
       {/* ── Fixed lighting — reflections belong to the light source, not the
           disc, so they hold their position while the record turns ── */}
       <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
-        {/* Broad sheen — top-right, with a hot streak inside it */}
-        <Path d={wedge(-85, -20, r)} fill="rgba(255,255,255,0.12)" />
-        <Path d={wedge(-68, -52, r)} fill="rgba(255,255,255,0.16)" />
-        {/* Opposite sheen — dimmer, with its own faint streak */}
-        <Path d={wedge(95, 160, r)} fill="rgba(255,255,255,0.07)" />
-        <Path d={wedge(112, 126, r)} fill="rgba(255,255,255,0.10)" />
-        {/* Specular rim glints — bright glass edge catching the light */}
-        <Path d={rimArc(-150, -95, r - 3)} stroke="rgba(255,255,255,0.65)" strokeWidth={2} strokeLinecap="round" fill="none" />
-        <Path d={rimArc(25, 60, r - 3)} stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} strokeLinecap="round" fill="none" />
-        {/* Inner glass ring highlight */}
-        <SvgCircle cx={cx} cy={cx} r={r * 0.50} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth={1} />
+        {/*
+          LIGHT IS DISPERSED, NEVER CUT (owner, 25.08: "make it smooth out as if
+          light is dispersed rather than, like, a cut line distinguishing
+          between what's not reflected and what is reflected").
+
+          This used to be four PIE WEDGES — literal triangles from the centre —
+          so every sheen had two straight radial edges running out to the rim,
+          and on a black pressing those edges are the first thing you see. It is
+          the rule this app keeps relearning on the mirror ball: any light drawn
+          as a hard-edged or stroked shape eventually gets reported as an
+          artefact, so light layers must be pure gradient falloff.
+
+          Two off-centre blooms instead — a key light from the upper right and a
+          weaker fill opposite. They are drawn BIGGER THAN THE DISC on purpose:
+          the wrapping View already has overflow:'hidden' and a full
+          borderRadius, so the bloom is cut cleanly at the rim and has no
+          boundary of its own anywhere inside the record. Do not clip them by
+          hand, and do not shrink them to fit — a bloom that ends before the rim
+          puts the cut line straight back.
+        */}
+        <Defs>
+          <RadialGradient id={`vdKey${uid}`} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#fff" stopOpacity={classic ? 0.115 : 0.20} />
+            <Stop offset="0.42" stopColor="#fff" stopOpacity={classic ? 0.055 : 0.10} />
+            <Stop offset="0.78" stopColor="#fff" stopOpacity={classic ? 0.016 : 0.030} />
+            <Stop offset="1" stopColor="#fff" stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id={`vdFill${uid}`} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#fff" stopOpacity={classic ? 0.055 : 0.10} />
+            <Stop offset="0.5" stopColor="#fff" stopOpacity={classic ? 0.022 : 0.042} />
+            <Stop offset="1" stopColor="#fff" stopOpacity={0} />
+          </RadialGradient>
+          {/* Rim glints fade in and out ALONG the rim rather than starting and
+              stopping — a specular highlight has no ends. userSpaceOnUse so the
+              ramp runs across the disc rather than each stroke's own box. */}
+          <SvgLinearGradient id={`vdGlintA${uid}`} gradientUnits="userSpaceOnUse" x1={cx - r} y1={cx - r * 0.5} x2={cx + r * 0.1} y2={cx - r}>
+            <Stop offset="0" stopColor="#fff" stopOpacity={0} />
+            <Stop offset="0.5" stopColor="#fff" stopOpacity={classic ? 0.55 : 0.65} />
+            <Stop offset="1" stopColor="#fff" stopOpacity={0} />
+          </SvgLinearGradient>
+          <SvgLinearGradient id={`vdGlintB${uid}`} gradientUnits="userSpaceOnUse" x1={cx + r * 0.9} y1={cx + r * 0.35} x2={cx + r * 0.3} y2={cx + r * 0.95}>
+            <Stop offset="0" stopColor="#fff" stopOpacity={0} />
+            <Stop offset="0.5" stopColor="#fff" stopOpacity={classic ? 0.28 : 0.35} />
+            <Stop offset="1" stopColor="#fff" stopOpacity={0} />
+          </SvgLinearGradient>
+        </Defs>
+        {/* Key light, upper right — centred off the disc so the brightest part
+            sits near the rim and falls away across the face. */}
+        <SvgEllipse cx={cx + r * 0.46} cy={cx - r * 0.52} rx={r * 1.16} ry={r * 0.98} fill={`url(#vdKey${uid})`} />
+        {/* Weaker fill from the opposite side, so the disc is never flat. */}
+        <SvgEllipse cx={cx - r * 0.52} cy={cx + r * 0.44} rx={r * 0.96} ry={r * 0.82} fill={`url(#vdFill${uid})`} />
+        {/* Specular rim glints — the bright edge catching the light */}
+        <Path d={rimArc(-150, -95, r - 3)} stroke={`url(#vdGlintA${uid})`} strokeWidth={2} strokeLinecap="round" fill="none" />
+        <Path d={rimArc(25, 60, r - 3)} stroke={`url(#vdGlintB${uid})`} strokeWidth={1.5} strokeLinecap="round" fill="none" />
+        {/* Inner ring highlight */}
+        <SvgCircle cx={cx} cy={cx} r={r * 0.50} fill="none" stroke="rgba(255,255,255,0.14)" strokeOpacity={classic ? 0.5 : 1} strokeWidth={1} />
       </Svg>
     </View>
   );
@@ -564,7 +618,7 @@ function TurntableHero({
       {!classic && <SparkleField size={platSize} />}
       {/* Platter disc — pan responder applied here for record scrub */}
       <View {...panHandlers} style={[th.platter, { width: platSize, height: platSize, borderRadius: platSize / 2, position: 'absolute', top: 0, left: 0 }]}>
-        <VinylDisc size={recSize} spin={spin} accent={accent} />
+        <VinylDisc size={recSize} spin={spin} accent={accent} classic={classic} />
       </View>
       {/* Disco light rays — rotate at half record speed */}
       {!classic && (

@@ -527,7 +527,7 @@ export default function ProfileScreen() {
               <IconChip icon="record-player" size={34} />
               <View style={styles.settingsTextBlock}>
                 <Text style={styles.settingsLabel}>Classic Vinyl</Text>
-                <Text style={styles.dataSaverSub}>Just the record and the arm · no glow or sparkles</Text>
+                <Text style={styles.dataSaverSub}>Plain black vinyl · no glow or sparkles</Text>
               </View>
             </View>
             <Switch

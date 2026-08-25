@@ -123,15 +123,22 @@ const VINYL_CLASSIC_KEY = 'cruise_vinyl_classic';
  *
  * The Vinyl deck's hardware is carefully observed — the tonearm is drawn from
  * a reference photograph, the label is the real album art, the record casts a
- * real shadow — and on top of that sit a thick pulsing ring in the station's
- * colour, eight rotating light rays and a field of gold specks. None of those
- * exist on a turntable, and a listener asked for the option of the plain thing
- * (Ethan, 23.08: "from an arcade holographic style to something more like the
- * MD app").
+ * real shadow — and on top of that sat a thick pulsing ring in the station's
+ * colour, eight rotating light rays and a field of gold specks, over a CLEAR
+ * accent-tinted pressing. None of that exists on a turntable, and a listener
+ * asked for the option of the plain thing (Ethan, 23.08: "from an arcade
+ * holographic style to something more like the MD app").
  *
- * Default OFF, so nobody's deck changes unless they choose it. The station's
- * colour still reaches the rim, the grooves and the arm, so a Classic deck
- * still reads as the mood it belongs to.
+ * So this hides the three neon layers AND makes the record itself real: an
+ * opaque black pressing with grey grooves. That second half is what actually
+ * closes the gap — measured against the alternatives on 25.08, the clear disc
+ * nearly disappears on a pale station (Mountain Pass over a daylit mountain),
+ * while a black one is unmistakably a record on every station.
+ *
+ * Default OFF, so nobody's deck changes unless they choose it. THE RIM AND THE
+ * TONEARM KEEP THE STATION'S COLOUR — that is what stops a black record
+ * becoming a generic one, and it is the whole reason this reads as a look
+ * rather than a loss.
  */
 export async function getVinylClassic(): Promise<boolean> {
   try {

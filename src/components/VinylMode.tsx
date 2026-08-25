@@ -95,6 +95,15 @@ const VINYL_ACCENTS: Record<string, string> = {
   'coastal':        '#FF7A3C', // golden-hour orange (matches the warm moods)
 };
 
+/**
+ * Where Classic's grooves sit, from just outside the label to just inside the
+ * rim. 26 of them at ~2.6px apart on a phone-sized disc: dense enough to read
+ * as a cut surface, and deliberately NOT denser — below about 2px apart
+ * neighbouring rings start to moiré against the pixel grid, which is its own
+ * kind of drawn-looking artefact.
+ */
+const CLASSIC_GROOVES = Array.from({ length: 26 }, (_, i) => 0.505 + (i / 25) * 0.44);
+
 /** '#RRGGBB' → 'rgba(r,g,b,a)' — for animated colour interpolation. */
 /** See MAX_COAST_MS in useTrackClock — the deck keeps its own clock, and
  *  needs the same bound on how far one reading may be extrapolated. It also
@@ -117,7 +126,6 @@ function formatMs(ms: number): string {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
-// Preview geometry — computed dynamically from container width inside VinylModePreview
 
 // ── Disco sparkle field ───────────────────────────────────────────────────────
 function SparkleField({ size }: { size: number }) {
@@ -185,17 +193,46 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false, classic = f
           <SvgCircle cx={cx} cy={cx} r={r - 5.5} fill="none" stroke={accent} strokeOpacity={0.35} strokeWidth={5} />
           {/* Outer groove band catching the light */}
           <SvgCircle cx={cx} cy={cx} r={r * 0.82} fill="none" stroke={classic ? V.grooveBand : accent} strokeOpacity={0.10} strokeWidth={r * 0.22} />
-          {/* Fine pressed grooves */}
-          {[0.56, 0.62, 0.68, 0.73, 0.78, 0.86, 0.90].map((f, i) => (
-            <SvgCircle key={i} cx={cx} cy={cx} r={r * f} fill="none" stroke={classic ? V.groove : accent} strokeOpacity={i % 2 ? 0.24 : 0.14} strokeWidth={0.8} />
-          ))}
+          {/* Fine pressed grooves.
+              CLASSIC CUTS THEM, IT DOES NOT DRAW THEM (owner, 25.08: "smooth
+              out the circle white lines, it makes it look 2D — either remove
+              it or change it to black, like as if there were real vinyl
+              indents not just white lines"). Seven bright rings read as seven
+              rings; a record has hundreds, and at this size they are a
+              TEXTURE rather than lines you can count. So: many more, much
+              fainter, and DARK — each groove is a recess, so it is a dark cut
+              with a hairline of light on the wall just outside it, which is
+              what makes it read as pressed into the surface rather than
+              painted onto it. The glow look keeps its seven accent rings —
+              that disc is glass, and they belong to it. */}
+          {classic
+            ? CLASSIC_GROOVES.map((f, i) => (
+                <G key={i}>
+                  <SvgCircle cx={cx} cy={cx} r={r * f} fill="none" stroke="#000"
+                    strokeOpacity={i % 3 === 0 ? 0.40 : 0.30} strokeWidth={0.75} />
+                  <SvgCircle cx={cx} cy={cx} r={r * f + 0.8} fill="none" stroke="#fff"
+                    strokeOpacity={i % 3 === 0 ? 0.055 : 0.038} strokeWidth={0.5} />
+                </G>
+              ))
+            : [0.56, 0.62, 0.68, 0.73, 0.78, 0.86, 0.90].map((f, i) => (
+                <SvgCircle key={i} cx={cx} cy={cx} r={r * f} fill="none" stroke={accent} strokeOpacity={i % 2 ? 0.24 : 0.14} strokeWidth={0.8} />
+              ))}
           {/* Pressing marks — asymmetric surface texture, brighter than the
               grooves, so the spin reads at a glance instead of only the
-              label appearing to turn */}
+              label appearing to turn.
+              NOT IN CLASSIC (owner, 25.08: "remove the white lines that run
+              from the centre to the outside"). They were drawn for the CLEAR
+              pressing on 24.07, where the surface was otherwise pure
+              concentric circles and the label looked like it was turning
+              alone. A real record has no such spokes. The scattered flecks
+              below stay and are what carries the spin now — they are dust and
+              wear, which a record genuinely has. */}
+          {!classic && (<>
           <Path d={`M ${pt(37, r * 0.50)} L ${pt(37, r * 0.95)}`} stroke="rgba(255,255,255,0.20)" strokeWidth={1.3} strokeLinecap="round" />
           <Path d={`M ${pt(203, r * 0.58)} L ${pt(203, r * 0.90)}`} stroke="rgba(255,255,255,0.14)" strokeWidth={1} strokeLinecap="round" />
           <Path d={`M ${pt(130, r * 0.44)} L ${pt(130, r * 0.70)}`} stroke="rgba(255,255,255,0.12)" strokeWidth={0.8} strokeLinecap="round" />
           <Path d={`M ${pt(305, r * 0.62)} L ${pt(305, r * 0.85)}`} stroke="rgba(255,255,255,0.10)" strokeWidth={0.8} strokeLinecap="round" />
+          </>)}
           <SvgCircle cx={cx + r * 0.42} cy={cx - r * 0.31} r={1.6} fill="rgba(255,255,255,0.32)" />
           <SvgCircle cx={cx - r * 0.58} cy={cx + r * 0.22} r={1.3} fill="rgba(255,255,255,0.24)" />
           <SvgCircle cx={cx - r * 0.20} cy={cx - r * 0.66} r={1} fill="rgba(255,255,255,0.20)" />
@@ -278,7 +315,9 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false, classic = f
         <Path d={rimArc(-150, -95, r - 3)} stroke={`url(#vdGlintA${uid})`} strokeWidth={2} strokeLinecap="round" fill="none" />
         <Path d={rimArc(25, 60, r - 3)} stroke={`url(#vdGlintB${uid})`} strokeWidth={1.5} strokeLinecap="round" fill="none" />
         {/* Inner ring highlight */}
-        <SvgCircle cx={cx} cy={cx} r={r * 0.50} fill="none" stroke="rgba(255,255,255,0.14)" strokeOpacity={classic ? 0.5 : 1} strokeWidth={1} />
+        {/* Inner ring highlight — a GLASS cue, so Classic does without it:
+            it is one more drawn circle on a surface that should read as cut. */}
+        {!classic && <SvgCircle cx={cx} cy={cx} r={r * 0.50} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth={1} />}
       </Svg>
     </View>
   );
@@ -1744,96 +1783,3 @@ const fs = StyleSheet.create({
   scrubIndicatorText: { color: V.gold, fontSize: 11, fontWeight: '700', letterSpacing: 2.5 },
 });
 
-// Preview geometry — fixed so record fits fully inside the 260px preview container
-const PV_PLATTER = 232;
-const PV_RECORD  = 216;  // PV_PLATTER - 16 (8px visual gap each side inside gold ring)
-const PV_ARM_LEN = 138;
-const PV_PIVOT_X = 224;  // PV_PLATTER - 8 (near top-right of platter)
-const PV_PIVOT_Y = 8;
-
-// ── Preview card ──────────────────────────────────────────────────────────────
-export function VinylModePreview() {
-  const idleSpin     = useRef(new Animated.Value(0)).current;
-  const tonearmAngle = useRef(new Animated.Value(0)).current;
-  const [modalOpen,  setModalOpen] = useState(false);
-  const idleRef      = useRef<any>(null);
-
-  // Zero-rotation passed to VinylDisc so the disc is static relative to the
-  // platter — the outer Animated.View provides the actual idle spin,
-  // keeping the entire record (grooves + label) spinning as one unit.
-  const idleRotate   = idleSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const staticRotate = idleSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '0deg'] });
-  const armRot       = tonearmAngle.interpolate({ inputRange: [0, 1], outputRange: ['-18deg', '4deg'] });
-
-  const startIdleSpin = () => {
-    idleRef.current = Animated.loop(
-      Animated.timing(idleSpin, { toValue: 1, duration: 8000, easing: Easing.linear, useNativeDriver: true })
-    );
-    idleRef.current.start();
-  };
-
-  useEffect(() => {
-    startIdleSpin();
-    return () => idleRef.current?.stop();
-  }, []);
-
-  const handlePress = () => {
-    idleRef.current?.stop();
-    setModalOpen(true);
-  };
-
-  const handleModalClose = () => {
-    setModalOpen(false);
-    startIdleSpin();
-  };
-
-  return (
-    <TouchableOpacity onPress={handlePress} activeOpacity={0.9} style={pv.scene}>
-      <View style={pv.glowOrb} />
-      <View style={pv.tapHint}>
-        <Ionicons name="play" size={9} color="rgba(255,255,255,0.4)" />
-        <Text style={pv.tapHintText}>tap to open</Text>
-      </View>
-
-      {/* Shared positioning container — tonearm sits here, static, while platter spins */}
-      <View style={{ width: PV_PLATTER, height: PV_PLATTER }}>
-        {/* Spinning platter — entire record (gold ring + disc + label) rotates as one */}
-        <Animated.View style={[pv.platter, {
-          width: PV_PLATTER, height: PV_PLATTER, borderRadius: PV_PLATTER / 2,
-          transform: [{ rotate: idleRotate }],
-        }]}>
-          <VinylDisc size={PV_RECORD} spin={staticRotate} showLabel />
-        </Animated.View>
-        {/* Tonearm — positioned in same container but outside spinning view */}
-        <Tonearm armLen={PV_ARM_LEN} armW={3} headW={13} pivotX={PV_PIVOT_X} pivotY={PV_PIVOT_Y} rotation={armRot} />
-      </View>
-
-      <VinylFullscreen visible={modalOpen} onClose={handleModalClose} />
-    </TouchableOpacity>
-  );
-}
-
-const pv = StyleSheet.create({
-  scene: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#0a0a0a',
-  },
-  glowOrb: {
-    position: 'absolute',
-    width: PV_PLATTER + 80, height: PV_PLATTER + 80,
-    borderRadius: (PV_PLATTER + 80) / 2,
-    backgroundColor: 'rgba(200,134,10,0.09)',
-  },
-  tapHint: {
-    position: 'absolute', top: 10, right: 10,
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
-  },
-  tapHintText: { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '600' },
-  platter: {
-    backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 4, borderColor: '#C8960A',
-    shadowColor: '#C8960A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.35, shadowRadius: 14, elevation: 10,
-  },
-});

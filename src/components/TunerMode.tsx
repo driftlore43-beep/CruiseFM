@@ -711,43 +711,6 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
     snapRaf.current = requestAnimationFrame(step);
   };
 
-  // Change Mood from the sheet: reel the dial across to the chosen station
-  // (a deliberate sweep, so the frequency visibly travels there) rather than
-  // snapping instantly. The music + active station lock in when it arrives.
-  const reelTo = (id: string) => {
-    cancelSnap();
-    const target = dialValue(id);
-    const toBand = bandOf(id);
-    // Picking a station on the other band flips the dial over first — there is
-    // nothing to sweep across, the scales aren't the same ruler.
-    if (toBand !== bandRef.current) {
-      bandRef.current = toBand;
-      setBand(toBand);
-      setFreq(target);
-      freqRef.current = target;
-      setActiveId(id);
-      npSetStation(id);
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      return;
-    }
-    const from = freqRef.current;
-    if (Math.abs(target - from) < BAND_CFG[toBand].tick) { setActiveId(id); npSetStation(id); return; }
-    const t0 = Date.now();
-    const DUR = 720;
-    const step = () => {
-      const t = clamp((Date.now() - t0) / DUR, 0, 1);
-      const e = 1 - Math.pow(1 - t, 3); // ease-out cubic
-      setFreq(from + (target - from) * e);
-      if (t < 1) { snapRaf.current = requestAnimationFrame(step); }
-      else {
-        snapRaf.current = 0;
-        setActiveId(id);
-        npSetStation(id);
-        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      }
-    };
-    snapRaf.current = requestAnimationFrame(step);
-  };
 
   // The dial zone owns its touches outright. The old move-based negotiation
   // (claim only once the drag proves horizontal) kept losing on iOS — between

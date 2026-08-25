@@ -761,71 +761,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
 // ── Card ──────────────────────────────────────────────────────────────────────
 
-export function EqualizerModeCard() {
-  const cardValues = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(MIN_H))).current;
-  const [modalOpen, setModalOpen] = useState(false);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  useEffect(() => {
-    startBarAnims(cardValues, cardBellMaxH, MIN_H, timers);
-    return () => stopBarAnims(cardValues, timers);
-  }, []);
-
-  const handleOpen = () => {
-    stopBarAnims(cardValues, timers);
-    setModalOpen(true);
-  };
-
-  const handleClose = () => {
-    setModalOpen(false);
-    startBarAnims(cardValues, cardBellMaxH, MIN_H, timers);
-  };
-
-  return (
-    <View style={card.shell}>
-      <TouchableOpacity onPress={handleOpen} activeOpacity={0.9} style={card.scene}>
-        <View style={card.glowCyan} pointerEvents="none" />
-        <View style={card.glowPink} pointerEvents="none" />
-        <View style={card.tapHint}>
-          <Ionicons name="play" size={9} color="rgba(255,255,255,0.4)" />
-          <Text style={card.tapHintText}>tap to open</Text>
-        </View>
-        <Bars values={cardValues} barW={CARD_BAR_W} maxH={MAX_H} />
-      </TouchableOpacity>
-      <View style={card.footer}>
-        <View style={card.titleRow}>
-          <Text style={card.title}>Equalizer Mode</Text>
-          <View style={card.freeBadge}><Text style={card.freeBadgeText}>FREE</Text></View>
-        </View>
-        <Text style={card.sub}>Tap to open the full experience. LED bars. Full screen. All night.</Text>
-      </View>
-      <EqualizerFullscreen visible={modalOpen} onClose={handleClose} />
-    </View>
-  );
-}
-
-export function EqualizerModePreview() {
-  const values = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(MIN_H))).current;
-  const [active, setActive] = useState(false);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  return (
-    <TouchableOpacity
-      onPress={() => {
-        if (active) { stopBarAnims(values, timers); setActive(false); }
-        else        { startBarAnims(values, cardBellMaxH, MIN_H, timers); setActive(true); }
-      }}
-      activeOpacity={0.9}
-      style={card.scene}>
-      <View style={card.glowCyan} pointerEvents="none" />
-      <View style={card.glowPink} pointerEvents="none" />
-      <View style={card.tapHint}>
-        <Ionicons name={active ? 'pause' : 'play'} size={9} color="rgba(255,255,255,0.4)" />
-        <Text style={card.tapHintText}>{active ? 'tap to stop' : 'tap to play'}</Text>
-      </View>
-      <Bars values={values} barW={CARD_BAR_W} maxH={MAX_H} />
-    </TouchableOpacity>
-  );
-}
 
 // ── Card styles ───────────────────────────────────────────────────────────────
 const card = StyleSheet.create({

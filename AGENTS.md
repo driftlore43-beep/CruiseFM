@@ -9,7 +9,7 @@ A premium driving-companion app (React Native / Expo SDK 56, Expo Router). Users
 The owner does not code — describe changes in plain English, Claude implements everything. Keep explanations non-technical.
 
 ## Product decisions (fixed)
-- Monetisation (locked 2026-07-22): £1.99/mo + £14.99/yr annual ("save 37%"), 7-day free trial; optional launch-week Founder lifetime £24.99 one-time. Launch FREE first, payments as fast-follow update. (RevenueCat SDK wired: sandbox test_ key in config.ts, entitlement "premium", safe no-op on web/old builds via src/utils/purchases.ts; real store products + keys still pending)
+- Monetisation (locked 2026-07-22, annual price revised 2026-08-25): £1.99/mo + £18/yr annual ("save 25%" — was £14.99/yr at 37% off; owner, 25.08: "can it be 18 pounds not 15, thats quite low"), 7-day free trial; optional launch-week Founder lifetime £24.99 one-time. Launch FREE first, payments as fast-follow update. NOTHING TO UPDATE IN CODE OR DOCS for this revision — checked src/, docs/ and website/: the annual figure has never appeared anywhere except this line, since real store products don't exist yet. The live paywall (premium.tsx) shows only the £1.99/month price today. When the RevenueCat/App Store Connect annual product is actually created, price it at £18, not £14.99. (RevenueCat SDK wired: sandbox test_ key in config.ts, entitlement "premium", safe no-op on web/old builds via src/utils/purchases.ts; real store products + keys still pending)
 - FREE tier: Cassette + Equalizer modes, basic playback, limited custom stations (3), badges
 - PREMIUM: Vinyl + Retro Radio modes, all mood themes, unlimited playlists, future additions
 - Never premium: offline listening, badges, founder cosmetics, seasonal themes

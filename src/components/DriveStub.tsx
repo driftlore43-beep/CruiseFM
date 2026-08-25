@@ -79,7 +79,7 @@ export function StubCard({
   const s = useStyles(makeStyles);
   const { seg7 } = useDsegFonts();
   const station = resolveAnyStation(drive.stationId);
-  const dial = stationDial(drive.stationId, !!station.premium);
+  const dial = stationDial(drive.stationId, !!station.premium, station.dialAm);
   const accent = station.eqColors?.[1] ?? '#F59E0B';
   const w = words(drive.kind ?? 'driving');
   const modeLabel = MODE_CATALOG.find((m) => m.id === drive.mode)?.label ?? null;
@@ -144,7 +144,7 @@ export function DriveRow({
   const pal = usePalette();
   const { seg7 } = useDsegFonts();
   const station = resolveAnyStation(drive.stationId);
-  const dial = stationDial(drive.stationId, !!station.premium);
+  const dial = stationDial(drive.stationId, !!station.premium, station.dialAm);
   const modeLabel = MODE_CATALOG.find((m) => m.id === drive.mode)?.label;
 
   return (

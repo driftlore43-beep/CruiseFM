@@ -138,7 +138,7 @@ export function widgetsAvailable(): boolean {
 export function toWidgetStation(id: string): WidgetStation {
   const s = resolveAnyStation(id);
   const known = STATIONS.some((x) => x.id === s.id);
-  const dial = stationDial(s.id, known ? s.premium : false);
+  const dial = stationDial(s.id, known ? s.premium : false, s.dialAm);
   const icon = s.iconName ?? s.icon;
   return {
     id: s.id,

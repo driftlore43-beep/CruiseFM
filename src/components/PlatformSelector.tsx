@@ -64,6 +64,15 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
 
   useEffect(() => {
     if (visible) {
+      // THE "KEEPS UNSELECTING" BUG (Ethan, 25.08). `selected` started at
+      // `null` on every open, so the sheet always showed nothing chosen even
+      // though the saved platform hadn't moved — it just never asked what it
+      // was. `getSavedPlatform` can return 'none' (Skip for now was pressed
+      // once) — that has no card of its own to light up, so it's left
+      // unselected rather than mapped onto a platform nobody chose.
+      getSavedPlatform().then((id) => {
+        if (id && id !== 'none') setSelected(id);
+      }).catch(() => {});
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1, duration: 400, useNativeDriver: true,

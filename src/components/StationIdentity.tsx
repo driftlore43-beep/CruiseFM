@@ -50,7 +50,7 @@ export function useDsegFont(): string {
 }
 
 export function stationDisplayName(station: Station): string {
-  const dial = stationDial(station.id, !!station.premium);
+  const dial = stationDial(station.id, !!station.premium, station.dialAm);
   const name = /\s(AM|FM)$/i.test(station.name) ? station.name : `${station.name} ${dial.band}`;
   return `${dial.label} ${name}`;
 }
@@ -70,7 +70,7 @@ export function StationIdentity({
   const dseg = useDsegFont();
   const day = useDaylight();
 
-  const dial = stationDial(station.id, !!station.premium);
+  const dial = stationDial(station.id, !!station.premium, station.dialAm);
   const name = /\s(AM|FM)$/i.test(station.name) ? station.name : `${station.name} ${dial.band}`;
   const alignItems = align === 'center' ? 'center' as const : 'flex-start' as const;
 

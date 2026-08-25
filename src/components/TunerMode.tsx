@@ -93,7 +93,7 @@ function registerCustomOnDial(list: CustomStation[]): void {
   DIAL_STATIONS = [...STATIONS];
   for (const c of list) {
     const st = customToStation(c);
-    DIAL.set(st.id, stationDial(st.id, false));
+    DIAL.set(st.id, stationDial(st.id, false, st.dialAm));
     DIAL_STATIONS.push(st);
   }
 }

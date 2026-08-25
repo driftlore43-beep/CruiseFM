@@ -31,7 +31,7 @@ export function ShelfCard({ station, onPress }: { station: Station; onPress?: ()
   // which RN's Image draws as nothing. See utils/stationImage.
   const art = stationImageSource(station.image);
   const dseg = useDsegFont();
-  const dial = stationDial(station.id, !!station.premium);
+  const dial = stationDial(station.id, !!station.premium, station.dialAm);
   const press = (to: number) =>
     Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 42, bounciness: 5 }).start();
 

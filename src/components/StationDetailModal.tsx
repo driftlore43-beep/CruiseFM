@@ -104,7 +104,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const kind = useSessionKind();
   const { seg7: dseg, seg14 } = useDsegFonts();
   // The modal renders with station null while closed.
-  const dial = station ? stationDial(station.id, !!station.premium) : { band: 'AM' as const, label: '', value: 0 };
+  const dial = station ? stationDial(station.id, !!station.premium, station.dialAm) : { band: 'AM' as const, label: '', value: 0 };
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { dataSaver } = useMotion();

@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDsegFont } from '@/components/StationIdentity';
 import { usePalette, useStyles } from '@/context/AppearanceContext';
 import type { Palette } from '@/utils/appearance';
-import { stationDial } from '@/constants/stations';
+import { clampAm, stationAm, stationDial } from '@/constants/stations';
 import { Cruise, Fonts } from '@/constants/theme';
 import { saveCustomStation, updateCustomStation, type CustomStation } from '@/utils/customStations';
 import {
@@ -144,6 +144,12 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
   // A photo of their own, behind the station. Null keeps today's behaviour —
   // the chosen colour — which is what every station made before this had.
   const [photo, setPhoto] = useState<StationPhoto | null>(null);
+  // The dial number, typed rather than left to the hash. Ethan's ask (25.08):
+  // colour-matched custom stations kept landing scattered across the AM band
+  // because the number was always derived from the id, with no way to put
+  // them next to each other. A blank string means "pick one automatically",
+  // same as every station before this.
+  const [amNumber, setAmNumber] = useState('');
   // The photo they just chose, waiting to be framed. Held here rather than
   // saved straight away, because the crop has to come off the ORIGINAL.
   const [framing, setFraming] = useState<ChosenPhoto | null>(null);
@@ -187,6 +193,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
       setSelectedIcon(editing.icon);
       setSelectedPalette(PALETTES.find((pal) => pal.color === editing.color) ?? DEFAULT_PALETTE);
       setPhoto(editing.image ? { image: editing.image, imageBlur: editing.imageBlur ?? editing.image } : null);
+      setAmNumber(editing.dialAm != null ? String(editing.dialAm) : '');
     }
     setSettled(false);
     Animated.spring(slideY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start(
@@ -209,6 +216,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
     setSelectedPalette(DEFAULT_PALETTE);
     setError('');
     setPhoto(null);
+    setAmNumber('');
   }
 
   // The dial number is a hash of the station's id, so the id is settled the
@@ -217,7 +225,9 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
   const newIdRef = useRef(`custom-${Date.now()}`);
   useEffect(() => { if (visible && !editing) newIdRef.current = `custom-${Date.now()}`; }, [visible, editing]);
   const previewId = editing ? editing.id : newIdRef.current;
-  const dial = stationDial(previewId, false);
+  const amTyped = amNumber.trim() ? Number(amNumber) : NaN;
+  const amOverride = Number.isFinite(amTyped) ? amTyped : undefined;
+  const dial = stationDial(previewId, false, amOverride);
   const dsegFont = useDsegFont();
 
   async function handleSave() {
@@ -243,6 +253,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
       trackCount: 0,
       spotifyUrl: `https://open.spotify.com/search/${encodeURIComponent(trimName)}`,
       appleMusicUrl: `https://music.apple.com/search?term=${encodeURIComponent(trimName)}`,
+      dialAm: amOverride != null ? clampAm(amOverride) : undefined,
     };
     if (editing) {
       await updateCustomStation(station);
@@ -421,6 +432,27 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
                 </Pressable>
               ))}
             </View>
+
+            <Text style={styles.label}>Dial number (optional)</Text>
+            <View style={[styles.inputWrap, atLimit && styles.inputDisabled]}>
+              <CardWash radius={12} />
+              <TextInput
+                style={styles.input}
+                placeholder={`Automatic — ${stationAm(previewId)}`}
+                placeholderTextColor={pal.ink(0.42)}
+                value={amNumber}
+                onChangeText={(t) => setAmNumber(t.replace(/[^0-9]/g, '').slice(0, 4))}
+                keyboardType="number-pad"
+                maxLength={4}
+                editable={!atLimit}
+                selectionColor={Cruise.violet}
+              />
+            </View>
+            <Text style={styles.photoHint}>
+              Leave blank for one picked automatically, or set your own so
+              stations you group by colour or mood sit next to each other on
+              the dial (540–1600).
+            </Text>
 
             {/* Preview = an actual row off the Stations dial, not a card.
                 The page is a printed list now (dial number, name, MINE chip,

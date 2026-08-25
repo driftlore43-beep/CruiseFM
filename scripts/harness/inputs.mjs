@@ -135,9 +135,31 @@ const read = (p) => p.evaluate(() => {
       const f = rel(over(fg, bg)), b = rel(bg);
       ratio = Math.round(((Math.max(f, b) + 0.05) / (Math.min(f, b) + 0.05)) * 100) / 100;
     }
+    // TWO DIFFERENT THINGS, AND ONLY ONE IS A BUG.
+    //
+    // The 19.08 fault this file exists for pushed the name field to top
+    // -142: the sheet overflowed UPWARD out of its bottom-anchored backdrop,
+    // so the field was gone and no amount of scrolling brought it back.
+    // A field merely BELOW the fold inside a scroller that can still scroll
+    // is the ordinary shape of a long form — you scroll to it, and iOS
+    // scrolls a focused input into view by itself.
+    //
+    // Conflating them cost a round on 25.08, when a third (optional) field
+    // was added to the create sheet and this reported a failure on a sheet
+    // that was working correctly. `aboveFold` stays a hard failure;
+    // `belowFold` is reported and forgiven, but ONLY when something above it
+    // genuinely has room left to scroll — if nothing can scroll, being below
+    // the fold means gone, and that is a failure again.
+    let canScroll = false;
+    for (let n = i.parentElement; n && n !== document.documentElement; n = n.parentElement) {
+      if (n.scrollHeight > n.clientHeight + 4 && n.clientHeight > 50) { canScroll = true; break; }
+    }
     out.push({
       top: Math.round(r.top), bottom: Math.round(r.bottom), h: Math.round(r.height),
       onScreen: r.top >= 0 && r.bottom <= window.innerHeight,
+      aboveFold: r.top < 0,
+      belowFold: r.bottom > window.innerHeight,
+      canScroll,
       colour: cs.color, ratio,
     });
   }
@@ -169,12 +191,16 @@ for (const theme of ['dark', 'light']) {
       await p.waitForTimeout(1500);
       const tight = await read(p);
 
-      const hidden = tight.filter((f) => !f.onScreen).length;
+      // Gone (off the top, or below with nothing able to scroll) vs merely
+      // further down a form that scrolls — see the note in `read`.
+      const lost = tight.filter((f) => f.aboveFold || (f.belowFold && !f.canScroll)).length;
+      const scrollTo = tight.filter((f) => f.belowFold && f.canScroll).length;
       const faint = full.filter((f) => f.ratio != null && f.ratio < 3).length;
-      const ok = hidden === 0 && faint === 0 && tight.length === full.length;
-      console.log(`${ok ? 'ok  ' : 'FAIL'} ${theme.padEnd(5)} ${s.name.padEnd(19)} ${full.length} field(s)  off-screen when squeezed ${hidden}  low-contrast ${faint}`);
+      const ok = lost === 0 && faint === 0 && tight.length === full.length;
+      const note = scrollTo ? `  (${scrollTo} below the fold, scrollable)` : '';
+      console.log(`${ok ? 'ok  ' : 'FAIL'} ${theme.padEnd(5)} ${s.name.padEnd(19)} ${full.length} field(s)  unreachable when squeezed ${lost}  low-contrast ${faint}${note}`);
       for (const f of full) console.log(`        colour ${f.colour}  contrast ${f.ratio ?? 'n/a'}`);
-      if (!ok) problems.push(`${theme}/${s.name}: ${hidden} off screen, ${faint} unreadable`);
+      if (!ok) problems.push(`${theme}/${s.name}: ${lost} unreachable, ${faint} unreadable`);
       if (errs.length) problems.push(`${theme}/${s.name}: ${errs[0]}`);
     } catch (e) {
       problems.push(`${theme}/${s.name}: ${String(e).slice(0, 110)}`);

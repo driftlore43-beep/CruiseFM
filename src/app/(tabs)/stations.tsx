@@ -449,7 +449,7 @@ export default function StationsScreen() {
     .map((s) => ({ station: s, dial: stationDial(s.id, false) }))
     .sort((a, b) => a.dial.value - b.dial.value);
   const amCustom = customStations
-    .map((c) => ({ station: c, dial: stationDial(c.id, false) }))
+    .map((c) => ({ station: c, dial: stationDial(c.id, false, c.dialAm) }))
     .sort((a, b) => a.dial.value - b.dial.value);
 
   const fmBand = STATIONS.filter((s) => s.premium)

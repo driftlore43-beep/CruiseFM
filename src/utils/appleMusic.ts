@@ -219,14 +219,41 @@ export async function getAppleUserPlaylists(): Promise<LinkedPlaylist[]> {
 let lastQueuedUri: string | null = null;
 export function lastAppleQueueUri(): string | null { return lastQueuedUri; }
 
+/**
+ * Races a native call against a timeout, REJECTING rather than resolving
+ * quietly on it — the caller below is already inside a try/catch that turns
+ * any throw into an honest 'error' verdict.
+ *
+ * WHY IT'S HERE: Ethan (25.08) — "if the Apple Music app is not open cruise
+ * fm will not play music and will freeze inside a station." `bridge.play()`
+ * and `bridge.playPlaylist()` are `try?` on the Swift side and were awaited
+ * here with no bound, so a native call that HANGS rather than throws (the
+ * Music app not being warm is a believable way for that to happen, though it
+ * can't be confirmed without a device — Swift can't be built from here) left
+ * nothing telling the driver anything: `startStationMusic`'s own 8-second
+ * safety timer would eventually clear the "switching" state, but the
+ * attempt itself never resolved and never reported a verdict, so the notice
+ * that should have said "try again" never appeared either. This is the
+ * control-side twin of `getAppleNowPlaying`'s read-side timeout above.
+ */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Apple Music did not answer')), ms);
+    p.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
+
 export async function startApplePlaylist(uri?: string): Promise<'playing' | 'error'> {
   if (!bridge) return 'error';
   try {
     if (uri && isApplePlaylist(uri)) {
-      await bridge.playPlaylist(applePlaylistId(uri));
+      await withTimeout(bridge.playPlaylist(applePlaylistId(uri)), 6000);
       lastQueuedUri = uri;
     } else {
-      await bridge.play();
+      await withTimeout(bridge.play(), 6000);
     }
     return 'playing';
   } catch {

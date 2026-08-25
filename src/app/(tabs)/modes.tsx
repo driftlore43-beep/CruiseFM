@@ -11,6 +11,7 @@ import { defaultStationForNow, loadLastCruise, saveLastCruise } from '@/utils/la
 import { recordDriveStart } from '@/utils/driveStats';
 import { needsOffAirAsk } from '@/constants/schedule';
 import { resolveAnyStation } from '@/utils/customStations';
+import { applyModeOrder, getModeOrder, moveModeWithinGroup, saveModeOrder } from '@/utils/modeOrder';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
@@ -116,27 +117,39 @@ function HeroMode({ mode, locked, onPress }: { mode: ModeDef; locked: boolean; o
   );
 }
 
-function ModeRow({ mode, locked, last, onPress }: {
+function ModeRow({ mode, locked, last, onPress, editing, onMoveUp, onMoveDown, canMoveUp, canMoveDown }: {
   mode: ModeDef; locked: boolean; last: boolean; onPress: () => void;
+  editing?: boolean; onMoveUp?: () => void; onMoveDown?: () => void;
+  canMoveUp?: boolean; canMoveDown?: boolean;
 }) {
   const styles = useStyles(makeStyles);
   const pal = usePalette();
-  return (
-    <Pressy onPress={onPress}>
-      <View style={[styles.row, !last && styles.rowRule]}>
-        <View style={styles.thumbClip}>
-          <ModeThumb mode={mode.id} size={THUMB} colors={mode.colors} uid={`row${mode.id}`} />
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.rowTitle}>{mode.title}</Text>
-          <Text style={styles.rowDesc} numberOfLines={1}>{mode.desc}</Text>
-        </View>
-        {locked
-          ? <Ionicons name="lock-closed" size={14} color={pal.ink(0.45)} />
-          : <Ionicons name="chevron-forward" size={16} color={pal.ink(0.34)} />}
+  const row = (
+    <View style={[styles.row, !last && styles.rowRule]}>
+      <View style={styles.thumbClip}>
+        <ModeThumb mode={mode.id} size={THUMB} colors={mode.colors} uid={`row${mode.id}`} />
       </View>
-    </Pressy>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.rowTitle}>{mode.title}</Text>
+        <Text style={styles.rowDesc} numberOfLines={1}>{mode.desc}</Text>
+      </View>
+      {editing ? (
+        <View style={styles.orderBtns}>
+          <Pressable onPress={onMoveUp} disabled={!canMoveUp} hitSlop={8} style={styles.orderBtn}>
+            <Ionicons name="chevron-up" size={18} color={pal.ink(canMoveUp ? 0.75 : 0.2)} />
+          </Pressable>
+          <Pressable onPress={onMoveDown} disabled={!canMoveDown} hitSlop={8} style={styles.orderBtn}>
+            <Ionicons name="chevron-down" size={18} color={pal.ink(canMoveDown ? 0.75 : 0.2)} />
+          </Pressable>
+        </View>
+      ) : locked
+        ? <Ionicons name="lock-closed" size={14} color={pal.ink(0.45)} />
+        : <Ionicons name="chevron-forward" size={16} color={pal.ink(0.34)} />}
+    </View>
   );
+  // While reordering, the row is a still picture — tapping it must not launch
+  // a drive out from under someone trying to move it.
+  return editing ? row : <Pressy onPress={onPress}>{row}</Pressy>;
 }
 
 const THUMB = 62;
@@ -166,6 +179,24 @@ export default function ModesScreen() {
   useEffect(() => {
     loadLastCruise().then((c) => { if (c?.stationId) setLastStation(c.stationId); }).catch(() => {});
   }, []);
+
+  // Ethan's ask (25.08): "I use the Tuner, CD, Vinyl, and Cassette the most
+  // so it would be nice to have the option move those to the front." A
+  // driver's own order, saved and reapplied — see modeOrder.ts for why it
+  // never lets a mode cross out of its own free/premium group.
+  const [order, setOrder] = useState<string[] | null>(null);
+  const [editingOrder, setEditingOrder] = useState(false);
+  useEffect(() => {
+    getModeOrder().then(setOrder).catch(() => {});
+  }, []);
+  const proOf = (id: string) => MODES.find((m) => m.id === id)?.pro ?? false;
+  const move = (id: string, dir: -1 | 1) => {
+    const base = order ?? MODES.map((m) => m.id);
+    const next = moveModeWithinGroup(base, id, dir, proOf);
+    if (next === base && order) return; // nowhere to go
+    setOrder(next);
+    saveModeOrder(next);
+  };
 
   function open(mode: string, locked: boolean) {
     setPending({ mode, locked });
@@ -205,8 +236,9 @@ export default function ModesScreen() {
   }
 
   const hero = MODES.find((m) => m.id === HERO_ID)!;
-  const free = MODES.filter((m) => !m.pro);
-  const pro = MODES.filter((m) => m.pro);
+  const ordered = applyModeOrder(MODES, order);
+  const free = ordered.filter((m) => !m.pro);
+  const pro = ordered.filter((m) => m.pro);
 
   return (
     <View style={styles.root}>
@@ -215,20 +247,33 @@ export default function ModesScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 26, paddingBottom: TAB_SAFE_INSET + insets.bottom }}
         showsVerticalScrollIndicator={false}>
 
-        <Text style={styles.pageTitle}>Modes</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.pageTitle}>Modes</Text>
+          <Pressable onPress={() => setEditingOrder((v) => !v)} hitSlop={10} style={styles.editOrderBtn}>
+            <Text style={styles.editOrderText}>{editingOrder ? 'Done' : 'Edit order'}</Text>
+          </Pressable>
+        </View>
 
-        <HeroMode mode={hero} locked={hero.pro && !isPro} onPress={() => open(hero.id, hero.pro && !isPro)} />
+        {!editingOrder && (
+          <HeroMode mode={hero} locked={hero.pro && !isPro} onPress={() => open(hero.id, hero.pro && !isPro)} />
+        )}
 
         <Text style={styles.section}>INCLUDED</Text>
         {free.map((m, i) => (
           <ModeRow key={m.id} mode={m} locked={false} last={i === free.length - 1}
-            onPress={() => open(m.id, false)} />
+            onPress={() => open(m.id, false)}
+            editing={editingOrder}
+            onMoveUp={() => move(m.id, -1)} onMoveDown={() => move(m.id, 1)}
+            canMoveUp={i > 0} canMoveDown={i < free.length - 1} />
         ))}
 
         <Text style={styles.section}>PREMIUM</Text>
         {pro.map((m, i) => (
           <ModeRow key={m.id} mode={m} locked={!isPro} last={i === pro.length - 1}
-            onPress={() => open(m.id, !isPro)} />
+            onPress={() => open(m.id, !isPro)}
+            editing={editingOrder}
+            onMoveUp={() => move(m.id, -1)} onMoveDown={() => move(m.id, 1)}
+            canMoveUp={i > 0} canMoveDown={i < pro.length - 1} />
         ))}
 
       </ScrollView>
@@ -265,13 +310,31 @@ export default function ModesScreen() {
  */
 const makeStyles = (p: Palette) => StyleSheet.create({
   root: { flex: 1 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: PAGE_GUTTER,
+    marginBottom: 24,
+  },
   pageTitle: {
     color: p.text,
     fontSize: 36,
     fontWeight: '800',
     letterSpacing: -1.3,
-    paddingHorizontal: PAGE_GUTTER,
-    marginBottom: 24,
+  },
+  editOrderBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: p.ink(0.06),
+    borderWidth: 1,
+    borderColor: p.ink(0.14),
+  },
+  editOrderText: {
+    color: p.ink(0.75),
+    fontSize: 12.5,
+    fontWeight: '700',
   },
   section: {
     color: p.ink(0.9),
@@ -380,4 +443,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
+  orderBtns: { gap: 2 },
+  orderBtn: { padding: 4 },
 });

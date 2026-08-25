@@ -203,8 +203,21 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
       if (cancelledRef.current) return;
       // Someone pressed something else since — their intent wins.
       if (lastControlRef.current !== askedAt) return;
+      // BACKGROUNDED SINCE THE PRESS (Ethan, 25.08: "requests will come in
+      // late and reset my playlist if Apple Music is still playing after
+      // closing Cruise app"). Nothing here clears `cancelledRef` on a mere
+      // background — the sheet/screen is still mounted — so this check kept
+      // running unattended after the driver had switched away. The 1.6s
+      // window is short, but Apple's own status can genuinely lag behind
+      // reality by that much, and this check has no way to tell "really
+      // didn't start" from "hasn't told us yet" while nobody is watching to
+      // notice a wrong guess. Not our music to second-guess once we're not
+      // the thing on screen — if it turns out the song really did stall,
+      // the driver presses play again the next time they open the app.
+      if (!isInFront(AppState.currentState)) return;
       const entry = await getAppleNowPlaying().catch(() => null);
       if (cancelledRef.current || lastControlRef.current !== askedAt) return;
+      if (!isInFront(AppState.currentState)) return;
       if (entry?.isPlaying) return;                 // it started; nothing to do
       const ok = await recoverApplePlayback(resumeAt);
       if (ok && !cancelledRef.current) after();

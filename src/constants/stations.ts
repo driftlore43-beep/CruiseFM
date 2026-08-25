@@ -27,6 +27,10 @@ export type Station = {
   trackCount: number;
   spotifyUrl: string;
   appleMusicUrl: string;
+  /** A custom station's own AM dial number, chosen by the user rather than
+   *  derived from its name (25.08 — see `stationAm`). Never set on the ten
+   *  built-in stations, which keep their fixed places in `STATION_AM`. */
+  dialAm?: number;
 };
 
 export const STATIONS: Station[] = [
@@ -322,18 +326,36 @@ function hashOf(id: string): number {
   return h;
 }
 
-/** A made-up station's AM slot: stable, on the real 540–1600 kHz scale, and
- *  always a round 10 kHz so it looks like something a receiver would show. */
-export function stationAm(id: string): number {
+/** Clamps a chosen AM number onto the real 540–1600 kHz scale, on a round
+ *  10 kHz — the same shape every AM slot on this dial already has, whether
+ *  picked automatically or typed in by the owner of the station. */
+export function clampAm(value: number): number {
+  const rounded = Math.round(value / 10) * 10;
+  return Math.min(1600, Math.max(540, rounded));
+}
+
+/** A made-up station's AM slot: the user's own choice if they set one
+ *  (25.08 — Ethan: colour-matched custom stations kept landing scattered
+ *  across the dial because the number was always hashed from the id), else
+ *  stable and derived from the id so an unset station never jumps about
+ *  between screens. */
+export function stationAm(id: string, override?: number): number {
+  if (override != null) return clampAm(override);
   return STATION_AM[id] ?? 540 + (hashOf(id) % 107) * 10;
 }
 
-/** What the dial reads for a station, and which band it's on. */
-export function stationDial(id: string, premium: boolean): { band: Band; label: string; value: number } {
+/** What the dial reads for a station, and which band it's on. `amOverride`
+ *  only ever applies on the AM side — a custom station is never premium, so
+ *  it never reaches the FM branch, but the parameter is harmless either way. */
+export function stationDial(
+  id: string,
+  premium: boolean,
+  amOverride?: number,
+): { band: Band; label: string; value: number } {
   if (premium) {
     const f = stationFrequency(id);
     return { band: 'FM', label: f.toFixed(1), value: f };
   }
-  const a = stationAm(id);
+  const a = stationAm(id, amOverride);
   return { band: 'AM', label: String(a), value: a };
 }

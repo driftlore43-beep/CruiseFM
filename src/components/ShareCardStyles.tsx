@@ -192,7 +192,7 @@ function derive(p: StyleProps): Derived {
   const title = track?.title ?? station.tagline;
   const artist = track?.artist ?? '';
   const freq = stationFrequency(station.id);
-  const dial = stationDial(station.id, !!station.premium);
+  const dial = stationDial(station.id, !!station.premium, station.dialAm);
   return {
     eq,
     wash,

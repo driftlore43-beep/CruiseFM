@@ -14,8 +14,8 @@ import { readableOn, type Palette } from '@/utils/appearance';
 
 type Row = { id: string; name: string; tagline: string; accent: string; icon: string; band: 'AM' | 'FM'; dial: string; mine: boolean };
 
-function toRow(s: { id: string; name: string; tagline: string; eqColors?: readonly string[]; iconName?: string; premium?: boolean }, mine: boolean): Row {
-  const d = stationDial(s.id, !!s.premium);
+function toRow(s: { id: string; name: string; tagline: string; eqColors?: readonly string[]; iconName?: string; premium?: boolean; dialAm?: number }, mine: boolean): Row {
+  const d = stationDial(s.id, !!s.premium, s.dialAm);
   return {
     id: s.id,
     name: s.name,

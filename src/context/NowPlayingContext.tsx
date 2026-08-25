@@ -198,6 +198,13 @@ const START_NOTICES: Record<StartResult, string | null> = {
   'offline': "You're offline, so Cruise FM can't control Spotify — that part needs a connection. Play your downloaded music in Spotify and cruise on; the visuals work without signal.",
 };
 
+// 'error' is the ONE StartResult reachable from BOTH services — Apple's own
+// timeout added 25.08 returns it too — and START_NOTICES.error names Spotify
+// by name, which would be a wrong (and confusing) thing to tell an Apple
+// Music listener whose station just failed to start. See reportStartResult.
+const APPLE_START_ERROR =
+  "Apple Music didn't respond. Make sure you have a subscription and are signed in, then press play to retry.";
+
 /** The default companion note on every start attempt — Spotify only hands
  * over control once its own app is awake, and new users need to know that
  * up front, not after a timeout. A clean 'playing' verdict clears it. */
@@ -322,9 +329,16 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const showWakeNudge = useCallback(() => setPlaybackNotice(WAKE_SPOTIFY_NUDGE), []);
   const [musicSwitching, setMusicSwitching] = useState(false);
   const reportStartResult = useCallback((result: StartResult) => {
-    setPlaybackNotice(START_NOTICES[result] ?? null);
-    // Handoff = the music is playing in the Spotify app, uncontrollable here.
     setHandoff(result === 'handoff');
+    if (result === 'error' && appleMusicAvailable()) {
+      // Which service actually failed decides which message is true — see
+      // the note on APPLE_START_ERROR.
+      getSavedPlatform().then((p) => {
+        setPlaybackNotice(p === 'appleMusic' ? APPLE_START_ERROR : START_NOTICES.error);
+      }).catch(() => setPlaybackNotice(START_NOTICES.error));
+      return;
+    }
+    setPlaybackNotice(START_NOTICES[result] ?? null);
   }, []);
   // Every play/pause is also a sign of life for the drive check.
   const setPlaying = useCallback((p: boolean) => {

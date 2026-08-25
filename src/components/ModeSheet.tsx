@@ -1,5 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
@@ -13,6 +13,7 @@ import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useSheetOpen } from '@/context/NowPlayingContext';
 import { usePalette, useStyles } from '@/context/AppearanceContext';
 import type { Palette } from '@/utils/appearance';
+import { applyModeOrder, getModeOrder } from '@/utils/modeOrder';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -41,8 +42,8 @@ const MODE_LOOK: Record<string, { icon: string | null }> = {
   disco:     { icon: null }, // MirrorBallGlyph
 };
 
-// Free modes first, the same shelf order as the Modes tab.
-const SHELF = [...MODE_CATALOG].sort((a, b) => Number(a.pro) - Number(b.pro));
+// Free modes first, the same default shelf order as the Modes tab.
+const DEFAULT_SHELF = [...MODE_CATALOG].sort((a, b) => Number(a.pro) - Number(b.pro));
 
 export function ModeSheet({ visible, onClose, onPick, currentId, title = 'CHANGE MODE', extraBottom = 0 }: {
   visible: boolean;
@@ -65,6 +66,15 @@ export function ModeSheet({ visible, onClose, onPick, currentId, title = 'CHANGE
   const insets = useSafeAreaInsets();
   const { isPro } = useEntitlements();
   const np = useNowPlaying();
+
+  // The driver's own order from the Modes tab (25.08) — re-read on every open
+  // rather than once, since it can change between drives and this sheet is
+  // cheap to refresh.
+  const [shelf, setShelf] = useState(DEFAULT_SHELF);
+  useEffect(() => {
+    if (!visible) return;
+    getModeOrder().then((order) => setShelf(applyModeOrder(MODE_CATALOG, order))).catch(() => {});
+  }, [visible]);
   const y = useRef(new Animated.Value(SCREEN_H)).current;
   const fade = useRef(new Animated.Value(0)).current;
 
@@ -114,7 +124,7 @@ export function ModeSheet({ visible, onClose, onPick, currentId, title = 'CHANGE
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={s.row}>
-          {SHELF.map((m) => {
+          {shelf.map((m) => {
             const look = MODE_LOOK[m.id] ?? MODE_LOOK.equalizer;
             const active = m.id === activeId;
             // Locked modes still switch — they become the usual free taste,

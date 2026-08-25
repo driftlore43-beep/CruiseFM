@@ -18,15 +18,18 @@ const check = (n, ok, extra = '') => {
   fails++; console.log('  FAIL', n, extra);
 };
 
-function load({ hasBridge = true, playlistThrows = false } = {}) {
+function load({ hasBridge = true, playlistThrows = false, playThrows = false } = {}) {
+  // Mutable so a test can queue successfully FIRST and only then make the
+  // re-queue refuse — which is the real shape of this failure.
+  const fail = { playlist: playlistThrows, play: playThrows };
   const js = ts.transpileModule(fs.readFileSync(SRC, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
   const calls = [];
   const bridge = {
-    playPlaylist: async (id) => { calls.push(['playPlaylist', id]); if (playlistThrows) throw new Error('no queue'); },
+    playPlaylist: async (id) => { calls.push(['playPlaylist', id]); if (fail.playlist) throw new Error('no queue'); },
     seekTo: async (ms) => { calls.push(['seekTo', Math.round(ms)]); },
-    play: async () => { calls.push(['play']); },
+    play: async () => { calls.push(['play']); if (fail.play) throw new Error('refused'); },
   };
   const m = { exports: {} };
   const req = (name) => {
@@ -35,17 +38,35 @@ function load({ hasBridge = true, playlistThrows = false } = {}) {
     return new Proxy({}, { get: () => () => {} });
   };
   new Function('module', 'exports', 'require', js)(m, m.exports, req);
-  return { A: m.exports, calls };
+  return { A: m.exports, calls, fail };
 }
 
 const URI = 'applemusic:playlist:p.abc123';
 
-console.log('\n  it only recovers what the app itself started:');
+// A drive adopted from music already playing never queues anything of its own,
+// so this is the flow the listener said he uses most — and the recovery used
+// to decline on it outright (23.08). It presses play a second time instead:
+// that is what he does by hand, and it cannot take over the Music app's
+// playback because it sets no queue.
+console.log('\n  with no queue of our own (an adopted drive):');
 {
-  const { A } = load();
-  check('nothing queued yet — refuses rather than hijacking the Music app',
-    (await A.recoverApplePlayback(60_000)) === false);
-  check('and says so honestly', A.lastAppleQueueUri() === null);
+  const { A, calls } = load();
+  check('nothing was queued', A.lastAppleQueueUri() === null);
+  check('it still tries — a second press, not a refusal',
+    (await A.recoverApplePlayback(60_000)) === true);
+  check('...by pressing play', calls.some(([f]) => f === 'play'), JSON.stringify(calls));
+  check('it NEVER re-queues music it did not start',
+    !calls.some(([f]) => f === 'playPlaylist'), JSON.stringify(calls));
+  check('and never seeks — that would move someone else\'s song',
+    !calls.some(([f]) => f === 'seekTo'), JSON.stringify(calls));
+}
+
+console.log('\n  and if that second press is refused too:');
+{
+  const { A } = load({ playThrows: true });
+  let threw = false;
+  const ok = await A.recoverApplePlayback(60_000).catch(() => { threw = true; });
+  check('it reports failure rather than throwing mid-drive', threw === false && ok === false);
 }
 
 console.log('\n  after the app starts a playlist:');
@@ -77,8 +98,9 @@ console.log('\n  it does not seek when there is nowhere sensible to go:');
 
 console.log('\n  it never throws, whatever the bridge does:');
 {
-  const { A } = load({ playlistThrows: true });
-  await A.startApplePlaylist(URI).catch(() => {});
+  const { A, fail } = load();
+  await A.startApplePlaylist(URI);
+  fail.playlist = true;
   let threw = false, ok = null;
   try { ok = await A.recoverApplePlayback(30_000); } catch { threw = true; }
   check('a refusing queue is reported, not thrown', threw === false && ok === false);

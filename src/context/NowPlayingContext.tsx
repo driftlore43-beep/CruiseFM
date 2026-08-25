@@ -334,6 +334,10 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef<NowPlayingSession | null>(null);
   useEffect(() => { sessionRef.current = session; }, [session]);
 
+  // Bumped by every startStationMusic call; anything holding an older number
+  // has been tuned past and stays quiet. See the comment on that function.
+  const startGenRef = useRef(0);
+
   const adoptPlayState = useCallback((p: boolean) => {
     if (!sessionRef.current) return;
     setPlayingRaw(p);
@@ -381,23 +385,39 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   // change should feel like retuning a radio, not a hard cut.
   // `resumeAny` (previews): no linked playlist just resumes the user's music.
   const startStationMusic = useCallback((stationId: string, opts?: { breath?: boolean; resumeAny?: boolean }) => {
+    // ONLY THE STATION YOU LAND ON TALKS TO THE MUSIC SERVICE. Sweeping the
+    // Tuner's dial across five stations used to start five uncancellable
+    // chains, each with its own 900ms breath, its own 8s unstick, its own
+    // pause and its own serial Spotify sequence — and each setting or clearing
+    // the wake notice as it resolved, out of order. That notice is its own
+    // iOS Modal, so a stack of them mounts and unmounts real windows over the
+    // mode's own window: the documented third-window trap, where iOS presents
+    // nothing and swallows every touch. That is the Tuner freeze (Ethan, 23.08).
+    // The counter supersedes: a later call makes every earlier one stand down
+    // before it can speak.
+    const gen = ++startGenRef.current;
+    const superseded = () => startGenRef.current !== gen;
     let settled = false;
     // The atmosphere holds its beat through the silent gap; safety timer so a
     // dead network can never leave it stuck holding.
     setMusicSwitching(true);
-    const unstick = setTimeout(() => setMusicSwitching(false), 8000);
+    const unstick = setTimeout(() => { if (!superseded()) setMusicSwitching(false); }, 8000);
     // Spotify-only. Apple Music plays on THIS phone with nothing to wake, so
     // telling an Apple listener to go and open Spotify is both wrong and
     // alarming — the owner saw it flash on an Apple Music drive (03.08).
     (async () => {
       if (appleMusicAvailable() && (await getSavedPlatform()) === 'appleMusic') return;
       const c = await isSpotifyConnected();
-      if (c && !settled) setPlaybackNotice(WAKE_SPOTIFY_NUDGE);
+      if (c && !settled && !superseded()) setPlaybackNotice(WAKE_SPOTIFY_NUDGE);
     })().catch(() => {});
     const kick = () => {
+      if (superseded()) { clearTimeout(unstick); return; }
       playStationMusic(stationId, { resumeAny: opts?.resumeAny }).then((r) => {
         settled = true;
         clearTimeout(unstick);
+        // A late answer from a station you have already tuned past must not
+        // clear the current one's holding beat, nor narrate its own outcome.
+        if (superseded()) return;
         setMusicSwitching(false);
         if (r) reportStartResult(r);
       });

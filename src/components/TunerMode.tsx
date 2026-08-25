@@ -108,6 +108,13 @@ function dialValue(id: string): number {
 
 const DEMO_DURATION_MS = 214000; // 3:34
 
+/**
+ * Floor between two tuning haptics. A detent still has to be crossed to earn
+ * one; this is the ceiling on how fast they can arrive, so a fast sweep feels
+ * grainy instead of drowning the haptic queue. See tuneTo.
+ */
+const HAPTIC_MIN_MS = 45;
+
 /** The dial needle. Deliberately fixed, never the station accent. */
 const NEEDLE_RED = '#FF3B30';
 
@@ -646,6 +653,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const startFreqRef = useRef(0);
   const snapRaf = useRef(0);
   const lastTickRef = useRef(0);
+  const lastHapticRef = useRef(0);
   // Bumped when custom stations join the dial, so the scale redraws with
   // their markers on it.
   const [, setDialVersion] = useState(0);
@@ -655,11 +663,22 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   const tuneTo = (f: number) => {
     const cfg = BAND_CFG[bandRef.current];
     const v = clamp(f, cfg.min, cfg.max);
-    // Haptic tick every couple of ticks swept (native only)
+    // Haptic tick every couple of ticks swept (native only).
+    //
+    // RATE-LIMITED, AND THE LIMIT IS LOAD-BEARING. A tick bucket is 0.2 MHz on
+    // FM / 20 kHz on AM, and a brisk sweep crosses more than one per frame, so
+    // the bucket check alone let this fire on essentially every touch move —
+    // ~60 a second, unbounded. Saturating the haptic queue stalls the main
+    // thread, during exactly the gesture that was reported as freezing the app
+    // (23.08). The bucket stays as the coarse gate; the clock is the ceiling.
     const bucket = Math.round(v / (cfg.tick * 2));
     if (bucket !== lastTickRef.current) {
       lastTickRef.current = bucket;
-      if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
+      const now = Date.now();
+      if (Platform.OS !== 'web' && now - lastHapticRef.current >= HAPTIC_MIN_MS) {
+        lastHapticRef.current = now;
+        Haptics.selectionAsync().catch(() => {});
+      }
     }
     setFreq(v);
   };

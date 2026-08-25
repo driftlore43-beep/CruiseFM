@@ -152,8 +152,16 @@ function AutoDim() {
   // screen dimmed over the song list, taps went nowhere, and the ones that
   // leaked through to the disc paused the music). Sheets announce themselves
   // through useSheetOpen — see the note on sheetCount.
+  //
+  // A PLAYBACK NOTICE IS A WINDOW TOO, and it is deliberately checked directly
+  // rather than through useSheetOpen: the notice decides whether to show by
+  // READING sheetCount, so registering itself would flip its own condition and
+  // oscillate. Testing the notice itself also covers the case where one is
+  // pending behind a sheet, which is the safer side to err on — AutoDim
+  // standing down too often costs nothing, mounting a third window freezes the
+  // app (Ethan's Tuner freeze, 23.08).
   const eligible = autoDim && !daylight && !!np.session && np.expanded && np.playing
-    && np.sheetCount === 0 && Platform.OS !== 'web';
+    && np.sheetCount === 0 && !np.playbackNotice && Platform.OS !== 'web';
 
   const restore = useCallback(async () => {
     setDimmed(false);

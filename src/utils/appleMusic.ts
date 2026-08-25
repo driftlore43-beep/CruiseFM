@@ -256,12 +256,28 @@ export async function startApplePlaylist(uri?: string): Promise<'playing' | 'err
  * last started, then seek back to where the song was, so the fix is invisible
  * rather than a restart from the top.
  *
- * Returns false when there is nothing to recover WITH — no bridge, or the app
- * never queued anything this session (music started from the Music app), in
- * which case re-queueing would be taking over playback we were never driving.
+ * Returns false when there is nothing to recover WITH — i.e. no bridge at all.
  */
 export async function recoverApplePlayback(resumeAtMs: number | null): Promise<boolean> {
-  if (!bridge || !lastQueuedUri) return false;
+  if (!bridge) return false;
+  // NO QUEUE OF OUR OWN IS STILL WORTH A SECOND PRESS. A drive started from
+  // music already playing (the "I can hear this" card) never calls
+  // startApplePlaylist, by design — adopting exists precisely to touch
+  // nothing — so `lastQueuedUri` is null on exactly the flow the listener said
+  // he uses most, and the recovery used to decline there (23.08).
+  //
+  // Re-queueing would be wrong: that music belongs to the Music app and taking
+  // it over would be worse than the bug. A bare second press is not — it sets
+  // no queue, so the worst case is that it fails the same way the first
+  // attempt did, and it is literally what the listener does by hand.
+  if (!lastQueuedUri) {
+    try {
+      await bridge.play();
+      return true;
+    } catch {
+      return false;
+    }
+  }
   try {
     await bridge.playPlaylist(applePlaylistId(lastQueuedUri));
     // Re-queueing starts the playlist at its first track, so without this the

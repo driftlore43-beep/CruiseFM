@@ -392,7 +392,16 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     // the wake notice as it resolved, out of order. That notice is its own
     // iOS Modal, so a stack of them mounts and unmounts real windows over the
     // mode's own window: the documented third-window trap, where iOS presents
-    // nothing and swallows every touch. That is the Tuner freeze (Ethan, 23.08).
+    // nothing and swallows every touch.
+    //
+    // THAT IS THE SPOTIFY SHAPE OF IT, AND THE REPORTER WAS ON APPLE MUSIC —
+    // the wake nudge below returns early for Apple listeners, so the notice
+    // stack cannot be what froze his phone. What overlaps for him is worse:
+    // four `playPlaylist` calls landing on the SYSTEM music player, each
+    // fetching its tracks and taking the queue over from the last. That is
+    // also the likeliest reading of "it desyncs from Apple Music". Same fix,
+    // and it matters more on that platform, not less.
+    //
     // The counter supersedes: a later call makes every earlier one stand down
     // before it can speak.
     const gen = ++startGenRef.current;

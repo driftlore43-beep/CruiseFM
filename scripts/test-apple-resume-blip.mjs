@@ -73,10 +73,22 @@ function makeReact() {
   return { React, loop };
 }
 
-function load({ pollMs = 30 } = {}) {
-  const js = ts.transpileModule(fs.readFileSync(SRC, 'utf8'), {
+function load({ pollMs = 30, settleMs = 400 } = {}) {
+  // The settle window is a module constant, so it is shortened HERE rather
+  // than made configurable in production code for a test's benefit. The
+  // ratio is what is being tested, not the literal 3.5 seconds.
+  let js = ts.transpileModule(fs.readFileSync(SRC, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
+  const before = js;
+  js = js.replace(/RESUME_SETTLE_MS = \d+/, `RESUME_SETTLE_MS = ${settleMs}`);
+  if (process.env.TRACE) {
+    js = js.replace('const settling = Date.now() - resumedAtRef.current < RESUME_SETTLE_MS;',
+      'const settling = Date.now() - resumedAtRef.current < RESUME_SETTLE_MS; console.log("      [decide] sinceResume=", Date.now()-resumedAtRef.current, "settling=", settling);');
+    js = js.replace('if (wasAway) { pausedStreakRef.current = 0; resumedAtRef.current = Date.now(); }',
+      'if (wasAway) { pausedStreakRef.current = 0; resumedAtRef.current = Date.now(); console.log("      [resume] marked"); }');
+  }
+  if (js === before) throw new Error('RESUME_SETTLE_MS not found — the test is not testing what it thinks');
   const { React, loop } = makeReact();
   // `adopted` is what the DRIVE believes — NowPlayingContext's play state,
   // i.e. what the pause button shows.
@@ -85,11 +97,21 @@ function load({ pollMs = 30 } = {}) {
   // and some catch one, purely on timer phase — which made this test fail
   // against correct code. `state.polls` counts actual reads, so a step can
   // wait for EXACTLY one more however the timers happen to line up.
-  const state = { entry: null, adopted: [], polls: 0 };
+  const state = { entry: null, adopted: [], polls: 0, appStateFns: [] };
   const req = (name) => {
     if (name === 'react') return React;
-    if (name === 'react-native') return { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } };
-    if (name === '@/utils/useAppActive') return { isInFront: () => true };
+    if (name === 'react-native') return {
+      AppState: {
+        currentState: 'active',
+        addEventListener: (_e, fn) => { state.appStateFns.push(fn); return { remove() {} }; },
+      },
+    };
+    // THE REAL RULE, not a constant `true`. The first version stubbed this
+    // as always-in-front, so 'background' never registered, `wasAway` was
+    // never true and the resume was never marked — the test then measured a
+    // settle window that had never started. Mirrors useAppActive: 'inactive'
+    // (Notification Centre, a call banner) still counts as in front.
+    if (name === '@/utils/useAppActive') return { isInFront: (st) => st !== 'background' };
     if (name === '@/context/NowPlayingContext') return {
       useActivityPing: () => () => {},
       useAdoptPlayState: () => (p) => { state.adopted.push(p); },
@@ -121,7 +143,12 @@ function load({ pollMs = 30 } = {}) {
     await sleep(4);                       // let the awaited body settle
     return call();
   };
-  return { call, step, state };
+  /** Background then foreground, exactly as iOS does it. */
+  const resume = () => {
+    for (const fn of state.appStateFns) fn('background');
+    for (const fn of state.appStateFns) fn('active');
+  };
+  return { call, step, state, resume };
 }
 
 const playing = { title: 'S', artist: 'A', artworkUrl: null, durationMs: 200000, positionMs: 5000, isPlaying: true };
@@ -202,6 +229,49 @@ console.log('\n  a blip does not leave the count armed for next time:');
   out = await step();
   check('the counter reset, so one later blip still does not pause',
     !state.adopted.includes(false), JSON.stringify(state.adopted));
+}
+
+console.log("\n  THE OWNER'S OWN CLIP, measured frame by frame (26.08):");
+{
+  // Returned at 4.9s; flipped to paused at 5.8s; disc dead still 7.2-8.4s;
+  // everything back at 8.5s. So the system player answered "not playing" for
+  // roughly 2.7 SECONDS after the resume. Two-in-a-row alone cannot survive
+  // that — the 900ms re-ask lands inside the same bad window and confirms
+  // the wrong answer. This is that sequence.
+  const { step, state, resume } = load();
+  state.entry = playing;
+  let out = await step();
+  state.adopted.length = 0;
+
+  resume();                                   // came back from another app
+  state.entry = { ...playing, isPlaying: false };
+  // Several reads across the settle window, all of them wrong.
+  for (let i = 1; i <= 4; i++) {
+    out = await step();
+    check(`read ${i} inside the settle window is not believed`,
+      !state.adopted.includes(false) && out.track?.isPlaying === true,
+      `adopted=${JSON.stringify(state.adopted)} scene=${out.track?.isPlaying}`);
+  }
+
+  state.entry = playing;                      // the player finally tells the truth
+  out = await step();
+  check('nothing ever showed as stopped', !state.adopted.includes(false), JSON.stringify(state.adopted));
+  check('the disc never stopped turning', out.track?.isPlaying === true);
+}
+
+console.log('\n  but a pause AFTER the window has passed still lands:');
+{
+  const { step, state, resume } = load();
+  state.entry = playing;
+  let out = await step();
+  resume();
+  await new Promise((r) => setTimeout(r, 500));  // past the (shortened) settle window
+  state.adopted.length = 0;
+  state.entry = { ...playing, isPlaying: false };
+  out = await step();
+  out = await step();
+  check('two answers past the window are believed',
+    state.adopted.includes(false), JSON.stringify(state.adopted));
 }
 
 console.log(fails ? `\n  ${fails} failure(s)\n`

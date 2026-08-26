@@ -42,6 +42,20 @@ import {
  *  enough that a driver does not sit looking at a dead button. */
 const RESUME_CHECK_MS = 1600;
 
+/**
+ * How long after returning to the app a "not playing" answer counts for
+ * nothing at all.
+ *
+ * MEASURED FROM THE OWNER'S OWN CLIP (26.08), not guessed: the app returned
+ * at 4.9s, went to paused at 5.8s, the disc was completely still from 7.2s
+ * to 8.4s, and everything recovered at 8.5s — so the system player was
+ * answering wrongly for roughly 2.7 seconds after the resume. 3.5s covers
+ * that with a margin without being long enough to make a real pause feel
+ * slow, and a pause the DRIVER makes in this window is unaffected anyway
+ * because that runs through lastControlRef instead.
+ */
+const RESUME_SETTLE_MS = 3500;
+
 export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number }) {
   const [connected, setConnected] = useState(false);
   const [track, setTrack] = useState<NowPlaying | null>(null);
@@ -71,6 +85,9 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
   /** Consecutive "not playing" readings. Two are needed before the drive
    *  believes the music stopped — see the note at the adopt call. */
   const pausedStreakRef = useRef(0);
+  /** When the app last came back to the front — see RESUME_SETTLE_MS. Starts
+   *  at 0 so a drive opened normally is never treated as "settling". */
+  const resumedAtRef = useRef(0);
   const settled = <T,>(ref: { current: PendingToggle<T> }, reported: T): boolean => {
     const ok = acceptReported(ref.current, reported, Date.now());
     if (ok) ref.current = null;
@@ -166,19 +183,54 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
          * instantly: hearing music and showing paused is the bug, and there
          * is no symmetric risk in believing "it's playing" straight away.
          */
+        // ONE VERDICT, USED BY BOTH SURFACES. The transport and the scene read
+        // different values (np.playing vs track.isPlaying), and deciding
+        // "is this pause real?" separately in two places is how one ends up
+        // held while the other freezes — which is the visible half.
+        let believedPlaying = entry.isPlaying;
         if (Date.now() - lastControlRef.current > 8000) {
           if (entry.isPlaying) {
             pausedStreakRef.current = 0;
             adoptRef.current(true);
           } else {
-            pausedStreakRef.current += 1;
-            if (pausedStreakRef.current >= 2) {
-              adoptRef.current(false);
-            } else {
-              // Confirm QUICKLY rather than waiting out the 5s poll, so a
-              // real pause still settles in about a second — the same
-              // 900ms re-ask Spotify's copy of this rule uses.
+            /**
+             * AND THE SETTLE WINDOW, WHICH THE SCREEN RECORDING FORCED.
+             *
+             * The owner's 26.08 clip was measured frame by frame: the app
+             * came back at 4.9s, flipped to paused at 5.8s, the disc coasted
+             * down and sat DEAD STILL from 7.2s to 8.4s, and it all came
+             * back at 8.5s — so the system player was answering "not
+             * playing" for the better part of THREE SECONDS after the
+             * resume, with the music audibly going the whole time.
+             *
+             * Two-in-a-row alone does not survive that: the 900ms re-ask
+             * would land inside the same bad window, confirm the wrong
+             * answer, and show the identical fault half a second later. So
+             * for a short window after returning, a "not playing" answer is
+             * not evidence AT ALL — that is precisely the period the player
+             * is known to be lying — and it is only counted once the phone
+             * has had time to settle. Deliberately narrow, and it costs
+             * nothing anywhere else: a pause that happens at any other
+             * moment still lands on the second answer, about a second.
+             *
+             * A genuine pause made DURING the window is unaffected, because
+             * that goes through lastControlRef above, not through here.
+             */
+            const settling = Date.now() - resumedAtRef.current < RESUME_SETTLE_MS;
+            if (settling) {
+              believedPlaying = true;          // not evidence — see above
               setTimeout(() => { if (!cancelledRef.current) refreshRef.current(); }, 900);
+            } else {
+              pausedStreakRef.current += 1;
+              if (pausedStreakRef.current >= 2) {
+                adoptRef.current(false);
+              } else {
+                believedPlaying = true;        // one answer is not enough
+                // Confirm QUICKLY rather than waiting out the 5s poll, so a
+                // real pause still settles in about a second — the same
+                // 900ms re-ask Spotify's copy of this rule uses.
+                setTimeout(() => { if (!cancelledRef.current) refreshRef.current(); }, 900);
+              }
             }
           }
         }
@@ -194,9 +246,8 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
           // `track.isPlaying` — so writing the stale `false` here would stop
           // the disc even while the transport was correctly held. That is the
           // half the owner actually sees: "the disc likes to stop, while the
-          // music continues to play". Report the CONFIRMED state; the streak
-          // above is what decides when a pause is real.
-          isPlaying: entry.isPlaying || pausedStreakRef.current === 1,
+          // music continues to play".
+          isPlaying: believedPlaying,
         });
         if (entry.contextName !== undefined) setContextName(entry.contextName ?? null);
         // The REAL shuffle/repeat state, when this build's bridge reports
@@ -250,7 +301,7 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
       // over from before the app was backgrounded would let the very first
       // reading on return — the stale one — reach 2 and pause the drive,
       // which is the bug this rule exists to stop, arriving by another door.
-      if (wasAway) pausedStreakRef.current = 0;
+      if (wasAway) { pausedStreakRef.current = 0; resumedAtRef.current = Date.now(); }
       if (wasAway || pollRef.current == null) { refreshRef.current(); startPoll(); }
     });
     return () => sub.remove();

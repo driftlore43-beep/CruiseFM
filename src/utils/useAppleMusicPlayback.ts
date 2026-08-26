@@ -20,7 +20,10 @@ import {
   recoverApplePlayback,
   isAppleMusicConnected,
 } from './appleMusic';
-import { backButtonAction, type NowPlaying, type RepeatMode } from './useSpotifyPlayback';
+import {
+  acceptReported, backButtonAction, TOGGLE_GUARD_MS,
+  type NowPlaying, type PendingToggle, type RepeatMode,
+} from './useSpotifyPlayback';
 
 /**
  * Live Apple Music playback bridge — the peer of useSpotifyPlayback, and the
@@ -53,6 +56,23 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
   const artCacheRef = useRef<{ key: string | null; url: string | null; at: number }>({ key: null, url: null, at: 0 });
   const refreshRef = useRef<() => void>(() => {});
   const lastControlRef = useRef(0);
+
+  /**
+   * HELD AGAINST A STALE READING, EXACTLY LIKE SPOTIFY'S (18.08's rule,
+   * imported rather than copied). Before 26.08 there was nothing here at
+   * all — `shuffle`/`repeat` below just flipped this state and left it,
+   * because `currentEntry` never reported the real setting back. So the
+   * button's own highlight was the whole of the evidence, and it could
+   * never notice a command that silently failed to reach the Music app —
+   * "the buttons highlight, but doesn't repeat" (owner, 26.08).
+   */
+  const pendingShuffleRef = useRef<PendingToggle<boolean>>(null);
+  const pendingRepeatRef = useRef<PendingToggle<RepeatMode>>(null);
+  const settled = <T,>(ref: { current: PendingToggle<T> }, reported: T): boolean => {
+    const ok = acceptReported(ref.current, reported, Date.now());
+    if (ok) ref.current = null;
+    return ok;
+  };
   const adoptPlay = useAdoptPlayState();
   const adoptRef = useRef(adoptPlay);
   adoptRef.current = adoptPlay;
@@ -133,6 +153,17 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
           isPlaying: entry.isPlaying,
         });
         if (entry.contextName !== undefined) setContextName(entry.contextName ?? null);
+        // The REAL shuffle/repeat state, when this build's bridge reports
+        // one (26.08) — `undefined` on an older build, which must leave the
+        // optimistic guess exactly alone, not snap it back to 'off'/false.
+        // Held against a stale reading the same way Spotify's is: a chase
+        // poll landing 220ms after a press still carries the OLD setting.
+        if (entry.shuffleOn !== undefined && settled(pendingShuffleRef, entry.shuffleOn)) {
+          setShuffleOn(entry.shuffleOn);
+        }
+        if (entry.repeatMode !== undefined && settled(pendingRepeatRef, entry.repeatMode)) {
+          setRepeatMode(entry.repeatMode);
+        }
         // A missing cover is re-chased every ~20s, not claimed once forever:
         // a chase can die mid-flight (backgrounded app, dropped signal), and
         // the old one-shot claim left the deck blank for the rest of the
@@ -249,7 +280,21 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
       applePrev();
       after();
     },
-    shuffle: (state: boolean) => { ping(); setShuffleOn(state); appleSetShuffle(state); after(); },
-    repeat: (mode: RepeatMode) => { ping(); setRepeatMode(mode); appleSetRepeat(mode); after(); },
+    // Optimistic, same as Spotify's — and now HELD against the poll rather
+    // than trusted forever, via pendingShuffleRef/pendingRepeatRef above.
+    shuffle: (state: boolean) => {
+      ping();
+      setShuffleOn(state);
+      pendingShuffleRef.current = { want: state, until: Date.now() + TOGGLE_GUARD_MS };
+      appleSetShuffle(state);
+      after();
+    },
+    repeat: (mode: RepeatMode) => {
+      ping();
+      setRepeatMode(mode);
+      pendingRepeatRef.current = { want: mode, until: Date.now() + TOGGLE_GUARD_MS };
+      appleSetRepeat(mode);
+      after();
+    },
   };
 }

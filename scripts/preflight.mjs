@@ -169,8 +169,45 @@ try {
     risky.push(`${name} ${installed} (SDK ships ${String(bundled[name]).replace(/^[\^~]/, '')})`);
   }
 
-  if (changed.length) {
-    warn('native modules changed', `${changed.join('; ')} — this build must be LAUNCHED on a phone before it goes to Apple`);
+  /**
+   * THIS REPO'S OWN NATIVE CODE, which the version check above is blind to.
+   *
+   * Everything above compares npm package VERSIONS — and `modules/` holds
+   * local Expo modules whose Swift is edited in place, so nothing about a
+   * change there ever reaches package-lock.json. Found 26.08 the honest way:
+   * the Apple Music repeat fix rewrote CruiseMusicKitModule.swift and this
+   * check cheerfully reported "native modules changed: none", which is the
+   * precise claim that decides whether a build gets opened on a phone before
+   * it goes to Apple. A silent native change is exactly what killed build 25.
+   */
+  const nativeSrc = [];
+  try {
+    const listed = execFileSync(
+      'git', ['diff', '--name-only', `${provenCommit}..HEAD`, '--', 'modules/', 'targets/', 'plugins/'],
+      { cwd: ROOT, encoding: 'utf8' },
+    ).trim();
+    if (listed) nativeSrc.push(...listed.split('\n'));
+    // Uncommitted edits count too — they are about to be committed and built.
+    // NOT `.trim()` on the whole output, and not `slice(3)`: porcelain lines
+    // are `XY<space>path`, and X is a SPACE for an unstaged edit — so
+    // trimming the output eats the first line's leading space and a fixed
+    // offset then swallows a character of the path ("odules/..."). Strip the
+    // status with a pattern instead, per line.
+    const dirtyNative = execFileSync(
+      'git', ['status', '--porcelain', '--', 'modules/', 'targets/', 'plugins/'],
+      { cwd: ROOT, encoding: 'utf8' },
+    );
+    for (const line of dirtyNative.split('\n')) {
+      const f = line.replace(/^.{2} /, '').trim();
+      if (f && !nativeSrc.includes(f)) nativeSrc.push(`${f} (uncommitted)`);
+    }
+  } catch { /* not a git checkout, or no such commit — the check above already says so */ }
+
+  if (changed.length || nativeSrc.length) {
+    const parts = [];
+    if (changed.length) parts.push(changed.join('; '));
+    if (nativeSrc.length) parts.push(`this repo's own native source: ${nativeSrc.join(', ')}`);
+    warn('native modules changed', `${parts.join(' | ')} — this build must be LAUNCHED on a phone before it goes to Apple, and an OTA update CANNOT carry any of it`);
   } else {
     ok('native modules changed', `none since ${provenCommit}, so the native side is the same as a build that launches`);
   }

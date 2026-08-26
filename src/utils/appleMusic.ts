@@ -60,6 +60,14 @@ type RawEntry = {
   isPlaying: boolean;
   /** Name of the playlist/album the queue came from, when known. */
   contextName?: string | null;
+  /**
+   * The system player's ACTUAL shuffle/repeat state — added 26.08, so a
+   * build without it (nothing shipped between builds is guaranteed to have
+   * it) sends `undefined` here, not a wrong answer. See useAppleMusicPlayback
+   * for why the caller must treat "missing" and "false"/"off" differently.
+   */
+  shuffleOn?: boolean;
+  repeatMode?: 'off' | 'context' | 'track';
 };
 
 /**

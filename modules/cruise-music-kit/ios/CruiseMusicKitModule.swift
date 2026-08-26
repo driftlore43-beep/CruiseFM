@@ -89,6 +89,23 @@ public class CruiseMusicKitModule: Module {
         artist = entry.subtitle ?? ""
       }
 
+      // THE TRUTH ABOUT SHUFFLE AND REPEAT, READ BACK FROM THE SAME OLD
+      // BRIDGE `setShuffle`/`setRepeat` NOW WRITE THROUGH (26.08). Before
+      // this the JS side had NOTHING to poll against, so the button's
+      // highlight was purely the local optimistic guess made at the moment
+      // it was pressed — it could never notice a command that silently
+      // failed to take, which is indistinguishable from "the button lit up
+      // but nothing repeated". Spotify's own toggles have carried this same
+      // read-and-reconcile shape since 18.08; Apple's simply never had
+      // anything to reconcile against.
+      let sys = MPMusicPlayerController.systemMusicPlayer
+      let repeatString: String
+      switch sys.repeatMode {
+      case .one: repeatString = "track"
+      case .all: repeatString = "context"
+      default:   repeatString = "off"
+      }
+
       return [
         "title": entry.title,
         "artist": artist,
@@ -104,6 +121,8 @@ public class CruiseMusicKitModule: Module {
         // back to the station's own linked playlist name — which is what the
         // user chose anyway.
         "contextName": nil,
+        "shuffleOn": sys.shuffleMode == .songs || sys.shuffleMode == .albums,
+        "repeatMode": repeatString,
       ]
     }
 
@@ -133,17 +152,37 @@ public class CruiseMusicKitModule: Module {
       CruisePlayer.shared.playbackTime = max(0, positionMs / 1000)
     }
 
+    /**
+     * SHUFFLE AND REPEAT, THROUGH THE OLD BRIDGE ON PURPOSE (owner, 26.08:
+     * "the buttons highlight, but doesn't repeat").
+     *
+     * The first version set `CruisePlayer.shared.state.shuffleMode`/
+     * `.repeatMode` — MusicKit's own mutation surface. That is the right call
+     * for `ApplicationMusicPlayer`, where the queue is genuinely ours, but
+     * `CruisePlayer` is `SystemMusicPlayer` (04.08, so the music survives a
+     * force-quit) — its `state` mirrors the Music APP's own playback, and
+     * MusicKit's newer write path onto that mirror is exactly the kind of
+     * thing this file has learned not to trust blind: the JS side already
+     * showed the button flipping and lighting up (the local optimistic guess,
+     * fixed 26.08) with nothing confirming the Music app actually obeyed.
+     *
+     * `MPMusicPlayerController.systemMusicPlayer` is the OLD MediaPlayer
+     * bridge — the one this file already trusts for artwork below — and its
+     * `repeatMode`/`shuffleMode` properties are the same ones the lock screen
+     * and Siri use to drive the Music app directly. Routed through there
+     * instead, since it is the proven path to the same player rather than a
+     * second, newer one reaching for the same target.
+     */
     AsyncFunction("setShuffle") { (on: Bool) in
-      guard #available(iOS 16.0, *) else { return }
-      CruisePlayer.shared.state.shuffleMode = on ? .songs : .off
+      MPMusicPlayerController.systemMusicPlayer.shuffleMode = on ? .songs : .off
     }
 
     AsyncFunction("setRepeat") { (mode: String) in
-      guard #available(iOS 16.0, *) else { return }
+      let player = MPMusicPlayerController.systemMusicPlayer
       switch mode {
-      case "track":   CruisePlayer.shared.state.repeatMode = .one
-      case "context": CruisePlayer.shared.state.repeatMode = .all
-      default:        CruisePlayer.shared.state.repeatMode = MusicPlayer.RepeatMode.none
+      case "track":   player.repeatMode = .one
+      case "context": player.repeatMode = .all
+      default:        player.repeatMode = .none
       }
     }
 

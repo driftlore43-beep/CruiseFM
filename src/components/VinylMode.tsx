@@ -27,7 +27,7 @@ import { PlatformIcon } from '@/components/icons/PlatformIcon';
 // the record turned, the bar moved, and the song snapped back (owner, 04.08).
 // CD works because it goes through useTrackClock. Same router for both now.
 import { seekActive, shouldKeepCoasting } from '@/utils/useTrackClock';
-import { useMusicPlayback, nextRepeat } from '@/utils/useMusicPlayback';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PreviewGate } from '@/components/PreviewGate';
@@ -35,6 +35,7 @@ import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
 import { CastShadow } from '@/components/CastShadow';
 import { ModeActionRow } from '@/components/ModeActionRow';
+import { RepeatButton, ShuffleButton } from '@/components/TransportToggle';
 import { SeekCar } from '@/components/SeekBar';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
@@ -1639,9 +1640,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
           {/* Controls */}
           <View style={fs.controls}>
-            <TouchableOpacity onPress={() => spotify.shuffle(!shuffle)} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={26} color={shuffle ? (station.eqColors?.[1] ?? V.gold) : '#ffffff'} />
-            </TouchableOpacity>
+            <ShuffleButton accent={station.eqColors?.[1] ?? V.gold} size={26} on={shuffle}
+              onPress={() => spotify.shuffle(!shuffle)} />
             <TouchableOpacity onPress={() => { setActiveTrack((t) => Math.max(0, t - 1)); spotify.prev(); }} style={fs.skipBtn} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-previous" size={48} color="#fff" />
             </TouchableOpacity>
@@ -1664,9 +1664,8 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             <TouchableOpacity onPress={() => { setActiveTrack((t) => Math.min(VINYL_TRACKS.length - 1, t + 1)); spotify.next(); }} style={fs.skipBtn} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-next" size={48} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => spotify.repeat(nextRepeat(repeat))} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <MaterialCommunityIcons name={repeat === 'track' ? 'repeat-once' : 'repeat'} size={26} color={repeat !== 'off' ? (station.eqColors?.[1] ?? V.gold) : '#ffffff'} />
-            </TouchableOpacity>
+            <RepeatButton accent={station.eqColors?.[1] ?? V.gold} size={26} mode={repeat}
+              onPress={(next) => spotify.repeat(next)} />
           </View>
 
           {/* Left-aligned action pills — keep the record the focus */}

@@ -26,7 +26,7 @@ import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/u
 // Platform-routed, not Spotify's own — same fault Vinyl had (04.08), found
 // by grepping for the rest rather than waiting for it to be reported.
 import { seekActive, shouldKeepCoasting } from '@/utils/useTrackClock';
-import { useMusicPlayback, nextRepeat } from '@/utils/useMusicPlayback';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
 import { PreviewGate } from '@/components/PreviewGate';
@@ -34,6 +34,7 @@ import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
 import { CastShadow } from '@/components/CastShadow';
 import { ModeActionRow } from '@/components/ModeActionRow';
+import { RepeatButton, ShuffleButton } from '@/components/TransportToggle';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
 import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
@@ -1235,12 +1236,8 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
           {/* Controls */}
           <View style={fs.controls}>
-            <TouchableOpacity
-              onPress={() => spotify.shuffle(!shuffle)}
-              style={fs.shuffleRepeatBtn}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={26} color={shuffle ? (currentEq?.[1] ?? '#C8860A') : '#ffffff'} />
-            </TouchableOpacity>
+            <ShuffleButton accent={currentEq?.[1] ?? '#C8860A'} size={26} on={shuffle}
+              onPress={() => spotify.shuffle(!shuffle)} />
 
             <TouchableOpacity
               onPress={() => { setActiveTrack((t) => Math.max(0, t - 1)); spotify.prev(); }}
@@ -1271,12 +1268,8 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
               <MaterialCommunityIcons name="skip-next" size={48} color="#fff" />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => spotify.repeat(nextRepeat(repeat))}
-              style={fs.shuffleRepeatBtn}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <MaterialCommunityIcons name={repeat === 'track' ? 'repeat-once' : 'repeat'} size={26} color={repeat !== 'off' ? (currentEq?.[1] ?? '#C8860A') : '#ffffff'} />
-            </TouchableOpacity>
+            <RepeatButton accent={currentEq?.[1] ?? '#C8860A'} size={26} mode={repeat}
+              onPress={(next) => spotify.repeat(next)} />
           </View>
 
           {/* Left-aligned action pills — keeps the tape the focus */}

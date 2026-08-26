@@ -19,7 +19,7 @@ import { mixHex } from '@/components/GlassPane';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
-import { useMusicPlayback, nextRepeat } from '@/utils/useMusicPlayback';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { HandoffOverlay } from '@/components/HandoffOverlay';
@@ -27,6 +27,7 @@ import { PreviewGate } from '@/components/PreviewGate';
 import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
 import { AmbientGlow } from '@/components/AmbientGlow';
 import { ModeActionRow } from '@/components/ModeActionRow';
+import { RepeatButton, ShuffleButton } from '@/components/TransportToggle';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { MarqueeText } from '@/components/MarqueeText';
 import { SeekBar } from '@/components/SeekBar';
@@ -696,9 +697,8 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
 
           {/* Controls */}
           <View style={fs.controls}>
-            <TouchableOpacity onPress={() => spotify.shuffle(!shuffle)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={24} color={shuffle ? eq[1] : 'rgba(255,255,255,0.85)'} />
-            </TouchableOpacity>
+            <ShuffleButton accent={eq[1]} size={24} on={shuffle}
+              onPress={() => spotify.shuffle(!shuffle)} />
             <TouchableOpacity onPress={() => { resetTrack(); spotify.prev(); }} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-previous" size={44} color="#fff" />
             </TouchableOpacity>
@@ -715,9 +715,8 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
             <TouchableOpacity onPress={() => { resetTrack(); spotify.next(); }} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-next" size={44} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => spotify.repeat(nextRepeat(repeat))} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <MaterialCommunityIcons name={repeat === 'track' ? 'repeat-once' : 'repeat'} size={24} color={repeat !== 'off' ? eq[1] : 'rgba(255,255,255,0.85)'} />
-            </TouchableOpacity>
+            <RepeatButton accent={eq[1]} size={24} mode={repeat}
+              onPress={(next) => spotify.repeat(next)} />
           </View>
 
           {/* Left-aligned action pills — keep the visual the focus */}

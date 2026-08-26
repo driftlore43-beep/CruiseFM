@@ -68,6 +68,9 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
    */
   const pendingShuffleRef = useRef<PendingToggle<boolean>>(null);
   const pendingRepeatRef = useRef<PendingToggle<RepeatMode>>(null);
+  /** Consecutive "not playing" readings. Two are needed before the drive
+   *  believes the music stopped — see the note at the adopt call. */
+  const pausedStreakRef = useRef(0);
   const settled = <T,>(ref: { current: PendingToggle<T> }, reported: T): boolean => {
     const ok = acceptReported(ref.current, reported, Date.now());
     if (ok) ref.current = null;
@@ -140,9 +143,45 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
         const artKey = `${entry.title}|${entry.artist}`;
         const claimed = artCacheRef.current.key === artKey;
         const art = entry.artworkUrl ?? (claimed ? artCacheRef.current.url : null);
-        // Mirror reality: if music stops elsewhere (car Bluetooth drops, the
-        // Music app pauses) the drive follows. Recent taps win for 8s.
-        if (Date.now() - lastControlRef.current > 8000) adoptRef.current(entry.isPlaying);
+        /**
+         * MIRROR REALITY — BUT NEVER PAUSE ON A SINGLE ANSWER.
+         *
+         * Owner, 26.08: "when i leave the app to go to another app and open
+         * back the app the pause button comes on and the disc likes to stop,
+         * while the music continues to play. after a few seconds it picks
+         * back up."
+         *
+         * That is this line, before the streak below existed. The poll is
+         * STOPPED while backgrounded (the SIGKILL rule), so returning fires
+         * an immediate refresh at the exact moment the system player is
+         * still spinning its state back up — and its first answer after a
+         * resume is routinely a stale `isPlaying: false`. One reading was
+         * enough to adopt PAUSED, which stops the disc and flips the button,
+         * and the next poll five seconds later put it back. The music never
+         * actually stopped; only the app believed it had.
+         *
+         * Spotify has required TWO idle answers in a row since 10.08 for the
+         * same reason — a blip during a handover must not pause a working
+         * drive. Apple simply never got the rule. STARTING is still adopted
+         * instantly: hearing music and showing paused is the bug, and there
+         * is no symmetric risk in believing "it's playing" straight away.
+         */
+        if (Date.now() - lastControlRef.current > 8000) {
+          if (entry.isPlaying) {
+            pausedStreakRef.current = 0;
+            adoptRef.current(true);
+          } else {
+            pausedStreakRef.current += 1;
+            if (pausedStreakRef.current >= 2) {
+              adoptRef.current(false);
+            } else {
+              // Confirm QUICKLY rather than waiting out the 5s poll, so a
+              // real pause still settles in about a second — the same
+              // 900ms re-ask Spotify's copy of this rule uses.
+              setTimeout(() => { if (!cancelledRef.current) refreshRef.current(); }, 900);
+            }
+          }
+        }
         setTrack({
           title: entry.title,
           artist: entry.artist,
@@ -150,7 +189,14 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
           durationMs: entry.durationMs,
           progressMs: entry.positionMs,
           syncedAt: Date.now(),
-          isPlaying: entry.isPlaying,
+          // THE SAME UNCONFIRMED READING MUST NOT REACH THE SCENE EITHER.
+          // Every mode gates its animation on `confirmedPlaying`, which reads
+          // `track.isPlaying` — so writing the stale `false` here would stop
+          // the disc even while the transport was correctly held. That is the
+          // half the owner actually sees: "the disc likes to stop, while the
+          // music continues to play". Report the CONFIRMED state; the streak
+          // above is what decides when a pause is real.
+          isPlaying: entry.isPlaying || pausedStreakRef.current === 1,
         });
         if (entry.contextName !== undefined) setContextName(entry.contextName ?? null);
         // The REAL shuffle/repeat state, when this build's bridge reports
@@ -200,6 +246,11 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
       // on the Spotify copy of this.
       const wasAway = !inFront;
       inFront = true;
+      // COMING BACK STARTS THE COUNT AGAIN. Without this a streak of 1 left
+      // over from before the app was backgrounded would let the very first
+      // reading on return — the stale one — reach 2 and pause the drive,
+      // which is the bug this rule exists to stop, arriving by another door.
+      if (wasAway) pausedStreakRef.current = 0;
       if (wasAway || pollRef.current == null) { refreshRef.current(); startPoll(); }
     });
     return () => sub.remove();

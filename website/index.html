@@ -9,11 +9,11 @@
 <meta property="og:description" content="Your playlists, wrapped in a cinematic driving experience. Out now on the App Store — free during launch.">
 <style>
   :root{
-    --violet:#7B38E0; --violet-light:#9B5FFF; --violet-dim:#4A1F8A;
-    --charcoal:#1a1a2e; --midnight:#12122A; --deep:#0D0D20;
-    --surface:#20203A; --surface-hi:#2A2A48;
-    --text:#FFFFFF; --text-2:#9090B0; --text-3:#505068;
-    --amber:#F59E0B; --amber-soft:rgba(245,158,11,.35);
+    --deep:#0a0a10; --charcoal:#0e0e15; --midnight:#0a0a10;
+    --surface:rgba(255,255,255,.05); --surface-hi:rgba(255,255,255,.12);
+    --text:#FFFFFF; --text-2:rgba(255,255,255,.62); --text-3:rgba(255,255,255,.38);
+    --amber:#F7B733; --amber-soft:rgba(247,183,51,.30);
+    --hair:rgba(255,255,255,.12);
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html{scroll-behavior:smooth}
@@ -32,15 +32,14 @@
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     text-align:center; padding:80px 24px 64px;
     background:
-      radial-gradient(ellipse 80% 55% at 50% -10%, rgba(123,56,224,.28), transparent 60%),
-      radial-gradient(ellipse 60% 40% at 50% 110%, rgba(245,158,11,.14), transparent 60%),
+      radial-gradient(ellipse 70% 45% at 50% -10%, rgba(247,183,51,.10), transparent 60%),
       linear-gradient(180deg, var(--deep) 0%, var(--charcoal) 100%);
   }
   .badge-pill{
     display:inline-flex; align-items:center; gap:8px;
-    border:1px solid var(--amber-soft); border-radius:999px;
+    border:1px solid var(--hair); border-radius:999px;
     padding:7px 16px; font-size:13px; letter-spacing:.14em; text-transform:uppercase;
-    color:var(--amber); background:rgba(245,158,11,.07); margin-bottom:28px;
+    color:var(--amber); background:rgba(255,255,255,.04); margin-bottom:28px;
   }
   .badge-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);
     animation:pulse 2s ease-in-out infinite}
@@ -48,11 +47,10 @@
 
   .wordmark{
     font-size:clamp(52px,9vw,96px); font-weight:800; letter-spacing:.06em; line-height:1.05;
-    background:linear-gradient(180deg,#fff 30%,#c9c9e8 100%);
-    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
-    text-shadow:0 0 80px rgba(123,56,224,.4);
+    color:#fff;
+    text-shadow:0 0 60px rgba(255,255,255,.14);
   }
-  .wordmark .fm{color:var(--amber);-webkit-text-fill-color:var(--amber)}
+  .wordmark .fm{color:var(--amber)}
   .pitch{
     margin:26px auto 10px; max-width:640px;
     font-size:clamp(19px,2.6vw,24px); color:var(--text-2); font-weight:400;
@@ -62,9 +60,9 @@
   /* hero equalizer */
   .eq{display:flex;align-items:flex-end;gap:6px;height:56px;margin:36px auto 8px}
   .eq span{width:8px;border-radius:4px 4px 2px 2px;
-    background:linear-gradient(180deg,var(--violet-light),var(--violet));
+    background:rgba(255,255,255,.85);
     animation:eqb 1.1s ease-in-out infinite alternate}
-  .eq span:nth-child(3n){background:linear-gradient(180deg,var(--amber),#d97706)}
+  .eq span:nth-child(3n){background:var(--amber)}
   .eq span:nth-child(1){height:30%;animation-delay:.05s}
   .eq span:nth-child(2){height:70%;animation-delay:.25s}
   .eq span:nth-child(3){height:45%;animation-delay:.45s}
@@ -83,19 +81,19 @@
   .signup form{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
   .signup input[type=email]{
     flex:1 1 260px; padding:16px 20px; font-size:16px; color:var(--text);
-    background:rgba(32,32,58,.85); border:1px solid var(--surface-hi); border-radius:14px;
+    background:rgba(255,255,255,.05); border:1px solid var(--hair); border-radius:14px;
     outline:none; transition:border-color .2s, box-shadow .2s;
   }
   .signup input[type=email]::placeholder{color:var(--text-3)}
-  .signup input[type=email]:focus{border-color:var(--amber);box-shadow:0 0 0 3px rgba(245,158,11,.18)}
+  .signup input[type=email]:focus{border-color:rgba(255,255,255,.4);box-shadow:0 0 0 3px rgba(255,255,255,.08)}
   .btn{
     padding:16px 30px; font-size:16px; font-weight:700; letter-spacing:.02em;
-    color:#1a1200; background:linear-gradient(180deg,#FFB733,var(--amber));
-    border:none; border-radius:14px; cursor:pointer;
-    box-shadow:0 6px 28px rgba(245,158,11,.35);
+    color:#0a0a10; background:#FFFFFF;
+    border:none; border-radius:999px; cursor:pointer;
+    box-shadow:0 6px 28px rgba(0,0,0,.4);
     transition:transform .15s, box-shadow .2s;
   }
-  .btn:hover{transform:translateY(-2px);box-shadow:0 10px 36px rgba(245,158,11,.5)}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 10px 36px rgba(0,0,0,.5)}
   .btn:active{transform:translateY(0)}
   .signup .note{margin-top:14px;font-size:13.5px;color:var(--text-3)}
   .signup .note b{color:var(--text-2);font-weight:600}
@@ -114,7 +112,7 @@
   .shots::-webkit-scrollbar{display:none}
   .shot{flex:0 0 auto;scroll-snap-align:center;width:min(240px,62vw);border-radius:30px;
     border:6px solid #08080f;outline:1px solid var(--surface-hi);overflow:hidden;
-    box-shadow:0 18px 48px rgba(0,0,0,.55), 0 0 44px rgba(123,56,224,.18);
+    box-shadow:0 18px 48px rgba(0,0,0,.55), 0 0 34px rgba(0,0,0,.4);
     transition:transform .25s}
   .shot:hover{transform:translateY(-6px) scale(1.015)}
   .shot img{display:block;width:100%;height:auto}
@@ -137,7 +135,7 @@
     border:1px solid var(--surface-hi); overflow:hidden; text-align:center;
     transition:transform .2s, border-color .2s;
   }
-  .mode-card:hover{transform:translateY(-4px);border-color:var(--violet-dim)}
+  .mode-card:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.28)}
   .mode-card .stage{height:130px;display:flex;align-items:center;justify-content:center;margin-bottom:22px}
   .mode-card h3{font-size:19px;font-weight:700;letter-spacing:.03em}
   .mode-card p{font-size:14px;color:var(--text-2);margin-top:6px}
@@ -146,72 +144,116 @@
     padding:5px 10px;border-radius:999px;text-transform:uppercase;
   }
   .tag.free{color:#7ef0c0;background:rgba(60,220,150,.12);border:1px solid rgba(60,220,150,.3)}
-  .tag.premium{color:var(--amber);background:rgba(245,158,11,.1);border:1px solid var(--amber-soft)}
+  .tag.premium{color:var(--amber);background:rgba(247,183,51,.1);border:1px solid var(--amber-soft)}
 
   /* equalizer mode mini */
   .mini-eq{display:flex;align-items:flex-end;gap:5px;height:78px}
   .mini-eq span{width:9px;border-radius:3px;transform-origin:bottom;animation:eqb 1s ease-in-out infinite alternate}
-  .mini-eq span:nth-child(1){height:45%;background:#5EE7FF;animation-delay:.1s}
-  .mini-eq span:nth-child(2){height:85%;background:#5B7BFF;animation-delay:.35s}
-  .mini-eq span:nth-child(3){height:60%;background:#C44CFF;animation-delay:.55s}
-  .mini-eq span:nth-child(4){height:100%;background:#5EE7FF;animation-delay:.2s}
-  .mini-eq span:nth-child(5){height:70%;background:#5B7BFF;animation-delay:.65s}
-  .mini-eq span:nth-child(6){height:88%;background:#C44CFF;animation-delay:.4s}
-  .mini-eq span:nth-child(7){height:52%;background:#5EE7FF;animation-delay:.05s}
+  .mini-eq span{background:rgba(255,255,255,.9)}
+  .mini-eq span:nth-child(3n){background:var(--amber)}
+  .mini-eq span:nth-child(1){height:45%;animation-delay:.1s}
+  .mini-eq span:nth-child(2){height:85%;animation-delay:.35s}
+  .mini-eq span:nth-child(3){height:60%;animation-delay:.55s}
+  .mini-eq span:nth-child(4){height:100%;animation-delay:.2s}
+  .mini-eq span:nth-child(5){height:70%;animation-delay:.65s}
+  .mini-eq span:nth-child(6){height:88%;animation-delay:.4s}
+  .mini-eq span:nth-child(7){height:52%;animation-delay:.05s}
 
   /* cassette mini */
   .cassette{width:170px;height:104px;border-radius:12px;position:relative;
-    background:linear-gradient(180deg,#2e2e50,#232340);border:1px solid #3a3a60;
+    background:linear-gradient(180deg,#26262c,#1a1a1f);border:1px solid #3a3a40;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
   .cassette .window{position:absolute;left:50%;top:26px;transform:translateX(-50%);
-    width:118px;height:44px;border-radius:8px;background:#15152c;border:1px solid #3a3a60;
+    width:118px;height:44px;border-radius:8px;background:#101013;border:1px solid #3a3a40;
     display:flex;align-items:center;justify-content:space-between;padding:0 12px}
-  .reel{width:30px;height:30px;border-radius:50%;border:3px solid #6a6a92;position:relative;
+  .reel{width:30px;height:30px;border-radius:50%;border:3px solid #8a8a90;position:relative;
     animation:spin 3s linear infinite}
-  .reel::before,.reel::after{content:"";position:absolute;background:#6a6a92}
+  .reel::before,.reel::after{content:"";position:absolute;background:#8a8a90}
   .reel::before{left:50%;top:2px;width:2.5px;height:20px;transform:translateX(-50%)}
   .reel::after{top:50%;left:2px;height:2.5px;width:20px;transform:translateY(-50%)}
   .cassette .label{position:absolute;top:7px;left:50%;transform:translateX(-50%);
     font-size:8.5px;letter-spacing:.28em;color:var(--amber);text-transform:uppercase}
   .cassette .tape{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
-    width:80px;height:10px;border-radius:0 0 8px 8px;background:#15152c;border:1px solid #3a3a60;border-top:none}
+    width:80px;height:10px;border-radius:0 0 8px 8px;background:#101013;border:1px solid #3a3a40;border-top:none}
   @keyframes spin{to{transform:rotate(360deg)}}
 
   /* vinyl mini */
   .vinyl{width:110px;height:110px;border-radius:50%;position:relative;animation:spin 4.5s linear infinite;
     background:
-      radial-gradient(circle at 50% 50%, #17172e 0 14%, transparent 14%),
-      repeating-radial-gradient(circle at 50% 50%, #101024 0 3px, #1c1c36 3px 5px);
-    box-shadow:0 0 34px rgba(123,56,224,.35), inset 0 0 12px rgba(0,0,0,.7)}
+      radial-gradient(circle at 50% 50%, #141416 0 14%, transparent 14%),
+      repeating-radial-gradient(circle at 50% 50%, #0c0c0e 0 3px, #1c1c1f 3px 5px);
+    box-shadow:0 0 24px rgba(0,0,0,.5), inset 0 0 12px rgba(0,0,0,.7)}
   .vinyl::before{content:"";position:absolute;inset:34%;border-radius:50%;
-    background:radial-gradient(circle,#FFB733,#c47a06);box-shadow:0 0 14px rgba(245,158,11,.5)}
+    background:radial-gradient(circle,#FFB733,#c47a06);box-shadow:0 0 14px rgba(247,183,51,.5)}
   .vinyl::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px;
     border-radius:50%;background:var(--deep)}
 
   /* retro radio mini */
   .radio{width:170px;height:100px;border-radius:14px;position:relative;
-    background:linear-gradient(180deg,#33334f,#20203a);border:1px solid #3a3a60;padding:14px 16px 0}
-  .radio .dialband{height:30px;border-radius:6px;background:#15152c;border:1px solid #3a3a60;
+    background:linear-gradient(180deg,#2a2a30,#17171c);border:1px solid #3a3a40;padding:14px 16px 0}
+  .radio .dialband{height:30px;border-radius:6px;background:#101013;border:1px solid #3a3a40;
     position:relative;overflow:hidden}
   .radio .dialband::before{content:"88   92   96   100   104   108";position:absolute;inset:0;
-    font-size:8px;letter-spacing:1px;color:#6a6a92;display:flex;align-items:center;justify-content:center}
+    font-size:8px;letter-spacing:1px;color:#8a8a90;display:flex;align-items:center;justify-content:center}
   .radio .needle{position:absolute;top:0;bottom:0;width:2px;background:var(--amber);
     box-shadow:0 0 8px var(--amber);animation:tune 6s ease-in-out infinite}
   @keyframes tune{0%,100%{left:22%}45%,55%{left:74%}}
   .radio .knobs{display:flex;justify-content:space-between;padding:12px 8px 0}
-  .radio .knob{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#55557c,#2a2a48);
-    border:1px solid #3a3a60}
+  .radio .knob{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#4a4a50,#202024);
+    border:1px solid #3a3a40}
   .radio .speaker{position:absolute;right:18px;bottom:12px;width:56px;height:22px;
-    background:repeating-linear-gradient(90deg,#15152c 0 3px,transparent 3px 6px);border-radius:3px}
+    background:repeating-linear-gradient(90deg,#101013 0 3px,transparent 3px 6px);border-radius:3px}
+
+  /* horizon mini */
+  .horizon{width:170px;height:104px;position:relative;overflow:hidden;border-radius:12px;
+    background:linear-gradient(180deg,#1a1a1f,#0c0c0e)}
+  .horizon .sun{position:absolute;left:50%;top:16px;width:66px;height:66px;border-radius:50%;
+    transform:translateX(-50%);
+    background:radial-gradient(circle at 50% 35%,#FFD79B,var(--amber) 62%,#c47a06);
+    box-shadow:0 0 28px rgba(247,183,51,.4)}
+  .horizon .sun::before{content:"";position:absolute;left:0;right:0;top:36%;height:3px;background:#0c0c0e}
+  .horizon .sun::after{content:"";position:absolute;left:0;right:0;top:56%;bottom:0;background:#0c0c0e}
+  .horizon .line{position:absolute;left:0;right:0;top:56px;height:1px;background:rgba(255,255,255,.45)}
+  .horizon .grid{position:absolute;left:-20%;right:-20%;bottom:0;height:46px;
+    background:repeating-linear-gradient(90deg,rgba(255,255,255,.16) 0 1px,transparent 1px 18px);
+    transform:perspective(60px) rotateX(48deg);transform-origin:top}
+
+  /* circular EQ mini */
+  .orb{width:112px;height:112px;border-radius:50%;position:relative;
+    background:repeating-conic-gradient(rgba(255,255,255,.85) 0deg 3deg, transparent 3deg 9deg);
+    -webkit-mask:radial-gradient(circle,transparent 36%,#000 41%,#000 92%,transparent 97%);
+    mask:radial-gradient(circle,transparent 36%,#000 41%,#000 92%,transparent 97%);
+    animation:spin 9s linear infinite}
+  .orb::after{content:"";position:absolute;inset:38%;border-radius:50%;
+    background:radial-gradient(circle,rgba(247,183,51,.5),transparent 70%)}
+
+  /* mirror ball mini */
+  .mirrorball{width:104px;height:104px;border-radius:50%;position:relative;overflow:hidden;
+    background:
+      radial-gradient(circle at 34% 28%, rgba(255,255,255,.6), transparent 42%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.14) 0 8px, rgba(0,0,0,.28) 8px 16px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,.10) 0 8px, transparent 8px 16px),
+      radial-gradient(circle at 50% 55%, #4a4a50, #17171a 75%);
+    box-shadow:0 0 26px rgba(255,255,255,.1), inset 0 0 20px rgba(0,0,0,.6);
+    animation:spin 13s linear infinite}
+
+  /* CD mini */
+  .cd-mode{width:112px;height:112px;border-radius:50%;position:relative;animation:spin 5s linear infinite;
+    background:conic-gradient(from 0deg,#ff5a5a,#ffd45a,#5aff8e,#5ad4ff,#7a5aff,#ff5ad4,#ff5a5a);
+    box-shadow:0 0 24px rgba(0,0,0,.5), inset 0 0 14px rgba(0,0,0,.6)}
+  .cd-mode::before{content:"";position:absolute;inset:9%;border-radius:50%;
+    background:radial-gradient(circle,#e8e8ea,#b8b8bc 72%);opacity:.9}
+  .cd-mode::after{content:"";position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px;
+    border-radius:50%;background:#101013;box-shadow:0 0 0 3px #2a2a30}
 
   /* ---------- STATIONS ---------- */
   .stations-list{margin-top:52px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
   .station{
     display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:16px;
-    background:rgba(32,32,58,.55);border:1px solid var(--surface-hi);
+    background:rgba(255,255,255,.05);border:1px solid var(--surface-hi);
     transition:border-color .2s, background .2s;
   }
-  .station:hover{border-color:var(--violet-dim);background:rgba(42,42,72,.7)}
+  .station:hover{border-color:rgba(255,255,255,.24);background:rgba(255,255,255,.08)}
   .station .dots{display:flex;gap:4px;flex-shrink:0}
   .station .dots i{width:9px;height:9px;border-radius:50%;display:block}
   .station b{font-size:15.5px;letter-spacing:.02em}
@@ -219,18 +261,18 @@
 
   /* ---------- FOUNDER ---------- */
   .founder{background:
-      radial-gradient(ellipse 70% 60% at 50% 0%, rgba(245,158,11,.12), transparent 60%),
+      radial-gradient(ellipse 70% 60% at 50% 0%, rgba(247,183,51,.12), transparent 60%),
       var(--midnight)}
   .founder-card{
     max-width:640px;margin:48px auto 0;text-align:center;padding:44px 34px;border-radius:26px;
-    background:linear-gradient(180deg,rgba(245,158,11,.09),rgba(32,32,58,.6));
+    background:linear-gradient(180deg,rgba(247,183,51,.09),rgba(255,255,255,.05));
     border:1px solid var(--amber-soft);
   }
   .founder-medal{
     width:88px;height:88px;margin:0 auto 22px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;font-size:38px;
     background:radial-gradient(circle at 35% 30%,#FFC24C,#c47a06);
-    box-shadow:0 0 44px rgba(245,158,11,.45);
+    box-shadow:0 0 44px rgba(247,183,51,.45);
   }
   .founder-card h3{font-size:26px;font-weight:800}
   .founder-card p{color:var(--text-2);margin-top:12px;font-size:16px}
@@ -270,7 +312,7 @@
     <!-- LAUNCH state (08.08.2026). The waitlist markup this replaced is
          preserved in the git history at commit 6966d7f. -->
     <a class="btn store-btn" href="https://apps.apple.com/app/id6793233679">
-      <svg class="apple" width="22" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1a1200" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.031 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-.702"/></svg>
+      <svg class="apple" width="22" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="#0a0a10" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.031 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-.702"/></svg>
       <span><small>Download on the</small><span class="big">App&nbsp;Store</span></span>
     </a>
     <p class="note">Free — <b>every mode unlocked.</b> No account, no ads.</p>
@@ -303,7 +345,7 @@
   <div class="wrap">
     <p class="kicker">Eight ways to watch your music</p>
     <h2>Full-screen modes, built for the dashboard</h2>
-    <p class="sub">Your playlist becomes the soundtrack. Cruise FM becomes the film. Eight full-bleed, glowing modes — here's a taste, all free while Cruise FM is in its launch period.</p>
+    <p class="sub">Your playlist becomes the soundtrack. Cruise FM becomes the film. Eight full-bleed, glowing modes — all free while Cruise FM is in its launch period.</p>
 
     <div class="mode-grid">
       <div class="mode-card">
@@ -332,7 +374,7 @@
         <span class="tag premium">Free at launch</span>
         <div class="stage"><div class="vinyl" aria-hidden="true"></div></div>
         <h3>Vinyl</h3>
-        <p>Your track, spinning in amber and violet.</p>
+        <p>Your track, pressed in vinyl. Real grooves, real light.</p>
       </div>
 
       <div class="mode-card">
@@ -347,25 +389,61 @@
         <h3>Tuner</h3>
         <p>Drag a real FM dial between moods.</p>
       </div>
+
+      <div class="mode-card">
+        <span class="tag free">Free</span>
+        <div class="stage"><div class="orb" aria-hidden="true"></div></div>
+        <h3>Circular EQ</h3>
+        <p>A hollow ring of bars, breathing with the beat.</p>
+      </div>
+
+      <div class="mode-card">
+        <span class="tag premium">Free at launch</span>
+        <div class="stage">
+          <div class="horizon" aria-hidden="true">
+            <div class="sun"></div>
+            <div class="line"></div>
+            <div class="grid"></div>
+          </div>
+        </div>
+        <h3>Horizon</h3>
+        <p>A retrowave sunset, receding into the road ahead.</p>
+      </div>
+
+      <div class="mode-card">
+        <span class="tag premium">Free at launch</span>
+        <div class="stage"><div class="mirrorball" aria-hidden="true"></div></div>
+        <h3>Mirror Ball</h3>
+        <p>Chrome facets, catching the light as it turns.</p>
+      </div>
+
+      <div class="mode-card">
+        <span class="tag premium">Free at launch</span>
+        <div class="stage"><div class="cd-mode" aria-hidden="true"></div></div>
+        <h3>CD</h3>
+        <p>A disc behind clear plastic, diffraction and all.</p>
+      </div>
     </div>
   </div>
 </section>
 
 <section>
   <div class="wrap">
-    <p class="kicker">Eight moods, one tap</p>
+    <p class="kicker">Ten moods, one tap</p>
     <h2>Stations tuned to the drive</h2>
     <p class="sub">Link your own Spotify playlist to any station. Hit Start Drive. That's the whole idea.</p>
 
     <div class="stations-list">
-      <div class="station"><span class="dots"><i style="background:#5EE7FF"></i><i style="background:#5B7BFF"></i><i style="background:#C44CFF"></i></span><span><b>Night Run AM</b><small>Empty expressways. Violet dashboards.</small></span></div>
+      <div class="station"><span class="dots"><i style="background:#BDF1F5"></i><i style="background:#19C6D4"></i><i style="background:#0B6577"></i></span><span><b>Night Run AM</b><small>Empty expressways. Blue-lit dashboards.</small></span></div>
       <div class="station"><span class="dots"><i style="background:#FFF3B8"></i><i style="background:#FFE070"></i><i style="background:#F0C24C"></i></span><span><b>Rain Drive FM</b><small>Streetlights reflected in glass. Slow roads.</small></span></div>
       <div class="station"><span class="dots"><i style="background:#4FE0C0"></i><i style="background:#F0B048"></i><i style="background:#FF7A3C"></i></span><span><b>Coastal FM</b><small>Ocean air. Open horizons. Golden hour.</small></span></div>
       <div class="station"><span class="dots"><i style="background:#FFFFFF"></i><i style="background:#F2F6FF"></i><i style="background:#FFFFFF"></i></span><span><b>Mountain Pass FM</b><small>Cold air. Fog ahead. One more corner.</small></span></div>
       <div class="station"><span class="dots"><i style="background:#FF4444"></i><i style="background:#FF1111"></i><i style="background:#FF0000"></i></span><span><b>After Hours FM</b><small>When the world is asleep. And the road belongs to you.</small></span></div>
-      <div class="station"><span class="dots"><i style="background:#FFC24C"></i><i style="background:#FF7A48"></i><i style="background:#D84C8A"></i></span><span><b>Sunset AM</b><small>Golden hour. Open roads.</small></span></div>
+      <div class="station"><span class="dots"><i style="background:#FFA24B"></i><i style="background:#FF6F5A"></i><i style="background:#D2467F"></i></span><span><b>Sunset AM</b><small>Golden hour. Open roads.</small></span></div>
       <div class="station"><span class="dots"><i style="background:#FFD9A0"></i><i style="background:#F0A050"></i><i style="background:#C06A28"></i></span><span><b>Cars &amp; Coffee FM</b><small>Cold mornings. Warm cups. Engines idling.</small></span></div>
       <div class="station"><span class="dots"><i style="background:#FFD24C"></i><i style="background:#FF8A2A"></i><i style="background:#F03A2E"></i></span><span><b>Tunnel FM</b><small>Underground. Neon tubes. Bass reverberating.</small></span></div>
+      <div class="station"><span class="dots"><i style="background:#6E8CFF"></i><i style="background:#9B5CFF"></i><i style="background:#E24CFF"></i></span><span><b>Downtown FM</b><small>Violet towers. Sleeping streets.</small></span></div>
+      <div class="station"><span class="dots"><i style="background:#FFD84A"></i><i style="background:#FBA518"></i><i style="background:#E8720E"></i></span><span><b>Daylight AM</b><small>Top down. Open road.</small></span></div>
     </div>
   </div>
 </section>
@@ -376,11 +454,11 @@
     <h2>Claim the Founder badge</h2>
     <div class="founder-card">
       <div class="founder-medal">🏁</div>
-      <h3>First 500 on the road</h3>
-      <p>The Founder badge is reserved for drivers who arrive <b>before mid-September</b> — a permanent cosmetic on your profile that will <b>never</b> be sold, unlockable, or offered again. When it's gone, it's gone.</p>
+      <h3>Reserved for the early drivers</h3>
+      <p>The Founder badge is reserved for drivers who arrive <b>before mid-September</b> — a permanent cosmetic on your profile that will <b>never</b> be sold, unlockable, or offered again. When the date passes, it's gone.</p>
       <div class="signup" style="margin:30px auto 0">
         <a class="btn store-btn" href="https://apps.apple.com/app/id6793233679">
-          <svg class="apple" width="22" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1a1200" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.031 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-.702"/></svg>
+          <svg class="apple" width="22" height="26" viewBox="0 0 24 24" aria-hidden="true"><path fill="#0a0a10" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.031 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-.702"/></svg>
           <span><small>Download on the</small><span class="big">App&nbsp;Store</span></span>
         </a>
       </div>
@@ -392,18 +470,19 @@
   <div class="mark">CRUISE <span>FM</span></div>
   <p class="fine">
     Cruise FM is <b>free</b> — all eight modes unlocked during the launch period, no account, no ads.
-    Full in-app playback control works with your own <b>Spotify Premium</b> account; on any other music
-    service, play music in your own app while Cruise FM runs the visuals alongside. A small subscription
-    for the premium modes arrives after launch — badges and seasonal themes stay free forever.
-    <br><br>Cruise FM is made by <b>Strofi Technologies</b>. Not affiliated with Spotify AB. Please don't watch the screen while driving — that's what passengers are for.
+    Full in-app playback control works with your own <b>Spotify Premium</b> or <b>Apple Music</b>
+    account; on any other music service, play music in your own app while Cruise FM runs the visuals
+    alongside. A small subscription for the premium modes arrives after launch — badges and seasonal
+    themes stay free forever.
+    <br><br>Cruise FM is made by <b>Strofi Technologies</b>. Not affiliated with Spotify AB or Apple Inc. Please don't watch the screen while driving — that's what passengers are for.
     <br><br>
-    <a href="/privacy/" style="color:var(--violet-light);text-decoration:none">Privacy Policy</a>
+    <a href="/privacy/" style="color:rgba(255,255,255,.55);text-decoration:none">Privacy Policy</a>
     &nbsp;·&nbsp;
-    <a href="/terms/" style="color:var(--violet-light);text-decoration:none">Terms of Service</a>
+    <a href="/terms/" style="color:rgba(255,255,255,.55);text-decoration:none">Terms of Service</a>
     &nbsp;·&nbsp;
-    <a href="/support/" style="color:var(--violet-light);text-decoration:none">Support</a>
+    <a href="/support/" style="color:rgba(255,255,255,.55);text-decoration:none">Support</a>
     &nbsp;·&nbsp;
-    <a href="mailto:cruisefmservice@gmail.com" style="color:var(--violet-light);text-decoration:none">cruisefmservice@gmail.com</a>
+    <a href="mailto:cruisefmservice@gmail.com" style="color:rgba(255,255,255,.55);text-decoration:none">cruisefmservice@gmail.com</a>
   </p>
 </footer>
 

@@ -20,7 +20,12 @@ const FOUNDER_KEY = 'cruise_founder_badge';
 
 // Extended 10.08 from the original launch week, so the badge is still worth
 // promoting while the first real recruiting happens (TikTok, Reddit, friends).
-const WINDOW_CLOSES_MS = Date.parse('2026-08-31T23:59:59Z');
+// Extended AGAIN 26.08 (owner: "the app is just getting started") — a real
+// recruiting push (Ethan, word of mouth) was underway with 5 days left on the
+// clock, which is not enough runway for a badge meant to reward exactly that.
+// Mid-September rather than another vague push, so there's a real date to
+// re-check this against next time it's tempting to extend once more.
+const WINDOW_CLOSES_MS = Date.parse('2026-09-15T23:59:59Z');
 
 /** Call once at app start. Decides and records eligibility. Idempotent. */
 export async function claimFounderIfEligible(): Promise<void> {

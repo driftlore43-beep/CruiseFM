@@ -254,6 +254,48 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+/**
+ * HOW LONG TO GIVE A FRESHLY QUEUED PLAYLIST BEFORE CHECKING IT ACTUALLY TOOK.
+ *
+ * Reasoned from RESUME_SETTLE_MS in useAppleMusicPlayback.ts (3500ms),
+ * measured on the owner's own screen recording of a RESUME after
+ * backgrounding — not independently measured for a cold start, which this
+ * is, and cannot be without a device. A cold Music app has strictly more
+ * work to do than a resume (activating the audio session from nothing, not
+ * just picking back up), so if anything this is an underestimate.
+ */
+const START_VERIFY_MS = 3500;
+
+/**
+ * THE NATIVE CALL RESOLVING IS NOT THE SAME AS AUDIO ACTUALLY PLAYING.
+ *
+ * Ethan, 27.08: "when I go to play a station without music already playing
+ * from Apple Music nothing happens." A Music app that was not already
+ * active can accept a queue and still take a few seconds to make sound —
+ * the same lag RESUME_SETTLE_MS already knows about — and nothing here ever
+ * checked for that; the deck simply showed "playing" over silence.
+ *
+ * DELIBERATELY NOT ON THE RETURN PATH. Checking before answering would add
+ * ~3.5s to every ordinary start, healthy or not, to catch a failure that is
+ * the exception — and worse, a rapid string of station changes already has
+ * its own supersede guard (`startStationMusic`'s generation counter, 25.08's
+ * tuner freeze), which this check knows nothing about; blocking here would
+ * only add a second, uncoordinated source of delay on top of it. So
+ * `startApplePlaylist` still answers the instant the native call resolves,
+ * exactly as before, and this runs alongside, unawaited — quiet on success,
+ * and a genuine silent failure gets ONE recovery attempt a few seconds
+ * later instead of never. `recoverApplePlayback` always acts on whichever
+ * playlist is CURRENTLY queued, so a check left over from a station someone
+ * has since tuned away from corrects whatever is actually meant to be
+ * playing rather than stepping on it.
+ */
+async function verifyPlaylistTook(): Promise<void> {
+  await new Promise((r) => setTimeout(r, START_VERIFY_MS));
+  const entry = await getAppleNowPlaying().catch(() => null);
+  if (entry?.isPlaying) return;
+  await recoverApplePlayback(null);
+}
+
 export async function startApplePlaylist(uri?: string): Promise<'playing' | 'error'> {
   if (!bridge) return 'error';
   try {
@@ -263,6 +305,7 @@ export async function startApplePlaylist(uri?: string): Promise<'playing' | 'err
     } else {
       await withTimeout(bridge.play(), 6000);
     }
+    verifyPlaylistTook().catch(() => {});
     return 'playing';
   } catch {
     return 'error';
@@ -292,6 +335,13 @@ export async function startApplePlaylist(uri?: string): Promise<'playing' | 'err
  * rather than a restart from the top.
  *
  * Returns false when there is nothing to recover WITH — i.e. no bridge at all.
+ *
+ * EVERY NATIVE CALL HERE IS TIMEOUT-WRAPPED (27.08) — it was not, even
+ * though `withTimeout` exists specifically because a Swift `try?` call can
+ * hang rather than throw, and this is the recovery path a stalled resume
+ * calls into. An unwrapped hang here was a believable second cause of
+ * Ethan's "occasionally the app will freeze" (27.08) on top of the one this
+ * function already exists to fix.
  */
 export async function recoverApplePlayback(resumeAtMs: number | null): Promise<boolean> {
   if (!bridge) return false;
@@ -307,18 +357,18 @@ export async function recoverApplePlayback(resumeAtMs: number | null): Promise<b
   // attempt did, and it is literally what the listener does by hand.
   if (!lastQueuedUri) {
     try {
-      await bridge.play();
+      await withTimeout(bridge.play(), 6000);
       return true;
     } catch {
       return false;
     }
   }
   try {
-    await bridge.playPlaylist(applePlaylistId(lastQueuedUri));
+    await withTimeout(bridge.playPlaylist(applePlaylistId(lastQueuedUri)), 6000);
     // Re-queueing starts the playlist at its first track, so without this the
     // recovery would silently throw away where they were.
     if (resumeAtMs != null && resumeAtMs > 1500) {
-      await bridge.seekTo(resumeAtMs);
+      await withTimeout(bridge.seekTo(resumeAtMs), 6000);
     }
     return true;
   } catch {

@@ -56,6 +56,23 @@ const RESUME_CHECK_MS = 1600;
  */
 const RESUME_SETTLE_MS = 3500;
 
+/**
+ * A second, later look before `verifyResume` gives up on a genuine resume.
+ *
+ * Ethan, 27.08: "if I am playing music already from Apple Music then after
+ * about 1 song the playlist will start from the top but won't play." Before
+ * this, `verifyResume` asked ONCE at RESUME_CHECK_MS (1.6s) and, on a single
+ * "not playing" answer, called `recoverApplePlayback` — which re-queues the
+ * playlist from its first track. But RESUME_SETTLE_MS exists precisely
+ * because a single early reading is known to lie: the owner's own clip
+ * measured the system player answering "not playing" for up to ~2.7s after
+ * a genuine resume. `verifyResume` never got that lesson — a perfectly
+ * healthy resume landing inside that window was read as a failure and
+ * "recovered" by restarting the playlist from track one, which is exactly
+ * the symptom reported. One more look, this far out, before believing it.
+ */
+const RESUME_RECHECK_MS = 2000; // 1.6s + 2s ≈ 3.6s, just past RESUME_SETTLE_MS
+
 export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number }) {
   const [connected, setConnected] = useState(false);
   const [track, setTrack] = useState<NowPlaying | null>(null);
@@ -330,9 +347,22 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
    * taking it over would be worse than the bug.
    */
   const verifyResume = () => {
-    const askedAt = Date.now();
+    /**
+     * READ THE STAMP THAT WAS ACTUALLY STORED — never a fresh clock.
+     *
+     * This said `Date.now()` until 27.08, and the guard below tests
+     * `lastControlRef.current !== askedAt`. `play` sets that ref from its
+     * own `Date.now()` one statement earlier, so the two agreed only when
+     * the millisecond happened not to tick in between — and when it did,
+     * the guard fired instantly and the ENTIRE resume check silently did
+     * nothing. Non-deterministic by construction: the same press worked or
+     * didn't on the same build, which fits "occasionally" in Ethan's
+     * reports better than any of the mechanisms above. Caught by a test
+     * that flapped between pass and fail on identical code.
+     */
+    const askedAt = lastControlRef.current;
     const resumeAt = trackRef.current?.progressMs ?? null;
-    setTimeout(async () => {
+    const check = async (isFinal: boolean) => {
       if (cancelledRef.current) return;
       // Someone pressed something else since — their intent wins.
       if (lastControlRef.current !== askedAt) return;
@@ -352,9 +382,17 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
       if (cancelledRef.current || lastControlRef.current !== askedAt) return;
       if (!isInFront(AppState.currentState)) return;
       if (entry?.isPlaying) return;                 // it started; nothing to do
+      if (!isFinal) {
+        // ONE READING IS NOT ENOUGH — see RESUME_RECHECK_MS. Give the
+        // system player the same room the poll already gives it before
+        // believing a resume genuinely failed.
+        setTimeout(() => check(true), RESUME_RECHECK_MS);
+        return;
+      }
       const ok = await recoverApplePlayback(resumeAt);
       if (ok && !cancelledRef.current) after();
-    }, RESUME_CHECK_MS);
+    };
+    setTimeout(() => check(false), RESUME_CHECK_MS);
   };
 
   return {

@@ -242,9 +242,124 @@ worst possible medium. A single 20-second capture of one drive, cutting
 between three or four modes, would carry more than all nine screenshots
 together.
 
-This is real work (it has to be captured on a device, at Apple's exact frame
-sizes) and it needs no build, so it can happen any time. Recommended as the
-highest-value listing task after the name change.
+Needs no build, so it can happen any time. Recommended as the highest-value
+listing task after the name change. **Full plan below.**
+
+---
+
+## THE APP PREVIEW VIDEO — how to actually make it
+
+Parked 29.08 for a later day at the owner's request. Everything needed to
+start is here; nothing about it depends on the next build.
+
+### Who does which half
+
+The honest division, because one half genuinely cannot be done from this
+environment:
+
+**The owner records the raw footage.** Apple's guidance is that a preview
+must show authentic use of the app's real UI, which in practice means a real
+device. The web build used for screenshots is react-native-web — close, but
+its fonts differ, its animations fall back off the native driver, and the
+marquee behaves differently. Good enough for a still; not good enough to
+stake a store listing on.
+
+**Claude does everything either side of that.** The shot list and timings
+below, and then the edit itself — trimming, sequencing, resizing to Apple's
+exact frame, adding the silent audio track Apple requires — all of which is
+ffmpeg work on footage the owner sends over.
+
+### How the owner records it — two routes, both free
+
+1. **QuickTime on the MacBook (best quality).** Plug the iPhone in by cable,
+   open QuickTime Player → File → New Movie Recording → click the arrow beside
+   the record button → choose the iPhone as camera and microphone. Records the
+   phone's screen at full resolution with no on-screen recording indicator.
+2. **iOS built-in Screen Recording** (Control Centre → the record button).
+   Simpler, and fine — it just records at the phone's own resolution and can
+   catch the odd system UI element.
+
+Record **generously**: a couple of minutes of unhurried driving through the
+modes gives plenty to cut from, and re-recording later to fix one shot is far
+more annoying than recording too much now.
+
+### The rights decision, which has to be made BEFORE recording
+
+The App Store screenshots are deliberately taken in **demo mode with no music
+service connected**, so every deck shows the station's own tagline instead of
+a real song title and album art — no rights questions at all. `AGENTS.md`
+records that as a deliberate choice.
+
+The same choice applies here, and it has a real cost:
+
+- **No service connected** — the visuals still animate fully (the scene gate
+  defaults to running when there is no track at all, which is the documented
+  companion-mode behaviour), so Mirror Ball, Equalizer, Horizon, Cassette and
+  Tuner all look exactly right. **But Vinyl and CD lose their album art**,
+  which is a good part of what makes those two decks beautiful.
+- **A real playlist connected** — everything looks its best, but a real song
+  title, artist and album cover appear in the store listing.
+
+**Recommendation: record it BOTH ways in the same sitting.** It costs one
+extra pass, and it means the decision can be made while looking at the two
+side by side rather than in the abstract. Plenty of music apps show real
+artwork in previews; this listing has simply been more cautious than it had
+to be so far, and that caution is worth keeping unless the Vinyl shot is
+visibly poorer for it.
+
+### Shot list — one 20-second cut
+
+Timings are a starting point, not a rule; the edit can breathe once there is
+real footage.
+
+| Time | Shot | Why |
+|---|---|---|
+| 0–3s | **Mirror Ball**, resting, light moving across the room | Opens on the strongest image in the app. A preview autoplays silently in search — the first second has to be arresting with no words at all. |
+| 3–6s | **Stations dial**, thumb scrolling the AM/FM list | Says "this is a real thing with structure", not a screensaver. |
+| 6–8s | Tap a station → the deck opens | The one-tap promise, shown rather than claimed. |
+| 8–12s | **Vinyl**, record turning, tonearm down | The most recognisable object in the app. |
+| 12–15s | **Cassette**, reels winding | Variety, and the reels genuinely move — it reads as alive. |
+| 15–18s | **Tuner**, dragging the dial between two stations | The only shot showing a gesture doing something. Interaction converts. |
+| 18–20s | **Horizon** or back to Mirror Ball, hold | Ends on motion rather than a cut to black. |
+
+Two things to get right while recording, both easy to miss:
+
+- **Let each deck REST before moving on.** After about six untouched seconds
+  the controls fade and the scene re-centres — that rested state is the app at
+  its most cinematic and is what should be on screen for most of each shot.
+- **Do not press the transport just before a shot.** Pausing stops the scene
+  (deliberately — a still deck is what paused looks like), so a paused deck in
+  a preview reads as a broken app.
+
+### Technical specification, confirmed 29.08
+
+| Requirement | Value |
+|---|---|
+| Length | **15–30 seconds** — App Store Connect rejects anything outside it |
+| iPhone resolution | **886×1920** or 1920×886 |
+| iPad resolution | **1200×1600** or 1600×1200 |
+| Format | .mov, .m4v or .mp4, H.264 (or ProRes 422 HQ as .mov) |
+| Max file size | 500 MB |
+| Audio | **An audio track must be present even if silent** — a silent stereo AAC track satisfies it |
+| How many | Up to 3 per device size |
+
+That silent-audio requirement is the one that catches people out: a video
+exported with no audio stream at all is rejected, and the error does not
+explain itself. The edit will add one.
+
+Sources checked on the day: [Apple's own App Preview specifications](https://www.developer.apple.com/help/app-store-connect/reference/app-information/app-preview-specifications),
+[DemoScope's 2026 summary](https://demoscope.app/blog/posts/app-store-preview-video-requirements-apple-guidelines),
+[ScreenKit specs](https://screenkit.tools/specs/app-store-app-preview-video-specs).
+**Re-check them at the time rather than trusting this table** — Apple changes
+accepted frame sizes when new devices land, and this file will not update
+itself.
+
+### One thing to decide at the same time
+
+If the iPad build has shipped by then, an **iPad preview** is a separate
+video at a separate resolution. Worth recording the iPad footage in the same
+sitting if the build is out; otherwise the iPhone preview alone is perfectly
+valid and the iPad slot can stay empty.
 
 ### iPad screenshots — REQUIRED by the next build, easy to be blindsided by
 
@@ -265,7 +380,10 @@ Do this as part of the build, not after it, or the submission blocks.
    search lever, and already once forgotten. Do it with the next version.
 2. **iPad screenshots** — blocks the submission, so it is not optional.
 3. **New captions** on the existing screenshots — cheap, no build needed.
-4. **App preview video** — highest conversion value, most effort, no build
-   needed, can happen any time.
+4. **App preview video** — highest conversion value, no build needed, can
+   happen any time. **Parked 29.08 for a later day.** Needs ~10 minutes of
+   screen recording from the owner on a real iPhone; everything else (shot
+   list, edit, resize, silent audio track) is done from here. Full plan in
+   the section above.
 5. **Promotional text** — after the build is live, since it names iPad and
    widgets.

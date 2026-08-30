@@ -48,6 +48,8 @@ for (const theme of ['light', 'dark']) {
     const errs = []; p.on('pageerror', (e) => errs.push(String(e)));
     await p.addInitScript((t) => {
       window.localStorage.setItem('cruisefm_platform', 'none');
+      // Past the one-off intro sheet; scripts/harness/intro.mjs owns that.
+      window.localStorage.setItem('cruisefm_intro_seen', '1');
       window.localStorage.setItem('cruise_appearance', t);
     }, theme);
     await p.goto(BASE + '/' + route, { waitUntil: 'networkidle' });

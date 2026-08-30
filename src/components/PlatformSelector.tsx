@@ -291,15 +291,30 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
 // ── Hook — show on first launch, re-show when triggered ──────────────────────
 export function usePlatformSelector() {
   const [visible, setVisible] = useState(false);
+  /**
+   * Whether the saved-platform lookup has come back yet.
+   *
+   * `visible` alone cannot answer "is the platform question settled?" — it is
+   * false both BEFORE the async read finishes and AFTER the sheet is
+   * dismissed, and those are opposite situations. Anything that must wait its
+   * turn behind this sheet (the WhatIsThis explainer does) needs to tell them
+   * apart, or it appears for a frame underneath the sheet that is about to
+   * cover it.
+   */
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    getSavedPlatform().then((saved) => {
-      if (!saved) setVisible(true);
-    });
+    getSavedPlatform()
+      .then((saved) => {
+        if (!saved) setVisible(true);
+      })
+      .catch(() => {})
+      .finally(() => setChecked(true));
   }, []);
 
   return {
     visible,
+    checked,
     show:    () => setVisible(true),
     dismiss: () => setVisible(false),
   };

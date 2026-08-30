@@ -23,6 +23,7 @@ import { AutoUpdateHost } from '@/components/AutoUpdateHost';
 import { NotificationHost } from '@/components/NotificationHost';
 import { WidgetSyncHost } from '@/components/WidgetSyncHost';
 import { NotifyPrompt } from '@/components/NotifyPrompt';
+import { WhatIsThis, useIntroNeeded } from '@/components/WhatIsThis';
 
 // Stamp launch-week devices as Founders (fire-and-forget, idempotent).
 claimFounderIfEligible();
@@ -35,6 +36,12 @@ function AppShell() {
   // on a first launch it was covering the opening logo about a third of the
   // way through it. The brand goes first, then the question.
   const [introDone, setIntroDone] = useState(false);
+  /**
+   * The one-off "what is this app" sheet. Null until storage answers, so it
+   * never flashes at somebody who has already seen it.
+   */
+  const introNeeded = useIntroNeeded();
+  const [introExplained, setIntroExplained] = useState(false);
 
   const handleDismiss = async (skipped?: boolean) => {
     if (skipped) await setPlatformSkipped();
@@ -52,6 +59,27 @@ function AppShell() {
       <PlatformSelector
         visible={introDone && platformSelector.visible}
         onDismiss={handleDismiss}
+      />
+      {/* WHAT THIS APP IS — once, for everybody, new installs and existing
+          users alike (owner, 29.08, after a listener installed it and asked
+          what it did on top of Apple Music).
+
+          THE `visible` EXPRESSION IS THE WHOLE SAFETY OF IT. Both this and
+          the platform sheet are Modals, and iOS will not reliably stack a
+          second Modal over the first — it presents nothing and eats every
+          touch. So this waits for all three of: the brand intro to finish,
+          the saved-platform lookup to have ANSWERED (`checked` — not merely
+          "not visible", which is also true before the read returns), and
+          that sheet to be gone. */}
+      <WhatIsThis
+        visible={
+          introDone
+          && platformSelector.checked
+          && !platformSelector.visible
+          && introNeeded === true
+          && !introExplained
+        }
+        onDone={() => setIntroExplained(true)}
       />
       {/* Local notifications: schedules them, and turns a tap into a drive.
           Renders nothing. The prompt asks only after the third drive, and

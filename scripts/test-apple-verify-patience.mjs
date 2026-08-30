@@ -50,10 +50,24 @@ const check = (n, ok, extra = '') => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * The control is PINNED TO A COMMIT, not to HEAD.
+ *
+ * It read `HEAD` for about an hour, which worked exactly until the fix was
+ * committed — at which point "the original" became the fixed code, the
+ * patch below found no anchor, and the suite died. That failure was the
+ * guard doing its job (better a loud stop than a control that quietly
+ * proves nothing), but the underlying mistake was pinning a fixed point in
+ * history to a moving reference.
+ *
+ * 599e8a4 is the commit immediately BEFORE the fix (112627d). It does not
+ * move, so this stays honest however far the branch travels.
+ */
+const PRE_FIX = '599e8a4';
+
 function original(path) {
-  // The last committed version, BEFORE this session's fix — the control.
   const rel = path.slice(REPO.length + 1);
-  let src = execSync(`git show HEAD:${rel}`, { cwd: REPO, encoding: 'utf8' });
+  let src = execSync(`git show ${PRE_FIX}:${rel}`, { cwd: REPO, encoding: 'utf8' });
   if (rel.endsWith('useAppleMusicPlayback.ts')) {
     /**
      * THE CONTROL CARRIES THE askedAt FIX, DELIBERATELY.

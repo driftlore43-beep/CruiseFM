@@ -35,7 +35,9 @@ const b = await chromium.launch({ args:['--no-sandbox'] });
 const problems = [];
 for (const MODE of MODES) {
   const ctx = await b.newContext({ viewport:{width:393,height:852} });
-  await ctx.addInitScript(()=>{ localStorage.setItem('cruisefm_platform','none'); localStorage.setItem('cruise_appearance','dark'); });
+  await ctx.addInitScript(()=>{ localStorage.setItem('cruisefm_platform','none'); localStorage.setItem('cruise_appearance','dark');
+    // Past the one-off intro sheet; scripts/harness/intro.mjs owns that.
+    localStorage.setItem('cruisefm_intro_seen','1'); });
   const p = await ctx.newPage();
   p.on('pageerror',e=>problems.push(`${MODE}: page error ${e.message}`));
   try {

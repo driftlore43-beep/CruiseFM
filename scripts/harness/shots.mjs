@@ -67,6 +67,11 @@ async function page() {
     // 'none' is the companion listener: no service, so no track, so every mode
     // shows the station's tagline instead of a song.
     localStorage.setItem('cruisefm_platform', 'none');
+    // Past the one-off "what is this app" sheet, the same way this seeds
+    // past the platform sheet above. scripts/harness/intro.mjs owns that
+    // sheet; every other harness would otherwise run with a Modal over
+    // the app, which is how a harness passes while testing nothing.
+    localStorage.setItem('cruisefm_intro_seen', '1');
     localStorage.setItem('cruise_appearance', 'dark');
     localStorage.setItem('cruisefm_session_kind', 'driving');
   });

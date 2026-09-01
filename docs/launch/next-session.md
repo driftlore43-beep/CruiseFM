@@ -33,6 +33,16 @@ is one screenshot away and names the cause.
 Everything is staged and committed. Once the log says what is wrong and it is
 fixed, one button re-runs it.
 
+**BUMP `runtimeVersion` TO 1.4.0 IN THE SAME COMMIT THAT CUTS THE BUILD.** It
+is deliberately **held at 1.3.0** right now (`runtimeHeldAt` in
+`scripts/preflight-allow.json` says so, and preflight enforces it), because the
+runtime decides which installed phones can receive an update — and while every
+1.4.0 build was failing, having it set to 1.4.0 meant every over-the-air update
+reached **nobody**. That is not a hypothetical: it happened on 01.09 and the
+build-is-listening guard is what caught it.
+
+So: runtime moves when a build that works actually exists, not before.
+
 What 1.4.0 carries:
 
 | | |

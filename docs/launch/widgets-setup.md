@@ -43,6 +43,40 @@ nothing is logged. It only becomes useful once the two steps below are done.
 
 Same shape as enabling MusicKit. Nothing to pay for.
 
+### And the widget's OWN app ID — learned the hard way, 01.09
+
+**The extension is a separate app**, `com.driftlore.CruiseFM.widget`, and it
+needs the same App Group ticked on it. This is not optional and it is not the
+same box: an extension has its own identifier, its own provisioning profile
+and its own capabilities.
+
+It does not exist until the first build tries to make it. EAS registers it
+automatically — `✔ Bundle identifier registered com.driftlore.CruiseFM.widget`
+— and then tries to switch App Groups on for it and **fails**:
+
+```
+Failed to patch capabilities: [ { capabilityType: 'APP_GROUPS', option: 'ON' } ]
+Apple API error: The request entity is not a valid request document object -
+Unexpected or invalid value at 'data.relationships.bundleIdCapabilities.data.[0].attributes'
+```
+
+That is Apple's API refusing the automatic switch, not a repo problem — App
+Groups needs to be told *which* group, and the auto-sync does not send one. The
+error prints the exact URL to fix it at. So the first build of a widget target
+is **expected** to fail once, and the sequence is:
+
+1. Run the build. Let it fail at "Syncing capabilities".
+2. Open the link it prints, or Identifiers → App IDs →
+   `com.driftlore.CruiseFM.widget`.
+3. Tick **App Groups**, click **Edit/Configure**, tick
+   `group.com.driftlore.CruiseFM`, Continue, **Save**.
+4. Run the build again. With the capability already on, there is nothing to
+   patch, so the sync finds no difference and passes.
+
+**A failed build still burns a build number** (`appVersionSource: remote`
+increments server-side before any of this), so expect a gap in the sequence.
+Harmless — build numbers only have to increase.
+
 **If this is skipped**, the build still succeeds and the widgets still install
 — they just show "Open the app to get started" for ever, because the shared
 container the snapshot goes into does not exist. That is the failure to watch

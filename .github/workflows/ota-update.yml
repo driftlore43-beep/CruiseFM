@@ -376,6 +376,10 @@ jobs:
           fi
           echo "this update would publish as runtime: $mine"
 
+          # NOTE the 2>/dev/null: a failure here used to become '[]', which the
+          # check below then treated as "nothing to compare against" and let
+          # through. It now fails closed, so a broken list stops the publish
+          # rather than silently blessing it.
           builds=$(eas build:list --platform ios --limit 12 --json --non-interactive 2>/dev/null || echo '[]')
           # The build list goes in through the ENVIRONMENT, not a pipe: the
           # heredoc below is already using stdin to carry the script, so a
@@ -383,24 +387,60 @@ jobs:
           CFM_BUILDS="$builds" CFM_MINE="$mine" CFM_CHANNEL="${{ env.CHANNEL }}" python3 <<'PY'
           import json, os, sys
           mine, channel = os.environ["CFM_MINE"], os.environ["CFM_CHANNEL"]
+
+          # THIS CHECK FAILED OPEN AND NOBODY NOTICED, 01.09. It published an
+          # update at runtime 1.4.0 to a channel whose newest build is 1.3.0 —
+          # i.e. to nobody — and reported success. Cause: it read the channel
+          # as b["channel"], and in `build:list --json` that key is not there
+          # (diagnose gets the channel right only because it greps the HUMAN
+          # output instead). So `on_channel` was empty every time, and empty
+          # took the "nothing to compare against, carry on" branch.
+          #
+          # A guard that cannot fail is worse than no guard, because it is
+          # read as evidence. Two changes: look for the channel in more than
+          # one place, and treat "could not check" as a FAILURE rather than a
+          # pass — the whole point of this step is to stop a publish that
+          # reaches no one, and a publish is always safe to retry.
+          def channel_of(b):
+              for key in ("channel", "updateChannel", "buildChannel"):
+                  v = b.get(key)
+                  if v:
+                      return v
+              return None
+
           try:
               builds = json.loads(os.environ.get("CFM_BUILDS") or "[]")
           except Exception:
-              print("::warning::Could not read the build list; publishing anyway.")
-              sys.exit(0)
-          on_channel = [b for b in builds
-                        if b.get("channel") == channel and b.get("status") == "FINISHED"]
+              print("::error::Could not read the build list, so this update cannot be checked.")
+              print("::error::Refusing to publish blind. Re-run once `eas build:list` works.")
+              sys.exit(1)
+
+          finished = [b for b in builds if b.get("status") == "FINISHED"]
+          if not finished:
+              print("::error::No finished iOS builds at all — nothing to check this runtime against.")
+              sys.exit(1)
+
+          on_channel = [b for b in finished if channel_of(b) == channel]
+          # If NO build in the list exposes a channel, the field has moved
+          # again. Fall back to checking every finished build rather than
+          # silently checking none, and say plainly that is what happened.
+          scope = f"the '{channel}' channel"
+          if not on_channel and not any(channel_of(b) for b in finished):
+              print(f"::warning::No build in the list reports a channel — the field has moved.")
+              print("::warning::Falling back to checking ALL finished builds, which is weaker.")
+              on_channel, scope = finished, "any finished build"
+          elif not on_channel:
+              print(f"::error::No finished iOS build is on the '{channel}' channel.")
+              sys.exit(1)
+
           seen = {b.get("runtimeVersion") for b in on_channel}
           for b in on_channel[:6]:
               label = b.get("appBuildVersion") or b.get("appVersion") or b.get("id", "?")[:8]
-              print(f"  build {label}  runtime {b.get('runtimeVersion')}")
-          if not on_channel:
-              print(f"::warning::No finished iOS builds found on the '{channel}' channel to check against.")
-              sys.exit(0)
+              print(f"  build {label}  runtime {b.get('runtimeVersion')}  channel {channel_of(b)}")
           if mine in seen:
-              print(f"OK — a build on '{channel}' is listening on {mine}.")
+              print(f"OK — {scope} is listening on {mine}.")
               sys.exit(0)
-          print(f"::error::Nothing on the '{channel}' channel is listening on runtime {mine}.")
+          print(f"::error::Nothing on {scope} is listening on runtime {mine}.")
           print(f"::error::Builds there are on: {', '.join(sorted(x or '?' for x in seen))}")
           print("::error::This update would publish successfully and never reach a single phone.")
           print("::error::Either a new build is still finishing, or app.json's runtimeVersion")

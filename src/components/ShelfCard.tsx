@@ -75,7 +75,12 @@ export function ShelfCard({ station, onPress }: { station: Station; onPress?: ()
           <Text style={[st.dial, { fontFamily: dseg }]}>{dial.label}</Text>
           {'  '}{station.name}
         </Text>
-        {!!station.tags[0] && <Text style={st.tag} numberOfLines={1}>{station.tags[0]}</Text>}
+        {/* `tags?.` because a custom station is JSON loaded straight out of
+            storage with no sanitising — the type says the field is required,
+            which is true of everything the create sheet writes, but a
+            partial or hand-edited entry would take the whole home page
+            down with a red screen. One character against that. */}
+        {!!station.tags?.[0] && <Text style={st.tag} numberOfLines={1}>{station.tags[0]}</Text>}
       </Pressable>
     </Animated.View>
   );

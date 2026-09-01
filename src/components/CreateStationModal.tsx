@@ -80,7 +80,23 @@ const PALETTES: { label: string; color: string; gradientColors: [string, string,
   { label: 'Gold',     color: '#D4AF37', gradientColors: ['#241a02', '#6b5510', '#000000'], glowColor: '#6b5510', iconBg: '#443508' },
   { label: 'Lavender', color: '#A78BFA', gradientColors: ['#160f2e', '#4a3a8a', '#000000'], glowColor: '#4a3a8a', iconBg: '#2c2158' },
   { label: 'Coral',    color: '#FF6F61', gradientColors: ['#2a0c08', '#7a2a20', '#000000'], glowColor: '#7a2a20', iconBg: '#4a1710' },
-  { label: 'Mint',     color: '#4ADE80', gradientColors: ['#03200f', '#15683a', '#000000'], glowColor: '#15683a', iconBg: '#0e4425' },
+  // MINT IS BRIGHTER THAN THE REST OF THE SET ON PURPOSE (Ethan, 29.08:
+  // "the icon for the colour is like a lime green but the background when
+  // using the station is like a dark forest green"). He is right, and the
+  // gap is real: the swatch is 58% lightness and the backdrop was 25%.
+  //
+  // IT CANNOT MATCH THE SWATCH, and that is physics rather than taste —
+  // a custom station has no photograph, so this gradient IS the whole
+  // background with white type sitting straight on it, and #4ADE80 gives
+  // white 1.74:1. What it can do is take all the headroom there is.
+  //
+  // MEASURED, not guessed, on the real deck at 393x852: the binding
+  // constraint is the tagline/song-title line in EQUALIZER, which sits
+  // lowest and over the brightest part of the diagonal. Current 5.60:1,
+  // this 4.56:1, and the next step up (#1FA157) 4.34:1 — under the 4.5
+  // floor for normal text, so this is the last safe stop. Every other
+  // mode is far looser (Mirror Ball 11.67, Cassette 6.93, CD 6.19).
+  { label: 'Mint',     color: '#4ADE80', gradientColors: ['#05301A', '#1B8A4B', '#000000'], glowColor: '#1B8A4B', iconBg: '#125733' },
   { label: 'Ice',      color: '#9AD6FF', gradientColors: ['#0e1a26', '#2e5a7a', '#000000'], glowColor: '#2e5a7a', iconBg: '#1c3a52' },
   // Added 10.08 (owner: "browns and a wider colour selection... include a
   // pearl white also that would look good in many images"). Earths and muted

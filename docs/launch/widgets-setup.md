@@ -77,6 +77,49 @@ is **expected** to fail once, and the sequence is:
 increments server-side before any of this), so expect a gap in the sequence.
 Harmless — build numbers only have to increase.
 
+### And THEN a second one: the new target has no signing certificate
+
+With App Groups ticked on both app IDs the capability sync passes
+(`✔ Synced capabilities: No updates`) and the build gets one step further,
+then stops on:
+
+```
+Distribution Certificate is not validated for non-interactive builds.
+Failed to set up credentials.
+Credentials are not set up. Run this command again in interactive mode.
+```
+
+**This is not about the App Group and not about the certificate being broken.**
+Read eas-cli's own source — `credentials/ios/actions/SetUpDistributionCertificate.js`
+— and the non-interactive path is four lines: warn, then throw
+`MissingCredentialsNonInteractiveError` **only if the target has no
+certificate on file**. The main app has had one for a year. The widget is a
+brand-new app record in EAS's credential store and has none, and the code that
+would pick one (`createOrReuseDistCertAsync`) is on the INTERACTIVE branch and
+is never reached with `--non-interactive`.
+
+So the first build of a new target cannot set up its own signing, by design.
+There is no flag for it: `autoAcceptCredentialReuse` exists but is only ever
+set by `eas go`, never by `eas build`.
+
+**The fix is one interactive run, once, ever.** On a machine with eas-cli and
+`eas login` done (docs/launch/mac-setup.md sets that up):
+
+```
+npx eas-cli credentials -p ios
+```
+
+Pick the **CruiseFMWidgets / com.driftlore.CruiseFM.widget** target, and when
+it offers to reuse the existing distribution certificate, say yes — EAS says
+so itself at the top of every build: *"They can share the same Distribution
+Certificate but require separate Provisioning Profiles."* One certificate,
+two profiles. After that the credential exists and every later
+`--non-interactive` build finds it, exactly as the main app's already does.
+
+Worth trying first, because it needs no terminal at all: the same thing may be
+doable from **expo.dev → the CruiseFM project → Credentials**, which lists
+each bundle identifier and its iOS credentials.
+
 **If this is skipped**, the build still succeeds and the widgets still install
 — they just show "Open the app to get started" for ever, because the shared
 container the snapshot goes into does not exist. That is the failure to watch

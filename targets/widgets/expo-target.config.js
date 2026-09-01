@@ -14,7 +14,25 @@
  */
 module.exports = {
   type: 'widget',
-  name: 'CruiseFM Widgets',
+  // NO SPACE, AND THAT IS NOT COSMETIC — it is what build 37 died on:
+  //
+  //   Assigning provisioning profile ... to target 'CruiseFMWidgets'
+  //   Could not find target 'CruiseFMWidgets' in project.pbxproj
+  //
+  // The plugin derives TWO names from this field. `productName` is
+  // `sanitizeNameForNonDisplayUse(name)`, which strips non-word characters,
+  // so 'CruiseFM Widgets' became 'CruiseFMWidgets' — and that sanitised form
+  // is what EAS registers the target and its credentials under. But the
+  // Xcode target itself is named with the RAW value, space and all, so at
+  // signing time EAS looked for a target that did not exist under that name.
+  // Keeping the two identical removes the mismatch at its source.
+  //
+  // Nothing user-facing is lost: the names people actually see in the widget
+  // gallery come from each widget's own `configurationDisplayName` in Swift
+  // ("Start Drive", "On Air Now", "Your Streak", "On Air"), and `displayName`
+  // below carries the readable form for anywhere the extension itself is named.
+  name: 'CruiseFMWidgets',
+  displayName: 'Cruise FM Widgets',
   icon: '../../assets/images/icon.png',
   entitlements: {
     'com.apple.security.application-groups': ['group.com.driftlore.CruiseFM'],

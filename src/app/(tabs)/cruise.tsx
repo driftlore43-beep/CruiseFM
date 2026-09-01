@@ -12,6 +12,7 @@ import { ConnectMusicCard } from '@/components/ConnectMusicCard';
 import { ConnectSpotifyCard } from '@/components/ConnectSpotifyCard';
 import { SpotifyNudgeCard } from '@/components/SpotifyNudgeCard';
 import { MakeStationCard } from '@/components/MakeStationCard';
+import { WhatsNewCard } from '@/components/WhatsNewCard';
 import { HeadingAnywhereCard, SessionKindSwitch } from '@/components/HeadingAnywhereCard';
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
@@ -256,6 +257,13 @@ export default function CruiseScreen() {
           {/* Only ever appears once someone has actually listened a couple of
               times, and never again after they make one — see the component. */}
           <MakeStationCard />
+          {/* NEWS, SO IT SITS DOWN HERE with the rating ask rather than up
+              with the update card. Everything above the hero is something the
+              driver needs before they set off; "the green is brighter" is
+              worth knowing and worth nobody's journey being delayed by. Above
+              RateCard because telling someone something outranks asking them
+              for something. Shows once per release note — see utils/whatsNew. */}
+          <WhatsNewCard />
           {/* BELOW THE HERO ON PURPOSE. The cards above it are things the
               driver needs (a binary update, music already playing, the
               driving question); asking for a rating is something WE want, so

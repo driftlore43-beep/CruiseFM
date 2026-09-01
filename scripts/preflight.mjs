@@ -88,7 +88,19 @@ const ents = ios.entitlements ?? {};
 // entitlement at all fails the build at signing — that was build 15
 // (com.apple.developer.applemusic) and build 24 (aps-environment).
 const unexpectedEnts = Object.keys(ents).filter((k) => !allow.entitlements.includes(k));
-if (unexpectedEnts.length === 0) ok('entitlements', 'none, which is what the profile expects');
+// NAME WHAT IS ACTUALLY DECLARED, never just "none". This line used to read
+// "none, which is what the profile expects" whenever nothing was UNEXPECTED —
+// which was honest while the allowlist was empty and became a lie the moment
+// it wasn't: a build carrying an App Group reported the same words as a build
+// carrying nothing. An instrument may not summarise away the one detail it
+// exists to report (the same fault as the artwork check printing "artwork
+// yes" over a blank label, 04.08).
+const entNames = Object.keys(ents);
+if (unexpectedEnts.length === 0) {
+  ok('entitlements', entNames.length
+    ? `${entNames.join(', ')} — each one allowlisted, so the profile is expected to carry it`
+    : 'none declared');
+}
 else fail('entitlements', `${unexpectedEnts.join(', ')} — the profile has no matching capability, so signing will fail`);
 
 // Background modes. Cruise FM never plays audio itself; Spotify and Apple

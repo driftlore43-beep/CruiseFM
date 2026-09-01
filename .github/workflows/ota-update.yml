@@ -401,10 +401,20 @@ jobs:
           # one place, and treat "could not check" as a FAILURE rather than a
           # pass — the whole point of this step is to stop a publish that
           # reaches no one, and a publish is always safe to retry.
+          # THE FIELD IS `updateChannel`, AND IT IS AN OBJECT — {id, name} —
+          # not a string. Read from eas-cli's own GraphQL fragment
+          # (graphql/types/Build.js) rather than guessed at: there is no
+          # top-level `channel` key at all, which is why the original check
+          # compared against None every time and passed vacuously, and why
+          # the first fix still failed (it found the dict, then compared a
+          # dict to "production"). Unwrap, and keep the other spellings in
+          # case the shape moves again.
           def channel_of(b):
-              for key in ("channel", "updateChannel", "buildChannel"):
+              for key in ("updateChannel", "channel", "buildChannel"):
                   v = b.get(key)
-                  if v:
+                  if isinstance(v, dict):
+                      v = v.get("name")
+                  if isinstance(v, str) and v:
                       return v
               return None
 

@@ -1,18 +1,22 @@
-// AN "ON" TOGGLE MUST LOOK ON — ON EVERY STATION.
+// AN "ON" TOGGLE MUST LOOK ON, AND ITS ARROWS MUST BE READABLE — ON EVERY
+// STATION AND EVERY SWATCH.
 //
-// Owner, 26.08: "the shuffle playlists doesn't seem to highlight when i tap
-// on it, so im not sure if it does shuffle. the same goes for the repeat."
+// Two owner reports, and the second was caused by the fix for the first.
 //
+// 26.08: "the shuffle playlists doesn't seem to highlight when i tap on it."
 // The commands were reaching the service the whole time (that cycle is
-// covered by test-transport-toggles.mjs). What failed was the SIGNAL: "on"
-// was drawn by swapping the icon from white-at-85% to the station's accent,
-// and an accent is almost always DARKER than white — so pressing it dimmed
-// the icon instead of lighting it. This pins down both halves of the fix:
+// covered by test-transport-toggles.mjs); what failed was the SIGNAL. An
+// active toggle grew a filled pill to fix it.
 //
-//   1. the pill's fill clears a floor on EVERY colour the app can produce,
-//      so the shape is visible whatever station you are on;
-//   2. a colour already bright enough is returned UNTOUCHED, so nothing that
-//      reads well today changes.
+// 01.09: "can it be a bold colour — whatever colour theme is selected — not a
+// bubble which makes it hard to see the shuffle arrows." The pill was filled
+// with the accent LIFTED TOWARD WHITE (to separate it from the dark deck)
+// while the icon on it was hardcoded white — two jobs pulling opposite ways.
+// Measured, the arrows fell under 3:1 on 20 of 35 colours, and Mountain Pass
+// sat at 1.08:1, which is white on white.
+//
+// So this file now pins the property that actually matters and is the one
+// that was violated: WHATEVER the fill, the arrows on it can be seen.
 import fs from 'node:fs';
 import ts from '/home/user/CruiseFM/node_modules/typescript/lib/typescript.js';
 
@@ -36,19 +40,16 @@ const req = (name) => {
 };
 const m = { exports: {} };
 new Function('module', 'exports', 'require', js)(m, m.exports, req);
-const { litAccent, PILL_FLOOR } = m.exports;
+const { inkOn, INK_DARK } = m.exports;
 
-const perceived = (hex) => {
+const relLum = (hex) => {
   const n = parseInt(hex.replace('#', ''), 16);
-  return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
+  const ch = (v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255);
 };
-const hueOf = (hex) => {
-  const n = parseInt(hex.replace('#', ''), 16);
-  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
-  if (d < 1e-6) return null;                       // grey has no hue to keep
-  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  h *= 60; return h < 0 ? h + 360 : h;
+const contrast = (a, b) => {
+  const la = relLum(a), lb = relLum(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 };
 
 // Every colour the app can actually put behind this pill: the ten built-in
@@ -57,68 +58,60 @@ const STATION_ACCENTS = [...fs.readFileSync('/home/user/CruiseFM/src/constants/s
   .matchAll(/eqColors: \['#\w+', '(#\w+)', '#\w+'\]/g)].map((x) => x[1]);
 const SWATCHES = [...fs.readFileSync('/home/user/CruiseFM/src/components/CreateStationModal.tsx', 'utf8')
   .matchAll(/label: '(\w+)',\s+color: '(#\w+)'/g)].map((x) => ({ label: x[1], color: x[2] }));
+const ALL = [
+  ...STATION_ACCENTS.map((c) => ({ label: 'station', color: c })),
+  ...SWATCHES,
+];
 
-console.log(`\n  the pill clears the floor (${PILL_FLOOR}) on every built-in station:`);
+console.log(`\n  the palette this has to survive: ${STATION_ACCENTS.length} stations + ${SWATCHES.length} swatches`);
+check('both palettes were actually found', STATION_ACCENTS.length >= 8 && SWATCHES.length >= 20,
+  `${STATION_ACCENTS.length}/${SWATCHES.length} — if either is 0 this whole file passes vacuously`);
+
+// 3:1 is the WCAG bar for a graphic this size; 4.5:1 is the normal-text bar.
+// Hold the floor at 3 and REPORT anything under 4.5, so a future swatch that
+// merely gets close is visible before it gets worse.
+const ICON_FLOOR = 3.0;
+
+console.log('\n  the arrows are legible on every fill the app can produce:');
 {
-  check(`all ${STATION_ACCENTS.length} station accents found`, STATION_ACCENTS.length === 10, String(STATION_ACCENTS.length));
-  const bad = STATION_ACCENTS.filter((c) => perceived(litAccent(c)) < PILL_FLOOR - 0.5);
-  check('none is left too dark to see', bad.length === 0, JSON.stringify(bad));
+  const bad = ALL.filter((s) => contrast(s.color, inkOn(s.color)) < ICON_FLOOR);
+  check(`nothing falls under ${ICON_FLOOR}:1`, bad.length === 0,
+    JSON.stringify(bad.map((s) => `${s.label} ${s.color} -> ${contrast(s.color, inkOn(s.color)).toFixed(2)}:1`)));
+  const worst = ALL.map((s) => ({ ...s, cr: contrast(s.color, inkOn(s.color)) }))
+    .sort((a, b) => a.cr - b.cr)[0];
+  console.log(`       worst is ${worst.label} ${worst.color} at ${worst.cr.toFixed(2)}:1 (ink ${inkOn(worst.color)})`);
 }
 
-console.log('\n  ...and on every custom-station colour:');
-{
-  check(`all ${SWATCHES.length} swatches found`, SWATCHES.length === 25, String(SWATCHES.length));
-  const bad = SWATCHES.filter((s) => perceived(litAccent(s.color)) < PILL_FLOOR - 0.5);
-  check('none is left too dark to see', bad.length === 0,
-    JSON.stringify(bad.map((s) => `${s.label} ${s.color}->${litAccent(s.color)}`)));
-  // The two the owner would have hit first: the default, and the darkest.
-  const violet = SWATCHES.find((s) => s.label === 'Violet');
-  const none = SWATCHES.find((s) => s.label === 'None');
-  console.log(`       Violet  ${violet.color} -> ${litAccent(violet.color)}  `
-    + `(${perceived(violet.color).toFixed(0)} -> ${perceived(litAccent(violet.color)).toFixed(0)})`);
-  console.log(`       None    ${none.color} -> ${litAccent(none.color)}  `
-    + `(${perceived(none.color).toFixed(0)} -> ${perceived(litAccent(none.color)).toFixed(0)})`);
+console.log('\n  the exact colours that were broken before are fixed:');
+for (const [name, hex] of [['Mountain Pass', '#F2F6FF'], ['Pearl', '#EFE8DC'], ['Rain Drive', '#FFE070']]) {
+  const cr = contrast(hex, inkOn(hex));
+  check(`${name} ${hex} — was white-on-white, now ${cr.toFixed(2)}:1`, cr >= ICON_FLOOR);
 }
 
-console.log('\n  a colour bright enough already is left ALONE:');
+console.log('\n  the fill is the station colour, untouched:');
 {
-  // THE CONTROL. Without this the function could "pass" by flooding every
-  // pill to near-white, which would throw away the station's identity — the
-  // exact thing the accent is there to carry.
-  const bright = ['#FFE070', '#F2F6FF', '#EFE8DC', '#FFFFFF'];
-  for (const c of bright) {
-    check(`${c} is returned unchanged`, litAccent(c) === c, litAccent(c));
-  }
-  const untouched = [...STATION_ACCENTS, ...SWATCHES.map((s) => s.color)]
-    .filter((c) => perceived(c) >= PILL_FLOOR);
-  check('every colour already above the floor is untouched',
-    untouched.every((c) => litAccent(c) === c),
-    JSON.stringify(untouched.filter((c) => litAccent(c) !== c)));
+  // THE REGRESSION GUARD FOR THIS ROUND. The old build lifted the fill toward
+  // white, which is exactly what made the arrows vanish. Nothing exported
+  // here may transform a colour any more.
+  check('litAccent is gone', m.exports.litAccent === undefined);
+  check('PILL_FLOOR is gone', m.exports.PILL_FLOOR === undefined);
+  const src = fs.readFileSync(SRC, 'utf8');
+  check('the pill fills with the raw accent', /backgroundColor: accent\b/.test(src));
+  check('...and carries a rim so a dark pill still reads',
+    /borderColor: 'rgba\(255,255,255/.test(src));
 }
 
-console.log('\n  the station keeps its identity — hue survives the lift:');
+console.log('\n  ink is chosen by measurement, both ways:');
 {
-  const shifted = SWATCHES
-    .map((s) => ({ ...s, lit: litAccent(s.color), h0: hueOf(s.color), h1: hueOf(litAccent(s.color)) }))
-    .filter((s) => s.h0 != null && s.h1 != null)
-    .map((s) => ({ ...s, d: Math.min(Math.abs(s.h1 - s.h0), 360 - Math.abs(s.h1 - s.h0)) }))
-    .filter((s) => s.d > 1.5);
-  check('no swatch shifts hue by more than 1.5 degrees', shifted.length === 0,
-    JSON.stringify(shifted.map((s) => `${s.label} ${s.d.toFixed(1)}deg`)));
-  // ...and it must not simply desaturate everything to grey either.
-  const greyed = SWATCHES.filter((s) => hueOf(s.color) != null && hueOf(litAccent(s.color)) == null);
-  check('no colour is flattened to grey', greyed.length === 0, JSON.stringify(greyed.map((s) => s.label)));
-}
-
-console.log('\n  it never throws on rubbish:');
-{
-  for (const bad of ['', 'rgba(255,255,255,0.85)', 'nonsense', '#12', '#GGGGGG']) {
-    let threw = false;
-    try { litAccent(bad); } catch { threw = true; }
-    check(`"${bad}" is handled rather than thrown on`, !threw);
-  }
+  check('a pale fill gets dark arrows', inkOn('#F2F6FF') === INK_DARK);
+  check('a deep fill gets white arrows', inkOn('#2A2E3D') === '#ffffff');
+  check('near-black ink, not pure black — #000 reads as a hole punched in a bright pill',
+    INK_DARK !== '#000000' && relLum(INK_DARK) < 0.02);
+  let threw = false;
+  try { inkOn('not-a-colour'); } catch { threw = true; }
+  check('a malformed colour does not throw on a deck', !threw);
 }
 
 console.log(fails ? `\n  ${fails} failure(s)\n`
-  : '\n  an active toggle reads as active on every station the app can make\n');
+  : '\n  the pill wears the station\'s own colour and the arrows read on all of it\n');
 process.exit(fails ? 1 : 0);

@@ -29,47 +29,82 @@ import { nextRepeat, type RepeatMode } from '@/utils/useMusicPlayback';
  * into a pastel — at which point it is no longer the station's colour. The
  * "on" state needs a change of SHAPE, not of shade.
  *
- * So an active toggle now grows a filled pill behind it, with a WHITE icon on
- * top. That is the app's own selected-state language (ModeSheet's active chip,
- * the play disc, the Tune-in pill: a solid fill in the opposite of its
- * ground), it reads at a glance in a moving car, and it survives any station
- * colour because the icon no longer depends on the accent to be legible. The
- * accent tints the pill, so the station's identity is still what lights up.
+ * So an active toggle grows a filled PILL behind it — the app's own
+ * selected-state language (ModeSheet's active chip, the play disc, the Tune-in
+ * pill), which reads at a glance in a moving car.
+ *
+ * ── AND THE PILL WAS THEN THE WRONG COLOUR (owner, 01.09) ────────────────
+ * "This is what the button looks like when it's on shuffle, can it be a bold
+ * colour — whatever colour theme is selected — not a bubble which makes it
+ * hard to see the shuffle arrows."
+ *
+ * She is right, and the first build contained the contradiction that caused
+ * it. The pill was filled with `litAccent(accent)` — the accent LIFTED TOWARD
+ * WHITE until it cleared a brightness floor, so that a dark accent would still
+ * separate from the dark scene behind it — while the icon on top was
+ * hardcoded `#fff`. Those two jobs pull in opposite directions: everything
+ * done to make the pill stand out made the white arrows on it disappear.
+ *
+ * MEASURED across every colour the app can produce (10 stations + 25
+ * swatches): the white arrows fell below 3:1 on **20 of 35**, and Mountain
+ * Pass — whose eqColors are literally three whites — sat at **1.08:1**, which
+ * is white on white. It was never one bad station; it was most of the palette.
+ *
+ * THE FIX SEPARATES THE TWO JOBS instead of trading them off:
+ *
+ *   FILL  is the station's accent EXACTLY as chosen. No lifting, no washing
+ *         toward white. "Whatever colour theme is selected", which is both
+ *         what was asked for and the honest thing for a control that exists
+ *         to show the station's identity.
+ *   INK   adapts to the fill — `inkOn` picks white or near-black by measured
+ *         contrast, so the arrows are legible on a cream pill AND on a navy
+ *         one. Worst case across the whole palette is now 4.31:1 (Slate),
+ *         against a 3:1 bar for icon-sized graphics; 34 of 35 clear 4.5:1.
+ *   RIM   carries the SHAPE, which is what the lifting was really for. A
+ *         hairline is enough to read a pill against the deck even when the
+ *         fill is nearly black ("None", #2A2E3D, is 1.36:1 against the scene
+ *         and would otherwise be a dark blob on a dark scrim), and unlike
+ *         lifting it costs the colour nothing.
+ *
+ * `litAccent` is retired. Do not reintroduce a brightness floor on the FILL:
+ * it is the thing that made the arrows vanish, and the rim does its job
+ * without touching the station's colour.
  */
 
-/** Perceived brightness, 0-255. The eye weights green far above blue, so a
- *  plain average calls a saturated blue "mid" when it is nearly black. */
-function perceived(hex: string): number | null {
+/** WCAG relative luminance — the basis for a real contrast ratio, which is
+ *  what actually decides whether the arrows can be seen. The old
+ *  `perceived` approximation went with `litAccent`: it was only ever used to
+ *  drive the brightness floor, and the floor is what this round removed. */
+function relLum(hex: string): number | null {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return null;
   const n = parseInt(m[1], 16);
-  return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
+  const ch = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255);
 }
 
-/**
- * The accent, lifted only as far as it must be to read as a lit pill on a
- * dark scene — the mirror of `readableOn`, which deepens pale colours for
- * paper. Hue survives (it mixes toward white rather than replacing), and a
- * colour already bright enough is returned untouched, so nothing that reads
- * well today can change.
- *
- * PILL_FLOOR is set from the measurement above: "None" (#2A2E3D) sits at 47
- * and is the darkest thing the palette can produce, while Midnight and
- * Espresso sit near 60-75. 110 lifts all of them clear of the scene behind
- * without turning the bright ones into pastels.
- */
-export const PILL_FLOOR = 110;
+function contrast(a: string, b: string): number {
+  const la = relLum(a), lb = relLum(b);
+  if (la == null || lb == null) return 1;
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
 
-export function litAccent(color: string): string {
-  const lum = perceived(color);
-  if (lum == null || lum >= PILL_FLOOR) return color;
-  const n = parseInt(color.trim().replace('#', ''), 16);
-  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  // How far toward white this colour has to travel to clear the floor.
-  const t = Math.min(0.72, (PILL_FLOOR - lum) / Math.max(255 - lum, 1));
-  const mix = (c: number) => Math.round(c + (255 - c) * t);
-  const hex = (c: number) => c.toString(16).padStart(2, '0');
-  return `#${hex(mix(r))}${hex(mix(g))}${hex(mix(b))}`;
+/** Near-black rather than pure black: on a bright pill, #000 reads as a hole
+ *  punched in it, while a very dark ink still looks like an icon. */
+export const INK_DARK = '#12131a';
+
+/**
+ * The arrows' colour, chosen for whichever reads better on this fill.
+ *
+ * A hardcoded white icon is what put Mountain Pass at 1.08:1. Choosing by
+ * MEASUREMENT rather than by assumption means a pale station gets dark arrows
+ * and a deep one gets white, and no future swatch can reintroduce the fault.
+ */
+export function inkOn(fill: string): string {
+  return contrast(fill, INK_DARK) > contrast(fill, '#ffffff') ? INK_DARK : '#ffffff';
 }
 
 type Props = {
@@ -83,7 +118,13 @@ const PAD = 9;
 
 function Pill({ on, accent, children }: { on: boolean; accent: string; children: React.ReactNode }) {
   return (
-    <View style={[t.pill, on && { backgroundColor: litAccent(accent) }]}>
+    <View
+      style={[
+        t.pill,
+        // The accent as chosen — never lifted. The rim, not a brightness
+        // floor, is what keeps a dark pill readable against the deck.
+        on && { backgroundColor: accent, borderColor: 'rgba(255,255,255,0.34)' },
+      ]}>
       {children}
     </View>
   );
@@ -101,7 +142,7 @@ export function ShuffleButton({ accent, size = 24, on, onPress }: Props & {
       accessibilityLabel={on ? 'Shuffle on' : 'Shuffle off'}
       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
       <Pill on={on} accent={accent}>
-        <Ionicons name="shuffle" size={size} color="#fff" />
+        <Ionicons name="shuffle" size={size} color={on ? inkOn(accent) : '#fff'} />
       </Pill>
     </TouchableOpacity>
   );
@@ -129,7 +170,7 @@ export function RepeatButton({ accent, size = 24, mode, onPress }: Props & {
             : 'Repeat off'}
       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
       <Pill on={on} accent={accent}>
-        <MaterialCommunityIcons name={glyph} size={size} color="#fff" />
+        <MaterialCommunityIcons name={glyph} size={size} color={on ? inkOn(accent) : '#fff'} />
       </Pill>
     </TouchableOpacity>
   );
@@ -146,5 +187,9 @@ const t = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
+    // Always laid out, transparent when off — a border that appears on press
+    // would nudge the whole transport row sideways.
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
 });

@@ -401,22 +401,32 @@ jobs:
           # one place, and treat "could not check" as a FAILURE rather than a
           # pass — the whole point of this step is to stop a publish that
           # reaches no one, and a publish is always safe to retry.
-          # THE FIELD IS `updateChannel`, AND IT IS AN OBJECT — {id, name} —
-          # not a string. Read from eas-cli's own GraphQL fragment
-          # (graphql/types/Build.js) rather than guessed at: there is no
-          # top-level `channel` key at all, which is why the original check
-          # compared against None every time and passed vacuously, and why
-          # the first fix still failed (it found the dict, then compared a
-          # dict to "production"). Unwrap, and keep the other spellings in
-          # case the shape moves again.
-          def channel_of(b):
-              for key in ("updateChannel", "channel", "buildChannel"):
+          # BOTH FIELDS THIS CHECK NEEDS ARE NESTED OBJECTS, not the strings
+          # their names suggest. Read from eas-cli's own GraphQL fragment
+          # (graphql/types/Build.js) rather than guessed at:
+          #
+          #     updateChannel { id name }      <- NOT `channel`
+          #     runtime       { id version }   <- NOT `runtimeVersion`
+          #
+          # That is the whole story of this guard's history. It compared
+          # b["channel"] (absent) to a channel name and b["runtimeVersion"]
+          # (absent) to a version, so both were None on every build, the
+          # candidate list came out empty, and empty took a branch that
+          # exited 0 — a guard printing reassurance while checking nothing.
+          def pick(b, keys, sub):
+              for key in keys:
                   v = b.get(key)
                   if isinstance(v, dict):
-                      v = v.get("name")
+                      v = v.get(sub)
                   if isinstance(v, str) and v:
                       return v
               return None
+
+          def channel_of(b):
+              return pick(b, ("updateChannel", "channel", "buildChannel"), "name")
+
+          def runtime_of(b):
+              return pick(b, ("runtime", "runtimeVersion"), "version")
 
           try:
               builds = json.loads(os.environ.get("CFM_BUILDS") or "[]")
@@ -443,10 +453,10 @@ jobs:
               print(f"::error::No finished iOS build is on the '{channel}' channel.")
               sys.exit(1)
 
-          seen = {b.get("runtimeVersion") for b in on_channel}
+          seen = {runtime_of(b) for b in on_channel}
           for b in on_channel[:6]:
               label = b.get("appBuildVersion") or b.get("appVersion") or b.get("id", "?")[:8]
-              print(f"  build {label}  runtime {b.get('runtimeVersion')}  channel {channel_of(b)}")
+              print(f"  build {label}  runtime {runtime_of(b)}  channel {channel_of(b)}")
           if mine in seen:
               print(f"OK — {scope} is listening on {mine}.")
               sys.exit(0)

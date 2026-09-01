@@ -116,9 +116,36 @@ Certificate but require separate Provisioning Profiles."* One certificate,
 two profiles. After that the credential exists and every later
 `--non-interactive` build finds it, exactly as the main app's already does.
 
-Worth trying first, because it needs no terminal at all: the same thing may be
-doable from **expo.dev → the CruiseFM project → Credentials**, which lists
-each bundle identifier and its iOS credentials.
+**It IS doable without a terminal, and this is the route that worked (01.09):**
+**expo.dev → CruiseFM → Credentials → iOS → "+ Add bundle identifier"**, and
+enter `com.driftlore.CruiseFM.widget`. Then walk the wizard:
+
+| Step | What to do |
+|---|---|
+| Distribution certificate | **Choose saved certificate** → the existing one. Never upload or delete — that is the certificate the live app is signed with. |
+| Provisioning profile | **Upload new profile** — see the gap below. |
+| Push key | **Skip this step.** Notifications are scheduled on the phone; claiming push is what broke build 24. |
+| ASC API key | **Skip this step.** Submission is app-level and the account already has one. |
+
+**THE GAP, and it is the only hard part:** the profile step offers *Upload* or
+*Choose saved* and nothing else — it cannot generate one. The only saved
+profiles belong to the parent app's bundle id, and it **refuses to continue
+without a selection** ("Select an existing provisioning profile to continue"),
+so there is no way to save a partial record and let EAS generate the profile at
+build time the way it does for the app. Do not pick a parent-app profile to get
+past it: a profile is bound to one bundle id, and that one is not the widget's.
+
+Make it on Apple's site first, in another tab, leaving the wizard open:
+
+1. developer.apple.com → Certificates, Identifiers & Profiles → **Profiles** → **＋**
+2. Distribution → **App Store Connect** → Continue
+3. App ID → **`com.driftlore.CruiseFM.widget`** (not the plain one)
+4. Certificate → the existing distribution certificate → Continue
+5. Name it anything (`CruiseFM Widget App Store`) → Generate → **Download**
+6. Back in the wizard: **Upload new profile** → give it the `.mobileprovision`
+
+One certificate, two profiles — exactly what EAS prints at the top of every
+build. Finish the wizard and both lines should read **valid**.
 
 **If this is skipped**, the build still succeeds and the widgets still install
 — they just show "Open the app to get started" for ever, because the shared

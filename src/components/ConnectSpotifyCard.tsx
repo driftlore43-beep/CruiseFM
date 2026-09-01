@@ -33,10 +33,16 @@ export function ConnectSpotifyCard() {
     useCallback(() => {
       let active = true;
       (async () => {
-        // Apple Music listeners get their own card — two connect prompts on
-        // one screen is noise, and only one of them is theirs.
+        // ONLY EXISTING SPOTIFY LISTENERS SEE THIS. Spotify stopped being
+        // offered in the platform picker on 01.09 (it caps a development-tier
+        // app at five accounts, so "connect Spotify" fails for almost everyone
+        // who tries), and inviting someone to connect a service they were
+        // never given the choice of is worse than the old bug it replaces —
+        // it is an errand that cannot succeed. Apple Music listeners have
+        // their own card; everyone else is in companion mode and needs
+        // nothing connected at all.
         const platform = await getSavedPlatform();
-        if (platform === 'appleMusic') { if (active) setConnected(true); return; }
+        if (platform !== 'spotify') { if (active) setConnected(true); return; }
         const c = await isSpotifyConnected();
         if (active) setConnected(c);
       })();

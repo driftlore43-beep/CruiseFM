@@ -58,7 +58,10 @@ const LINES: Line[] = [
   {
     icon: 'music-note',
     title: 'Your music keeps playing where it lives',
-    body: 'Apple Music or Spotify plays it. Cruise FM is the view over the top.',
+    // Names Apple Music alone since 01.09, because it is now the only
+    // service the picker offers full control for. Naming Spotify sent a
+    // brand-new listener looking for an option that is no longer there.
+    body: 'Apple Music, or whatever you already use. Cruise FM is the view over the top.',
   },
 ];
 

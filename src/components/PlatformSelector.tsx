@@ -24,15 +24,35 @@ import { readableOn, type Palette } from '@/utils/appearance';
 
 const NONE_ENTRY = { id: 'none' as PlatformId, name: 'None / Other', color: '#666666' };
 
+/**
+ * SPOTIFY IS NOT OFFERED (owner, 01.09: "remove the option to have Spotify as
+ * it's not available").
+ *
+ * It is not a code limit and no amount of work here changes it: Spotify caps a
+ * development-tier app at FIVE authorised accounts, and extension requests have
+ * been organisations-only since May 2025, needing an established business with
+ * 250k+ monthly users. So for essentially everyone who picks it, "Full in-app
+ * control" was a promise the app could not keep — they would sign in, be
+ * refused, and land in the visual companion mode they could have had without
+ * the detour.
+ *
+ * `PLATFORMS.spotify` is deliberately LEFT IN PLACE. Anyone already running on
+ * Spotify — the owner and the handful of allowlisted testers — keeps working
+ * exactly as before, because the playback switchboard reads their saved choice
+ * and never consults this list. This removes the offer, not the feature.
+ */
 const PLATFORM_ENTRIES = [
-  ...Object.entries(PLATFORMS).map(([id, p]) => ({ id: id as PlatformId, ...p })),
+  ...Object.entries(PLATFORMS)
+    .filter(([id]) => id !== 'spotify')
+    .map(([id, p]) => ({ id: id as PlatformId, ...p })),
   NONE_ENTRY,
 ];
 
-// Honest tier line under each name. Spotify is the full ride; everything
-// else runs as the visual companion beside the user's own music app (which
-// genuinely works today — never call it "upcoming"), with Apple Music
-// flagged as the next full integration.
+// Honest tier line under each name. Apple Music is the full ride; everything
+// else runs as the visual companion beside the user's own music app, which
+// genuinely works today — never call it "upcoming". The `spotify` entry is
+// kept only so an existing Spotify listener's saved choice still resolves to a
+// caption; it is no longer offered (see PLATFORM_ENTRIES).
 const TIER_CAPTIONS: Record<string, string> = {
   spotify:      'Full in-app control',
   appleMusic:   'Full in-app control',
@@ -171,7 +191,7 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
 
           <Text style={styles.title}>Connect Your Music</Text>
           <Text style={styles.subtitle}>
-            Spotify and Apple Music play inside Cruise FM, with the controls on the card. Anywhere else, the visuals run alongside your own music app.
+            Apple Music plays inside Cruise FM, with the controls on the card. Anywhere else, the visuals run alongside your own music app.
           </Text>
 
           {/* ── Platform grid ────────────────────────────────────────────── */}

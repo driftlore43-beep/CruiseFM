@@ -15,6 +15,7 @@ struct CruiseWidgetBundle: WidgetBundle {
   @WidgetBundleBuilder
   var body: some Widget {
     StartDriveWidget()
+    VinylWidget()
     OnAirWidget()
     StatsWidget()
     if #available(iOSApplicationExtension 16.0, *) {

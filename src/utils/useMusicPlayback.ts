@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { noteTrackHeard } from './driveStats';
+import { noteSongForWidgets } from './widgetArtwork';
 
 import { getSavedPlatform, type PlatformId } from './musicPlatform';
 import { appleMusicAvailable } from './appleMusic';
@@ -64,6 +65,14 @@ export function useMusicPlayback(visible: boolean, opts?: { pollMs?: number }) {
   useEffect(() => {
     if (!live.track?.title) return;
     noteTrackHeard(live.track.title, live.track.artist ?? '').catch(() => {});
+    // AND THE WIDGETS GET THE COVER. Deliberately alongside rather than
+    // inside noteTrackHeard: that one only records during an open drive,
+    // while "the last song this phone played" is true whether or not a drive
+    // was running, and the widget is most useful when the app is closed.
+    // Fire-and-forget — nothing here may delay a song change.
+    noteSongForWidgets(
+      live.track.title, live.track.artist ?? '', live.track.albumArt ?? null,
+    ).catch(() => {});
   }, [heard]);
 
   return useApple ? { ...apple, platform } : { ...spotify, platform };

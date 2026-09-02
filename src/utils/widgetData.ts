@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 
 import GLYPHS from '@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json';
 
+import { getLastPlayed } from './lastPlayed';
+
 import { STATIONS, stationDial } from '@/constants/stations';
 import { primaryOnAir, upNext, clockLabel } from '@/constants/schedule';
 import { resolveAnyStation, cachedCustomStations, loadCustomStations } from '@/utils/customStations';
@@ -70,6 +72,16 @@ export type WidgetStation = {
   /** Deep → mid → black, the station's own card ramp. */
   colors: [string, string, string];
   accent: string;
+  /**
+   * The station's own blurred backdrop, if the widget has one bundled.
+   *
+   * This is just the station id — the images in `targets/widgets/stations/`
+   * are NAMED by id precisely so nothing has to carry a filename or, worse,
+   * so Swift never needs a second copy of the id→file mapping. Null for a
+   * custom station, whose photograph lives in the app's documents directory,
+   * outside the shared container the widget can reach.
+   */
+  image: string | null;
 };
 
 /** One changeover on the broadcast timeline. */
@@ -89,6 +101,15 @@ export type WidgetSnapshot = {
   onAir: WidgetOnAir[];
   /** "UP NEXT · Sunset AM at 5pm", already worded. */
   upNextLine: string | null;
+  /**
+   * The last song the app saw play — NOT what is playing now, and the widget
+   * says so in as many words.
+   *
+   * A widget is redrawn a handful of times a day, so "now playing" would be
+   * wrong most of the time anyone reads it. "Last played" is a claim about
+   * the past and stays true however stale the widget gets. See lastPlayed.ts.
+   */
+  lastPlayed: { title: string; artist: string } | null;
   stats: {
     streakDays: number;
     sessionsThisWeek: number;
@@ -147,6 +168,7 @@ export function toWidgetStation(id: string): WidgetStation {
     dial: `${dial.label} ${dial.band}`,
     icon,
     iconChar: glyphChar(icon),
+    image: known ? s.id : null,
     colors: s.cardGradient,
     // The accent slot every mode wears — eqColors[1] where a station has a
     // ramp, its mid gradient stop otherwise. Same rule as the app itself, so
@@ -201,9 +223,10 @@ export async function buildWidgetSnapshot(now: Date = new Date()): Promise<Widge
   if (!cachedCustomStations().length) await loadCustomStations().catch(() => {});
   await loadSessionKind().catch(() => {});
 
-  const [last, stats] = await Promise.all([
+  const [last, stats, played] = await Promise.all([
     loadLastCruise().catch(() => null),
     getDriveStats().catch(() => null),
+    getLastPlayed().catch(() => null),
   ]);
   const w = words(cachedSessionKind());
   const kind = cachedSessionKind();
@@ -214,6 +237,10 @@ export async function buildWidgetSnapshot(now: Date = new Date()): Promise<Widge
     lastDrive: last ? { ...toWidgetStation(last.stationId), mode: last.mode } : null,
     onAir: buildOnAirTimeline(now),
     upNextLine: upNextLine(now),
+    // Title and artist only. The COVER is not in here — it is a file in the
+    // App Group, written by setArtwork, because a JPEG in shared UserDefaults
+    // would be re-read on every widget draw.
+    lastPlayed: played ? { title: played.title, artist: played.artist } : null,
     stats: {
       streakDays: stats?.streakDays ?? 0,
       // Their own kind, so a desk listener is never shown a drive count of

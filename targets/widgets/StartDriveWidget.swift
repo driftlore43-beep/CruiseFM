@@ -56,6 +56,15 @@ struct StartDriveView: View {
       let s = entry.station!
       ZStack(alignment: .topLeading) {
         s.gradient
+        // THE STATION'S OWN PHOTOGRAPH, when this target bundles one — the
+        // ten built-ins do, a custom station does not and keeps the gradient
+        // above. Already blurred in the asset, exactly as the app's decks
+        // draw it; re-blurring at runtime is what got the app killed once.
+        if let img = Art.station(s.image) {
+          img.resizable().aspectRatio(contentMode: .fill)
+            .clipped()
+            .overlay(Color.black.opacity(0.42))
+        }
         // A single soft catch from the top-left, the same light the app's
         // cards take. Enough to stop a flat fill reading as a coloured
         // rectangle, not enough to compete with the type.

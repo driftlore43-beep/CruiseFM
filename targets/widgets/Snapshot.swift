@@ -21,6 +21,11 @@ import WidgetKit
  * change big enough to break drawing bumps it, and the widget declines
  * rather than misdraws.
  */
+struct LastPlayedInfo: Codable {
+  let title: String
+  let artist: String
+}
+
 struct WidgetStation: Codable {
   let id: String
   let name: String
@@ -34,6 +39,9 @@ struct WidgetStation: Codable {
   let icon: String?
   /// Already the character, not the glyph name (see glyphChar in widgetData).
   let iconChar: String?
+  /// The station id, when this target bundles a backdrop for it (see
+  /// Art.station). Nil for a custom station, which has no bundled image.
+  let image: String?
   /// Deep, mid, black — the station's own card ramp.
   let colors: [String]
   let accent: String
@@ -59,6 +67,11 @@ struct Snapshot: Codable {
   let lastDrive: WidgetStation?
   let onAir: [WidgetStation]
   let upNextLine: String?
+  /// The last song the app saw play — NOT what is playing now. A widget is
+  /// redrawn a handful of times a day, so "now playing" would be wrong most
+  /// of the time anyone reads it; "last played" is a claim about the past and
+  /// stays true however stale this gets. Any view drawing it must say so.
+  let lastPlayed: LastPlayedInfo?
   let stats: WidgetStats
 }
 
@@ -113,6 +126,15 @@ extension Color {
 }
 
 extension WidgetStation {
+  /// The accent slot every mode wears — eqColors[1] in the app, sent already
+  /// resolved so a widget can never pick a different one from the screen it
+  /// links into. Falls back to the ramp's mid stop, then to the app's violet.
+  var accentColor: Color {
+    if !accent.isEmpty { return Color(hex: accent) }
+    if colors.count > 1 { return Color(hex: colors[1]) }
+    return Color(hex: "#7B38E0")
+  }
+
   /// The station's own ramp, corner to corner — the same diagonal the app's
   /// cards use, so a widget sits beside the app rather than beside iOS.
   var gradient: LinearGradient {

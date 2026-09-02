@@ -59,6 +59,9 @@ const W = (() => {
     if (name === '@/utils/sessionKind') return {
       cachedSessionKind: () => 'driving', loadSessionKind: async () => 'driving',
       words: () => ({ countLabel: 'DRIVES', timeLabel: 'CRUISED' }) };
+    if (name === './lastPlayed') return {
+      getLastPlayed: async () => ({ title: 'Zero', artist: 'Pumpkins', artUrl: null, at: 1 }),
+    };
     throw new Error('unstubbed: ' + name);
   };
   new Function('module', 'exports', 'require', compile(`${ROOT}/src/utils/widgetData.ts`))(m, m.exports, req);

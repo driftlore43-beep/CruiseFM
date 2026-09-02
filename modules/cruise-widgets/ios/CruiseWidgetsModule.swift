@@ -37,6 +37,9 @@ public class CruiseWidgetsModule: Module {
    */
   private static let appGroup = "group.com.driftlore.CruiseFM"
   private static let snapshotKey = "cruisefm.widget.snapshot"
+  /** The last-played cover, as a file in the App Group container. Named here
+   *  and in the extension's Artwork.swift; the two must agree. */
+  private static let artworkFile = "last-artwork.jpg"
 
   public func definition() -> ModuleDefinition {
     Name("CruiseWidgets")
@@ -70,6 +73,39 @@ public class CruiseWidgetsModule: Module {
      */
     AsyncFunction("isReady") { () -> Bool in
       UserDefaults(suiteName: Self.appGroup) != nil
+    }
+
+    /**
+     * Put the last-played album cover where the widget can draw it.
+     *
+     * A FILE, NOT UserDefaults. Shared UserDefaults is a property list read
+     * whole on every access, and the snapshot already lives there; a few tens
+     * of kilobytes of JPEG in it would be paid for on every widget draw. The
+     * App Group's container directory is the right home for bytes.
+     *
+     * THE COVER IS OF THE LAST SONG, WHICH IS WHY IT CAN BE SHOWN AT ALL. A
+     * widget is redrawn a handful of times a day, so it can never honestly
+     * claim what is playing NOW — by the time anyone looks, the song has
+     * usually changed. "Last played" is a statement about the past, and the
+     * past does not go stale. The label under it in the widget says so.
+     *
+     * Passing nil clears it, which is what a drive with no artwork should do
+     * rather than leaving yesterday's cover sitting on the record for ever.
+     */
+    AsyncFunction("setArtwork") { (base64: String?) -> Bool in
+      guard let dir = FileManager.default
+        .containerURL(forSecurityApplicationGroupIdentifier: Self.appGroup) else { return false }
+      let url = dir.appendingPathComponent(Self.artworkFile)
+      guard let b64 = base64, !b64.isEmpty else {
+        try? FileManager.default.removeItem(at: url)
+        if #available(iOS 14.0, *) { WidgetCenter.shared.reloadAllTimelines() }
+        return true
+      }
+      guard let data = Data(base64Encoded: b64) else { return false }
+      // Atomic so a widget waking mid-write never reads half a JPEG.
+      do { try data.write(to: url, options: .atomic) } catch { return false }
+      if #available(iOS 14.0, *) { WidgetCenter.shared.reloadAllTimelines() }
+      return true
     }
   }
 }

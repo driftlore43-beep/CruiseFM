@@ -34,6 +34,7 @@ const station = (id) => ({
 let stats = { streakDays: 3, drivesThisWeek: 2, listensThisWeek: 5, totalMinutes: 140 };
 let lastCruise = { stationId: 'sunset', mode: 'vinyl' };
 let kind = 'driving';
+let lastPlayed = null;
 
 const W = (() => {
   const js = compile(`${ROOT}/src/utils/widgetData.ts`);
@@ -56,6 +57,7 @@ const W = (() => {
       cachedCustomStations: () => [{ id: 'custom-1' }],
       loadCustomStations: async () => [],
     };
+    if (name === './lastPlayed') return { getLastPlayed: async () => lastPlayed };
     if (name === '@/utils/lastCruise') return { loadLastCruise: async () => lastCruise };
     if (name === '@/utils/driveStats') return { getDriveStats: async () => stats };
     if (name === '@/utils/sessionKind') return {
@@ -172,6 +174,39 @@ console.log('\n  publishing is a safe no-op without the extension:');
   try { await W.publishWidgetData(); } catch { threw = true; }
   check('no bridge, no throw — this runs on drive start and foreground', !threw);
   check('widgetsAvailable() is honest about it', W.widgetsAvailable() === false);
+}
+
+console.log('\n  the last-played song, which is the only track claim a widget may make:');
+{
+  // A widget is redrawn a handful of times a day, so "now playing" would be
+  // wrong most of the time anyone reads it. "Last played" is a claim about the
+  // past — it cannot go stale. These two cases pin that the field crosses at
+  // all, and that absent means absent rather than a stale leftover.
+  lastPlayed = { title: 'Zero', artist: 'The Smashing Pumpkins', artUrl: null, at: 1 };
+  let snap = await W.buildWidgetSnapshot(new Date('2026-09-01T21:00:00Z'));
+  check('a remembered song reaches the snapshot',
+    snap.lastPlayed?.title === 'Zero' && snap.lastPlayed?.artist === 'The Smashing Pumpkins',
+    JSON.stringify(snap.lastPlayed));
+  // Check the KEYS, not a substring of the JSON — "artist" contains "art",
+  // which is how the first version of this assertion failed against correct
+  // code. A JPEG must never travel in the snapshot: it lives in shared
+  // UserDefaults, which is re-read whole on every widget draw.
+  check('the cover itself is NOT in the snapshot — it is a file in the App Group',
+    Object.keys(snap.lastPlayed).sort().join() === 'artist,title',
+    Object.keys(snap.lastPlayed).join());
+
+  lastPlayed = null;
+  snap = await W.buildWidgetSnapshot(new Date('2026-09-01T21:00:00Z'));
+  check('nothing remembered means null, not a leftover', snap.lastPlayed === null,
+    JSON.stringify(snap.lastPlayed));
+}
+
+console.log('\n  a built-in station carries its bundled backdrop, a custom one does not:');
+{
+  const built = W.toWidgetStation('sunset');
+  check('a built-in station names its image by id', built.image === 'sunset', String(built.image));
+  const custom = W.toWidgetStation('custom-1');
+  check('a custom station has no bundled image', custom.image === null, String(custom.image));
 }
 
 console.log(fails ? `\n  ${fails} failure(s)\n` : '\n  the widgets will be told the truth\n');

@@ -137,7 +137,15 @@ extension WidgetStation {
 /// The seven-segment face the app sets every dial number in.
 func dialFont(_ size: CGFloat) -> Font { .custom("DSEG7Classic-Bold", size: size) }
 /// The icon set every station picks its glyph from.
-func iconFont(_ size: CGFloat) -> Font { .custom("MaterialCommunityIcons", size: size) }
+///
+/// "MaterialDesignIcons" IS THE FONT'S POSTSCRIPT NAME, and it is not the
+/// filename — SwiftUI's `.custom` wants the former. Asking for
+/// "MaterialCommunityIcons" (which is what the file is called) silently falls
+/// back to the system font, and a private-use codepoint has no glyph there, so
+/// every station icon rendered as the missing-glyph box. Read it out of the
+/// ttf's own name table rather than assuming; `scripts/test-widget-fonts.mjs`
+/// pins both names so a future font swap cannot quietly break this again.
+func iconFont(_ size: CGFloat) -> Font { .custom("MaterialDesignIcons", size: size) }
 
 /// Shown when there is no snapshot yet — an honest empty state rather than a
 /// made-up station. Deliberately says what to do about it.

@@ -37,13 +37,16 @@ module.exports = {
   entitlements: {
     'com.apple.security.application-groups': ['group.com.driftlore.CruiseFM'],
   },
-  // The two faces the widgets draw with. DSEG is the app's own seven-segment
-  // gauge font (already in assets/fonts, SIL OFL) and MaterialCommunityIcons
-  // is the icon set every station picks its glyph from — the snapshot carries
-  // the resolved CHARACTER, so the extension only needs the font, never the
-  // name-to-codepoint table.
-  fonts: [
-    '../../assets/fonts/DSEG7Classic-Bold.ttf',
-    '../../node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf',
-  ],
+  // NO `fonts` KEY HERE, and that is not an oversight. @bacons/apple-targets
+  // does not read one — it reads icon, images, colors, entitlements,
+  // frameworks, name, displayName and a few more, and silently ignores
+  // anything else. A `fonts: [...]` array sat here from 21.08 until 01.09
+  // doing nothing at all, which is why the first widget build drew its dial
+  // in a plain system face and every station icon as a missing-glyph box.
+  //
+  // Fonts reach the extension the way any other resource does: the ttf files
+  // live in THIS FOLDER, so the target's file-system-synchronized group picks
+  // them up as bundle resources, and Info.plist beside them declares them in
+  // UIAppFonts. That Info.plist is committed deliberately — the plugin writes
+  // one only when none exists, so ours is respected rather than overwritten.
 };

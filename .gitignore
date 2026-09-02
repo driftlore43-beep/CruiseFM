@@ -50,4 +50,3 @@ example
 # its own prebuild, so committing these only risks them going stale against
 # app.json's icon and the target config.
 /targets/*/Assets.xcassets
-/targets/*/Info.plist

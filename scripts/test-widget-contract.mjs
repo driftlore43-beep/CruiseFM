@@ -135,21 +135,20 @@ console.log('\n  the version gate is real:');
     `app ${snap.version} vs widget ${supported?.[1]}`);
 }
 
-console.log('\n  the fonts the widgets ask for actually exist:');
-{
-  const cfg = fs.readFileSync(`${ROOT}/targets/widgets/expo-target.config.js`, 'utf8');
-  const paths = [...cfg.matchAll(/'(\.\.\/\.\.\/[^']+\.ttf)'/g)].map((m) => m[1]);
-  check('the config lists font files', paths.length > 0);
-  for (const rel of paths) {
-    const abs = `${ROOT}/targets/widgets/${rel}`;
-    check(`present: ${rel.split('/').pop()}`, fs.existsSync(abs), abs);
-  }
-  // A font is asked for BY POSTSCRIPT NAME in Swift, which is not the same as
-  // the filename — getting it wrong is a silent fall back to the system face.
-  for (const face of ['DSEG7Classic-Bold', 'MaterialCommunityIcons']) {
-    check(`Swift asks for "${face}"`, swift.includes(`"${face}"`));
-  }
-}
+// FONTS MOVED TO scripts/test-widget-fonts.mjs, and the block that used to sit
+// here is worth remembering as a warning. It asserted two things:
+//
+//   1. that expo-target.config.js listed font files under a `fonts:` key —
+//      which @bacons/apple-targets never reads, so the check was confirming a
+//      setting that did nothing; and
+//   2. that Swift asked for "MaterialCommunityIcons" — which is the FILENAME,
+//      not the font's PostScript name ("MaterialDesignIcons"), so it was
+//      pinning the exact bug that made every station icon render as a
+//      missing-glyph box.
+//
+// It passed the whole time both were broken. A check that asserts your
+// assumption rather than the property is worse than none, because it is read
+// as evidence. The replacement reads the ttf's own name table.
 
 console.log(fails ? `\n  ${fails} failure(s)\n` : '\n  the app and its widgets agree\n');
 process.exit(fails ? 1 : 0);

@@ -57,6 +57,9 @@ const W = (() => {
       cachedCustomStations: () => [{ id: 'custom-1' }],
       loadCustomStations: async () => [],
     };
+    // The back-fill reaches for the native bridge and does real work; the
+    // snapshot only calls it to keep existing stations' photos in step.
+    if (name === './widgetArtwork') return { backfillStationImagesOnce: async () => {} };
     if (name === './lastPlayed') return { getLastPlayed: async () => lastPlayed };
     if (name === '@/utils/lastCruise') return { loadLastCruise: async () => lastCruise };
     if (name === '@/utils/driveStats') return { getDriveStats: async () => stats };

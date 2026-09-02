@@ -1,5 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
+import { sendStationImageToWidgets } from './widgetArtwork';
+
 /**
  * A photo of your own, behind a station you made.
  *
@@ -187,6 +189,11 @@ export async function saveStationPhoto(
 
     // Whatever this station had before is now unreachable.
     await deleteStationPhoto(stationId, stamp);
+    // AND THE WIDGETS GET A COPY. A widget extension cannot reach this
+    // directory — different process, different sandbox — so the only route
+    // across is the App Group. Unawaited and unguarded: a station must save
+    // whether or not the widgets are reachable.
+    sendStationImageToWidgets(stationId, imageBlur).catch(() => {});
     return { kind: 'photo', photo: { image, imageBlur } };
   } catch {
     return { kind: 'failed' };
@@ -244,6 +251,10 @@ export function clampCrop(c: CropRect, imgW: number, imgH: number): CropRect {
  * new one, via `keepStamp`) and when the station itself is deleted.
  */
 export async function deleteStationPhoto(stationId: string, keepStamp?: number): Promise<void> {
+  // ONLY ON A REAL DELETE. `keepStamp` means this is the tidy-up inside a
+  // SAVE — the new files are already written and the widget copy is about to
+  // be sent, so clearing it here would wipe the one being replaced.
+  if (keepStamp == null) sendStationImageToWidgets(stationId, null).catch(() => {});
   try {
     const info = await FileSystem.getInfoAsync(DIR);
     if (!info.exists) return;

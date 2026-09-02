@@ -41,6 +41,20 @@ public class CruiseWidgetsModule: Module {
    *  and in the extension's Artwork.swift; the two must agree. */
   private static let artworkFile = "last-artwork.jpg"
 
+  /** A custom station's own photograph, one file per station. The extension
+   *  builds the same name from the station id it already has in the snapshot,
+   *  so neither side needs a list of what exists. */
+  private static func stationFile(_ id: String) -> String { "station-\(id).jpg" }
+
+  /** Station ids come from the app, not a user, but they end up in a FILE
+   *  NAME — so anything that could climb out of the container is refused
+   *  rather than trusted. A rejected id simply means no photo in the widget. */
+  private static func safeId(_ id: String) -> String? {
+    let ok = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
+    guard !id.isEmpty, id.count <= 64, id.unicodeScalars.allSatisfy({ ok.contains($0) }) else { return nil }
+    return id
+  }
+
   public func definition() -> ModuleDefinition {
     Name("CruiseWidgets")
 
@@ -92,6 +106,39 @@ public class CruiseWidgetsModule: Module {
      * Passing nil clears it, which is what a drive with no artwork should do
      * rather than leaving yesterday's cover sitting on the record for ever.
      */
+    /**
+     * Put a CUSTOM station's photograph where the widgets can draw it.
+     *
+     * The ten built-in stations' backdrops are bundled into the extension
+     * itself, which is why they needed nothing like this. A custom station's
+     * photo lives in the app's documents directory — a place a widget
+     * extension genuinely cannot reach, being a separate process with its own
+     * sandbox — so the only route across is to copy it into the App Group.
+     *
+     * ONE FILE PER STATION, named from the station id the snapshot already
+     * carries, so the extension can find it without being told and nothing
+     * has to keep a list in step. Passing nil deletes it, which is what
+     * removing a station or its photo should do rather than leaving an
+     * orphan behind for a widget to draw.
+     */
+    AsyncFunction("setStationImage") { (id: String, base64: String?) -> Bool in
+      guard
+        let safe = Self.safeId(id),
+        let dir = FileManager.default
+          .containerURL(forSecurityApplicationGroupIdentifier: Self.appGroup)
+      else { return false }
+      let url = dir.appendingPathComponent(Self.stationFile(safe))
+      guard let b64 = base64, !b64.isEmpty else {
+        try? FileManager.default.removeItem(at: url)
+        if #available(iOS 14.0, *) { WidgetCenter.shared.reloadAllTimelines() }
+        return true
+      }
+      guard let data = Data(base64Encoded: b64) else { return false }
+      do { try data.write(to: url, options: .atomic) } catch { return false }
+      if #available(iOS 14.0, *) { WidgetCenter.shared.reloadAllTimelines() }
+      return true
+    }
+
     AsyncFunction("setArtwork") { (base64: String?) -> Bool in
       guard let dir = FileManager.default
         .containerURL(forSecurityApplicationGroupIdentifier: Self.appGroup) else { return false }

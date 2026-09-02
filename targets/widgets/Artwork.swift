@@ -28,9 +28,29 @@ enum Art {
   static let artworkFile = "last-artwork.jpg"
   static let appGroup = "group.com.driftlore.CruiseFM"
 
-  /// The blurred backdrop for a built-in station, or nil for a custom one.
+  /// A custom station's photograph, as written by `setStationImage`. Must
+  /// match `stationFile` in CruiseWidgetsModule.swift.
+  static func stationFile(_ id: String) -> String { "station-\(id).jpg" }
+
+  /**
+   * The backdrop for a station, from whichever of the two places has one.
+   *
+   * BUNDLED FIRST — the ten built-ins ship inside this extension, so they
+   * cost no I/O and are always present. Then the App Group container, where
+   * a CUSTOM station's photo is copied when it is saved; that is the only
+   * route across, because the app's documents directory is outside anything
+   * this process can see.
+   *
+   * Nil is a perfectly good answer: a custom station with no photo, or one
+   * saved by a build older than the copying, falls back to its gradient.
+   */
   static func station(_ id: String?) -> Image? {
-    guard let id, let ui = UIImage(named: id) else { return nil }
+    guard let id else { return nil }
+    if let ui = UIImage(named: id) { return Image(uiImage: ui) }
+    guard
+      let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup),
+      let ui = UIImage(contentsOfFile: dir.appendingPathComponent(stationFile(id)).path)
+    else { return nil }
     return Image(uiImage: ui)
   }
 

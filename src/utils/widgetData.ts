@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import GLYPHS from '@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json';
 
 import { getLastPlayed } from './lastPlayed';
+import { backfillStationImagesOnce } from './widgetArtwork';
 
 import { STATIONS, stationDial } from '@/constants/stations';
 import { primaryOnAir, upNext, clockLabel } from '@/constants/schedule';
@@ -75,11 +76,14 @@ export type WidgetStation = {
   /**
    * The station's own blurred backdrop, if the widget has one bundled.
    *
-   * This is just the station id — the images in `targets/widgets/stations/`
-   * are NAMED by id precisely so nothing has to carry a filename or, worse,
-   * so Swift never needs a second copy of the id→file mapping. Null for a
-   * custom station, whose photograph lives in the app's documents directory,
-   * outside the shared container the widget can reach.
+   * This is just the station id, and it means "there is a backdrop for this
+   * one" rather than naming a file. The extension looks in two places for it:
+   * its own bundled copies (the ten built-ins, in `targets/widgets/stations/`,
+   * named by id precisely so nothing carries a filename) and then the App
+   * Group container, where a CUSTOM station's photo is copied when saved.
+   *
+   * Null means draw the gradient — a custom station with no photograph, which
+   * is the normal case for one made from colours alone.
    */
   image: string | null;
 };
@@ -168,7 +172,10 @@ export function toWidgetStation(id: string): WidgetStation {
     dial: `${dial.label} ${dial.band}`,
     icon,
     iconChar: glyphChar(icon),
-    image: known ? s.id : null,
+    // A custom station qualifies too, but only once it HAS a photo — the
+    // widget's copy is written from `image` being set, so promising one here
+    // for a colours-only station would draw nothing and lose the gradient.
+    image: known || s.image ? s.id : null,
     colors: s.cardGradient,
     // The accent slot every mode wears — eqColors[1] where a station has a
     // ramp, its mid gradient stop otherwise. Same rule as the app itself, so
@@ -263,6 +270,9 @@ export async function buildWidgetSnapshot(now: Date = new Date()): Promise<Widge
 export async function publishWidgetData(): Promise<void> {
   if (!bridge) return;
   try {
+    // Stations made before the widgets could show photographs get their copy
+    // now. Once per install, and it no-ops on every later call.
+    await backfillStationImagesOnce().catch(() => {});
     await bridge.setSnapshot(JSON.stringify(await buildWidgetSnapshot()));
   } catch {
     // The last good snapshot stays on disk; the next call will try again.

@@ -59,6 +59,9 @@ const W = (() => {
     if (name === '@/utils/sessionKind') return {
       cachedSessionKind: () => 'driving', loadSessionKind: async () => 'driving',
       words: () => ({ countLabel: 'DRIVES', timeLabel: 'CRUISED' }) };
+    // The back-fill reaches for the native bridge and does real work; the
+    // snapshot only calls it to keep existing stations' photos in step.
+    if (name === './widgetArtwork') return { backfillStationImagesOnce: async () => {} };
     if (name === './lastPlayed') return {
       getLastPlayed: async () => ({ title: 'Zero', artist: 'Pumpkins', artUrl: null, at: 1 }),
     };

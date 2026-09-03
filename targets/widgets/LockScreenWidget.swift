@@ -52,21 +52,30 @@ struct LockScreenView: View {
         Text(entry.station?.name ?? "Cruise FM")
           .font(.system(size: 15, weight: .bold))
           .lineLimit(1).minimumScaleFactor(0.8)
-        Text(entry.station?.dial ?? "")
-          .font(dialFont(12))
-          .opacity(0.75)
+        // Number and band in their own faces. No colour set on either: the
+        // Lock Screen tints whatever it is given, and forcing white here
+        // would fight it.
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+          Text(dialNumber).font(dialFont(12))
+          if !dialBand.isEmpty { Text(dialBand).font(bandFont(7)) }
+        }
+        .opacity(0.75)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 
   /// "92.1 FM" split, so the circular family can stack the number over its
-  /// band instead of shrinking the whole string into illegibility.
+  /// band instead of shrinking the whole string into illegibility — and so
+  /// the rectangular one can set each half in the face that can draw it.
+  /// Through `splitDial` rather than a second copy of the same two lines:
+  /// this repo spent a whole round on one idea that had quietly become four
+  /// copies, and two is how that starts.
   private var dialNumber: String {
-    (entry.station?.dial ?? "").split(separator: " ").first.map(String.init) ?? "—"
+    entry.station.map { splitDial($0.dial).number } ?? "—"
   }
   private var dialBand: String {
-    (entry.station?.dial ?? "").split(separator: " ").last.map(String.init) ?? ""
+    entry.station.map { splitDial($0.dial).band } ?? ""
   }
 }
 

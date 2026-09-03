@@ -158,6 +158,50 @@ extension WidgetStation {
 
 /// The seven-segment face the app sets every dial number in.
 func dialFont(_ size: CGFloat) -> Font { .custom("DSEG7Classic-Bold", size: size) }
+
+/**
+ * The band letters — AM, FM — in the FOURTEEN-segment face.
+ *
+ * SEVEN SEGMENTS CAN ONLY APPROXIMATE A LETTER, and the approximation for M
+ * reads as N. DSEG7 does have A, M and F glyphs — checked, they are distinct
+ * outlines, not substitutions — but seven bars have no diagonals and no
+ * vertical centre, so its M is the closest a calculator display can get. The
+ * app hit this on 31.07 with a whole "94.7 FM" set in DSEG7 coming out as
+ * "94.7 FN", and fixed it by moving the band to DSEG14, which has fourteen
+ * segments and therefore real letterforms. Every widget was still setting the
+ * whole of `snapshot.dial` ("810 AM") in DSEG7 until 03.09.
+ *
+ * So numbers go through `dialFont` and letters through this one, always.
+ */
+func bandFont(_ size: CGFloat) -> Font { .custom("DSEG14Classic-Bold", size: size) }
+
+/**
+ * "810 AM" split into the part a seven-segment display can show and the part
+ * it cannot. Done here rather than by adding two more snapshot fields, so a
+ * phone still running an older build's snapshot gets the fix too.
+ */
+func splitDial(_ dial: String) -> (number: String, band: String) {
+  let parts = dial.split(separator: " ", maxSplits: 1).map(String.init)
+  guard parts.count == 2 else { return (dial, "") }
+  return (parts[0], parts[1])
+}
+
+/// Number and band set side by side in their own faces, which is the only way
+/// this reads as one display rather than two fonts that happen to be adjacent.
+struct DialText: View {
+  let dial: String
+  var size: CGFloat = 15
+  var color: Color = .white
+  var body: some View {
+    let d = splitDial(dial)
+    HStack(alignment: .firstTextBaseline, spacing: size * 0.28) {
+      Text(d.number).font(dialFont(size)).foregroundColor(color)
+      if !d.band.isEmpty {
+        Text(d.band).font(bandFont(size * 0.56)).foregroundColor(color.opacity(0.82))
+      }
+    }
+  }
+}
 /// The icon set every station picks its glyph from.
 ///
 /// "MaterialDesignIcons" IS THE FONT'S POSTSCRIPT NAME, and it is not the

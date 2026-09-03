@@ -15,7 +15,16 @@ struct CruiseWidgetBundle: WidgetBundle {
   @WidgetBundleBuilder
   var body: some Widget {
     StartDriveWidget()
-    VinylWidget()
+    // ONE OF THE TWO, NEVER BOTH — they share a `kind`, so the gallery shows
+    // a single "On the Deck" either way. iOS 17 gets the version whose look
+    // can be changed from Edit Widget; older phones get the plain one, which
+    // matters because build 39 already put the Deck on Home Screens and
+    // dropping it for them would take it away.
+    if #available(iOSApplicationExtension 17.0, *) {
+      DeckConfigurableWidget()
+    } else {
+      DeckWidget()
+    }
     OnAirWidget()
     StatsWidget()
     if #available(iOSApplicationExtension 16.0, *) {

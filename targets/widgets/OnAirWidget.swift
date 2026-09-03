@@ -99,9 +99,12 @@ struct OnAirView: View {
             }
           }
           Spacer(minLength: 4)
-          Text(s.dial)
-            .font(dialFont(family == .systemSmall ? 15 : 18))
-            .foregroundColor(.white.opacity(0.55))
+          // Number and band in their own faces. Seven segments can only
+          // approximate a letter and its M reads as N, so the band goes in
+          // the fourteen-segment face — see bandFont.
+          DialText(dial: s.dial,
+                   size: family == .systemSmall ? 15 : 18,
+                   color: .white.opacity(0.55))
           Text(s.name)
             .font(.system(size: family == .systemSmall ? 16 : 20, weight: .bold))
             .foregroundColor(.white)

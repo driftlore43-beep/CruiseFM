@@ -26,6 +26,39 @@ const check = (n, ok, extra = '') => {
   fails++; console.log('  FAIL', n, extra);
 };
 
+/** Every codepoint a ttf actually covers, from its own cmap (format 4 and 12). */
+function coverage(file) {
+  const d = fs.readFileSync(file);
+  const covered = new Set();
+  const numTables = d.readUInt16BE(4);
+  let cmapOff = null;
+  for (let i = 0; i < numTables; i++) {
+    const rec = 12 + i * 16;
+    if (d.toString('latin1', rec, rec + 4) === 'cmap') { cmapOff = d.readUInt32BE(rec + 8); break; }
+  }
+  if (cmapOff == null) return covered;
+  const n = d.readUInt16BE(cmapOff + 2);
+  for (let i = 0; i < n; i++) {
+    const sub = cmapOff + d.readUInt32BE(cmapOff + 4 + i * 8 + 4);
+    const fmt = d.readUInt16BE(sub);
+    if (fmt === 4) {
+      const segX2 = d.readUInt16BE(sub + 6);
+      for (let s = 0; s < segX2 / 2; s++) {
+        const end = d.readUInt16BE(sub + 14 + s * 2);
+        const start = d.readUInt16BE(sub + 16 + segX2 + s * 2);
+        for (let c = start; c <= end && c !== 0xffff; c++) covered.add(c);
+      }
+    } else if (fmt === 12) {
+      const groups = d.readUInt32BE(sub + 12);
+      for (let g = 0; g < groups; g++) {
+        const o = sub + 16 + g * 12;
+        for (let c = d.readUInt32BE(o); c <= d.readUInt32BE(o + 4); c++) covered.add(c);
+      }
+    }
+  }
+  return covered;
+}
+
 /** The PostScript name (nameID 6), read from the ttf's own name table — the
  *  only authority on what `.custom()` will match. */
 function postScriptName(file) {
@@ -90,39 +123,52 @@ console.log('\n  the subset still covers every icon a station can use:');
   check('found the icon names to check', names.size >= 10, `${names.size} — a regex matching nothing passes vacuously`);
 
   const sub = declared.find((f) => /Material/i.test(f));
-  const d = fs.readFileSync(`${DIR}/${sub}`);
-  // Walk the cmap format-4/12 subtables for the codepoints actually present.
-  const covered = new Set();
-  const numTables = d.readUInt16BE(4);
-  let cmapOff = null;
-  for (let i = 0; i < numTables; i++) {
-    const rec = 12 + i * 16;
-    if (d.toString('latin1', rec, rec + 4) === 'cmap') { cmapOff = d.readUInt32BE(rec + 8); break; }
-  }
-  const n = d.readUInt16BE(cmapOff + 2);
-  for (let i = 0; i < n; i++) {
-    const sub2 = cmapOff + d.readUInt32BE(cmapOff + 4 + i * 8 + 4);
-    const fmt = d.readUInt16BE(sub2);
-    if (fmt === 4) {
-      const segX2 = d.readUInt16BE(sub2 + 6);
-      for (let s = 0; s < segX2 / 2; s++) {
-        const end = d.readUInt16BE(sub2 + 14 + s * 2);
-        const start = d.readUInt16BE(sub2 + 16 + segX2 + s * 2);
-        for (let c = start; c <= end && c !== 0xffff; c++) covered.add(c);
-      }
-    } else if (fmt === 12) {
-      const groups = d.readUInt32BE(sub2 + 12);
-      for (let g = 0; g < groups; g++) {
-        const o = sub2 + 16 + g * 12;
-        for (let c = d.readUInt32BE(o); c <= d.readUInt32BE(o + 4); c++) covered.add(c);
-      }
-    }
-  }
+  const covered = coverage(`${DIR}/${sub}`);
   const missing = [...names].filter((nm) => glyphs[nm] && !covered.has(glyphs[nm]));
   check('every station icon is in the subset', missing.length === 0,
     `missing: ${JSON.stringify(missing)} — re-run the subset after adding an icon`);
   const unknown = [...names].filter((nm) => !glyphs[nm]);
   check('every icon name is a real glyph', unknown.length === 0, JSON.stringify(unknown));
+}
+
+// ── THE BAND LETTERS ──────────────────────────────────────────────────────
+//
+// The snapshot carries the dial as ONE string — "810 AM" — and every widget
+// set the whole thing in DSEG7Classic-Bold. That font DOES have A, M and F
+// (checked: distinct outlines, not substitutions), but seven bars have no
+// diagonal and no vertical centre, so its M is a calculator's best attempt
+// and reads as N. The app hit exactly that on 31.07 with "94.7 FM" coming out
+// "94.7 FN" and moved the band to the fourteen-segment face; the widgets
+// shipped without the fix because nothing here could see it.
+//
+// The rule this pins is ours, not the font's: a dial is never handed whole to
+// the number font. That is checkable; "does an M read as an N" is not.
+{
+  console.log('\n  the band letters go in a font that can draw them:');
+  const glyphless = 'DSEG7Classic-Bold';
+  let offenders = [];
+  for (const f of fs.readdirSync(DIR).filter((n) => n.endsWith('.swift'))) {
+    const src = fs.readFileSync(`${DIR}/${f}`, 'utf8');
+    // Text(<anything>.dial<anything>) followed by .font(dialFont(...)) — the
+    // whole string in the numbers-only face.
+    const re = /Text\(([^)]*\.dial[^)]*)\)[\s\S]{0,120}?\.font\(dialFont\(/g;
+    for (const m of src.matchAll(re)) offenders.push(`${f}: Text(${m[1].trim()})`);
+  }
+  check('no widget sets a whole dial string in ' + glyphless, offenders.length === 0,
+    offenders.join('; ') + ' — split it with splitDial/DialText so the band gets bandFont');
+
+  const snap = fs.readFileSync(`${DIR}/Snapshot.swift`, 'utf8');
+  check('a band font exists and names the 14-segment face',
+    /func bandFont\([\s\S]{0,120}DSEG14Classic-Bold/.test(snap));
+  check('the 14-segment font is declared in Info.plist',
+    fs.readFileSync(`${DIR}/Info.plist`, 'utf8').includes('DSEG14Classic-Bold.ttf'));
+  // The whole reason the split is needed: prove the numbers font really is
+  // missing the letters, rather than trusting that it is.
+  // The fourteen-segment face must actually carry the letters it is being
+  // used for, or this whole split buys nothing.
+  const fourteen = coverage(`${DIR}/DSEG14Classic-Bold.ttf`);
+  const gaps = [...'AMF'].filter((c) => !fourteen.has(c.charCodeAt(0)));
+  check('the 14-segment font covers the band letters', gaps.length === 0, JSON.stringify(gaps));
 }
 
 console.log(fails ? `\n  ${fails} failure(s)\n`

@@ -106,14 +106,33 @@ it belongs in this batch.
 
 ### 6. Not in this build, on purpose
 
-- **The app preview video.** The full plan and a shot list are written up in
-  `store-listing-next-build.md`. It is genuinely worth doing — a moving app sells
-  a visual app far better than stills — but it is an afternoon's work of its own
-  and the owner has parked it.
 - **The Live Activity.** This is the lock-screen banner during a drive, and it is
   the one that would also put Cruise FM on a car's CarPlay dashboard for free.
   It is the biggest single thing left on the widget list and it deserves its own
   round rather than being rushed in alongside four others.
+
+---
+
+## Before submitting — needed, not parked (owner, 3 September)
+
+**CORRECTION: this section used to say the app preview video was "parked by the
+owner."** It is not — she asked directly for both of these to be worked on
+before the next submission. Neither needs a build; both are marketing assets
+that sit alongside the binary in App Store Connect, so they can be done any
+time before pressing Submit, on the current screenshots or on fresh ones taken
+from the finished build.
+
+- **App Store screenshots.** The current set (`screenshots-appstore/`, built by
+  `scripts/marketing/build-slides.mjs`) predates the widget work, the light
+  theme, the broadcast schedule and the drive-ticket log — all of it landed
+  since 1.3.0's listing was last touched. Worth a fresh pass once the new
+  build's screens are settled, and iPad screenshots become REQUIRED the moment
+  `supportsTablet` ships.
+- **The app preview video.** Full plan, shot list and technical spec are
+  already written in `store-listing-next-build.md` under **"THE APP PREVIEW
+  VIDEO — how to actually make it"** — read that rather than re-deriving it.
+  Two routes for the owner to record it, both free; Claude does everything
+  either side of the recording (the shot list, the timing, the edit).
 
 ---
 

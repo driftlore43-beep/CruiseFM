@@ -3,7 +3,14 @@ import WidgetKit
 
 /**
  * Everything the extension offers, in the order it reads in the gallery:
- * start a drive, see what's on, see how you're doing, then the Lock Screen.
+ * start a drive, the record, the song you last heard, what's on, the mode as
+ * an object, how you're doing, then the Lock Screen.
+ *
+ * SEVEN ROWS FOR TEN DESIGNS, and that is the point of the Look settings. The
+ * Deck carries two looks, Last Played carries three and The Mode carries two;
+ * each would otherwise be its own row and the gallery would be a scroll rather
+ * than a choice. A look is a different way of drawing the SAME idea — where
+ * two designs answer different questions they get their own row instead.
  *
  * The Lock Screen widget is iOS 16+ because its families did not exist
  * before that. Below 16 it is simply absent from the gallery — the right
@@ -25,7 +32,20 @@ struct CruiseWidgetBundle: WidgetBundle {
     } else {
       DeckWidget()
     }
+    // Same two-configuration split as the Deck, and for the same reason:
+    // AppIntentConfiguration is iOS 17+, both share a `kind`, and only ever
+    // one of each pair is registered.
+    if #available(iOSApplicationExtension 17.0, *) {
+      LastPlayedConfigurableWidget()
+    } else {
+      LastPlayedWidget()
+    }
     OnAirWidget()
+    if #available(iOSApplicationExtension 17.0, *) {
+      ModeConfigurableWidget()
+    } else {
+      ModeWidget()
+    }
     StatsWidget()
     if #available(iOSApplicationExtension 16.0, *) {
       LockScreenWidget()

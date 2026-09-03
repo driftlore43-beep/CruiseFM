@@ -73,49 +73,79 @@ enum Art {
  * of every app, not just this one. So this is drawn as a still record, which
  * is what a turntable looks like at a glance anyway.
  *
- * The grooves are concentric rings rather than a texture because at widget
- * size (~70pt) a texture reads as noise; the app's own deck draws 26 of them
- * across a 350pt platter, and the same density here would be a grey smudge.
+ * THE GROOVES ARE A TEXTURE, NOT A DIAGRAM. This drew nine rings once, on the
+ * reasoning that a real density would be a grey smudge at widget size — and
+ * the owner called it on 03.09: "improve the vinyls' design add grooved and a
+ * bit of texture". Nine rings spaced wide apart read as a target printed on a
+ * black disc. A record has hundreds, and what makes them read as CUT rather
+ * than DRAWN is that each one is a dark trough with a hairline of light on the
+ * wall the light falls on — the same finding the app's own Classic vinyl was
+ * rebuilt around on 25.08.
+ *
+ * The pitch is held at ~1.7pt because below about 1.2 neighbouring rings
+ * moire against the pixel grid, which is its own drawn-looking artefact.
  */
 struct RecordView: View {
-  /// The station's accent — the record's rim and grooves take it, exactly as
-  /// the app's Vinyl deck does, so the two cannot look like different objects.
+  /// The station's accent — the record's rim takes it, exactly as the app's
+  /// Vinyl deck does, so the two cannot look like different objects.
   let accent: Color
-  /// The last-played cover, drawn as the label. Nil falls back to the accent.
+  /// The last-played cover, drawn as the label. Nil falls back to a pressing.
   let label: Image?
   let size: CGFloat
+  /// A printed label rather than a photographic one — the station's own
+  /// pressing, which `pressing()` then prints the name and frequency onto.
+  var plainLabel: Bool = false
 
-  private var grooveCount: Int { size > 90 ? 9 : 6 }
+  /// Pitch in points, not a count: the rings have to stay the same distance
+  /// apart whatever the record's size, or a small one looks coarse beside a
+  /// large one on the same Home Screen.
+  private var pitch: CGFloat { 1.7 }
+  private var innerEdge: CGFloat { 0.46 }   // where the label starts
+  private var ringCount: Int {
+    max(6, Int((size * (0.99 - innerEdge) / 2) / pitch))
+  }
 
   var body: some View {
     ZStack {
-      Circle().fill(Color(white: 0.055))
-      // Grooves: dark cuts with a hairline of light on the outer wall, which
-      // is what makes them read as pressed in rather than drawn on.
-      ForEach(0..<grooveCount, id: \.self) { i in
-        let t = CGFloat(i) / CGFloat(grooveCount)
-        let d = size * (0.99 - t * 0.42)
+      Circle().fill(Color(white: 0.045))
+      // Every groove twice: the trough, then the lit wall just outside it.
+      // One stroke alone is a line drawn on a surface; two is a cut into one.
+      ForEach(0..<ringCount, id: \.self) { i in
+        let d = size * 0.99 - CGFloat(i) * pitch * 2
         Circle()
-          .stroke(accent.opacity(0.10 + 0.05 * (1 - t)), lineWidth: 0.6)
+          .stroke(Color.black.opacity(0.55), lineWidth: pitch * 0.62)
           .frame(width: d, height: d)
+        Circle()
+          .stroke(Color.white.opacity(0.055), lineWidth: 0.5)
+          .frame(width: d + pitch * 0.66, height: d + pitch * 0.66)
       }
       // A single soft sheen. The app's deck learned the hard way that light
       // drawn as a hard-edged wedge reads as a drawn shape; falloff only.
       Circle()
         .fill(
           RadialGradient(
-            colors: [.white.opacity(0.16), .clear],
+            colors: [.white.opacity(0.15), .clear],
             center: .init(x: 0.32, y: 0.24), startRadius: 0, endRadius: size * 0.62))
+      // The raised lip a pressing has at its edge.
+      Circle().stroke(Color.white.opacity(0.13), lineWidth: 1)
+        .frame(width: size * 0.985, height: size * 0.985)
       // The label, and the album cover if there is one.
       Group {
         if let label {
           label.resizable().aspectRatio(contentMode: .fill)
+        } else if plainLabel {
+          Circle().fill(
+            RadialGradient(colors: [Color(hex: "#2b3550"), Color(hex: "#141a29")],
+                           center: .init(x: 0.38, y: 0.32),
+                           startRadius: 0, endRadius: size * 0.30))
         } else {
           Circle().fill(accent.opacity(0.85))
         }
       }
       .frame(width: size * 0.42, height: size * 0.42)
       .clipShape(Circle())
+      .overlay(Circle().stroke(Color.black.opacity(0.55), lineWidth: 1)
+                 .frame(width: size * 0.42, height: size * 0.42))
       // Spindle hole — small, and the one place the backdrop shows through.
       Circle().fill(Color.black.opacity(0.55)).frame(width: size * 0.055, height: size * 0.055)
       Circle().stroke(accent.opacity(0.55), lineWidth: 0.8)

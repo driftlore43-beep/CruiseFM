@@ -2,7 +2,7 @@ import AppIntents
 import WidgetKit
 
 /**
- * The Deck's three looks, and the setting that picks between them.
+ * The Deck's two looks, and the setting that picks between them.
  *
  * ONE WIDGET, NOT THREE. Every look could have been its own entry in the
  * widget gallery, and the gallery would then be seven items long for an app
@@ -27,12 +27,15 @@ enum DeckLook: String, AppEnum {
   case road
   /// The label is the subject: station and frequency printed on the pressing.
   case label
-  /// The record beside a lit receiver window — the object and the radio.
-  case set
 
+  /// THERE WAS A THIRD, "on the set" — the record beside a lit receiver. The
+  /// owner dropped it on 03.09 when she picked the line-up. Do not bring it
+  /// back without her: the receiver reads as the Dial widget in miniature,
+  /// which is a duplicate rather than a look.
+  ///
   /// What a phone too old for the setting gets, and the value a fresh widget
   /// starts on. The Road reads at a glance and needs no photograph to work,
-  /// so it is the safest of the three to hand someone who cannot change it.
+  /// so it is the safer of the two to hand someone who cannot change it.
   static let defaultLook: DeckLook = .road
 
   static var typeDisplayRepresentation: TypeDisplayRepresentation = "Look"
@@ -41,8 +44,6 @@ enum DeckLook: String, AppEnum {
                                  subtitle: "The record over your station's own picture"),
     .label: DisplayRepresentation(title: "The label",
                                   subtitle: "The pressing, with the song printed beside it"),
-    .set: DisplayRepresentation(title: "On the set",
-                                subtitle: "The record next to a lit receiver"),
   ]
 }
 

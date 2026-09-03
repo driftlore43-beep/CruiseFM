@@ -84,41 +84,40 @@ struct OnAirView: View {
         LinearGradient(colors: [.white.opacity(0.14), .clear],
                        startPoint: .topLeading, endPoint: .center)
 
-        VStack(alignment: .leading, spacing: 0) {
-          HStack(spacing: 5) {
-            // The app's own on-air lamp: a red dot, the one colour that never
-            // changes with the station (the Tuner's needle rule).
-            Circle().fill(Color(hex: "#FF3B30")).frame(width: 6, height: 6)
-            Text("ON AIR")
-              .font(.system(size: 9, weight: .heavy)).tracking(1.6)
-              .foregroundColor(.white.opacity(0.72))
-            Spacer()
-            if let ch = s.iconChar, !ch.isEmpty {
-              Text(ch).font(iconFont(family == .systemSmall ? 16 : 19))
-                .foregroundColor(.white.opacity(0.85))
-            }
+        if family == .systemSmall {
+          VStack(alignment: .leading, spacing: 0) {
+            onAirLamp(s)
+            Spacer(minLength: 4)
+            DialText(dial: s.dial, size: 15, color: .white.opacity(0.55))
+            Text(s.name).font(.system(size: 16, weight: .bold))
+              .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.8)
           }
-          Spacer(minLength: 4)
-          // Number and band in their own faces. Seven segments can only
-          // approximate a letter and its M reads as N, so the band goes in
-          // the fourteen-segment face — see bandFont.
-          DialText(dial: s.dial,
-                   size: family == .systemSmall ? 15 : 18,
-                   color: .white.opacity(0.55))
-          Text(s.name)
-            .font(.system(size: family == .systemSmall ? 16 : 20, weight: .bold))
-            .foregroundColor(.white)
-            .lineLimit(2).minimumScaleFactor(0.8)
-          if family != .systemSmall {
-            Text(s.tagline)
-              .font(.system(size: 12))
-              .foregroundColor(.white.opacity(0.68))
-              .lineLimit(1).padding(.top, 2)
+        } else {
+          // THE MEDIUM IS A DIAL, because this widget is the one that answers
+          // "what's on?" and a receiver answers it by showing you where you
+          // are on the band. Owner, 03.09, on the tick marks: "I can barely
+          // see the lines - they are quite short" — so they are nearly twice
+          // as long as the first cut and brighter with it. A scale you cannot
+          // read is decoration rather than a dial.
+          VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+              onAirLamp(s)
+              Spacer(minLength: 6)
+              DialText(dial: s.dial, size: 22, color: .white)
+            }
+            Text(s.name).font(.system(size: 21, weight: .heavy))
+              .foregroundColor(.white).lineLimit(1).minimumScaleFactor(0.7)
+              .padding(.top, 3)
+            Spacer(minLength: 6)
+            DialScale(accent: s.accentColor)
+            Spacer(minLength: 6)
             if let next = entry.upNext {
               Text("UP NEXT · \(next)")
                 .font(.system(size: 9, weight: .bold)).tracking(1)
-                .foregroundColor(.white.opacity(0.42))
-                .lineLimit(1).padding(.top, 5)
+                .foregroundColor(.white.opacity(0.46)).lineLimit(1)
+            } else {
+              Text(s.tagline).font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.66)).lineLimit(1)
             }
           }
         }
@@ -126,6 +125,64 @@ struct OnAirView: View {
       }
       .widgetURL(s.url(mode: nil))
     }
+  }
+}
+
+/// The app's own on-air lamp: a red dot, the one colour that never changes
+/// with the station (the Tuner's needle rule).
+private func onAirLamp(_ s: WidgetStation) -> some View {
+  HStack(spacing: 5) {
+    Circle().fill(Color(hex: "#FF3B30")).frame(width: 6, height: 6)
+    Text("ON AIR").font(.system(size: 9, weight: .heavy)).tracking(1.6)
+      .foregroundColor(.white.opacity(0.72))
+    if let ch = s.iconChar, !ch.isEmpty {
+      Text(ch).font(iconFont(15)).foregroundColor(.white.opacity(0.8))
+    }
+  }
+}
+
+/**
+ * A printed band scale with the needle parked on this station.
+ *
+ * THE TICKS ARE THE POINT, and they were the thing that failed: at 12pt and
+ * 22pt against a photograph they simply did not read. 20 and 36, and lifted
+ * in opacity, is what makes it a dial rather than a texture.
+ *
+ * The numbers are not the real band — this widget knows one station, not the
+ * whole dial — so the scale is printed and the NEEDLE is what is true. It sits
+ * where the station sits, which is the one claim being made.
+ */
+private struct DialScale: View {
+  let accent: Color
+
+  var body: some View {
+    GeometryReader { geo in
+      let w = geo.size.width
+      ZStack(alignment: .topLeading) {
+        LinearGradient(colors: [.clear, .black.opacity(0.42), .black.opacity(0.42), .clear],
+                       startPoint: .top, endPoint: .bottom)
+        // the ticks
+        ForEach(0..<33, id: \.self) { i in
+          let major = i % 5 == 0
+          Rectangle()
+            .fill(.white.opacity(major ? 0.78 : 0.42))
+            .frame(width: major ? 2 : 1.4, height: major ? 22 : 12)
+            .offset(x: w * (CGFloat(i) / 32) * 0.96 + w * 0.02,
+                    y: major ? 6 : 11)
+        }
+        Rectangle().fill(.white.opacity(0.28)).frame(height: 1).offset(y: 28)
+        // the needle, on the station
+        Rectangle().fill(Color(hex: "#FF3B30"))
+          .frame(width: 2, height: 32)
+          .offset(x: w * 0.38, y: 1)
+          .shadow(color: Color(hex: "#FF3B30").opacity(0.85), radius: 5)
+        Circle().fill(Color(hex: "#FF3B30"))
+          .frame(width: 7, height: 7)
+          .offset(x: w * 0.38 - 2.5, y: -2)
+          .shadow(color: Color(hex: "#FF3B30").opacity(0.9), radius: 5)
+      }
+    }
+    .frame(height: 34)
   }
 }
 

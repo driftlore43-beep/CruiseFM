@@ -36,7 +36,7 @@ import WidgetKit
 /// The look, in a form every iOS version can compile. `DeckLook` is the
 /// user-facing setting and is iOS 17+; this is what the views actually take,
 /// so the drawing is shared rather than duplicated behind an availability gate.
-enum DeckStyle { case road, label, set }
+enum DeckStyle { case road, label }
 
 private let cream = Color(red: 0.945, green: 0.929, blue: 0.890)
 private let creamDeep = Color(red: 0.878, green: 0.863, blue: 0.812)
@@ -103,7 +103,6 @@ struct DeckIntentProvider: AppIntentTimelineProvider {
     switch look {
     case .road: return .road
     case .label: return .label
-    case .set: return .set
     }
   }
 }
@@ -124,7 +123,6 @@ struct DeckView: View {
       switch entry.style {
       case .road:  road(s)
       case .label: label(s)
-      case .set:   set(s)
       }
     }
   }
@@ -176,17 +174,12 @@ struct DeckView: View {
     ZStack {
       LinearGradient(colors: [cream, creamDeep], startPoint: .topLeading, endPoint: .bottomTrailing)
 
+      // BOTH LOOKS SHARE ONE SMALL TILE. It is the same object either way —
+      // the pressing, its frequency, its name — and the only thing the look
+      // decides at this size is what it is sitting on. Two copies of it is
+      // how the two drifted apart the first time.
       if isSmall {
-        VStack(spacing: 7) {
-          pressing(s, size: 108)
-          VStack(spacing: 1) {
-            Text(s.name).font(.system(size: 12, weight: .bold)).foregroundColor(ink).lineLimit(1)
-            if let lp = entry.lastPlayed {
-              Text(lp.title).font(.system(size: 10)).foregroundColor(ink.opacity(0.62)).lineLimit(1)
-            }
-          }
-        }
-        .padding(10)
+        smallStack(s, ink: ink)
       } else {
         HStack(spacing: 0) {
           // Off the left edge on purpose: a pressing that fits inside the card
@@ -216,79 +209,51 @@ struct DeckView: View {
 
   /// A record whose label is printed rather than photographic — the station's
   /// own pressing. Used only by the Label look; the other two want the cover.
-  private func pressing(_ s: WidgetStation, size: CGFloat) -> some View {
+  private func pressing(_ s: WidgetStation, size: CGFloat, compact: Bool = false) -> some View {
     ZStack {
-      RecordView(accent: s.accentColor, label: nil, size: size)
-      VStack(spacing: size * 0.018) {
-        Text("CRUISE FM").font(.system(size: size * 0.042, weight: .heavy))
-          .tracking(size * 0.012).foregroundColor(.white.opacity(0.72))
-        Text(s.name).font(.system(size: size * 0.082, weight: .bold))
-          .foregroundColor(.white).lineLimit(1)
-        Circle().fill(.white.opacity(0.5)).frame(width: size * 0.03, height: size * 0.03)
-        DialText(dial: s.dial, size: size * 0.058, color: s.accentColor)
-      }
-      .frame(width: size * 0.40)
-    }
-  }
-
-  // ── ON THE SET ──────────────────────────────────────────────────────────
-  // The record beside the radio it is playing through. A record alone belongs
-  // to a collection; a record next to a lit dial belongs to a station.
-  private func set(_ s: WidgetStation) -> some View {
-    ZStack {
-      LinearGradient(colors: [Color(white: 0.135), Color(white: 0.065)],
-                     startPoint: .topLeading, endPoint: .bottomTrailing)
-      // The light catch along the top edge is what stops this reading as a
-      // flat panel — the thing every one of these widgets was missing.
-      VStack {
-        LinearGradient(colors: [.white.opacity(0.10), .clear],
-                       startPoint: .top, endPoint: .bottom)
-          .frame(height: 54)
-        Spacer(minLength: 0)
-      }
-
-      if isSmall {
-        smallStack(s, ink: .white)
+      RecordView(accent: s.accentColor, label: nil, size: size, plainLabel: true)
+      // WHAT FITS ON A LABEL IS A FUNCTION OF THE LABEL, not of the design.
+      // The disc's label is 42% of it, so at 92pt there is 38pt of room —
+      // "CRUISE FM" would set at under 4pt there, which is a grey smear
+      // rather than small type. The compact label carries the frequency
+      // alone, which is what the owner asked to see in the middle anyway,
+      // and the station's name goes underneath the record where it is
+      // legible.
+      if compact {
+        DialText(dial: s.dial, size: size * 0.105, color: s.accentColor)
       } else {
-        HStack(spacing: 13) {
-          RecordView(accent: s.accentColor, label: Art.lastPlayed(), size: 122)
-          window(s)
+        VStack(spacing: size * 0.018) {
+          Text("CRUISE FM").font(.system(size: size * 0.042, weight: .heavy))
+            .tracking(size * 0.012).foregroundColor(.white.opacity(0.72))
+          Text(s.name).font(.system(size: size * 0.082, weight: .bold))
+            .foregroundColor(.white).lineLimit(1)
+          Circle().fill(.white.opacity(0.5)).frame(width: size * 0.03, height: size * 0.03)
+          DialText(dial: s.dial, size: size * 0.058, color: s.accentColor)
         }
-        .padding(14)
+        .frame(width: size * 0.40)
       }
     }
   }
 
-  /// The lit window: dark face, glowing numbers, the way a receiver is built.
-  private func window(_ s: WidgetStation) -> some View {
-    VStack(alignment: .leading, spacing: 0) {
-      DialText(dial: s.dial, size: 25, color: s.accentColor)
-      Text(s.name).font(.system(size: 15, weight: .bold))
-        .foregroundColor(.white).lineLimit(1).padding(.top, 3)
-      Spacer(minLength: 4)
-      lastPlayed(ink: .white)
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .padding(13)
-    .background(
-      RoundedRectangle(cornerRadius: 9)
-        .fill(Color(red: 0.043, green: 0.035, blue: 0.027))
-        .overlay(RoundedRectangle(cornerRadius: 9).stroke(.white.opacity(0.09), lineWidth: 1)))
-  }
 
   // ── shared pieces ───────────────────────────────────────────────────────
 
+  /// THE SMALL TILE IS THE STATION'S OWN PRESSING (owner, 03.09: "increase the
+  /// size of the vinyl and put the station number in the centre of the vinyl,
+  /// and the name on the bottom. Remove the song name.")
+  ///
+  /// THE SONG COMING OFF IS WHAT MAKES THE RECORD BIGGER. At 78pt with a title
+  /// and a name underneath, the record was the smallest thing on a tile named
+  /// after it. With one line under it instead of two the disc takes 92 of a
+  /// 155pt tile and the widget finally reads as an object rather than a
+  /// caption with a picture above it.
   private func smallStack(_ s: WidgetStation, ink: Color) -> some View {
-    VStack(spacing: 6) {
-      RecordView(accent: s.accentColor, label: Art.lastPlayed(), size: 78)
-      VStack(spacing: 1) {
-        Text(s.name).font(.system(size: 12, weight: .bold)).foregroundColor(ink).lineLimit(1)
-        if let lp = entry.lastPlayed {
-          Text(lp.title).font(.system(size: 10)).foregroundColor(ink.opacity(0.68)).lineLimit(1)
-        }
-      }
+    VStack(spacing: 7) {
+      pressing(s, size: 92, compact: true)
+      Text(s.name).font(.system(size: 13, weight: .heavy))
+        .foregroundColor(ink).lineLimit(1).minimumScaleFactor(0.75)
     }
-    .padding(10)
+    .padding(11)
   }
 
   /// THE HONEST LABEL. "LAST PLAYED", never "now playing" — see the note at

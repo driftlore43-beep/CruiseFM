@@ -213,6 +213,21 @@ struct DialText: View {
 /// pins both names so a future font swap cannot quietly break this again.
 func iconFont(_ size: CGFloat) -> Font { .custom("MaterialDesignIcons", size: size) }
 
+/**
+ * The pixel face, for the CD Player look.
+ *
+ * ASK FOR THE POSTSCRIPT NAME, NEVER THE FILENAME. This is the trap that cost
+ * build 39's icons: Swift asked for "MaterialCommunityIcons", the file's own
+ * name table says "MaterialDesignIcons", SwiftUI matched nothing, and iOS
+ * quietly substituted the system font — no error, no log, just missing
+ * glyphs. Read from the ttf here rather than assumed: DotGothic16-Latin.ttf
+ * declares postscript name `DotGothic16-Regular`.
+ *
+ * Subset to Latin (1.6 MB -> 37 KB); the licence travels with it in
+ * DotGothic16-OFL.txt, as the OFL requires.
+ */
+func pixelFont(_ size: CGFloat) -> Font { .custom("DotGothic16-Regular", size: size) }
+
 /// Shown when there is no snapshot yet — an honest empty state rather than a
 /// made-up station. Deliberately says what to do about it.
 struct NotReadyView: View {

@@ -800,7 +800,6 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
     onPanResponderTerminate: (_, g) => settleDismiss(g),
   })).current;
 
-  const resetTrack = () => progress.setValue(0);
   const togglePlay = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
   togglePlayRef.current = togglePlay;
   closeRef.current = handleClose;
@@ -910,7 +909,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
           <View style={fs.controls}>
             <ShuffleButton accent={eq[1]} size={24} on={shuffle}
               onPress={() => spotify.shuffle(!shuffle)} />
-            <TouchableOpacity onPress={() => { resetTrack(); spotify.prev(); }} activeOpacity={0.75}>
+            <TouchableOpacity onPress={spotify.prev} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-previous" size={44} color="#fff" />
             </TouchableOpacity>
             <TouchableOpacity onPress={togglePlay} style={fs.playBtn} activeOpacity={0.9}>
@@ -923,7 +922,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
                 <MaterialCommunityIcons name="play" size={42} color="#0a0a12" style={{ marginLeft: 3 }} />
               )}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { resetTrack(); spotify.next(); }} activeOpacity={0.75}>
+            <TouchableOpacity onPress={spotify.next} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-next" size={44} color="#fff" />
             </TouchableOpacity>
             <RepeatButton accent={eq[1]} size={24} mode={repeat}
@@ -953,8 +952,8 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
             progress={progress}
             scrub={scrub}
             onPlayPause={togglePlay}
-            onPrev={() => { resetTrack(); spotify.prev(); }}
-            onNext={() => { resetTrack(); spotify.next(); }}
+            onPrev={spotify.prev}
+            onNext={spotify.next}
             onClose={handleClose}
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}

@@ -1104,8 +1104,8 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             progress={progress}
             scrub={cassetteScrub}
             onPlayPause={togglePlay}
-            onPrev={() => setActiveTrack((t) => Math.max(0, t - 1))}
-            onNext={() => setActiveTrack((t) => Math.min(SIDE_A_TRACKS.length - 1, t + 1))}
+            onPrev={() => { setActiveTrack((t) => Math.max(0, t - 1)); spotify.prev(); }}
+            onNext={() => { setActiveTrack((t) => Math.min(SIDE_A_TRACKS.length - 1, t + 1)); spotify.next(); }}
             onClose={handleClose}
             onChangeMood={() => setShowMood(true)}
             onPickPlaylist={() => setShowPicker(true)}

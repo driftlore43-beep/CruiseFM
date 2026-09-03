@@ -14,6 +14,7 @@ import { ModeSheet } from '@/components/ModeSheet';
 import { STATIONS } from '@/constants/stations';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
+import { ModeScrim } from '@/components/ModeScrim';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { mixHex } from '@/components/GlassPane';
 import { FloatingNotes } from '@/components/FloatingNotes';
@@ -580,17 +581,12 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
         {...dismissPan.panHandlers}
         onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
 
-        {/* Blurred station background — darkened hard so the scene reads like dusk */}
+        {/* Blurred station background under the shared scrim. This mode used to
+            darken it hard "so the scene reads like dusk" — but the dusk comes from
+            the scene drawn on top, and all that shading did was bury the
+            photograph. */}
         <StationBackdrop station={station} blurRadius={2.5} />
-        <LinearGradient
-          colors={[
-            'rgba(3,4,16,0.72)', 'rgba(3,4,16,0.62)', 'rgba(3,4,16,0.68)',
-            'rgba(3,4,16,0.78)', 'rgba(3,4,16,0.86)',
-          ]}
-          locations={[0, 0.4, 0.65, 0.85, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+        <ModeScrim station={station} />
 
         {/* Landscape: the scene IS the screen — the outrun sun and grid run
             edge to edge under the chrome, which is what turning this mode

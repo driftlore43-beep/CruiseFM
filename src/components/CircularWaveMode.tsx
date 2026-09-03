@@ -14,6 +14,7 @@ import { ModeSheet } from '@/components/ModeSheet';
 import { STATIONS } from '@/constants/stations';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
+import { ModeScrim } from '@/components/ModeScrim';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { Fonts } from '@/constants/theme';
@@ -372,15 +373,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
 
         {/* Blurred station background */}
         <StationBackdrop station={station} blurRadius={2.5} />
-        <LinearGradient
-          colors={[
-            'rgba(2,3,14,0.34)', 'rgba(2,3,14,0.26)', 'rgba(2,3,14,0.44)',
-            'rgba(2,3,14,0.58)', 'rgba(2,3,14,0.68)',
-          ]}
-          locations={[0, 0.4, 0.65, 0.85, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+        <ModeScrim station={station} />
         <LinearGradient
           colors={['transparent', glowTint, 'transparent']}
           locations={[0, 0.5, 1]}

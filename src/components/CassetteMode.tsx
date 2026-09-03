@@ -15,6 +15,7 @@ import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
+import { ModeScrim } from '@/components/ModeScrim';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
@@ -1057,21 +1058,11 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   // station's app-wide accent lives.
   const neonColor  = currentEq?.[1] ?? '#FF3DF0';
   const neonAccent = currentEq?.[0] ?? '#33E1FF';
+  const backdropStation = resolveAnyStation(activeId);
   const background = (
     <>
-      <StationBackdrop station={resolveAnyStation(activeId)} blurRadius={2.5} />
-      <LinearGradient
-        colors={[
-          'rgba(2,2,10,0.55)',
-          'rgba(2,2,10,0.48)',
-          'rgba(2,2,10,0.60)',
-          'rgba(2,2,10,0.72)',
-          'rgba(2,2,10,0.82)',
-        ]}
-        locations={[0, 0.4, 0.65, 0.85, 1]}
-        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+      <StationBackdrop station={backdropStation} blurRadius={2.5} />
+      <ModeScrim station={backdropStation} />
       <LinearGradient
         colors={['transparent', (currentEq?.[1] ?? '#C8860A') + '26', 'transparent']}
         locations={[0, 0.5, 1]}
@@ -1160,13 +1151,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
         onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
         {background}
         <GrainOverlay />
-
-        {/* Top vignette */}
-        <LinearGradient
-          colors={['rgba(0,0,0,0.5)', 'transparent']}
-          style={[StyleSheet.absoluteFill, { height: SCREEN_H * 0.2, zIndex: 1 }]}
-          pointerEvents="none"
-        />
 
         {/* Floating chrome */}
         <Animated.View style={[fs.floatingTop, { top: topPad + 8, zIndex: 10, opacity: chrome }]}>

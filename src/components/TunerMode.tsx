@@ -16,6 +16,7 @@ import { STATIONS, stationDial, type Band, type Station } from '@/constants/stat
 import { cachedCustomStations, customToStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
+import { ModeScrim } from '@/components/ModeScrim';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { Fonts } from '@/constants/theme';
@@ -169,6 +170,49 @@ function underPlate(x: number, label: string, dot: number, gap: number, plateW: 
 // The LIVE band is always the top scale, with the station markers on it. The
 // other band is printed below and drifts past at its own rate, exactly as a
 // real dual-band dial does: the needle crosses both, but only one is tuned.
+/**
+ * The dial's own face — a receiver's lit window sits on a dark one.
+ *
+ * IT NEEDS ITS OWN, and that is a fact about this mode rather than a taste:
+ * the scale is fine printed type in the MIDDLE of the screen, which is exactly
+ * the stretch ModeScrim deliberately leaves open for the photograph (every
+ * other deck puts an object there, not words). Over a bright picture of the
+ * user's own the scale numbers measured 1.45:1 — invisible — and no amount of
+ * shading in the shared ramp can fix that without burying the picture for the
+ * seven modes that do not need it. Measured on the '600' glyphs before and
+ * after, this face puts them at 4.27:1 while they keep their own brightness
+ * (0.690 -> 0.601, the printed scale being slightly transparent), and it
+ * darkens nothing above or below — a dark built-in station is unchanged.
+ *
+ * SOFT AT BOTH ENDS, NEVER A BAR. A hard-edged dark band across the screen is
+ * the one thing every light and shade layer in this app has eventually been
+ * reported for, so it fades in and out rather than starting anywhere.
+ */
+function DialFace({ children }: { children: React.ReactNode }) {
+  return (
+    <View>
+      <LinearGradient
+        colors={['transparent', 'rgba(3,4,16,0.55)', 'rgba(3,4,16,0.55)', 'transparent']}
+        locations={[0, 0.15, 0.88, 1]}
+        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+        // Reaches ABOVE the block, so the fade-in happens in the gap under the
+        // display panel rather than across the AM numbers — those sit on the
+        // very first row of the dial, and a fade starting at the block's own
+        // top edge leaves them on bare picture.
+        style={[StyleSheet.absoluteFill, { top: -30, bottom: -6 }]}
+        pointerEvents="none"
+      />
+      {/* zIndex, NOT just source order. An absolutely-positioned sibling paints
+          ABOVE in-flow content on web whatever the order in the tree, so the
+          first attempt drew the face straight over the dial and dimmed the
+          numbers by exactly as much as the background — measured, 0.690 ->
+          0.144, i.e. no gain at all. Saying which is in front removes the
+          question on both platforms. */}
+      <View style={{ zIndex: 1 }}>{children}</View>
+    </View>
+  );
+}
+
 function DialRuler({ band, freq, width, color, lock }: {
   band: Band; freq: number; width: number; color: string; lock: number;
 }) {
@@ -913,15 +957,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
           onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
 
           <StationBackdrop station={lockedStation} blurRadius={2.5} />
-          <LinearGradient
-            colors={[
-              'rgba(3,4,16,0.62)', 'rgba(3,4,16,0.55)', 'rgba(3,4,16,0.62)',
-              'rgba(3,4,16,0.75)', 'rgba(3,4,16,0.85)',
-            ]}
-            locations={[0, 0.4, 0.65, 0.85, 1]}
-            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
+          <ModeScrim station={lockedStation} />
           <LinearGradient
             colors={['transparent', accent + '22', 'transparent']}
             locations={[0, 0.5, 1]}
@@ -960,10 +996,12 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
               />
             </View>
             <View style={{ marginTop: 14 }}>
-              <DialRuler band={band} freq={freq} width={winW} color={accent} lock={lock} />
-              <StaticNoise width={winW} height={116} phase={phase} opacity={offAir * 0.55} />
+              <DialFace>
+                <DialRuler band={band} freq={freq} width={winW} color={accent} lock={lock} />
+                <StaticNoise width={winW} height={116} phase={phase} opacity={offAir * 0.55} />
+                <Text style={[fs.dragHint, { fontFamily: Fonts.mono }]}>tap am / fm  ·  drag to tune</Text>
+              </DialFace>
             </View>
-            <Text style={[fs.dragHint, { fontFamily: Fonts.mono }]}>tap am / fm  ·  drag to tune</Text>
           </Animated.View>
 
           <LandscapeChrome
@@ -1022,15 +1060,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
         {/* Locked station scene, darkened; mood tint follows the needle */}
         <StationBackdrop station={lockedStation} blurRadius={2.5} />
-        <LinearGradient
-          colors={[
-            'rgba(3,4,16,0.62)', 'rgba(3,4,16,0.55)', 'rgba(3,4,16,0.62)',
-            'rgba(3,4,16,0.75)', 'rgba(3,4,16,0.85)',
-          ]}
-          locations={[0, 0.4, 0.65, 0.85, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+        <ModeScrim station={lockedStation} />
         <LinearGradient
           colors={['transparent', accent + '22', 'transparent']}
           locations={[0, 0.5, 1]}
@@ -1080,13 +1110,14 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
 
             {/* Ruler + static */}
             <View style={{ marginTop: dialGap }}>
-              <DialRuler band={band} freq={freq} width={winW} color={accent} lock={lock} />
-              <StaticNoise width={winW} height={116} phase={phase} opacity={offAir * 0.55} />
-              {/* Notes only flow once the needle locks onto a station */}
-              <FloatingNotes playing={live && lock > 0.9} color={accent} />
+              <DialFace>
+                <DialRuler band={band} freq={freq} width={winW} color={accent} lock={lock} />
+                <StaticNoise width={winW} height={116} phase={phase} opacity={offAir * 0.55} />
+                {/* Notes only flow once the needle locks onto a station */}
+                <FloatingNotes playing={live && lock > 0.9} color={accent} />
+                <Text style={[fs.dragHint, { fontFamily: Fonts.mono }]}>tap am / fm  ·  drag to tune</Text>
+              </DialFace>
             </View>
-
-            <Text style={[fs.dragHint, { fontFamily: Fonts.mono }]}>tap am / fm  ·  drag to tune</Text>
           </Animated.View>
 
           {/* EVERYTHING BELOW THE DIAL RESTS TOGETHER. pointerEvents goes

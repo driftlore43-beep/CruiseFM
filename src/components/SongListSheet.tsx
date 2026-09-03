@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { useSheetOpen } from '@/context/NowPlayingContext';
+import { mmss } from '@/utils/formatTime';
 import { getApplePlaylistTracks, isApplePlaylist, playAppleTrack } from '@/utils/appleMusic';
 import { connectSpotify, getPlaybackQueue, getPlaylistTracks, playTrackInContext, type FailReason, type PlaylistTrack } from '@/utils/spotify';
 
@@ -41,10 +42,7 @@ const TROUBLE: Record<FailReason, { text: string; retry?: boolean; reconnect?: b
   notfound: { text: 'Spotify can’t find this playlist any more. It may have been deleted, or made private by whoever owns it.', retry: false },
 };
 
-function fmt(ms: number): string {
-  const s = Math.max(0, Math.round(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
+const fmt = (ms: number) => mmss(ms);
 
 /**
  * The songs in whatever is playing — tap one to jump straight to it.

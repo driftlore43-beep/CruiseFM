@@ -12,6 +12,7 @@ import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScen
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { STATIONS } from '@/constants/stations';
+import { mmss } from '@/utils/formatTime';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { ModeScrim } from '@/components/ModeScrim';
@@ -140,10 +141,7 @@ function sunCuts(cy: number, r: number, horizon: number) {
   });
 }
 
-function formatMs(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
+const formatMs = (ms: number) => mmss(ms);
 
 /**
  * ── The outrun scene — REBUILT STATIC + NATIVE-DRIVER OVERLAYS (04.08) ──────

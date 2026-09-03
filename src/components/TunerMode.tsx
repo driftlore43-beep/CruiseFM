@@ -13,6 +13,7 @@ import { DECK_FRAC, LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, 
 import { StationIdentity } from '@/components/StationIdentity';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
+import { mmss } from '@/utils/formatTime';
 import { cachedCustomStations, customToStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
@@ -123,10 +124,7 @@ const NEEDLE_RED = '#FF3B30';
 // Classic broadcast-studio red for the ON AIR lamp.
 const ON_AIR_RED = '#FF3B30';
 
-function formatMs(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
+const formatMs = (ms: number) => mmss(ms);
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));

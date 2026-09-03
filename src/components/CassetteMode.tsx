@@ -13,6 +13,7 @@ import Svg, {
 import { Fonts } from '@/constants/theme';
 import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
+import { mmss } from '@/utils/formatTime';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { ModeScrim } from '@/components/ModeScrim';
@@ -86,10 +87,8 @@ function parseTrackMs(duration: string): number {
   return (m * 60 + s) * 1000;
 }
 
-function fmtTapeMs(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-}
+/** Padded: a cassette counter shows leading zeros, so this one does too. */
+const fmtTapeMs = (ms: number) => mmss(ms, { pad: true });
 
 // ── Grain overlay ─────────────────────────────────────────────────────────────
 // Simulated film grain: a grid of tiny dots at random-but-stable positions
@@ -814,7 +813,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
       const s = Math.floor((value * trackMsRef.current) / 1000);
       if (s !== lastSecRef.current) {
         lastSecRef.current = s;
-        setElapsedTxt(`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`);
+        setElapsedTxt(mmss(s * 1000, { pad: true }));
       }
     });
     return () => progress.removeListener(id);

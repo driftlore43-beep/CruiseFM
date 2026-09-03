@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
+import { mmss } from '@/utils/formatTime';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
@@ -49,10 +50,7 @@ const BALL_SPIN_MS = 15000;
 const CHROME_REST_MS = 6000;
 
 
-function formatMs(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
+const formatMs = (ms: number) => mmss(ms);
 
 // ── The mirror ball ───────────────────────────────────────────────────────────
 // A "spinning globe" trick, not an in-plane rotate: the facet texture is

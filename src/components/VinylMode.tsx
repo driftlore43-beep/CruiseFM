@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OWNER_MODE } from '@/constants/config';
 import { Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
+import { mmss } from '@/utils/formatTime';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
 import { useScrubFocus } from '@/utils/useScrubFocus';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
@@ -122,10 +123,8 @@ function parseTrackMs(d: string): number {
   const [m, s] = d.split(':').map(Number);
   return (m * 60 + s) * 1000;
 }
-function formatMs(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-}
+/** Padded: this deck's readout is hardware, and a real one shows leading zeros. */
+const formatMs = (ms: number) => mmss(ms, { pad: true });
 
 
 // ── Disco sparkle field ───────────────────────────────────────────────────────

@@ -15,6 +15,7 @@ import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
+import { mmss } from '@/utils/formatTime';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
 import { useScrubFocus } from '@/utils/useScrubFocus';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
@@ -42,10 +43,7 @@ const DEMO_DURATION_MS = 214000;
 // is half the point of having both.
 const CD_SPIN_MS = 3400;
 
-function formatMs(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
+const formatMs = (ms: number) => mmss(ms);
 
 // Deterministic pseudo-random 0..1 (no Math.random — the disc must come out
 // identical on every render, or the scratches would crawl).

@@ -9,6 +9,7 @@ import {
 } from '@/components/ShareModeArt';
 import type { Station } from '@/constants/stations';
 import { stationDial, stationFrequency } from '@/constants/stations';
+import { mmss as formatTime } from '@/utils/formatTime';
 import { usePixelFont } from '@/utils/pixelFont';
 import type { NowPlaying } from '@/utils/useMusicPlayback';
 
@@ -366,10 +367,8 @@ function arcPath(cx: number, cy: number, r: number, a0: number, a1: number): str
 const CD_SHEEN = ['#efe0ac', '#e6e6a8', '#c8dfb4', '#bcdcc9', '#c9d9e6', '#dcccdf',
                   '#e8cdd2', '#f0dcb4', '#f2e8c0', '#d8e2bc', '#c4dbd2', '#dfd2e2'];
 
-function mmss(ms: number): string {
-  const t = Math.max(0, Math.round(ms / 1000));
-  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
-}
+/** The card prints times the same way the decks do — see utils/formatTime. */
+const mmss = (ms: number) => formatTime(ms);
 
 /** One labelled dialog field: grey label outside, sunken white well, and the
  *  combo-box button that every such field had whether or not it did anything. */

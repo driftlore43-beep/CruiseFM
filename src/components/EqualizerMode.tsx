@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Cruise, Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
+import { mmss } from '@/utils/formatTime';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
@@ -234,12 +235,7 @@ const Bars = React.memo(function Bars({ values, barW, maxH, colors, cap = true }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatMs(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
+const formatMs = (ms: number) => mmss(ms);
 
 // ── Full-screen modal ─────────────────────────────────────────────────────────
 

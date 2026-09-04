@@ -166,7 +166,7 @@ struct DeckView: View {
             if let art = Art.lastPlayed() {
               RecordView(accent: s.accentColor, label: art, size: 118)
             } else {
-              pressing(s, size: 118, compact: true)
+              pressing(s, size: 118)
             }
           }
           .padding(.trailing, 2)
@@ -191,27 +191,49 @@ struct DeckView: View {
       if isSmall {
         smallStack(s, ink: ink)
       } else {
-        HStack(spacing: 0) {
-          // Off the left edge on purpose: a pressing that fits inside the card
-          // reads as a picture OF a record, not as one sitting there.
-          pressing(s, size: 232).offset(x: -58)
-          Spacer(minLength: 0)
+        ZStack(alignment: .leading) {
+          // THE RECORD SLIDING OUT OF ITS SLEEVE. Drawn FIRST so the sleeve
+          // overlaps it — that overlap is the whole illusion, and it is also
+          // what closed the dead gap this card used to have down its middle
+          // (owner, 03.09: "there's a big gap between the vinyl and the text,
+          // let's push the vinyl towards the right where a vinyl sleeve
+          // (should be the station image) sits on the left").
+          //
+          // HOW FAR RIGHT IS NOT A TASTE: the label has to clear the sleeve's
+          // edge completely or the frequency reads as half a number. The
+          // label is 42% of the disc, so its left edge sits at
+          // (record left) + size*0.29 — that has to be past the sleeve.
+          pressing(s, size: 106)
+            .offset(x: 91)
+          RecordSleeve(image: s.image, gradient: s.gradient, size: 106)
+            .offset(x: 12)
+
           VStack(alignment: .trailing, spacing: 2) {
             Text("NOW ON THE DECK").font(.system(size: 7.5, weight: .heavy)).tracking(1.6)
               .foregroundColor(ink.opacity(0.48))
             if let lp = entry.lastPlayed {
               Text(lp.title).font(.system(size: 19, weight: .heavy))
-                .foregroundColor(ink).lineLimit(1).minimumScaleFactor(0.7)
-              Text(lp.artist).font(.system(size: 12)).foregroundColor(ink.opacity(0.60)).lineLimit(1)
+                .foregroundColor(ink).lineLimit(1).minimumScaleFactor(0.65)
+              Text(lp.artist).font(.system(size: 12)).foregroundColor(ink.opacity(0.60))
+                .lineLimit(1).minimumScaleFactor(0.8)
             } else {
-              Text(s.name).font(.system(size: 19, weight: .heavy)).foregroundColor(ink).lineLimit(1)
+              Text(s.tagline).font(.system(size: 13))
+                .foregroundColor(ink.opacity(0.55)).lineLimit(2)
             }
             Spacer(minLength: 4)
-            Text(s.tagline).font(.system(size: 10))
-              .foregroundColor(ink.opacity(0.46)).lineLimit(1)
+            // THE STATION AT THE FOOT (owner, 03.09). The concept sheet had
+            // the MODE printed here, which on the round she reviewed read
+            // "Cassette mode" underneath a picture of a RECORD — two objects
+            // contradicting each other on one card. The Swift had never said
+            // that (it printed the station's tagline), but her instruction
+            // stands either way: the foot names the station.
+            Text(s.name).font(.system(size: 15, weight: .heavy))
+              .foregroundColor(ink).lineLimit(1).minimumScaleFactor(0.7)
           }
-          .frame(width: 168, alignment: .trailing)
-          .padding(.vertical, 16).padding(.trailing, 15)
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+          .padding(.vertical, 16)
+          .padding(.trailing, 14)
+          .padding(.leading, 210)
         }
       }
     }
@@ -219,32 +241,19 @@ struct DeckView: View {
 
   /// A record whose label is printed rather than photographic — the station's
   /// own pressing. Used only by the Label look; the other two want the cover.
-  private func pressing(_ s: WidgetStation, size: CGFloat, compact: Bool = false) -> some View {
+  private func pressing(_ s: WidgetStation, size: CGFloat) -> some View {
     ZStack {
       RecordView(accent: s.accentColor, label: nil, size: size, plainLabel: true)
       // WHAT FITS ON A LABEL IS A FUNCTION OF THE LABEL, not of the design.
-      // The disc's label is 42% of it, so at 92pt there is 38pt of room —
+      // The label is 42% of the disc, so at 92pt there is 38pt of room —
       // "CRUISE FM" would set at under 4pt there, which is a grey smear
-      // rather than small type. The compact label carries the frequency
-      // alone, which is what the owner asked to see in the middle anyway,
-      // and the station's name goes underneath the record where it is
-      // legible.
-      if compact {
-        DialText(dial: s.dial, size: size * 0.105, color: s.accentColor)
-      } else {
-        VStack(spacing: size * 0.018) {
-          Text("CRUISE FM").font(.system(size: size * 0.042, weight: .heavy))
-            .tracking(size * 0.012).foregroundColor(.white.opacity(0.72))
-          Text(s.name).font(.system(size: size * 0.082, weight: .bold))
-            .foregroundColor(.white).lineLimit(1)
-          Circle().fill(.white.opacity(0.5)).frame(width: size * 0.03, height: size * 0.03)
-          DialText(dial: s.dial, size: size * 0.058, color: s.accentColor)
-        }
-        .frame(width: size * 0.40)
-      }
+      // rather than small type. The frequency alone, which is what the owner
+      // asked to see in the middle; the station's name goes at the foot of
+      // the card where it is legible, and printing it in both places is what
+      // made this circle unreadable in the first place.
+      DialText(dial: s.dial, size: size * 0.105, color: Color(hex: "#ffe7c2"))
     }
   }
-
 
   // ── shared pieces ───────────────────────────────────────────────────────
 
@@ -259,7 +268,7 @@ struct DeckView: View {
   /// caption with a picture above it.
   private func smallStack(_ s: WidgetStation, ink: Color) -> some View {
     VStack(spacing: 7) {
-      pressing(s, size: 92, compact: true)
+      pressing(s, size: 92)
       Text(s.name).font(.system(size: 13, weight: .heavy))
         .foregroundColor(ink).lineLimit(1).minimumScaleFactor(0.75)
     }
@@ -280,6 +289,49 @@ struct DeckView: View {
           .foregroundColor(ink.opacity(0.56)).lineLimit(1)
       }
     }
+  }
+}
+
+/**
+ * A record sleeve carrying the station's own photograph.
+ *
+ * This is what makes the Label look read as a shelf rather than a diagram —
+ * and it is the owner's, not mine (03.09): "a vinyl sleeve (should be the
+ * station image) sits on the left". A custom station's own picture lands here
+ * too, which is the point of drawing the station rather than a cover.
+ *
+ * The three details that make card stock read as card stock: a hard edge all
+ * round, one diagonal sheen across the front, and a DARKER STRIP down the
+ * opening side, which is the shadow of the record inside it.
+ */
+struct RecordSleeve: View {
+  let image: String?
+  let gradient: LinearGradient
+  let size: CGFloat
+
+  var body: some View {
+    ZStack {
+      if let img = Art.station(image) {
+        img.resizable().aspectRatio(contentMode: .fill)
+      } else {
+        gradient
+      }
+      LinearGradient(stops: [
+        .init(color: .white.opacity(0.16), location: 0),
+        .init(color: .clear, location: 0.46),
+      ], startPoint: .topLeading, endPoint: .bottomTrailing)
+      // the opening, on the side the record comes out of
+      HStack(spacing: 0) {
+        Spacer(minLength: 0)
+        LinearGradient(colors: [.black.opacity(0.30), .black.opacity(0.04)],
+                       startPoint: .trailing, endPoint: .leading)
+          .frame(width: 5)
+      }
+    }
+    .frame(width: size, height: size)
+    .clipped()
+    .overlay(Rectangle().stroke(.black.opacity(0.30), lineWidth: 1))
+    .shadow(color: .black.opacity(0.34), radius: 9, x: 3, y: 5)
   }
 }
 

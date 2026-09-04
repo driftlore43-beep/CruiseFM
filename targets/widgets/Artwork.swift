@@ -137,8 +137,10 @@ struct RecordView: View {
   /// The last-played cover, drawn as the label. Nil falls back to a pressing.
   let label: Image?
   let size: CGFloat
-  /// A printed label rather than a photographic one — the station's own
-  /// pressing, which `pressing()` then prints the name and frequency onto.
+  /// A printed label rather than a photographic one — a classic record's red
+  /// centre, which `pressing()` then prints the frequency onto. Red because
+  /// that is the label everybody pictures, and because the frequency has to
+  /// read against it at about 40pt across.
   var plainLabel: Bool = false
 
   /// Pitch in points, not a count: the rings have to stay the same distance
@@ -180,9 +182,9 @@ struct RecordView: View {
           label.resizable().aspectRatio(contentMode: .fill)
         } else if plainLabel {
           Circle().fill(
-            RadialGradient(colors: [Color(hex: "#2b3550"), Color(hex: "#141a29")],
-                           center: .init(x: 0.38, y: 0.32),
-                           startRadius: 0, endRadius: size * 0.30))
+            RadialGradient(colors: [Color(hex: "#d8402f"), Color(hex: "#96271b"), Color(hex: "#7a1e14")],
+                           center: .init(x: 0.38, y: 0.30),
+                           startRadius: 0, endRadius: size * 0.26))
         } else {
           Circle().fill(accent.opacity(0.85))
         }

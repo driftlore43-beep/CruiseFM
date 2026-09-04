@@ -74,6 +74,19 @@ def grooves(size, label_inset, label_html, shadow=True):
       </div>
     </div>"""
 
+def red_label(num='810', band='AN'):
+    """A classic record label: a red centre with the frequency printed on it.
+
+    The station's NAME is not here — it moved to the foot of the card, and
+    printing it in both places is the kind of duplication that makes a small
+    label unreadable. The frequency alone has room to be read."""
+    return f"""<div style="position:absolute;inset:0;background:
+        radial-gradient(circle at 38% 30%,#d8402f,#96271b 72%,#7a1e14);display:flex;
+        align-items:center;justify-content:center;gap:5px;">
+      <span class=seg style="font-size:22px;color:#ffe7c2;">{num}</span>
+      <span class=seg14 style="font-size:12px;color:#ffe7c2;opacity:.82;">{band}</span>
+    </div>"""
+
 def compact_label(num='810', band='AN'):
     """What pressing(compact:) draws. The label is 42% of the disc, so at the
     small tile's 92pt there is 38pt of room — 'CRUISE FM' would set at under
@@ -125,17 +138,38 @@ C2 = slot('C2 &middot; medium', 'The Deck &mdash; the label', f"""
   <div style="position:absolute;inset:0;background:{CREAM};"></div>
   <div style="position:absolute;inset:0;opacity:.4;background:repeating-linear-gradient(
       92deg,rgba(0,0,0,.022) 0 2px,transparent 2px 5px);"></div>
-  <div style="position:absolute;left:-64px;top:-14px;width:344px;height:344px;">
-    {grooves(344, 108, dial_label('Garage'))}
+
+  <!-- THE RECORD, sliding out of the sleeve to the RIGHT. Drawn first so the
+       sleeve overlaps it: that overlap is the whole illusion. -->
+  <div style="position:absolute;left:182px;top:50%;transform:translateY(-50%);width:212px;height:212px;">
+    {grooves(212, 58, red_label())}
   </div>
-  <div style="position:absolute;right:30px;top:44px;text-align:right;width:300px;">
+
+  <!-- THE SLEEVE — the station's own photograph, which is what a record
+       collection actually looks like on a shelf. -->
+  <div style="position:absolute;left:24px;top:50%;transform:translateY(-50%);width:212px;height:212px;
+      box-shadow:0 10px 26px rgba(40,34,24,.42);">
+    <img src="data:image/jpeg;base64,{A['coastal']}" style="position:absolute;inset:0;
+        width:100%;height:100%;object-fit:cover;">
+    <div style="position:absolute;inset:0;background:
+        linear-gradient(118deg,rgba(255,255,255,.16) 0 22%,transparent 46%);"></div>
+    <div style="position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.30),
+        inset -3px 0 8px rgba(0,0,0,.24);"></div>
+    <div style="position:absolute;right:0;top:0;bottom:0;width:5px;background:
+        linear-gradient(90deg,rgba(0,0,0,.28),rgba(0,0,0,.05));"></div>
+  </div>
+
+  <div style="position:absolute;right:24px;top:44px;text-align:right;width:246px;">
     <div class=eb style="color:#8a8474;font-size:9px;">Now on the deck</div>
     <div style="font-size:30px;font-weight:800;color:#1b1f27;margin-top:6px;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Everlong</div>
-    <div style="font-size:18px;color:#6f6a5c;margin-top:2px;">Foo Fighters</div>
+    <div style="font-size:18px;color:#6f6a5c;margin-top:2px;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Foo Fighters</div>
   </div>
-  <div style="position:absolute;right:30px;bottom:28px;text-align:right;">
-    <div style="font-size:13px;color:#8a8474;">Cassette mode &middot; 810 AM</div>
+  <!-- THE STATION, not the mode. It used to read "Cassette mode" under a
+       picture of a RECORD, which is two objects contradicting each other. -->
+  <div style="position:absolute;right:26px;bottom:26px;text-align:right;">
+    <div style="font-size:19px;font-weight:800;color:#1b1f27;">Garage</div>
   </div>""")
 
 # ══════════════════════════════ G — the stub ═══════════════════════════════

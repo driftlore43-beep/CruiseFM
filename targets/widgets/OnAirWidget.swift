@@ -109,7 +109,7 @@ struct OnAirView: View {
               .foregroundColor(.white).lineLimit(1).minimumScaleFactor(0.7)
               .padding(.top, 3)
             Spacer(minLength: 6)
-            DialScale(accent: s.accentColor)
+            DialScale(dial: s.dial)
             Spacer(minLength: 6)
             if let next = entry.upNext {
               Text("UP NEXT · \(next)")
@@ -153,7 +153,33 @@ private func onAirLamp(_ s: WidgetStation) -> some View {
  * where the station sits, which is the one claim being made.
  */
 private struct DialScale: View {
-  let accent: Color
+  let dial: String
+
+  /// WHERE THE NEEDLE REALLY GOES. It was pinned at 38% of the width, which
+  /// is a lie dressed as a dial — the one thing this drawing claims is where
+  /// on the band the station sits, so that had better come from the station.
+  ///
+  /// The bands are the app's own (`BAND_CFG` in TunerMode): FM 87.5–108.5,
+  /// AM 530–1600. An unreadable dial parks in the middle rather than at an
+  /// edge, because the middle reads as "somewhere here" and an edge reads as
+  /// a specific, wrong answer.
+  private var position: CGFloat {
+    let (number, band) = splitDial(dial)
+    guard let v = Double(number.filter { $0.isNumber || $0 == "." }), v > 0 else { return 0.5 }
+    let (lo, hi) = band.uppercased().hasPrefix("F") ? (87.5, 108.5) : (530.0, 1600.0)
+    return CGFloat(min(1, max(0, (v - lo) / (hi - lo))))
+  }
+
+  /// The printed scale. These are NOT other stations — a receiver's face has
+  /// numbers printed on it whether or not anything is broadcasting there, so
+  /// this claims nothing. Station NAMES would be a claim, and the widget only
+  /// knows one station, which is why there are none.
+  private var marks: [(CGFloat, String)] {
+    let (_, band) = splitDial(dial)
+    return band.uppercased().hasPrefix("F")
+      ? [(0.10, "90"), (0.36, "95"), (0.62, "100"), (0.88, "106")]
+      : [(0.10, "600"), (0.36, "800"), (0.62, "1000"), (0.88, "1400")]
+  }
 
   var body: some View {
     GeometryReader { geo in
@@ -161,28 +187,35 @@ private struct DialScale: View {
       ZStack(alignment: .topLeading) {
         LinearGradient(colors: [.clear, .black.opacity(0.42), .black.opacity(0.42), .clear],
                        startPoint: .top, endPoint: .bottom)
-        // the ticks
+        // THE TICKS ARE THE POINT, and they were what failed: at 12 and 22
+        // against a photograph they did not read at all (owner, 03.09: "I can
+        // barely see the lines"). Longer and brighter is what makes this a
+        // dial rather than a texture.
         ForEach(0..<33, id: \.self) { i in
-          let major = i % 5 == 0
+          let major = i % 8 == 0
           Rectangle()
-            .fill(.white.opacity(major ? 0.78 : 0.42))
-            .frame(width: major ? 2 : 1.4, height: major ? 22 : 12)
-            .offset(x: w * (CGFloat(i) / 32) * 0.96 + w * 0.02,
-                    y: major ? 6 : 11)
+            .fill(.white.opacity(major ? 0.80 : 0.44))
+            .frame(width: major ? 2 : 1.4, height: major ? 20 : 11)
+            .offset(x: w * (CGFloat(i) / 32) * 0.96 + w * 0.02, y: major ? 2 : 8)
         }
-        Rectangle().fill(.white.opacity(0.28)).frame(height: 1).offset(y: 28)
-        // the needle, on the station
+        Rectangle().fill(.white.opacity(0.28)).frame(height: 1).offset(y: 23)
+        // the printed numbers, under the rule
+        ForEach(marks, id: \.1) { m in
+          Text(m.1).font(dialFont(9)).foregroundColor(.white.opacity(0.42))
+            .offset(x: w * m.0 - 9, y: 26)
+        }
+        // the needle, where the station actually is
         Rectangle().fill(Color(hex: "#FF3B30"))
-          .frame(width: 2, height: 32)
-          .offset(x: w * 0.38, y: 1)
+          .frame(width: 2, height: 27)
+          .offset(x: w * position, y: -1)
           .shadow(color: Color(hex: "#FF3B30").opacity(0.85), radius: 5)
         Circle().fill(Color(hex: "#FF3B30"))
           .frame(width: 7, height: 7)
-          .offset(x: w * 0.38 - 2.5, y: -2)
+          .offset(x: w * position - 2.5, y: -4)
           .shadow(color: Color(hex: "#FF3B30").opacity(0.9), radius: 5)
       }
     }
-    .frame(height: 34)
+    .frame(height: 38)
   }
 }
 

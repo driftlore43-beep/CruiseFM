@@ -122,6 +122,42 @@ for (const [f, s] of Object.entries(src)) {
 check('the Deck\'s dropped third look is gone', !/DeckLook\.set|case \.set:|case set\b/.test(all),
   'a stale `set` case would not compile and would offer a look nothing draws');
 
+// ── the needle points where the station actually is ──────────────────────
+// THIS IS THE WIDGET'S ONE FACTUAL CLAIM. Everything else on the dial is a
+// printed face; the needle says "your station is HERE on the band". It was
+// pinned at a hardcoded 38% when this shipped, which is a lie dressed as an
+// instrument, so the arithmetic is mirrored here and checked against the
+// bands the app's own Tuner uses (BAND_CFG: FM 87.5–108.5, AM 530–1600).
+{
+  const swift = src['OnAirWidget.swift'] ?? '';
+  check('the needle is derived, not hardcoded',
+    /w \* position/.test(swift) && !/w \* 0\.38/.test(swift),
+    'a fixed offset would point at the wrong frequency for every station');
+
+  // The same rule, written out, so the numbers can be checked.
+  const place = (dial) => {
+    const [number, band = ''] = dial.split(' ');
+    const v = parseFloat(number);
+    if (!(v > 0)) return 0.5;
+    const [lo, hi] = band.toUpperCase().startsWith('F') ? [87.5, 108.5] : [530, 1600];
+    return Math.min(1, Math.max(0, (v - lo) / (hi - lo)));
+  };
+  const cases = [
+    ['530 AM', 0], ['1600 AM', 1], ['1065 AM', 0.5],
+    ['87.5 FM', 0], ['108.5 FM', 1], ['98 FM', 0.5],
+    ['810 AM', 0.2617],           // Night Run, a real one
+  ];
+  for (const [dial, want] of cases) {
+    check(`${dial} lands at ${(want * 100).toFixed(0)}% of its band`,
+      Math.abs(place(dial) - want) < 0.001, place(dial).toFixed(4));
+  }
+  // A dial it cannot read parks in the MIDDLE, never at an edge: the middle
+  // reads as "somewhere here", an edge reads as a specific wrong answer.
+  for (const bad of ['', 'AM', '—', 'zero FM']) {
+    check(`an unreadable dial (${JSON.stringify(bad)}) parks in the middle`, place(bad) === 0.5);
+  }
+}
+
 // ── a check that cannot fail is worse than none ──────────────────────────
 if (declared.length < 5 || Object.keys(kinds).length < 5) {
   console.error('\n  the scan looks empty — fix the scan, not the code.');

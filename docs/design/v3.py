@@ -74,6 +74,17 @@ def grooves(size, label_inset, label_html, shadow=True):
       </div>
     </div>"""
 
+def compact_label(num='810', band='AN'):
+    """What pressing(compact:) draws. The label is 42% of the disc, so at the
+    small tile's 92pt there is 38pt of room — 'CRUISE FM' would set at under
+    4pt there. The frequency alone, and the name goes under the record."""
+    return f"""<div style="position:absolute;inset:0;background:
+        radial-gradient(circle at 38% 32%,#2b3550,#141a29);display:flex;
+        align-items:center;justify-content:center;gap:5px;">
+      <span class=seg style="font-size:31px;color:#FF9A2E;">{num}</span>
+      <span class=seg14 style="font-size:16px;color:#FF9A2E;opacity:.8;">{band}</span>
+    </div>"""
+
 def dial_label(name, num='810', band='AN', sub=None):
     """A printed label — the station's own pressing."""
     return f"""<div style="position:absolute;inset:0;background:
@@ -185,41 +196,66 @@ EDITORIAL = slot('E &middot; medium', 'Editorial &mdash; station in the card', f
 # Owner: "increase the length of the lines in the tuner scale, I can barely
 # see the lines - they are quite short." Minors 12 -> 20, majors 22 -> 36, and
 # both lifted in opacity: a scale you cannot read is decoration, not a dial.
-DIAL = slot('D &middot; medium', 'The Dial &mdash; centred, station colour', f"""
+# 810 AM on a 530-1600 band is (810-530)/1070 = 26.2% along. The Swift works
+# this out from the station's own dial rather than parking the needle.
+NEEDLE = (810 - 530) / (1600 - 530)
+
+DIAL = slot('D &middot; medium', 'On Air &mdash; the dial', f"""
   <img src="data:image/jpeg;base64,{A['daylight']}" style="position:absolute;inset:0;
       width:100%;height:100%;object-fit:cover;filter:blur(13px);transform:scale(1.16);">
   <div style="position:absolute;inset:0;background:
-      linear-gradient(180deg,rgba(6,7,12,.62) 0%,rgba(6,7,12,.20) 30%,rgba(6,7,12,.22) 70%,rgba(6,7,12,.66) 100%);"></div>
-  <div style="position:absolute;left:28px;top:20px;">
-    <span class=eb style="color:rgba(255,255,255,.60);">Tune in</span>
-    <div style="color:#fff;font-size:27px;font-weight:800;margin-top:4px;">Garage</div>
+      linear-gradient(180deg,rgba(6,7,12,.62) 0%,rgba(6,7,12,.20) 30%,rgba(6,7,12,.24) 70%,rgba(6,7,12,.66) 100%);"></div>
+  <div style="position:absolute;left:32px;right:32px;top:26px;display:flex;align-items:flex-start;">
+    <div style="display:flex;align-items:center;gap:7px;">
+      <div style="width:11px;height:11px;border-radius:50%;background:#FF3B30;"></div>
+      <span class=eb style="color:rgba(255,255,255,.72);font-size:11px;">On air</span>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:baseline;gap:6px;">
+      <span class=seg style="font-size:38px;color:#fff;">810</span>
+      <span class=seg14 style="font-size:19px;color:#fff;opacity:.9;">AN</span>
+    </div>
   </div>
-  <div style="position:absolute;right:28px;top:22px;text-align:right;">
-    <span class=seg style="font-size:32px;color:#FF9A2E;text-shadow:0 0 16px rgba(255,154,46,.55);">810</span>
-    <span class=seg14 style="font-size:16px;color:#FF9A2E;opacity:.82;margin-left:5px;">AN</span>
-  </div>
-  <div style="position:absolute;left:0;right:0;top:128px;height:104px;">
+  <div style="position:absolute;left:32px;top:74px;color:#fff;font-size:38px;font-weight:800;
+      letter-spacing:-.02em;">Garage</div>
+  <div style="position:absolute;left:32px;right:32px;top:150px;height:68px;">
     <div style="position:absolute;inset:0;background:
-        linear-gradient(180deg,transparent,rgba(4,5,12,.58) 22%,rgba(4,5,12,.58) 78%,transparent);"></div>
-    {''.join(f'<div style="position:absolute;left:{i*2.9+2}%;top:{40 if i%5 else 32}px;width:{1.4 if i%5 else 2}px;'
-             f'height:{20 if i%5 else 36}px;background:rgba(255,255,255,{.78 if i%5==0 else .42});"></div>'
-             for i in range(34))}
-    <div style="position:absolute;left:0;right:0;top:60px;height:1px;background:rgba(255,255,255,.30);"></div>
-    {''.join(f'<div style="position:absolute;left:{p}%;top:6px;transform:translateX(-50%);font-size:10px;'
-             f'letter-spacing:.13em;text-transform:uppercase;white-space:nowrap;color:rgba(255,255,255,{o});">{n}</div>'
-             for p,n,o in [(13,'Sunset',.38),(38,'Garage',.95),(64,'Night Run',.38),(88,'Coastal',.38)])}
-    {''.join(f'<div style="position:absolute;left:{p}%;top:74px;transform:translateX(-50%);'
-             f'font-family:DSEG7;font-size:12px;color:rgba(255,255,255,.42);">{n}</div>'
-             for p,n in [(11,'600'),(38,'800'),(66,'1000'),(90,'1400')])}
-    <div style="position:absolute;left:38%;top:22px;width:2px;height:58px;background:#FF3B30;
-        box-shadow:0 0 12px rgba(255,59,48,.9);"></div>
-    <div style="position:absolute;left:38%;top:18px;width:10px;height:10px;margin-left:-4px;
-        border-radius:50%;background:#FF3B30;box-shadow:0 0 12px rgba(255,59,48,.95);"></div>
+        linear-gradient(180deg,transparent,rgba(4,5,12,.42) 26%,rgba(4,5,12,.42) 74%,transparent);"></div>
+    {''.join(f'<div style="position:absolute;left:{i/32*96+2:.2f}%;top:{4 if i%8==0 else 14}px;'
+             f'width:{2 if i%8==0 else 1.4}px;height:{36 if i%8==0 else 20}px;'
+             f'background:rgba(255,255,255,{.80 if i%8==0 else .44});"></div>' for i in range(33))}
+    <div style="position:absolute;left:0;right:0;top:42px;height:1px;background:rgba(255,255,255,.28);"></div>
+    {''.join(f'<div style="position:absolute;left:{p*100:.0f}%;top:47px;transform:translateX(-50%);'
+             f'font-family:DSEG7;font-size:16px;color:rgba(255,255,255,.42);">{n}</div>'
+             for p,n in [(.10,'600'),(.36,'800'),(.62,'1000'),(.88,'1400')])}
+    <div style="position:absolute;left:{NEEDLE*100:.1f}%;top:-2px;width:3px;height:49px;background:#FF3B30;
+        box-shadow:0 0 14px rgba(255,59,48,.9);"></div>
+    <div style="position:absolute;left:{NEEDLE*100:.1f}%;top:-8px;width:12px;height:12px;margin-left:-4.5px;
+        border-radius:50%;background:#FF3B30;box-shadow:0 0 14px rgba(255,59,48,.95);"></div>
   </div>
-  <div style="position:absolute;left:28px;bottom:18px;">
-    <span class=eb style="color:rgba(255,255,255,.46);font-size:10px;">Last played</span>
-    <span style="color:#fff;font-size:15px;font-weight:700;margin-left:8px;">Everlong</span>
-    <span style="color:rgba(255,255,255,.58);font-size:14px;margin-left:6px;">&middot; Foo Fighters</span>
+  <div style="position:absolute;left:32px;bottom:24px;">
+    <span class=eb style="color:rgba(255,255,255,.48);font-size:10px;">Up next &middot; After Hours FM at 11pm</span>
+  </div>""",
+  note='The needle sits at the station\u2019s real place on the band — 810 of 530&ndash;1600.')
+
+EDITORIAL2 = slot('E &middot; medium', 'Start Drive &mdash; the invitation', f"""
+  <div style="position:absolute;inset:0;background:#0d0f14;"></div>
+  <img src="data:image/jpeg;base64,{A['downtown']}" style="position:absolute;right:0;top:0;
+      width:50%;height:100%;object-fit:cover;">
+  <div style="position:absolute;right:0;top:0;width:50%;height:100%;background:
+      linear-gradient(90deg,#0d0f14 0%,rgba(13,15,20,.55) 34%,rgba(13,15,20,0) 100%);"></div>
+  <div style="position:absolute;left:32px;top:32px;right:352px;bottom:32px;display:flex;
+      flex-direction:column;">
+    <div class=eb style="color:#FF9A2E;font-size:10px;">Pick up where you left off</div>
+    <div style="flex:1"></div>
+    <div style="color:#fff;font-size:46px;font-weight:800;line-height:1.06;letter-spacing:-.02em;">Let&rsquo;s put<br>something on.</div>
+    <div style="flex:1"></div>
+    <div style="color:rgba(255,255,255,.62);font-size:24px;white-space:nowrap;">Garage &middot; Cassette</div>
+  </div>
+  <div style="position:absolute;right:32px;top:50%;transform:translateY(-50%);width:92px;height:92px;
+      border-radius:50%;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.5);
+      display:flex;align-items:center;justify-content:center;">
+    <div style="width:0;height:0;margin-left:8px;border-left:30px solid #111;
+        border-top:19px solid transparent;border-bottom:19px solid transparent;"></div>
   </div>""")
 
 # ══════════════════════════════ J — the CD Player window ═══════════════════
@@ -319,7 +355,7 @@ RECORD = slot('F &middot; small', 'The Record &mdash; on cream', f"""
   <div style="position:absolute;inset:0;opacity:.4;background:repeating-linear-gradient(
       92deg,rgba(0,0,0,.022) 0 2px,transparent 2px 5px);"></div>
   <div style="position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:258px;height:258px;">
-    {grooves(258, 80, dial_label('Garage'))}
+    {grooves(258, 80, compact_label())}
   </div>
   <div style="position:absolute;left:0;right:0;bottom:14px;text-align:center;">
     <span style="color:#1b1f27;font-size:17px;font-weight:800;">Garage</span>
@@ -384,6 +420,6 @@ CD = slot('I &middot; small', 'CD', f"""
   </div>""", 's')
 
 html = (f"<html><head><meta charset=utf-8><style>{CSS}</style></head><body>"
-        + WINAMP + C1 + C2 + STUB + EDITORIAL + DIAL + PLAYER + RECORD + BALL + CD + "</body></html>")
+        + WINAMP + C1 + C2 + STUB + EDITORIAL2 + DIAL + PLAYER + RECORD + BALL + CD + "</body></html>")
 pathlib.Path(os.environ.get('OUT', 'widgets.html')).write_text(html)
 print('built round 3')

@@ -179,14 +179,23 @@ check('the Deck\'s dropped third look is gone', !/DeckLook\.set|case \.set:|case
     check(`${f}: every cover has something to fall back to`, opens === elses,
       `${opens} slot(s), ${elses} with a fallback`);
   }
-  // THE ORDER IS THE DECISION, not an implementation detail: the STATION'S
-  // photograph first, the song's cover only as a fallback. The owner chose it
-  // that way "so people can add their photos in" — a custom station carries a
-  // picture the listener chose, and it is also the one that is always there.
-  // Flipping these two silently would undo that and nothing would complain.
-  check('the picture rule is station first, cover second',
-    /static func cover\(station id: String\?\) -> Image\? \{\s*station\(id\) \?\? lastPlayed\(\)/
-      .test(src['Artwork.swift'] ?? ''));
+  // THE ORDER IS THE DECISION, not an implementation detail, and there are two
+  // of them. Flipping the terms of a `??` is invisible in review and would
+  // undo an owner's call silently, so both are pinned — and so is WHICH
+  // widget uses WHICH, because the two helpers differ by one word and reading
+  // the wrong one at a call site would look perfectly fine.
+  const art = src['Artwork.swift'] ?? '';
+  check('the general rule is station first, cover second',
+    /static func cover\(station id: String\?\) -> Image\? \{\s*station\(id\) \?\? lastPlayed\(\)/.test(art),
+    'the owner chose this "so people can add their photos in"');
+  check('the CD\'s rule is cover first, station second',
+    /static func songCover\(station id: String\?\) -> Image\? \{\s*lastPlayed\(\) \?\? station\(id\)/.test(art),
+    'owner, 03.09: "I\'d rather keep the album art for the cd mode"');
+  check('only the CD uses the song-first rule',
+    (all.match(/Art\.songCover\(/g) || []).length === 1,
+    'a second caller means someone reached for whichever helper was nearer');
+  check('the CD is the one that calls it',
+    /Art\.songCover\(/.test(src['ModeWidget.swift'] ?? ''));
   // The Deck's Road look must NOT use it — the station photo is already its
   // backdrop, so the same picture would appear twice at two sizes.
   check('the Deck\'s Road look does not print the backdrop twice',

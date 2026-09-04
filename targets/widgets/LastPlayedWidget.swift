@@ -6,15 +6,17 @@ import WidgetKit
  * LAST PLAYED — the song, as an object.
  *
  * THREE LOOKS OF ONE IDEA, not three widgets. Each of these shows the same
- * thing: the last song the app saw, and which station it came from. The
- * PICTURE is the station's own photograph rather than the song's cover — the
+ * thing: the last song the app saw, and which station it came from. They
+ * differ only in what they pretend to be — a desktop CD player, a pocket
+ * player, a ticket stub. That is exactly what a Look setting is for, and it
+ * keeps the gallery at one row instead of three (the same reasoning as
+ * DeckLook, written out there).
+ *
+ * THE PICTURE IS THE STATION'S OWN PHOTOGRAPH, not the song's cover — the
  * owner's call (03.09) "so people can add their photos in", since a custom
- * station carries a photo the listener chose and a cover very often does not
- * exist at all. The words still name the song, which is what the widget is
- * about; see Art.cover. They differ only in what they pretend to be — a desktop CD player, a
- * pocket player, a ticket stub. That is exactly what a Look setting is for,
- * and it keeps the gallery at one row instead of three (the same reasoning
- * as DeckLook, written out there).
+ * station carries a picture the listener chose and a cover very often does
+ * not exist at all. The WORDS still name the song, which is what the widget
+ * is about. See Art.cover.
  *
  * IT SAYS "LAST PLAYED" AND NEVER "NOW PLAYING", in every look. A widget is
  * redrawn a handful of times a day, so by the time anyone reads this the song

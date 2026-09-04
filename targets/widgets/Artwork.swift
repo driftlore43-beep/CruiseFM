@@ -82,6 +82,23 @@ enum Art {
     station(id) ?? lastPlayed()
   }
 
+  /**
+   * THE OTHER WAY ROUND, for the one place the SONG is the subject.
+   *
+   * The CD look draws a disc, and a disc with a record sleeve printed on it
+   * is the whole idea — the owner kept it that way when she flipped
+   * everything else to the station (03.09: "I'd rather keep the album art for
+   * the cd mode"). It still falls back to the station's photograph, so a
+   * listener with no cover sees a real picture rather than a blank disc.
+   *
+   * Only the CD uses this. Everything else uses `cover` above; if a third
+   * caller ever appears, that is the moment to ask which rule it really wants
+   * rather than reaching for whichever is nearer.
+   */
+  static func songCover(station id: String?) -> Image? {
+    lastPlayed() ?? station(id)
+  }
+
   /// The cover of the last song the app saw play, or nil if there wasn't one.
   static func lastPlayed() -> Image? {
     guard

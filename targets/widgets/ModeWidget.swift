@@ -14,12 +14,13 @@ import WidgetKit
  * name; the CD carries no words at all (owner, 03.09: "the CD Mode should
  * remove all texts"). Nothing here claims to be playing.
  *
- * THE DISC SHOWS THE STATION'S PHOTOGRAPH, NOT THE SONG'S COVER, and that is
- * a later instruction overriding an earlier one: she first asked for the last
- * played song on the disc, then — asked which was better across the set —
- * chose the station "so people can add their photos in". A custom station's
- * own photograph is the thing that makes this personal, and unlike a cover it
- * is always there. See Art.cover; the song's cover is still the fallback.
+ * THE DISC IS THE ONE PLACE THE SONG'S COVER COMES FIRST. Everything else in
+ * the set draws the station's photograph, so a listener's own custom-station
+ * picture shows up — but a disc with a record sleeve printed on it is the
+ * whole idea of this one, and the owner kept it that way when she made that
+ * call (03.09: "I'd rather keep the album art for the cd mode"). It falls
+ * back to the station's photograph, so no cover still means a real picture.
+ * See Art.songCover, which exists for this and nothing else.
  *
  * AND NEITHER SPINS. iOS redraws a widget a handful of times a day and only
  * countdown text may animate itself — true of every app. A still ball is what
@@ -37,7 +38,7 @@ enum ModeLook: String, AppEnum {
     .mirrorBall: DisplayRepresentation(title: "Mirror ball",
                                        subtitle: "The ball, lit the way the app draws it"),
     .cd: DisplayRepresentation(title: "CD",
-                               subtitle: "Your station, printed on a disc in its case"),
+                               subtitle: "The last song, printed on a disc in its case"),
   ]
 }
 
@@ -150,7 +151,7 @@ struct ModeView: View {
       LinearGradient(colors: [Color(hex: "#1c1f26"), Color(hex: "#080a0e")],
                      startPoint: .topLeading, endPoint: .bottomTrailing)
       JewelCase()
-      CompactDisc(cover: Art.cover(station: s.image), accent: s.accentColor, size: 104)
+      CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 104)
         .offset(x: 5)
     }
     .widgetURL(s.url(mode: "cd"))

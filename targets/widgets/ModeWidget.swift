@@ -145,7 +145,7 @@ struct ModeView: View {
       LinearGradient(colors: [Color(hex: "#1c1f26"), Color(hex: "#080a0e")],
                      startPoint: .topLeading, endPoint: .bottomTrailing)
       JewelCase()
-      CompactDisc(cover: Art.lastPlayed(), accent: s.accentColor, size: 104)
+      CompactDisc(cover: Art.cover(station: s.image), accent: s.accentColor, size: 104)
         .offset(x: 5)
     }
     .widgetURL(s.url(mode: "cd"))

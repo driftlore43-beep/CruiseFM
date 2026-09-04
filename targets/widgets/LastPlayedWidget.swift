@@ -190,10 +190,12 @@ struct LastPlayedView: View {
           ZStack {
             Color.white
             bevel(raised: false, width: 2)
-            if let art = Art.lastPlayed() {
+            if let art = Art.cover(station: s.image) {
               art.resizable().aspectRatio(contentMode: .fill).padding(3)
             } else {
-              Rectangle().fill(Color(white: 0.82)).padding(3)
+              // Neither a cover nor a photograph: a custom station with no
+              // picture. Its own colour, not a grey slab.
+              s.gradient.padding(3)
             }
           }
           .frame(width: 106, height: 106)
@@ -295,9 +297,11 @@ struct LastPlayedView: View {
             HStack(alignment: .top, spacing: 11) {
               ZStack {
                 RoundedRectangle(cornerRadius: 3).fill(Color(white: 0.16))
-                if let art = Art.lastPlayed() {
+                if let art = Art.cover(station: s.image) {
                   art.resizable().aspectRatio(contentMode: .fill)
                     .clipShape(RoundedRectangle(cornerRadius: 3))
+                } else {
+                  s.gradient.clipShape(RoundedRectangle(cornerRadius: 3))
                 }
               }
               .frame(width: 74, height: 74)

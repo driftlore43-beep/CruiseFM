@@ -158,6 +158,36 @@ check('the Deck\'s dropped third look is gone', !/DeckLook\.set|case \.set:|case
   }
 }
 
+// ── no widget can show an empty picture slot ─────────────────────────────
+// The album cover only exists once someone has driven with a service that
+// reports the track, which for most listeners is never — Spotify caps full
+// playback at five accounts. So every slot that draws a cover has to say what
+// it draws when there isn't one, and "nothing" is not an answer: the first
+// cut fell back to a grey rectangle, an empty hole, and a flat accent disc in
+// three different widgets.
+{
+  const drawers = ['LastPlayedWidget.swift', 'ModeWidget.swift', 'VinylWidget.swift'];
+  for (const f of drawers) {
+    const swift = src[f] ?? '';
+    if (!/Art\.(cover|lastPlayed)\(/.test(swift)) continue;
+    check(`${f}: never falls back to a grey slab`,
+      !/Color\(white: 0\.8\d?\)\)\.padding/.test(swift),
+      'a grey rectangle reads as broken rather than as empty');
+    // Every `if let art = ...` that draws a picture needs an else.
+    const opens = (swift.match(/if let art = Art\.\w+\(/g) || []).length;
+    const elses = (swift.match(/if let art = Art\.\w+\([\s\S]{0,320}?\} else \{/g) || []).length;
+    check(`${f}: every cover has something to fall back to`, opens === elses,
+      `${opens} slot(s), ${elses} with a fallback`);
+  }
+  check('the shared fallback exists',
+    /static func cover\(station id: String\?\) -> Image\? \{[\s\S]{0,80}lastPlayed\(\) \?\? station\(id\)/
+      .test(src['Artwork.swift'] ?? ''));
+  // The Deck's Road look must NOT use it — the station photo is already its
+  // backdrop, so the same picture would appear twice at two sizes.
+  check('the Deck\'s Road look does not print the backdrop twice',
+    !/Art\.cover\(/.test(src['VinylWidget.swift'] ?? ''));
+}
+
 // ── a check that cannot fail is worse than none ──────────────────────────
 if (declared.length < 5 || Object.keys(kinds).length < 5) {
   console.error('\n  the scan looks empty — fix the scan, not the code.');

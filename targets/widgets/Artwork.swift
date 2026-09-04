@@ -54,6 +54,32 @@ enum Art {
     return Image(uiImage: ui)
   }
 
+  /**
+   * WHAT GOES IN A PICTURE SLOT: the song's cover if there is one, the
+   * station's own photograph if there is not.
+   *
+   * THE COVER IS OFTEN ABSENT, and that is not an edge case. It exists only
+   * once someone has driven with a service that reports the track — and
+   * Spotify caps full playback at five accounts, so most listeners are in
+   * companion mode with no track at all; a fresh install has none either.
+   * The station photo, by contrast, is BUNDLED in this extension for the ten
+   * built-ins and copied into the App Group for a custom one, so it needs no
+   * network and cannot go stale.
+   *
+   * Before this, the four widgets drawing a cover each failed differently —
+   * a grey rectangle, an empty hole, a flat accent disc — and the grey
+   * rectangle in particular reads as broken rather than as empty. One rule
+   * instead: your music when we have it, the station when we do not, never
+   * a blank.
+   *
+   * NOT USED BY THE DECK'S ROAD LOOK, deliberately: the station photo is
+   * already the backdrop there, so falling back to it would print the same
+   * picture twice at two sizes. That one falls back to its printed pressing.
+   */
+  static func cover(station id: String?) -> Image? {
+    lastPlayed() ?? station(id)
+  }
+
   /// The cover of the last song the app saw play, or nil if there wasn't one.
   static func lastPlayed() -> Image? {
     guard

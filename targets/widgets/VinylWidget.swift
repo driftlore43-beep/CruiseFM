@@ -158,8 +158,18 @@ struct DeckView: View {
             lastPlayed(ink: .white)
           }
           Spacer(minLength: 8)
-          RecordView(accent: s.accentColor, label: Art.lastPlayed(), size: 118)
-            .padding(.trailing, 2)
+          // THE ONE THAT DOES NOT FALL BACK TO THE STATION PHOTO. It is
+          // already the backdrop here, so using it on the label too would
+          // print the same picture twice at two sizes. No cover means the
+          // printed pressing instead — the station's own label.
+          Group {
+            if let art = Art.lastPlayed() {
+              RecordView(accent: s.accentColor, label: art, size: 118)
+            } else {
+              pressing(s, size: 118, compact: true)
+            }
+          }
+          .padding(.trailing, 2)
         }
         .padding(15)
       }

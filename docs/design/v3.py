@@ -264,10 +264,8 @@ EDITORIAL2 = slot('E &middot; medium', 'Start Drive &mdash; the invitation', f""
 # title bar runs to all three edges and the bevel is the widget's own rim,
 # rather than a little grey card sitting inside a rounded rectangle.
 WINAMP = slot('J &middot; medium', 'CD Player &mdash; last played', f"""
-  <div style="position:absolute;inset:0;background:#c3c7cb;
-      box-shadow:inset 3px 3px 0 #ffffff, inset -3px -3px 0 #5f666e,
-                 inset 6px 6px 0 #dfe3e6, inset -6px -6px 0 #818a94;"></div>
-  <div style="position:absolute;left:6px;right:6px;top:6px;height:50px;
+  <div style="position:absolute;inset:0;background:#c3c7cb;"></div>
+  <div style="position:absolute;left:0;right:0;top:0;height:56px;
       background:linear-gradient(90deg,#7a4a12,#c2761a 62%,#e0a24e);
       display:flex;align-items:center;padding:0 8px 0 12px;">
     <div style="width:26px;height:26px;border-radius:50%;background:

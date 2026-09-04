@@ -156,10 +156,15 @@ struct LastPlayedView: View {
   private func cdPlayer(_ s: WidgetStation) -> some View {
     ZStack(alignment: .topLeading) {
       face
-      // A raised control is lit top-left and shaded bottom-right. That
-      // inversion is the whole visual language of this look.
-      bevel(raised: true, width: 3)
-
+      // NO FRAME AROUND THE WINDOW. This drew a raised bevel round the whole
+      // widget and inset the title bar by 4pt, which left a grey rectangle
+      // between the widget's own edge and the orange — the owner called it
+      // twice: "make sure that this is gone and that the card is the shape of
+      // the widget itself." The window IS the widget, so the title bar runs
+      // into the top corners and the body runs into the bottom ones.
+      //
+      // The raised/sunken language is not lost by dropping it: it lives on
+      // the BUTTONS and the FIELDS inside, which is where anyone reads it.
       VStack(spacing: 0) {
         // title bar
         HStack(spacing: 8) {
@@ -175,12 +180,11 @@ struct LastPlayedView: View {
             .frame(width: 20, height: 17)
           }
         }
-        .padding(.horizontal, 7)
-        .frame(height: 30)
+        .padding(.horizontal, 10)
+        .frame(height: 32)
         .background(
           LinearGradient(colors: [Color(hex: "#7a4a12"), s.accentColor, Color(hex: "#e0a24e")],
                          startPoint: .leading, endPoint: .trailing))
-        .padding(4)
 
         HStack(alignment: .top, spacing: 11) {
           ZStack {

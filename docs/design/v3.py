@@ -74,17 +74,18 @@ def grooves(size, label_inset, label_html, shadow=True):
       </div>
     </div>"""
 
-def red_label(num='810', band='AN'):
-    """A classic record label: a red centre with the frequency printed on it.
+def red_label():
+    """A classic record label: a plain red centre, and nothing written on it.
 
-    The station's NAME is not here — it moved to the foot of the card, and
-    printing it in both places is the kind of duplication that makes a small
-    label unreadable. The frequency alone has room to be read."""
-    return f"""<div style="position:absolute;inset:0;background:
-        radial-gradient(circle at 38% 30%,#d8402f,#96271b 72%,#7a1e14);display:flex;
-        align-items:center;justify-content:center;gap:5px;">
-      <span class=seg style="font-size:22px;color:#ffe7c2;">{num}</span>
-      <span class=seg14 style="font-size:12px;color:#ffe7c2;opacity:.82;">{band}</span>
+    Everything that used to be printed here has gone — the owner asked for the
+    text out of the disc, then for the frequency out too. What is left is the
+    object itself, which is the point of this look; the words all live on the
+    card beside it."""
+    return """<div style="position:absolute;inset:0;background:
+        radial-gradient(circle at 38% 30%,#d8402f,#96271b 72%,#7a1e14);
+        display:flex;align-items:center;justify-content:center;">
+      <div style="width:9px;height:9px;border-radius:50%;background:#0b0b0d;
+          box-shadow:0 0 0 1px rgba(0,0,0,.5);"></div>
     </div>"""
 
 def compact_label(num='810', band='AN'):
@@ -139,37 +140,33 @@ C2 = slot('C2 &middot; medium', 'The Deck &mdash; the label', f"""
   <div style="position:absolute;inset:0;opacity:.4;background:repeating-linear-gradient(
       92deg,rgba(0,0,0,.022) 0 2px,transparent 2px 5px);"></div>
 
-  <!-- THE RECORD, sliding out of the sleeve to the RIGHT. Drawn first so the
-       sleeve overlaps it: that overlap is the whole illusion. -->
-  <div style="position:absolute;left:182px;top:50%;transform:translateY(-50%);width:212px;height:212px;">
-    {grooves(212, 58, red_label())}
-  </div>
-
-  <!-- THE SLEEVE — the station's own photograph, which is what a record
-       collection actually looks like on a shelf. -->
-  <div style="position:absolute;left:24px;top:50%;transform:translateY(-50%);width:212px;height:212px;
-      box-shadow:0 10px 26px rgba(40,34,24,.42);">
+  <!-- THE SLEEVE, laid down first and slightly askew — the station's own
+       photograph. -->
+  <div style="position:absolute;left:20px;top:50%;width:232px;height:232px;
+      transform:translateY(-50%) rotate(-5deg);
+      box-shadow:0 12px 30px rgba(40,34,24,.44);">
     <img src="data:image/jpeg;base64,{A['coastal']}" style="position:absolute;inset:0;
         width:100%;height:100%;object-fit:cover;">
     <div style="position:absolute;inset:0;background:
-        linear-gradient(118deg,rgba(255,255,255,.16) 0 22%,transparent 46%);"></div>
-    <div style="position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.30),
-        inset -3px 0 8px rgba(0,0,0,.24);"></div>
-    <div style="position:absolute;right:0;top:0;bottom:0;width:5px;background:
-        linear-gradient(90deg,rgba(0,0,0,.28),rgba(0,0,0,.05));"></div>
+        linear-gradient(118deg,rgba(255,255,255,.18) 0 20%,transparent 44%);"></div>
+    <div style="position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.32);"></div>
   </div>
 
-  <div style="position:absolute;right:24px;top:44px;text-align:right;width:246px;">
+  <!-- THE RECORD, resting ON the sleeve rather than sliding out of it. -->
+  <div style="position:absolute;left:188px;top:50%;width:232px;height:232px;
+      transform:translateY(-50%) rotate(4deg);">
+    {grooves(232, 76, red_label())}
+  </div>
+
+  <div style="position:absolute;right:24px;top:52px;text-align:right;width:206px;">
     <div class=eb style="color:#8a8474;font-size:9px;">Now on the deck</div>
-    <div style="font-size:30px;font-weight:800;color:#1b1f27;margin-top:6px;
+    <div style="font-size:27px;font-weight:800;color:#1b1f27;margin-top:6px;line-height:1.1;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Everlong</div>
-    <div style="font-size:18px;color:#6f6a5c;margin-top:2px;
+    <div style="font-size:17px;color:#6f6a5c;margin-top:2px;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Foo Fighters</div>
   </div>
-  <!-- THE STATION, not the mode. It used to read "Cassette mode" under a
-       picture of a RECORD, which is two objects contradicting each other. -->
-  <div style="position:absolute;right:26px;bottom:26px;text-align:right;">
-    <div style="font-size:19px;font-weight:800;color:#1b1f27;">Garage</div>
+  <div style="position:absolute;right:24px;bottom:28px;text-align:right;">
+    <div style="font-size:18px;font-weight:800;color:#1b1f27;">Garage</div>
   </div>""")
 
 # ══════════════════════════════ G — the stub ═══════════════════════════════
@@ -186,7 +183,7 @@ STUB = slot('G &middot; medium', 'The Stub &mdash; with the artist', f"""
   <div style="position:absolute;left:24px;top:64px;">
     <div style="font-size:10px;letter-spacing:.2em;color:#8a8474;font-family:ui-monospace,Menlo,monospace;">STATION</div>
     <div style="font-size:29px;font-weight:800;color:#1b1f27;line-height:1.04;margin-top:2px;">Garage</div>
-    <div style="font-size:12px;color:#6f6a5c;margin-top:2px;">Cassette mode</div>
+
   </div>
   <div style="position:absolute;right:24px;top:66px;text-align:right;">
     <div class=seg style="font-size:30px;color:#1b1f27;">810</div>
@@ -218,7 +215,7 @@ EDITORIAL = slot('E &middot; medium', 'Editorial &mdash; station in the card', f
     <div class=eb style="color:#FF9A2E;">Pick up where you left off</div>
     <div style="color:#fff;font-size:33px;font-weight:800;line-height:1.08;letter-spacing:-.02em;
         margin-top:11px;">Let&rsquo;s put<br>something on.</div>
-    <div style="color:rgba(255,255,255,.60);font-size:15px;margin-top:11px;white-space:nowrap;">Garage &middot; Cassette mode</div>
+    <div style="color:rgba(255,255,255,.60);font-size:15px;margin-top:11px;white-space:nowrap;">Garage &middot; Cassette</div>
   </div>
   <div style="position:absolute;right:32px;bottom:28px;width:74px;height:74px;border-radius:50%;
       background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;">

@@ -192,33 +192,41 @@ struct DeckView: View {
         smallStack(s, ink: ink)
       } else {
         ZStack(alignment: .leading) {
-          // THE RECORD SLIDING OUT OF ITS SLEEVE. Drawn FIRST so the sleeve
-          // overlaps it — that overlap is the whole illusion, and it is also
-          // what closed the dead gap this card used to have down its middle
-          // (owner, 03.09: "there's a big gap between the vinyl and the text,
-          // let's push the vinyl towards the right where a vinyl sleeve
-          // (should be the station image) sits on the left").
+          // LAID OUT LIKE A RECORD ON ITS SLEEVE, both slightly askew — the
+          // owner's own steer (03.09, with an MD Vinyl screenshot): "position
+          // the vinyl and the sleeve like they're on an angle where the vinyl
+          // sits on top of the vinyl sleeve".
           //
-          // HOW FAR RIGHT IS NOT A TASTE: the label has to clear the sleeve's
-          // edge completely or the frequency reads as half a number. The
-          // label is 42% of the disc, so its left edge sits at
-          // (record left) + size*0.29 — that has to be past the sleeve.
-          pressing(s, size: 106)
-            .offset(x: 91)
-          RecordSleeve(image: s.image, gradient: s.gradient, size: 106)
-            .offset(x: 12)
+          // THE ORDER IS THE WHOLE THING. The sleeve goes down first and the
+          // record rests ON it. Drawn the other way round the record reads as
+          // sliding OUT of the sleeve, which is a different object and is
+          // what this card did before.
+          RecordSleeve(image: s.image, gradient: s.gradient, size: 116)
+            .rotationEffect(.degrees(-5))
+            .offset(x: 10)
+
+          // NOT ONE WORD ON THE DISC. The frequency went the way the rest of
+          // the text did (owner: "remove the station number in the vinyl
+          // disc") — what is left is the object itself, and everything
+          // readable lives on the card beside it. The SMALL tile still prints
+          // the frequency on its label, because there it is the only thing
+          // naming the station.
+          RecordView(accent: s.accentColor, label: nil, size: 116, plainLabel: true)
+            .rotationEffect(.degrees(4))
+            .shadow(color: .black.opacity(0.34), radius: 9, x: 3, y: 5)
+            .offset(x: 94)
 
           VStack(alignment: .trailing, spacing: 2) {
             Text("NOW ON THE DECK").font(.system(size: 7.5, weight: .heavy)).tracking(1.6)
               .foregroundColor(ink.opacity(0.48))
             if let lp = entry.lastPlayed {
-              Text(lp.title).font(.system(size: 19, weight: .heavy))
-                .foregroundColor(ink).lineLimit(1).minimumScaleFactor(0.65)
-              Text(lp.artist).font(.system(size: 12)).foregroundColor(ink.opacity(0.60))
-                .lineLimit(1).minimumScaleFactor(0.8)
+              Text(lp.title).font(.system(size: 17, weight: .heavy))
+                .foregroundColor(ink).lineLimit(1).minimumScaleFactor(0.6)
+              Text(lp.artist).font(.system(size: 11)).foregroundColor(ink.opacity(0.60))
+                .lineLimit(1).minimumScaleFactor(0.75)
             } else {
-              Text(s.tagline).font(.system(size: 13))
-                .foregroundColor(ink.opacity(0.55)).lineLimit(2)
+              Text(s.tagline).font(.system(size: 12))
+                .foregroundColor(ink.opacity(0.55)).lineLimit(3)
             }
             Spacer(minLength: 4)
             // THE STATION AT THE FOOT (owner, 03.09). The concept sheet had
@@ -227,13 +235,13 @@ struct DeckView: View {
             // contradicting each other on one card. The Swift had never said
             // that (it printed the station's tagline), but her instruction
             // stands either way: the foot names the station.
-            Text(s.name).font(.system(size: 15, weight: .heavy))
+            Text(s.name).font(.system(size: 14, weight: .heavy))
               .foregroundColor(ink).lineLimit(1).minimumScaleFactor(0.7)
           }
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-          .padding(.vertical, 16)
-          .padding(.trailing, 14)
-          .padding(.leading, 210)
+          .padding(.vertical, 15)
+          .padding(.trailing, 13)
+          .padding(.leading, 218)
         }
       }
     }

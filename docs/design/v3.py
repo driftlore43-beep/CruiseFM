@@ -127,6 +127,16 @@ def red_label():
           box-shadow:0 0 0 1px rgba(0,0,0,.5);"></div>
     </div>"""
 
+def cover_label(img='coastal'):
+    """The label is the last-played song's own cover, not a printed disc
+    centre — the app's own fallback whenever there is a real cover to show,
+    same rule as the picture that goes on the Deck's sleeve."""
+    return f"""<div style="position:absolute;inset:0;overflow:hidden;">
+      <img src="data:image/jpeg;base64,{A[img]}" style="position:absolute;inset:0;
+          width:100%;height:100%;object-fit:cover;">
+      <div style="position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35);"></div>
+    </div>"""
+
 def compact_label(num='810', band='AN'):
     """What pressing(compact:) draws. The label is 42% of the disc, so at the
     small tile's 92pt there is 38pt of room — 'CRUISE FM' would set at under
@@ -180,8 +190,9 @@ C2 = slot('C2 &middot; medium', 'The Deck &mdash; the label', f"""
       92deg,rgba(0,0,0,.022) 0 2px,transparent 2px 5px);"></div>
 
   <!-- THE SLEEVE, laid down first and slightly askew — the station's own
-       photograph. -->
-  <div style="position:absolute;left:20px;top:50%;width:232px;height:232px;
+       photograph. Sized up and shifted right so the whole assembly sits
+       nearer the card's centre rather than hugging the left edge. -->
+  <div style="position:absolute;left:40px;top:50%;width:256px;height:256px;
       transform:translateY(-50%) rotate(-5deg);
       box-shadow:0 12px 30px rgba(40,34,24,.44);">
     <img src="data:image/jpeg;base64,{A['coastal']}" style="position:absolute;inset:0;
@@ -217,13 +228,13 @@ C2 = slot('C2 &middot; medium', 'The Deck &mdash; the label', f"""
        TIGHTEST where they touch, and lightens as it spreads — that one
        gradient is most of the difference between resting on the sleeve and
        floating above it. The app's own decks learned this on 19.08. -->
-  <div style="position:absolute;left:186px;top:50%;width:238px;height:238px;
+  <div style="position:absolute;left:222px;top:50%;width:262px;height:262px;
       transform:translateY(-50%);border-radius:50%;
       background:radial-gradient(circle at 42% 54%,rgba(20,15,10,.55),rgba(20,15,10,.22) 58%,transparent 72%);
       filter:blur(9px);"></div>
-  <div style="position:absolute;left:188px;top:50%;width:232px;height:232px;
+  <div style="position:absolute;left:224px;top:50%;width:256px;height:256px;
       transform:translateY(-50%) rotate(4deg);">
-    {grooves(232, 76, red_label())}
+    {grooves(256, 84, red_label())}
     <!-- A BROAD SPECULAR. Real vinyl is not matte: it takes one wide, soft
          band of the room across it, on top of the fine per-groove sheen. -->
     <div style="position:absolute;inset:0;border-radius:50%;pointer-events:none;background:
@@ -231,15 +242,18 @@ C2 = slot('C2 &middot; medium', 'The Deck &mdash; the label', f"""
         rgba(255,255,255,.02) 46%,transparent 62%);"></div>
   </div>
 
-  <div style="position:absolute;right:24px;top:52px;text-align:right;width:206px;">
+  <div style="position:absolute;right:24px;top:46px;text-align:right;width:160px;">
     <div class=eb style="color:#8a8474;font-size:9px;">Now on the deck</div>
     <div style="font-size:27px;font-weight:800;color:#1b1f27;margin-top:6px;line-height:1.1;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Everlong</div>
     <div style="font-size:17px;color:#6f6a5c;margin-top:2px;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Foo Fighters</div>
   </div>
-  <div style="position:absolute;right:24px;bottom:28px;text-align:right;">
-    <div style="font-size:18px;font-weight:800;color:#1b1f27;">Garage</div>
+  <!-- STATION NAME AND NUMBER, TOGETHER — the owner asked for the two to
+       read as one enlarged block rather than the name alone. -->
+  <div style="position:absolute;right:24px;bottom:22px;text-align:right;">
+    <div style="font-size:30px;font-weight:800;color:#1b1f27;line-height:1.05;">Garage</div>
+    <div style="font-size:20px;font-weight:700;color:#6f6a5c;margin-top:2px;">810 AM</div>
   </div>""")
 
 # ══════════════════════════════ G — the stub ═══════════════════════════════
@@ -255,26 +269,33 @@ STUB = slot('G &middot; medium', 'The Stub &mdash; with the artist', f"""
   </div>
   <div style="position:absolute;left:24px;top:64px;">
     <div style="font-size:10px;letter-spacing:.2em;color:#8a8474;font-family:ui-monospace,Menlo,monospace;">STATION</div>
-    <div style="font-size:29px;font-weight:800;color:#1b1f27;line-height:1.04;margin-top:2px;">Garage</div>
+    <div style="font-size:34px;font-weight:800;color:#1b1f27;line-height:1.04;margin-top:2px;">Garage</div>
 
   </div>
-  <div style="position:absolute;right:24px;top:66px;text-align:right;">
-    <div class=seg style="font-size:30px;color:#1b1f27;">810</div>
-    <div class=seg14 style="font-size:13px;color:#6f6a5c;margin-top:3px;">AN</div>
+  <div style="position:absolute;right:24px;top:64px;text-align:right;">
+    <div class=seg style="font-size:33px;color:#1b1f27;">810</div>
+    <div class=seg14 style="font-size:14px;color:#6f6a5c;margin-top:3px;">AN</div>
   </div>
   <div style="position:absolute;left:0;right:0;top:172px;height:2px;
       background:repeating-linear-gradient(90deg,#bcb5a3 0 7px,transparent 7px 15px);"></div>
   <div style="position:absolute;left:-11px;top:162px;width:22px;height:22px;border-radius:50%;background:#2c3240;"></div>
   <div style="position:absolute;right:-11px;top:162px;width:22px;height:22px;border-radius:50%;background:#2c3240;"></div>
-  <div style="position:absolute;left:24px;right:118px;bottom:22px;">
+  <!-- LAST PLAYED NOW RUNS THE FULL WIDTH, freeing the barcode below it to
+       run the full width too — the two were fighting for the same strip of
+       card, which is what kept the barcode short. -->
+  <div style="position:absolute;left:24px;right:24px;top:184px;">
     <div style="font-size:10px;letter-spacing:.2em;color:#8a8474;font-family:ui-monospace,Menlo,monospace;">LAST PLAYED</div>
-    <div style="font-size:30px;font-weight:800;color:#1b1f27;margin-top:3px;line-height:1.06;
+    <div style="font-size:33px;font-weight:800;color:#1b1f27;margin-top:2px;line-height:1.04;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Everlong</div>
-    <div style="font-size:21px;color:#5f5a4e;margin-top:1px;
+    <div style="font-size:22px;color:#5f5a4e;margin-top:0;
         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Foo Fighters</div>
   </div>
-  <div style="position:absolute;right:24px;bottom:24px;display:flex;align-items:flex-end;gap:2px;height:34px;">
-    {''.join(f'<div style="width:{2 if i%3 else 4}px;height:{34 if i%4 else 23}px;background:#1b1f27;"></div>' for i in range(20))}
+  <!-- THE BARCODE, full width now — a real one runs the length of the
+       stub, not a short strip in the corner. -->
+  <div style="position:absolute;left:24px;right:24px;bottom:18px;display:flex;align-items:flex-end;
+      gap:2px;height:30px;overflow:hidden;">
+    {''.join(f'<div style="width:{[2,3,5,2,4,2,6,3,2,4][i%10]}px;height:{30 if i%4 else 21}px;'
+             f'background:#1b1f27;flex-shrink:0;"></div>' for i in range(119))}
   </div>""")
 
 # ══════════════════════════════ E — editorial ══════════════════════════════
@@ -433,13 +454,16 @@ PLAYER = slot('K &middot; medium', 'The Player &mdash; new, your idea', f"""
   <div style="position:absolute;left:24px;top:26px;width:376px;bottom:26px;border-radius:8px;
       background:#0a0c12;box-shadow:inset 0 0 0 3px #9aa0a8, 0 3px 8px rgba(0,0,0,.35);
       overflow:hidden;">
-    <img src="data:image/jpeg;base64,{A['coastal']}" style="position:absolute;left:14px;top:16px;
-        width:152px;height:152px;object-fit:cover;border-radius:4px;">
-    <div style="position:absolute;left:182px;right:14px;top:22px;">
+    <!-- THE PHOTO RUNS THE FULL HEIGHT OF THE SCREEN — the screen's own
+         corner radius clips its left edge for free, so it reads as the
+         screen's own picture rather than a thumbnail floating on it. -->
+    <img src="data:image/jpeg;base64,{A['coastal']}" style="position:absolute;left:0;top:0;bottom:0;
+        width:190px;object-fit:cover;">
+    <div style="position:absolute;left:204px;right:14px;top:22px;">
       <div style="color:#fff;font-size:27px;font-weight:800;line-height:1.1;">Everlong</div>
       <div style="color:rgba(255,255,255,.66);font-size:19px;margin-top:8px;">Foo Fighters</div>
     </div>
-    <div style="position:absolute;left:14px;right:14px;bottom:16px;display:flex;align-items:center;
+    <div style="position:absolute;left:204px;right:14px;bottom:16px;display:flex;align-items:center;
         justify-content:space-between;">
       <span class=eb style="color:rgba(255,255,255,.5);font-size:9px;">Last played</span>
       <div style="display:flex;align-items:baseline;gap:4px;">
@@ -458,30 +482,40 @@ PLAYER = slot('K &middot; medium', 'The Player &mdash; new, your idea', f"""
   note='Drawn as “a player”, not as an iPod — see the note in the reply.')
 
 # ══════════════════════════════ smalls ═════════════════════════════════════
-# Owner: "Increase the size of the vinyl and put the station number in the
-# centre of the vinyl, and the name on the bottom. Remove the song name."
-RECORD = slot('F &middot; small', 'The Record &mdash; on cream', f"""
+# Owner, 04.09: "remove the station number and bottom text. Replace the blue
+# with the station last played song album cover." The label was the printed
+# navy pressing (compact_label) with the dial number on it; it is now the
+# song's own cover, and nothing else is written on the disc at all — the
+# object itself is the point, same rule red_label() was built around.
+RECORD = slot('F &middot; small', 'The Record &mdash; album cover', f"""
   <div style="position:absolute;inset:0;background:{CREAM};"></div>
   <div style="position:absolute;inset:0;opacity:.4;background:repeating-linear-gradient(
       92deg,rgba(0,0,0,.022) 0 2px,transparent 2px 5px);"></div>
-  <div style="position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:258px;height:258px;">
-    {grooves(258, 80, compact_label())}
-  </div>
-  <div style="position:absolute;left:0;right:0;bottom:14px;text-align:center;">
-    <span style="color:#1b1f27;font-size:17px;font-weight:800;">Garage</span>
+  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:258px;height:258px;">
+    {grooves(258, 80, cover_label())}
   </div>""", 's')
 
-# Owner: "Mirror ball needs to reflect the same as it is on the app."
+# Owner, 04.09: "improve the graphics of the mirror ball. Make this one
+# reflect off pretty pink, blue and purple colours - as if it's a party
+# happening." ball.py's mirror_ball(party=True) tints each mirror by WHICH
+# of three coloured lamps (pink/blue/purple) is actually catching it, rather
+# than washing the whole ball one colour — a mirror between two lamps blends,
+# same as its brightness already does. The room's own beams and glow are
+# recoloured to match, so the ball reads as lit BY the room rather than
+# carrying colour nothing else has.
+_BALL_BEAMS = [(-74,320,.20,'#ff8fd0'), (-48,340,.15,'#7fb3ff'), (-20,320,.19,'#c08bff'),
+               (14,340,.14,'#ff8fd0'), (42,320,.20,'#7fb3ff'), (68,340,.15,'#c08bff')]
+
 BALL = slot('H &middot; small', 'Mirror Ball', f"""
-  <div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 34%,#191c26,#05060a 76%);"></div>
+  <div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 34%,#241c2c,#0a060f 76%);"></div>
   {''.join(f'<div style="position:absolute;left:50%;top:30px;width:1px;height:{h}px;'
-           f'background:linear-gradient(180deg,rgba(214,230,255,{o}),transparent);'
+           f'background:linear-gradient(180deg,{c}{int(o*255):02x},transparent);'
            f'transform-origin:top center;transform:rotate({a}deg);"></div>'
-           for a,h,o in [(-74,320,.15),(-48,340,.10),(-20,320,.13),(14,340,.09),(42,320,.14),(68,340,.10)])}
+           for a,h,o,c in _BALL_BEAMS)}
   <div style="position:absolute;left:50%;top:6px;transform:translateX(-50%);width:2px;height:30px;
       background:rgba(255,255,255,.30);"></div>
   <div style="position:absolute;left:50%;top:34px;transform:translateX(-50%);
-      filter:drop-shadow(0 0 34px rgba(190,215,255,.34));">{BALLGEN.ball_svg(228)}</div>
+      filter:drop-shadow(0 0 34px rgba(230,150,230,.40));">{BALLGEN.ball_svg(228, party=True)}</div>
   <div style="position:absolute;left:0;right:0;bottom:14px;text-align:center;">
     <span style="color:#fff;font-size:17px;font-weight:800;">Garage</span>
   </div>""", 's')
@@ -511,21 +545,27 @@ CD = slot('I &middot; small', 'CD', f"""
         linear-gradient(128deg,rgba(255,255,255,.20) 4%,transparent 26%,transparent 74%,rgba(255,255,255,.10) 96%);
         pointer-events:none;"></div>
   </div>
-  <!-- the disc: the last played cover, and nothing written anywhere -->
-  <div style="position:absolute;left:53%;top:50%;transform:translate(-50%,-50%);width:210px;height:210px;
+  <!-- THE DISC — enlarged, and the rainbow pushed further: a darker photo
+       underneath so the colour reads against it, a second denser conic band
+       laid on top in 'screen' (which brightens rather than the muter
+       'overlay'), and the whole thing bigger within the case's own margins. -->
+  <div style="position:absolute;left:53%;top:50%;transform:translate(-50%,-50%);width:250px;height:250px;
       border-radius:50%;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,.7);">
     <img src="data:image/jpeg;base64,{A['coastal']}" style="position:absolute;inset:0;width:100%;
-        height:100%;object-fit:cover;filter:saturate(1.1) brightness(.86);">
+        height:100%;object-fit:cover;filter:saturate(1.15) brightness(.72);">
     <div style="position:absolute;inset:0;background:conic-gradient(from 20deg,
-        rgba(106,208,255,.85),rgba(185,140,255,.85),rgba(255,154,208,.85),rgba(255,214,138,.85),
-        rgba(168,255,207,.85),rgba(106,208,255,.85));mix-blend-mode:overlay;"></div>
+        rgba(106,208,255,.95),rgba(185,140,255,.95),rgba(255,154,208,.95),rgba(255,214,138,.95),
+        rgba(168,255,207,.95),rgba(106,208,255,.95));mix-blend-mode:overlay;"></div>
+    <div style="position:absolute;inset:0;background:conic-gradient(from 200deg,
+        rgba(106,208,255,.5),rgba(185,140,255,.5),rgba(255,154,208,.5),rgba(255,214,138,.5),
+        rgba(168,255,207,.5),rgba(106,208,255,.5));mix-blend-mode:screen;"></div>
     <div style="position:absolute;inset:0;background:repeating-radial-gradient(circle,
-        rgba(255,255,255,.06) 0 2px,transparent 2px 4px);"></div>
+        rgba(255,255,255,.08) 0 2px,transparent 2px 4px);"></div>
     <div style="position:absolute;inset:0;background:
-        linear-gradient(120deg,rgba(255,255,255,.34) 5%,transparent 28%,transparent 68%,rgba(255,255,255,.20) 92%);"></div>
-    <div style="position:absolute;inset:72px;border-radius:50%;background:rgba(222,228,238,.60);
+        linear-gradient(120deg,rgba(255,255,255,.40) 5%,transparent 28%,transparent 68%,rgba(255,255,255,.24) 92%);"></div>
+    <div style="position:absolute;inset:86px;border-radius:50%;background:rgba(222,228,238,.60);
         box-shadow:inset 0 0 0 1px rgba(255,255,255,.45);"></div>
-    <div style="position:absolute;inset:90px;border-radius:50%;background:#090a0e;
+    <div style="position:absolute;inset:107px;border-radius:50%;background:#090a0e;
         box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);"></div>
   </div>""", 's')
 

@@ -55,29 +55,31 @@ enum Art {
   }
 
   /**
-   * WHAT GOES IN A PICTURE SLOT: the song's cover if there is one, the
-   * station's own photograph if there is not.
+   * WHAT GOES IN A PICTURE SLOT: the STATION'S OWN PHOTOGRAPH first, the
+   * song's cover only if there is no photograph.
    *
-   * THE COVER IS OFTEN ABSENT, and that is not an edge case. It exists only
-   * once someone has driven with a service that reports the track — and
+   * THE OWNER PICKED THIS WAY ROUND, and her reason is the good one (03.09):
+   * "do it the station cover so people can add their photos in." A custom
+   * station can carry a photograph the listener chose themselves, and this is
+   * what puts it on their Home Screen — the feature is invisible otherwise.
+   *
+   * IT IS ALSO THE ONE THAT IS ALWAYS THERE. The song's cover exists only
+   * once someone has driven with a service that reports the track, and
    * Spotify caps full playback at five accounts, so most listeners are in
-   * companion mode with no track at all; a fresh install has none either.
-   * The station photo, by contrast, is BUNDLED in this extension for the ten
-   * built-ins and copied into the App Group for a custom one, so it needs no
-   * network and cannot go stale.
+   * companion mode with none; a fresh install has none either. The station
+   * photograph is BUNDLED in this extension for the ten built-ins and copied
+   * into the App Group for a custom one: no network, never stale.
    *
-   * Before this, the four widgets drawing a cover each failed differently —
-   * a grey rectangle, an empty hole, a flat accent disc — and the grey
-   * rectangle in particular reads as broken rather than as empty. One rule
-   * instead: your music when we have it, the station when we do not, never
-   * a blank.
+   * The cover is kept as the second choice rather than dropped, so a custom
+   * station with no photograph still shows something real.
    *
    * NOT USED BY THE DECK'S ROAD LOOK, deliberately: the station photo is
-   * already the backdrop there, so falling back to it would print the same
-   * picture twice at two sizes. That one falls back to its printed pressing.
+   * already the backdrop there, so using it again on the label would print
+   * the same picture twice at two sizes. That one falls back to its printed
+   * pressing.
    */
   static func cover(station id: String?) -> Image? {
-    lastPlayed() ?? station(id)
+    station(id) ?? lastPlayed()
   }
 
   /// The cover of the last song the app saw play, or nil if there wasn't one.

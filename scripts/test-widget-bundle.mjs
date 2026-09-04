@@ -179,8 +179,13 @@ check('the Deck\'s dropped third look is gone', !/DeckLook\.set|case \.set:|case
     check(`${f}: every cover has something to fall back to`, opens === elses,
       `${opens} slot(s), ${elses} with a fallback`);
   }
-  check('the shared fallback exists',
-    /static func cover\(station id: String\?\) -> Image\? \{[\s\S]{0,80}lastPlayed\(\) \?\? station\(id\)/
+  // THE ORDER IS THE DECISION, not an implementation detail: the STATION'S
+  // photograph first, the song's cover only as a fallback. The owner chose it
+  // that way "so people can add their photos in" — a custom station carries a
+  // picture the listener chose, and it is also the one that is always there.
+  // Flipping these two silently would undo that and nothing would complain.
+  check('the picture rule is station first, cover second',
+    /static func cover\(station id: String\?\) -> Image\? \{\s*station\(id\) \?\? lastPlayed\(\)/
       .test(src['Artwork.swift'] ?? ''));
   // The Deck's Road look must NOT use it — the station photo is already its
   // backdrop, so the same picture would appear twice at two sizes.

@@ -11,10 +11,15 @@ import WidgetKit
  * is deliberately not repeated here.
  *
  * NEITHER OF THEM SAYS ANYTHING IT CANNOT KNOW. The ball carries the station's
- * name; the CD carries no words at all, only the cover of the last song, which
- * is a fact about the past (owner, 03.09: "the CD Mode should remove all texts
- * — place only the last played song on the CD"). Nothing here claims to be
- * playing.
+ * name; the CD carries no words at all (owner, 03.09: "the CD Mode should
+ * remove all texts"). Nothing here claims to be playing.
+ *
+ * THE DISC SHOWS THE STATION'S PHOTOGRAPH, NOT THE SONG'S COVER, and that is
+ * a later instruction overriding an earlier one: she first asked for the last
+ * played song on the disc, then — asked which was better across the set —
+ * chose the station "so people can add their photos in". A custom station's
+ * own photograph is the thing that makes this personal, and unlike a cover it
+ * is always there. See Art.cover; the song's cover is still the fallback.
  *
  * AND NEITHER SPINS. iOS redraws a widget a handful of times a day and only
  * countdown text may animate itself — true of every app. A still ball is what
@@ -32,7 +37,7 @@ enum ModeLook: String, AppEnum {
     .mirrorBall: DisplayRepresentation(title: "Mirror ball",
                                        subtitle: "The ball, lit the way the app draws it"),
     .cd: DisplayRepresentation(title: "CD",
-                               subtitle: "The last song, printed on a disc in its case"),
+                               subtitle: "Your station, printed on a disc in its case"),
   ]
 }
 
@@ -138,8 +143,8 @@ struct ModeView: View {
     .widgetURL(s.url(mode: "disco"))
   }
 
-  // NOT ONE WORD ON IT. The disc carries the cover of the last song and
-  // nothing else; the case is what says which app it belongs to.
+  // NOT ONE WORD ON IT. The disc carries a picture and nothing else; the
+  // case is what says which app it belongs to.
   private func disc(_ s: WidgetStation) -> some View {
     ZStack {
       LinearGradient(colors: [Color(hex: "#1c1f26"), Color(hex: "#080a0e")],

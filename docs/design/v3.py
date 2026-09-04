@@ -264,7 +264,8 @@ EDITORIAL2 = slot('E &middot; medium', 'Start Drive &mdash; the invitation', f""
 # title bar runs to all three edges and the bevel is the widget's own rim,
 # rather than a little grey card sitting inside a rounded rectangle.
 WINAMP = slot('J &middot; medium', 'CD Player &mdash; last played', f"""
-  <div style="position:absolute;inset:0;background:#c3c7cb;"></div>
+  <div style="position:absolute;inset:0;background:
+      linear-gradient(180deg,#dfe3e6 0%,#c3c7cb 14%,#c3c7cb 78%,#a8adb4 100%);"></div>
   <div style="position:absolute;left:0;right:0;top:0;height:56px;
       background:linear-gradient(90deg,#7a4a12,#c2761a 62%,#e0a24e);
       display:flex;align-items:center;padding:0 8px 0 12px;">
@@ -305,7 +306,14 @@ WINAMP = slot('J &middot; medium', 'CD Player &mdash; last played', f"""
   </div>
   <div style="position:absolute;left:352px;bottom:22px;height:54px;display:flex;align-items:center;">
     <span class=px style="font-size:17px;color:#4a5058;">Garage &middot; 810 AM</span>
-  </div>""")
+  </div>
+  <!-- the edges: shading, never a rim. Each fades to nothing inward, so there
+       is no boundary anywhere for the eye to read as a border. -->
+  <div style="position:absolute;inset:0;pointer-events:none;background:
+      linear-gradient(180deg,rgba(255,255,255,.34) 0,transparent 22px),
+      linear-gradient(0deg,rgba(0,0,0,.22) 0,transparent 36px),
+      linear-gradient(90deg,rgba(255,255,255,.16) 0,transparent 26px),
+      linear-gradient(270deg,rgba(0,0,0,.18) 0,transparent 30px);"></div>""")
 
 # ══════════════════════════════ K — the player (new) ═══════════════════════
 # Owner's idea, from a photo of an iPod. It is a good one and it fits the

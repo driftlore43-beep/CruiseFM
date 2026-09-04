@@ -6,8 +6,12 @@ import WidgetKit
  * LAST PLAYED — the song, as an object.
  *
  * THREE LOOKS OF ONE IDEA, not three widgets. Each of these shows the same
- * thing: the last song the app saw, its cover, and which station it came
- * from. They differ only in what they pretend to be — a desktop CD player, a
+ * thing: the last song the app saw, and which station it came from. The
+ * PICTURE is the station's own photograph rather than the song's cover — the
+ * owner's call (03.09) "so people can add their photos in", since a custom
+ * station carries a photo the listener chose and a cover very often does not
+ * exist at all. The words still name the song, which is what the widget is
+ * about; see Art.cover. They differ only in what they pretend to be — a desktop CD player, a
  * pocket player, a ticket stub. That is exactly what a Look setting is for,
  * and it keeps the gallery at one row instead of three (the same reasoning
  * as DeckLook, written out there).
@@ -39,7 +43,7 @@ enum LastPlayedLook: String, AppEnum {
     .cdPlayer: DisplayRepresentation(title: "CD player",
                                      subtitle: "The song in a desktop window"),
     .player: DisplayRepresentation(title: "Pocket player",
-                                   subtitle: "A little player with the cover on its screen"),
+                                   subtitle: "A little player with your station on its screen"),
     .stub: DisplayRepresentation(title: "Ticket stub",
                                  subtitle: "The drive as a printed stub"),
   ]
@@ -155,7 +159,11 @@ struct LastPlayedView: View {
   // rectangle with a gap all round it.
   private func cdPlayer(_ s: WidgetStation) -> some View {
     ZStack(alignment: .topLeading) {
-      face
+      // The face is not a flat fill: a moulded plastic panel is lit from
+      // above, so it is faintly brighter at the top than at the foot.
+      LinearGradient(colors: [faceLit.opacity(0.55), face, face,
+                              faceDim.opacity(0.30)],
+                     startPoint: .top, endPoint: .bottom)
       // NO FRAME AROUND THE WINDOW. This drew a raised bevel round the whole
       // widget and inset the title bar by 4pt, which left a grey rectangle
       // between the widget's own edge and the orange — the owner called it
@@ -221,6 +229,20 @@ struct LastPlayedView: View {
         .padding(.top, 4)
         .padding(.bottom, 12)
       }
+
+      // ── THE EDGES ───────────────────────────────────────────────────────
+      // Owner, 03.09: "create shadowing on the edges of the winamp - so it
+      // looks less flat." Losing the raised frame in the previous round is
+      // what flattened it, and the frame is not coming back — she asked for
+      // that gone twice.
+      //
+      // SO THIS IS SHADING, NOT A RIM: every one of these is a gradient that
+      // fades to nothing INWARD, so there is no edge anywhere for the eye to
+      // catch. A hard-edged stroke at the boundary is exactly the rectangle
+      // border that was removed, however thin it is drawn — the app's own
+      // decks learned the same thing about light (25.08: any light drawn as a
+      // hard-edged shape eventually reads as a drawn artefact).
+      WindowShading()
     }
     .widgetURL(s.url(mode: s.mode))
   }
@@ -432,6 +454,37 @@ struct LastPlayedView: View {
           .frame(width: i % 3 == 0 ? 2.5 : 1.5, height: i % 4 == 0 ? 20 : 27)
       }
     }
+  }
+}
+
+/// The light on a moulded panel: a catch along the top, the surface falling
+/// away at the foot, and the two sides turning out of the light. Gradients
+/// only — see the note at the call site.
+private struct WindowShading: View {
+  var body: some View {
+    ZStack {
+      // top: the edge nearest the light
+      VStack(spacing: 0) {
+        LinearGradient(colors: [.white.opacity(0.34), .clear], startPoint: .top, endPoint: .bottom)
+          .frame(height: 10)
+        Spacer(minLength: 0)
+      }
+      // foot: the surface curving away
+      VStack(spacing: 0) {
+        Spacer(minLength: 0)
+        LinearGradient(colors: [.clear, .black.opacity(0.22)], startPoint: .top, endPoint: .bottom)
+          .frame(height: 18)
+      }
+      // sides: turning out of the light, the right harder than the left
+      HStack(spacing: 0) {
+        LinearGradient(colors: [.white.opacity(0.16), .clear], startPoint: .leading, endPoint: .trailing)
+          .frame(width: 12)
+        Spacer(minLength: 0)
+        LinearGradient(colors: [.clear, .black.opacity(0.18)], startPoint: .leading, endPoint: .trailing)
+          .frame(width: 14)
+      }
+    }
+    .allowsHitTesting(false)
   }
 }
 

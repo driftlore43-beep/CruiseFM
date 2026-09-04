@@ -48,6 +48,26 @@ def slot(tag, name, inner, cls='m', note=''):
 # what makes a groove read as cut in rather than printed on. Same rule the
 # app's own Classic vinyl was rebuilt around on 25.08.
 def grooves(size, label_inset, label_html, shadow=True):
+    """A pressing, drawn the way light actually falls on one.
+
+    FOUR THINGS DO THE WORK, and none of them is printed detail — at widget
+    size anything under ~4pt is a grey smudge, so premium here comes from how
+    the surface behaves in light, not from more marks on it.
+
+      1. TWO SMOOTH BANDS. A record is not grooved edge to edge: there is a
+         glassy lead-in at the rim and a glassy land just outside the label.
+         Those two mirrors are what read instantly as 'record' rather than
+         'black disc with rings on it'.
+      2. A DIRECTIONAL RIM. The old one was a uniform white ring, which is the
+         app's own long-standing mistake — a stroked shape reads as a drawn
+         outline. An edge is bright where the light hits and dark opposite, so
+         it is a conic sweep now.
+      3. THE LABEL IS STUCK ON. Paper glued to vinyl has a thickness: a lit
+         hairline on the lamp side and a shadow cast on the other. A single
+         dark ring around it reads as a hole.
+      4. AN INNER SHADOW UNDER THE LABEL'S EDGE, which is what stops the label
+         floating and is the same rule as the record's own contact shadow."""
+    land = label_inset - 7
     return f"""
     <div style="position:absolute;inset:0;">
       {'<div style="position:absolute;inset:9px 9px -7px 11px;border-radius:50%;background:radial-gradient(circle,rgba(38,32,24,.5),transparent 70%);filter:blur(11px);"></div>' if shadow else ''}
@@ -58,6 +78,13 @@ def grooves(size, label_inset, label_html, shadow=True):
             repeating-radial-gradient(circle,
               #050506 0 1.15px, #17171b 1.15px 2.1px, rgba(255,255,255,.055) 2.1px 2.5px,
               #101014 2.5px 3px);"></div>
+        <!-- LEAD-IN: the outermost band of a record is smooth, not cut. -->
+        <div style="position:absolute;inset:0;border-radius:50%;background:
+            radial-gradient(circle,transparent 0 {size/2 - 7:.1f}px,#0e0e12 {size/2 - 6.4:.1f}px);"></div>
+        <!-- THE LAND: the mirror ring just outside the label, where the
+             groove runs out. Second smooth band, and the pair is the tell. -->
+        <div style="position:absolute;inset:{land}px;border-radius:50%;
+            background:#0f0f13;"></div>
         <!-- pressing texture: fine speckle so the surface is not perfectly smooth -->
         <div style="position:absolute;inset:0;border-radius:50%;opacity:.5;background:
             repeating-conic-gradient(from 0deg,rgba(255,255,255,.030) 0deg 0.5deg,
@@ -66,11 +93,23 @@ def grooves(size, label_inset, label_html, shadow=True):
         <div style="position:absolute;inset:0;border-radius:50%;background:
             conic-gradient(from 205deg,transparent 0deg,rgba(255,255,255,.17) 26deg,transparent 64deg,
             transparent 194deg,rgba(255,255,255,.11) 224deg,transparent 260deg);"></div>
-        <!-- outer rim: a pressing has a raised lip -->
+        <!-- DIRECTIONAL RIM. Bright where the lamp is, dark opposite. A ring
+             of one brightness all the way round is a drawn circle. -->
         <div style="position:absolute;inset:0;border-radius:50%;
-            box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.13), inset 0 0 14px rgba(0,0,0,.75);"></div>
-        <div style="position:absolute;inset:{label_inset}px;border-radius:50%;overflow:hidden;
-            box-shadow:0 0 0 1px rgba(0,0,0,.55);">{label_html}</div>
+            -webkit-mask:radial-gradient(circle,transparent 0 {size/2 - 2:.1f}px,#000 {size/2 - 1.6:.1f}px);
+            mask:radial-gradient(circle,transparent 0 {size/2 - 2:.1f}px,#000 {size/2 - 1.6:.1f}px);
+            background:conic-gradient(from 190deg,rgba(255,255,255,.06),rgba(255,255,255,.42) 40deg,
+              rgba(255,255,255,.10) 92deg,rgba(0,0,0,.5) 190deg,rgba(255,255,255,.05) 300deg,
+              rgba(255,255,255,.06));"></div>
+        <div style="position:absolute;inset:0;border-radius:50%;
+            box-shadow:inset 0 0 14px rgba(0,0,0,.75);"></div>
+        <div style="position:absolute;inset:{label_inset}px;border-radius:50%;overflow:hidden;">{label_html}</div>
+        <!-- THE LABEL IS PAPER STUCK ON VINYL: a lit hairline on the lamp
+             side, a cast shadow on the other, and its own edge shading the
+             disc just outside it. -->
+        <div style="position:absolute;inset:{label_inset}px;border-radius:50%;pointer-events:none;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.30), inset 0 -1px 0 rgba(0,0,0,.45),
+              0 2px 5px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.35);"></div>
       </div>
     </div>"""
 
@@ -149,13 +188,47 @@ C2 = slot('C2 &middot; medium', 'The Deck &mdash; the label', f"""
         width:100%;height:100%;object-fit:cover;">
     <div style="position:absolute;inset:0;background:
         linear-gradient(118deg,rgba(255,255,255,.18) 0 20%,transparent 44%);"></div>
+    <!-- RING WEAR: the circle a record leaves on a sleeve it has lived in.
+         One detail, and it is the one that says OWNED rather than printed. -->
+    <div style="position:absolute;left:50%;top:50%;width:78%;height:78%;
+        transform:translate(-50%,-50%);border-radius:50%;
+        box-shadow:inset 0 0 0 1px rgba(255,255,255,.13), 0 0 0 1px rgba(0,0,0,.07);
+        opacity:.55;"></div>
+    <!-- CARD STOCK HAS THICKNESS: lit along the top edge, shaded along the
+         foot. Without it a sleeve is a photograph lying flat. -->
+    <div style="position:absolute;inset:0;background:
+        linear-gradient(180deg,rgba(255,255,255,.22) 0 2px,transparent 6px),
+        linear-gradient(0deg,rgba(0,0,0,.30) 0 2px,transparent 7px);"></div>
+    <!-- THE OPENING. A sleeve is a pocket, not a card, and the mouth is the
+         one detail that says so. It goes along the TOP — a top-opening
+         sleeve is real, and it is the only edge not hidden behind the
+         record, so an opening drawn on the right would do nothing at all.
+         Drawn as the mouth's shadow falling inward under a lit lip, never as
+         a stroked line, which reads as a border. -->
+    <div style="position:absolute;left:0;right:0;top:0;height:22px;background:
+        linear-gradient(180deg,rgba(0,0,0,.40),rgba(0,0,0,.14) 45%,transparent);"></div>
+    <div style="position:absolute;left:0;right:0;top:0;height:3px;background:
+        linear-gradient(180deg,rgba(255,255,255,.34),transparent);"></div>
     <div style="position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.32);"></div>
   </div>
 
   <!-- THE RECORD, resting ON the sleeve rather than sliding out of it. -->
+  <!-- THE CONTACT SHADOW. An object resting on another is DARKEST AND
+       TIGHTEST where they touch, and lightens as it spreads — that one
+       gradient is most of the difference between resting on the sleeve and
+       floating above it. The app's own decks learned this on 19.08. -->
+  <div style="position:absolute;left:186px;top:50%;width:238px;height:238px;
+      transform:translateY(-50%);border-radius:50%;
+      background:radial-gradient(circle at 42% 54%,rgba(20,15,10,.55),rgba(20,15,10,.22) 58%,transparent 72%);
+      filter:blur(9px);"></div>
   <div style="position:absolute;left:188px;top:50%;width:232px;height:232px;
       transform:translateY(-50%) rotate(4deg);">
     {grooves(232, 76, red_label())}
+    <!-- A BROAD SPECULAR. Real vinyl is not matte: it takes one wide, soft
+         band of the room across it, on top of the fine per-groove sheen. -->
+    <div style="position:absolute;inset:0;border-radius:50%;pointer-events:none;background:
+        linear-gradient(122deg,transparent 18%,rgba(255,255,255,.11) 34%,
+        rgba(255,255,255,.02) 46%,transparent 62%);"></div>
   </div>
 
   <div style="position:absolute;right:24px;top:52px;text-align:right;width:206px;">

@@ -166,6 +166,17 @@ struct RecordView: View {
           .stroke(Color.white.opacity(0.055), lineWidth: 0.5)
           .frame(width: d + pitch * 0.66, height: d + pitch * 0.66)
       }
+      // TWO SMOOTH BANDS, and they are the detail that reads as "record"
+      // rather than "black disc with rings on it". A pressing is not cut edge
+      // to edge: there is a glassy lead-in at the rim and a glassy land just
+      // outside the label, where the groove runs out. Both are mirrors, so
+      // they catch the sheen while everything between them scatters it.
+      Circle()
+        .stroke(Color(white: 0.055), lineWidth: size * 0.030)
+        .frame(width: size * 0.968, height: size * 0.968)
+      Circle()
+        .fill(Color(white: 0.058))
+        .frame(width: size * 0.50, height: size * 0.50)
       // A single soft sheen. The app's deck learned the hard way that light
       // drawn as a hard-edged wedge reads as a drawn shape; falloff only.
       Circle()
@@ -173,8 +184,23 @@ struct RecordView: View {
           RadialGradient(
             colors: [.white.opacity(0.15), .clear],
             center: .init(x: 0.32, y: 0.24), startRadius: 0, endRadius: size * 0.62))
-      // The raised lip a pressing has at its edge.
-      Circle().stroke(Color.white.opacity(0.13), lineWidth: 1)
+      // THE RIM IS DIRECTIONAL, and that is the whole point of it. A ring of
+      // one brightness all the way round is a drawn circle — the mistake the
+      // app's own mirror ball and vinyl decks each had to be talked out of.
+      // An edge is bright where the lamp is and dark opposite, so it sweeps.
+      Circle()
+        .stroke(
+          AngularGradient(
+            gradient: Gradient(stops: [
+              .init(color: .white.opacity(0.06), location: 0.00),
+              .init(color: .white.opacity(0.42), location: 0.11),
+              .init(color: .white.opacity(0.10), location: 0.26),
+              .init(color: .black.opacity(0.50), location: 0.53),
+              .init(color: .white.opacity(0.05), location: 0.83),
+              .init(color: .white.opacity(0.06), location: 1.00),
+            ]),
+            center: .center, angle: .degrees(190)),
+          lineWidth: 1.2)
         .frame(width: size * 0.985, height: size * 0.985)
       // The label, and the album cover if there is one.
       Group {
@@ -191,8 +217,18 @@ struct RecordView: View {
       }
       .frame(width: size * 0.42, height: size * 0.42)
       .clipShape(Circle())
-      .overlay(Circle().stroke(Color.black.opacity(0.55), lineWidth: 1)
-                 .frame(width: size * 0.42, height: size * 0.42))
+      // A LABEL IS PAPER STUCK ONTO VINYL, so it has a thickness: a lit
+      // hairline where the lamp catches its edge, a shadow along the other
+      // side, and its own shadow cast onto the disc just outside it. A single
+      // dark ring — which is what this was — reads as a hole instead.
+      .overlay(
+        Circle()
+          .stroke(
+            LinearGradient(colors: [.white.opacity(0.34), .clear, .black.opacity(0.46)],
+                           startPoint: .top, endPoint: .bottom),
+            lineWidth: 1)
+          .frame(width: size * 0.42, height: size * 0.42))
+      .shadow(color: .black.opacity(0.55), radius: size * 0.018, x: 0, y: size * 0.010)
       // Spindle hole — small, and the one place the backdrop shows through.
       Circle().fill(Color.black.opacity(0.55)).frame(width: size * 0.055, height: size * 0.055)
       Circle().stroke(accent.opacity(0.55), lineWidth: 0.8)

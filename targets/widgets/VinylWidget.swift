@@ -312,6 +312,30 @@ struct DeckView: View {
  * round, one diagonal sheen across the front, and a DARKER STRIP down the
  * opening side, which is the shadow of the record inside it.
  */
+/**
+ * The sleeve the record rests on — the station's own photograph.
+ *
+ * THREE DETAILS DO ALL THE WORK, and none of them is printed. At 116pt
+ * anything smaller than about 4pt is a grey smudge (which is why the station's
+ * name will not fit on the label), so premium at widget size has to come from
+ * how the object behaves in light rather than from more marks on it.
+ *
+ *   RING WEAR — the circle a record leaves on a sleeve it has lived in. One
+ *   faint ring, and it is the single detail that says OWNED rather than
+ *   printed. Borrowed straight from the share card's Sleeve style (03.08),
+ *   where it did the same job.
+ *
+ *   CARD STOCK HAS THICKNESS — lit along the top edge, shaded along the foot.
+ *   Without it a sleeve is a photograph lying flat on the widget.
+ *
+ *   THE OPENING — a sleeve is a pocket, not a card. It goes along the TOP,
+ *   which is a real way for a sleeve to open and, more to the point, the only
+ *   edge not hidden behind the record: an opening drawn on the right would be
+ *   perfectly correct and completely invisible. Drawn as the mouth's shadow
+ *   falling inward under a lit lip, never as a stroked line — a hard edge
+ *   anywhere on this reads as a border, which is the note the owner has
+ *   already made twice about the Winamp card.
+ */
 struct RecordSleeve: View {
   let image: String?
   let gradient: LinearGradient
@@ -328,12 +352,31 @@ struct RecordSleeve: View {
         .init(color: .white.opacity(0.16), location: 0),
         .init(color: .clear, location: 0.46),
       ], startPoint: .topLeading, endPoint: .bottomTrailing)
-      // the opening, on the side the record comes out of
-      HStack(spacing: 0) {
+      // ring wear
+      Circle()
+        .stroke(Color.white.opacity(0.13), lineWidth: 1)
+        .frame(width: size * 0.78, height: size * 0.78)
+      // card stock: lit top edge, shaded foot
+      VStack(spacing: 0) {
+        LinearGradient(colors: [.white.opacity(0.22), .clear],
+                       startPoint: .top, endPoint: .bottom)
+          .frame(height: 6)
         Spacer(minLength: 0)
-        LinearGradient(colors: [.black.opacity(0.30), .black.opacity(0.04)],
-                       startPoint: .trailing, endPoint: .leading)
-          .frame(width: 5)
+        LinearGradient(colors: [.clear, .black.opacity(0.30)],
+                       startPoint: .top, endPoint: .bottom)
+          .frame(height: 7)
+      }
+      // the opening, along the top
+      VStack(spacing: 0) {
+        ZStack(alignment: .top) {
+          LinearGradient(colors: [.black.opacity(0.40), .clear],
+                         startPoint: .top, endPoint: .bottom)
+            .frame(height: size * 0.10)
+          LinearGradient(colors: [.white.opacity(0.34), .clear],
+                         startPoint: .top, endPoint: .bottom)
+            .frame(height: 3)
+        }
+        Spacer(minLength: 0)
       }
     }
     .frame(width: size, height: size)

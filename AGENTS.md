@@ -1,3 +1,43 @@
+# START HERE — read the handover first
+
+**If you are new to this project, read `docs/CLAUDE_HANDOVER.md` before this
+file.** It is the entry document and it points at four others:
+
+| Document | What it holds |
+|---|---|
+| `docs/CLAUDE_HANDOVER.md` | **Start here.** How to work on this project, the rules that must not be broken, where to start reading the code |
+| `docs/PROJECT_ARCHITECTURE.md` | Every folder and file, navigation, the data layer, native modules, the widget extension, external services, build config |
+| `docs/CURRENT_STATE.md` | Versions, builds, channels, health checks, and exactly what was in progress |
+| `docs/KNOWN_ISSUES.md` | Open bugs, settled dead ends, and the traps this project has hit more than once |
+| `docs/TODO.md` | Remaining work, ordered, split into code-side and owner-side |
+
+## What THIS file is, and how to use it
+
+**AGENTS.md is a chronological LOG, not a specification.** It is the running
+record of every round of work — what was tried, what was measured, what failed
+and why. It is enormous and is not meant to be read end to end.
+
+**Use it by searching it.** When you are about to change something, search for
+the component or the symptom first: there is a good chance the reasoning behind
+the current shape is written down, including approaches that were already tried
+and rejected with evidence.
+
+**Where this file and the codebase disagree, the codebase wins.** A full audit
+on 2026-09-05 (commit `84e3cab`) found four stale claims, corrected here and in
+`docs/CURRENT_STATE.md` §7:
+
+| An entry below says | Reality at `84e3cab` |
+|---|---|
+| `BrandIntro.tsx` was DELETED (28.07) | Deleted in `5db5699`, then **re-added** in `247faef`. It is live and mounted in `src/app/_layout.tsx`. |
+| The widgets are "deliberately NOT wired into app.json" | **They are wired.** `@bacons/apple-targets` is in `plugins`, the App Group entitlement is in `app.json`, and it is allowlisted in `scripts/preflight-allow.json`. |
+| iPad `supportsTablet` is still to do | **Already `true` in `app.json`.** |
+| The entitlements list must be empty | It now correctly holds `com.apple.security.application-groups`. |
+
+Consequently **`docs/launch/next-build.md` is partly out of date**: its items 1
+and 2 are done in configuration and waiting only on a build that succeeds.
+
+---
+
 # Expo HAS CHANGED
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before writing any code.

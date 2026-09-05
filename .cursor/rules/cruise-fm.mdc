@@ -1,0 +1,194 @@
+---
+description: Cruise FM — project rules, constraints and working practices. Always applied.
+alwaysApply: true
+---
+
+# Cruise FM — read this before changing anything
+
+## Start here
+
+Before your first change in a session, read **`docs/CLAUDE_HANDOVER.md`**. It
+points at four others: `PROJECT_ARCHITECTURE.md` (every folder, file and
+service), `CURRENT_STATE.md` (versions, builds, what was in progress),
+`KNOWN_ISSUES.md` (open bugs and settled dead ends), `TODO.md` (what to do
+next).
+
+**`AGENTS.md` is a chronological LOG, not a specification.** It is long and not
+meant to be read end to end — *search* it for the component or symptom you are
+about to touch, because the reasoning behind the current shape is usually
+written down, including approaches already tried and rejected with evidence.
+**Where it and the codebase disagree, the codebase wins.**
+
+## Who you are working for
+
+**The owner does not code.**
+
+- Explain everything in **plain, non-technical English**. No jargon, no file
+  paths in conversation unless she asks.
+- **After any change, summarise plainly what changed and why.** Not a silent
+  commit. She should never have to ask "what did you just do", or find out by
+  noticing it on her phone.
+- She reviews design work **visually** — render it and show her. The mockup
+  harness in `docs/design/` exists for this.
+
+## Rules that must not be broken
+
+Each of these is a bug that already happened.
+
+### Product honesty — the app may not claim what it cannot verify
+
+1. **`AmbientGlow` is the only reader of the `atmosphere` setting.** Gating the
+   Mirror Ball's room layers on it was built, measured and **reverted at the
+   owner's instruction**. The beams breathing *is* the look.
+2. **Off air is presentation, never a lock** (`src/constants/schedule.ts`).
+   Every station stays playable at every hour.
+3. **The widget says LAST PLAYED, never "now playing".** A claim about the past
+   cannot go stale; a widget redraws a handful of times a day.
+4. **An unknown time is `--:--`, never `0:00`** (`src/utils/formatTime.ts`).
+   Zero is a claim.
+5. **The scene gates on `confirmedPlaying`; the transport gates on `playing`.**
+   A button that hesitates reads as broken; a scene animating over silence is a
+   lie. Do not collapse the two.
+6. **Nothing leaves the device.** No server, no accounts, no analytics — and the
+   privacy policy says so publicly. Adding an analytics SDK would break a
+   published promise, not just change an implementation.
+
+### Build and release
+
+7. **`runtimeVersion` in `app.json` moves only in the commit that cuts a build
+   which SUCCEEDS.** It decides which installed builds can receive an update;
+   moving it early made every publish reach zero phones. Held at `1.3.0` while
+   `version` is `1.4.0` — this is deliberate, see `scripts/preflight-allow.json`.
+8. **Never declare `UIBackgroundModes`** (rejected build 7) or add
+   **`com.apple.developer.applemusic`** (failed build 15).
+9. **`plugins/withoutPushEntitlement.js` stays last** in `app.json`'s plugins
+   array — auto-applied plugins run before named ones.
+10. **Bundle id `com.driftlore.CruiseFM` is permanent.**
+11. **Native version pins have no `~` on purpose.** Build 25 crashed 40 ms into
+    launch on a module compiled against a newer core than SDK 56 ships. Do not
+    loosen them; `scripts/preflight.mjs` enforces this.
+
+### Widgets
+
+12. **Any new snapshot field must be OPTIONAL in `targets/widgets/Snapshot.swift`.**
+    Swift's decoder is all-or-nothing — one missing property blanks every widget
+    at once with nothing logged anywhere.
+13. **Widget `kind` strings are permanent.** Changing one makes a widget already
+    on someone's Home Screen vanish.
+14. **The App Group `group.com.driftlore.CruiseFM` must match in four places**:
+    `app.json` entitlements, `targets/widgets/expo-target.config.js`,
+    `modules/cruise-widgets`, and the Apple Developer app ID. When they
+    disagree the widgets silently show placeholder data with no error.
+
+### Code
+
+15. **Nothing below the UI layer imports a platform's transport directly.** Go
+    through `src/utils/useMusicPlayback.ts` / `seekActive()`. Two modes silently
+    broke on Apple Music this way. Check with
+    `grep -rn "from '@/utils/spotify'" src/components`.
+16. **Every repeating timer is AppState-gated** (`useAppActive()`). A
+    backgrounded poll gets the app SIGKILLed by iOS — and Sentry can never see
+    those crashes.
+17. **Never animate a layout property** (`width`, `height`). Use `scaleX`/
+    `scaleY` with a paired translate on the native driver.
+18. **Anything deferred past the current tick must read state through a ref.**
+    `PanResponder.create` in a `useRef` captures the first render.
+19. **Never write `isLandscape ? <animated style> : null`.** A native-driven
+    transform lives on the native view; dropping it sends nothing, so the view
+    keeps the last transform for ever. Flatten to identity instead.
+20. **Never size an `<Svg>` in percentages.** A percentage canvas does not
+    re-resolve on rotation and the box clips, producing a straight cut.
+21. **Two `Modal`s will not stack on iOS** — it presents nothing and eats every
+    touch, so the app looks frozen. Any sheet that can appear during a drive
+    calls `useSheetOpen(true)`; any Modal that can needs
+    `supportedOrientations={['portrait','landscape']}`.
+
+### Design
+
+22. **Light is gradient falloff, never a stroked or hard-edged shape.** Any hard
+    edge eventually gets reported as an artefact. Relearnt on the mirror ball's
+    rim, the vinyl's wedges, the CD's fan and the Winamp frame.
+23. **The material carries no hue; mood arrives as light.** The mirror ball is
+    neutral chrome lit by coloured lamps.
+24. **The primary button is a solid pill in the opposite of the page** — it
+    inverts between light and dark.
+25. **Don't tighten letter-spacing below 28pt.**
+26. Colours from outside the palette used as text must go through `readableOn()`
+    (`src/utils/appearance.ts`).
+
+## The most repeated lesson in this project
+
+> **A check is not evidence until it has been seen to fail.**
+
+At least eight checks here shipped in a state where they could *only* pass —
+matching nothing, appended after `process.exit()`, looking in the wrong file, or
+with the loop that filled the results array deleted. One printed reassurance for
+a month while reading nothing at all.
+
+**Before believing a green check, reintroduce the bug and watch it go red.**
+
+The same applies to probes and harnesses: **when a probe reports total failure,
+check the probe first.** It has been wrong more often than the app.
+
+## Verify before shipping
+
+```bash
+npx tsc --noEmit
+for f in scripts/test-*.mjs; do node "$f" || echo "FAILED $f"; done   # 31 suites
+node scripts/preflight.mjs                                            # read every line
+```
+
+`scripts/test-contrast.mjs` needs Playwright **and** a running web build
+(`npx expo start --web`); its offline failure is a missing dependency, not a
+regression.
+
+**Measure, don't eyeball.** Layout is measured in the real web build with
+Playwright (`scripts/harness/`), not judged from a style sheet — when a layout
+number disagrees with a device screenshot, **the screenshot wins**.
+
+**The web build lies about six things**: `KeyboardAvoidingView` (inert),
+`flexShrink` on scrollers, `onTextLayout` (not implemented in react-native-web
+at all), `measure()`, haptics, and gesture termination. See
+`docs/KNOWN_ISSUES.md` §3.10.
+
+## Shipping — and one thing that will bite
+
+- A push to `claude/cruise-fm-v4wk5f` **auto-publishes to the `preview`
+  channel** (the owner's phone + TestFlight). **Production is never automatic.**
+- `node scripts/production-lag.mjs` answers "is the public app behind?"
+- **A finished EAS build is not a submitted build**, and a submitted build is
+  not a released one.
+- **Open a build on a real phone before it goes near Apple.** Build 25 crashed
+  40 ms into launch over something no static check could see.
+- **The owner's phone must stay on `testflight`-profile builds.** Installing a
+  production-profile build from TestFlight moves it to the production channel
+  and it silently stops receiving updates.
+
+## Settled — do not reopen
+
+Full reasoning in `docs/KNOWN_ISSUES.md` Part 2.
+
+- Spotify will not give a development-tier app a playlist's contents (403,
+  measured, after three wrong diagnoses). The song list uses the player's queue.
+- There is no beat map on either platform (403 / does not exist).
+- A Home Screen widget cannot spin a record.
+- The mirror ball's tiles cannot truly rotate in RN (measured: 89 px error, and
+  it does not improve with more columns).
+- A drive-framed recap was proposed and declined — the app cannot know a drive
+  happened.
+- A skin system (several looks per mode) was rejected.
+
+## Coordination
+
+**One agent per branch at a time.** Claude Code also works in this repository
+and pushes to the same branch. Two agents editing the same files without
+coordination produces merge conflicts at best and silent undone work at worst.
+Pull before starting; push when done.
+
+## Comments are the reasoning
+
+The code is heavily commented and those comments record what was tried, what was
+measured and why the current shape won. In several places they are the only
+record of a hard-won constraint. **Read them before changing the code they sit
+on, and keep them in step** — a comment that has drifted from its code is worse
+than none.

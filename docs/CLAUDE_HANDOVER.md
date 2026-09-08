@@ -10,6 +10,7 @@ This is the entry document. Read it, then the four beside it:
 | **`CURRENT_STATE.md`** | Versions, builds, channels, health checks, and **exactly what was being worked on** |
 | **`KNOWN_ISSUES.md`** | Open bugs, settled dead ends, and the traps this project has hit more than once |
 | **`TODO.md`** | Remaining work, ordered, split into what code can do and what only the owner can |
+| **`WIDGET_HANDOFF.md`** | The one task that was **mid-flight** — widget designs H and I, ready to execute |
 | **`AGENTS.md`** | The full chronological log. Enormous. Searchable, not readable end to end |
 
 Everything in these five was **verified against the codebase**, not recalled.
@@ -244,7 +245,9 @@ started**:
 
 I had just read `src/components/MirrorBallFlipbook.tsx` to match the app's real
 shading model when the handover was requested. The findings are written up in
-`CURRENT_STATE.md` §5 and turned into a task list in `TODO.md` §0.
+`CURRENT_STATE.md` §5, turned into a task list in `TODO.md` §0, and written out
+in full — with exact files, line numbers and current-versus-target values — in
+**`docs/WIDGET_HANDOFF.md`**, which is the one to open if you are picking this up.
 
 **Nothing from this round is in Swift.** It lives only in `docs/design/v3.py`
 and `docs/design/ball.py`.
@@ -282,3 +285,57 @@ Full reasoning in `KNOWN_ISSUES.md` Part 2.
 - Atmosphere governs the haze only
 - A drive-framed recap was proposed and declined
 - A skin system (several looks per mode) was rejected
+
+---
+
+## 10. Two agents, one repository
+
+The owner asked for this arrangement on 08.09:
+
+> "later in the future spread the workload where cursor does the manual work and
+> claude can do the polishing, editing etc."
+
+She runs into usage limits, so the point is to spend the scarce agent on the work
+that actually needs judgement.
+
+### The split
+
+| | |
+|---|---|
+| **Cursor — the volume work** | Executing a brief that already exists. Mechanical sweeps across many files. Porting an approved design into Swift. Running the suites and reading the output. Renaming, deleting dead code, keeping the mockup and the Swift in step. Anything where the *decision* is already made and what remains is doing it carefully. |
+| **Claude — the judgement work** | Diagnosing a report from the owner before anything is changed. Deciding what a one-line note actually means. Measuring — the harnesses, the frame extraction, the contrast and brightness probes all live here. Design rounds where the answer is not yet known. Writing the brief Cursor then executes. Release decisions: what goes in a build, when to publish, whether a check can be trusted. |
+
+**The brief is the handoff.** `docs/WIDGET_HANDOFF.md` is the shape to copy —
+exact files, exact line numbers, current value versus target, how to see the
+result, and what must not change. A brief that says "make the ball look better"
+wastes both agents.
+
+### The one rule that keeps it safe
+
+> **One agent per branch at a time.**
+
+Both push to `claude/cruise-fm-v4wk5f`, and **a push to that branch
+auto-publishes to the `preview` channel** — the owner's phone and every
+TestFlight tester. Two agents editing the same files without coordinating gives
+merge conflicts at best and silently undone work at worst, and the result goes
+out to real people either way.
+
+Pull before starting. Push when done. Say plainly which agent is holding the
+branch.
+
+### What each still owes the owner
+
+Both follow §2 regardless of which is working: **plain English, and a summary of
+what changed and why after every change.** She should never have to ask "what did
+you just do", or find out by noticing it on her phone.
+
+### Where the marketing work sits
+
+- **Screenshots and ASO** are agent-side and belong with Claude — the harnesses
+  are here (`scripts/marketing/build-slides.mjs`, `scripts/marketing/tints.py`,
+  `scripts/harness/shots.mjs`), and `tints.py` must be re-run after **any**
+  screenshot change because the surround colour is sampled from the picture
+  rather than picked.
+- **The app preview video needs the owner to record it.** The full plan and shot
+  list are in `docs/launch/store-listing-next-build.md` under *"THE APP PREVIEW
+  VIDEO — how to actually make it"*. Read that rather than re-deriving it.

@@ -13,6 +13,10 @@ service), `CURRENT_STATE.md` (versions, builds, what was in progress),
 `KNOWN_ISSUES.md` (open bugs and settled dead ends), `TODO.md` (what to do
 next).
 
+**If you are picking up where the last agent stopped, that is
+`docs/WIDGET_HANDOFF.md`** — widget designs H and I, written as a brief you can
+execute without further explanation.
+
 **`AGENTS.md` is a chronological LOG, not a specification.** It is long and not
 meant to be read end to end — *search* it for the component or symptom you are
 about to touch, because the reasoning behind the current shape is usually

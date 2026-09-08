@@ -10,8 +10,13 @@ an accountant). The owner-side items are usually the long pole.
 
 ## 0. IN PROGRESS — pick this up first
 
-**Widget design refinement, mockup stage.** See `CURRENT_STATE.md` §5 for the
-full context and the findings already made.
+**Widget design refinement, mockup stage.**
+
+> **Open `docs/WIDGET_HANDOFF.md`.** It is the executable version of this
+> section — exact files, exact line numbers, current value versus target, the
+> render loop, and what must not change. The checklist below is the summary.
+
+See `CURRENT_STATE.md` §5 for the full context and the findings already made.
 
 ### H — Mirror Ball (`docs/design/v3.py` + `docs/design/ball.py`)
 

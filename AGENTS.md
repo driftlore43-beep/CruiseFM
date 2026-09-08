@@ -10,6 +10,7 @@ file.** It is the entry document and it points at four others:
 | `docs/CURRENT_STATE.md` | Versions, builds, channels, health checks, and exactly what was in progress |
 | `docs/KNOWN_ISSUES.md` | Open bugs, settled dead ends, and the traps this project has hit more than once |
 | `docs/TODO.md` | Remaining work, ordered, split into code-side and owner-side |
+| `docs/WIDGET_HANDOFF.md` | The task that was mid-flight: widget designs H and I, ready to execute |
 
 ## What THIS file is, and how to use it
 

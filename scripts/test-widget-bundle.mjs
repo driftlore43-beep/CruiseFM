@@ -27,6 +27,7 @@ import path from 'node:path';
 const DIR = 'targets/widgets';
 const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.swift'));
 const src = Object.fromEntries(files.map((f) => [f, fs.readFileSync(path.join(DIR, f), 'utf8')]));
+const src_ = src;
 const all = Object.values(src).join('\n');
 const bundle = src['CruiseWidgetBundle.swift'] ?? '';
 
@@ -253,6 +254,60 @@ check('the Deck\'s dropped third look is gone', !/DeckLook\.set|case \.set:|case
 if (declared.length < 5 || Object.keys(kinds).length < 5) {
   console.error('\n  the scan looks empty — fix the scan, not the code.');
   process.exit(1);
+}
+
+
+// ── a modifier may not be chained onto an if/else ────────────────────────
+//
+// THIS IS WHAT BUILD 40 AND BUILD 41 DIED ON, and the shape reads perfectly:
+//
+//     if family == .systemSmall { … } else { … }
+//     .padding(family == .systemSmall ? 13 : 16)
+//
+// Inside a @ViewBuilder an if/else is a STATEMENT, not an expression, so
+// there is no view for the modifier to attach to. Swift reports it as
+// "instance member 'padding' cannot be used on type 'View'" — a message that
+// names neither the file nor the conditional, which is why two rounds went on
+// reading the wrong files. The fix is either a `Group { }` around the
+// conditional or the modifier inside each branch.
+//
+// Swift cannot be compiled here, so this file is the compiler. Checked
+// structurally rather than by any keyword: a modifier line whose immediately
+// preceding sibling is a closing brace AT THE SAME INDENT, where that brace
+// closes a conditional.
+{
+  const strip = (t) => t.replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/\/\/.*$/, '');
+  for (const [f, src] of Object.entries(src_)) {
+    const L = src.split('\n');
+    for (let i = 0; i < L.length; i++) {
+      const m = L[i].match(/^(\s+)\.[A-Za-z_]\w*\s*\(/);
+      if (!m) continue;
+      const indent = m[1].length;
+      // nearest real line above
+      let j = i - 1;
+      while (j >= 0 && (!L[j].trim() || L[j].trim().startsWith('//'))) j--;
+      if (j < 0) continue;
+      if (L[j].trim() !== '}' || (L[j].match(/^\s*/) || [''])[0].length !== indent) continue;
+      // walk back to the brace this one closes
+      let depth = 0, opener = -1;
+      for (let k = j; k >= 0; k--) {
+        const t = strip(L[k]);
+        for (let c = t.length - 1; c >= 0; c--) {
+          if (t[c] === '}') depth++;
+          else if (t[c] === '{') { depth--; if (depth === 0) { opener = k; break; } }
+        }
+        if (opener >= 0) break;
+      }
+      if (opener < 0) continue;
+      const head = L[opener].trim();
+      if (/^(if |switch |\} else\b|else \{)/.test(head)) {
+        check(`${f}:${i + 1} does not chain a modifier onto a conditional`, false,
+          `\`${L[i].trim()}\` follows \`${head}\` — wrap it in Group { } or move it into each branch`);
+      }
+    }
+  }
+  check('checked every Swift file for modifiers on conditionals',
+    Object.keys(src_).length >= 8, `${Object.keys(src_).length} files`);
 }
 
 console.log(fails ? `\n  ${fails} failure(s)\n` : '\n  the widget bundle hangs together\n');

@@ -84,6 +84,16 @@ struct OnAirView: View {
         LinearGradient(colors: [.white.opacity(0.14), .clear],
                        startPoint: .topLeading, endPoint: .center)
 
+        // EACH BRANCH OWNS ITS OWN PADDING, and that is what makes this
+        // compile at all. It used to be one `.padding(family == .systemSmall
+        // ? 13 : 16)` sitting under the whole if/else — which reads perfectly
+        // and cannot be built: inside a @ViewBuilder an if/else is a
+        // STATEMENT, so there is no view for a modifier to attach to, and
+        // Swift reports it as "instance member 'padding' cannot be used on
+        // type 'View'". It killed builds 40 and 41. A `Group { }` around the
+        // conditional would also work; putting the value in each branch is
+        // better, because the ternary was re-asking a question the if/else
+        // had already answered.
         if family == .systemSmall {
           VStack(alignment: .leading, spacing: 0) {
             onAirLamp(s)
@@ -92,6 +102,7 @@ struct OnAirView: View {
             Text(s.name).font(.system(size: 16, weight: .bold))
               .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.8)
           }
+          .padding(13)
         } else {
           // THE MEDIUM IS A DIAL, because this widget is the one that answers
           // "what's on?" and a receiver answers it by showing you where you
@@ -120,8 +131,8 @@ struct OnAirView: View {
                 .foregroundColor(.white.opacity(0.66)).lineLimit(1)
             }
           }
+          .padding(16)
         }
-        .padding(family == .systemSmall ? 13 : 16)
       }
       .widgetURL(s.url(mode: nil))
     }

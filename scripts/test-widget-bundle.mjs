@@ -38,7 +38,35 @@ const check = (name, ok, detail = '') => {
 
 console.log('\n  the extension is wired up:');
 check('found the Swift', files.length >= 8, `${files.length} files`);
-check('there is a bundle with @main', /@main[\s\S]{0,200}WidgetBundle/.test(bundle));
+check('there is a @main entry point', /@main/.test(bundle));
+
+// ── THE BUNDLE BODY MAY NOT CONTAIN AN `else` ─────────────────────────────
+//
+// THIS IS THE CHECK BUILD 40 DIED FOR WANT OF. `@WidgetBundleBuilder` is not
+// `@ViewBuilder`: it supplies `buildOptional`, so `if #available { … }` with
+// no else compiles, but it supplies no `buildEither`, so adding an `else`
+// rejects the entire body with "closure containing control flow statement
+// cannot be used with result builder 'WidgetBundleBuilder'". The shape reads
+// perfectly well and cannot be compiled here, which is exactly the kind of
+// mistake this file exists to catch.
+//
+// AND THE OLD VERSION OF THIS TEST ASSERTED THE BROKEN SHAPE. It required
+// `if #available(…) { … } else {` to be present in the bundle — so it was
+// holding the fault in place and reporting it as correct. A check that pins
+// your assumption rather than the property is worse than no check, because it
+// is read as evidence.
+const bundleBodies = Object.fromEntries(
+  [...bundle.matchAll(/struct (\w+): WidgetBundle \{([\s\S]*?)\n\}/g)].map((m) => [m[1], m[2]]));
+check('the bundles are declared', Object.keys(bundleBodies).length >= 1,
+  Object.keys(bundleBodies).join(', '));
+const decomment = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+for (const [name, body] of Object.entries(bundleBodies)) {
+  // Comments stripped first: the bundle's own note explains why there must
+  // never be an `else`, and a check that trips over its own documentation is
+  // noise rather than a finding.
+  check(`${name}: no else inside the WidgetBundleBuilder`, !/\belse\b/.test(decomment(body)),
+    'WidgetBundleBuilder has no buildEither — an else here fails to compile');
+}
 
 // ── every declared Widget is registered, and vice versa ───────────────────
 const declared = [...all.matchAll(/struct (\w+): Widget \{/g)].map((m) => m[1]);
@@ -73,8 +101,27 @@ for (const [f, s] of Object.entries(src)) {
   // The struct holding the AppIntentConfiguration must be availability-gated.
   const guarded = /@available\(iOSApplicationExtension 17\.0, \*\)\s*\nstruct \w+: Widget \{\s*\n\s*var body: some WidgetConfiguration \{\s*\n\s*AppIntentConfiguration/.test(s);
   check(`${f}: the configurable widget is marked iOS 17+`, guarded);
-  check(`${f}: the bundle picks one of the pair with #available`,
-    /if #available\(iOSApplicationExtension 17\.0, \*\) \{[\s\S]{0,120}\} else \{/.test(bundle));
+  // The property that matters is not HOW the choice is written but that only
+  // ONE of the pair is ever registered — two widgets sharing a `kind` in one
+  // bundle is a duplicate registration. Since the `else` is gone, the split is
+  // made by putting each half in a different bundle, and that is what is
+  // checked: the modern one and the legacy one, never both in either.
+  const intentName = s.match(/struct (\w+): Widget \{\s*\n\s*var body: some WidgetConfiguration \{\s*\n\s*AppIntentConfiguration/)?.[1];
+  const staticName = s.match(new RegExp(
+    `struct (\\w+): Widget \\{\\s*\\n\\s*var body: some WidgetConfiguration \\{\\s*\\n\\s*StaticConfiguration\\(kind: "${kind}"`))?.[1];
+  check(`${f}: both halves of the pair are named`, !!intentName && !!staticName,
+    `intent ${intentName}, static ${staticName}`);
+  if (intentName && staticName) {
+    const homes = (w) => Object.entries(bundleBodies)
+      .filter(([, body]) => new RegExp(`^\\s*${w}\\(\\)\\s*$`, 'm').test(body)).map(([n]) => n);
+    const inIntent = homes(intentName), inStatic = homes(staticName);
+    check(`${f}: each half is registered exactly once`,
+      inIntent.length === 1 && inStatic.length === 1,
+      `${intentName} in [${inIntent}], ${staticName} in [${inStatic}]`);
+    check(`${f}: the pair is split across two bundles`,
+      inIntent.length === 1 && inStatic.length === 1 && inIntent[0] !== inStatic[0],
+      `both in ${inIntent[0]} would register one kind twice`);
+  }
 }
 
 // ── every AppEnum look has a display representation for each case ─────────

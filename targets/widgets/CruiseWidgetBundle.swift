@@ -12,65 +12,81 @@ import WidgetKit
  * than a choice. A look is a different way of drawing the SAME idea — where
  * two designs answer different questions they get their own row instead.
  *
- * The Lock Screen widget is iOS 16+ because its families did not exist
- * before that. Below 16 it is simply absent from the gallery — the right
- * outcome, and the reason it is added conditionally rather than guarded
- * inside its own body.
+ * ── WHY THERE ARE TWO BUNDLES AND A LAUNCHER ──────────────────────────────
+ *
+ * THIS IS WHAT BUILD 40 DIED ON, and it is worth stating plainly because the
+ * shape that failed reads perfectly well:
+ *
+ *     if #available(iOSApplicationExtension 17.0, *) {
+ *       DeckConfigurableWidget()
+ *     } else {
+ *       DeckWidget()
+ *     }
+ *
+ * `@WidgetBundleBuilder` is NOT `@ViewBuilder`. It supplies `buildOptional`,
+ * so an `if #available` with NO else compiles — which is why the Lock Screen's
+ * lone availability check has always been fine — but it supplies no
+ * `buildEither`, so the moment an `else` appears the whole body is rejected:
+ * "closure containing control flow statement cannot be used with result
+ * builder 'WidgetBundleBuilder'".
+ *
+ * So the choice is made ABOVE the builder instead. `@main` needs nothing more
+ * than a `static func main()`, and `WidgetBundle` already provides one, so the
+ * launcher picks a bundle and that bundle's body is a plain list with no
+ * control flow in it at all.
+ *
+ * THE PROPERTY THIS PRESERVES, which is the only reason the split exists:
+ * exactly ONE widget of each configurable/static pair is ever registered, and
+ * the two halves of a pair share a `kind`. A changed kind makes a widget that
+ * is already on someone's Home Screen vanish, and build 39 has already put the
+ * Deck on the owner's.
+ *
+ * The Lock Screen widget is iOS 16+ because its families did not exist before
+ * that. Below 16 it is simply absent from the gallery — the right outcome, and
+ * the reason it is added conditionally rather than guarded inside its own body.
  */
 @main
-struct CruiseWidgetBundle: WidgetBundle {
-  @WidgetBundleBuilder
-  var body: some Widget {
-    StartDriveWidget()
-    // ONE OF THE TWO, NEVER BOTH — they share a `kind`, so the gallery shows
-    // a single "On the Deck" either way. iOS 17 gets the version whose look
-    // can be changed from Edit Widget; older phones get the plain one, which
-    // matters because build 39 already put the Deck on Home Screens and
-    // dropping it for them would take it away.
+struct CruiseWidgets {
+  static func main() {
     if #available(iOSApplicationExtension 17.0, *) {
-      DeckConfigurableWidget()
+      ModernWidgets.main()
     } else {
-      DeckWidget()
-    }
-    // Same two-configuration split as the Deck, and for the same reason:
-    // AppIntentConfiguration is iOS 17+, both share a `kind`, and only ever
-    // one of each pair is registered.
-    if #available(iOSApplicationExtension 17.0, *) {
-      LastPlayedConfigurableWidget()
-    } else {
-      LastPlayedWidget()
-    }
-    OnAirWidget()
-    if #available(iOSApplicationExtension 17.0, *) {
-      ModeConfigurableWidget()
-    } else {
-      ModeWidget()
-    }
-    StatsWidget()
-    if #available(iOSApplicationExtension 16.0, *) {
-      LockScreenWidget()
+      LegacyWidgets.main()
     }
   }
 }
 
-/**
- * iOS 17 moved a widget's background from "whatever you draw" to something
- * the system owns and needs told about — and a widget built without it gets
- * its padding wrong on 17 and later, while `containerBackground` does not
- * exist at all before then. So both paths are written out once, here, and
- * every widget view ends with this rather than each one repeating the
- * availability dance.
- */
-extension View {
-  @ViewBuilder
-  func cruiseContainerBackground() -> some View {
-    if #available(iOSApplicationExtension 17.0, *) {
-      // The views already paint their own gradient edge to edge, so the
-      // container is handed a clear background rather than a second one that
-      // would sit under it doing nothing.
-      self.containerBackground(.clear, for: .widget)
-    } else {
-      self
+/// iOS 17 and later: the three widgets whose look can be changed from
+/// Edit Widget, plus the four that never had a setting.
+@available(iOSApplicationExtension 17.0, *)
+struct ModernWidgets: WidgetBundle {
+  @WidgetBundleBuilder
+  var body: some Widget {
+    StartDriveWidget()
+    DeckConfigurableWidget()
+    LastPlayedConfigurableWidget()
+    OnAirWidget()
+    ModeConfigurableWidget()
+    StatsWidget()
+    LockScreenWidget()
+  }
+}
+
+/// iOS 16 and older: the same seven rows, with the plain version of each pair.
+/// Someone here gets one fixed look rather than a setting — the alternative is
+/// the widget not existing for them at all.
+struct LegacyWidgets: WidgetBundle {
+  @WidgetBundleBuilder
+  var body: some Widget {
+    StartDriveWidget()
+    DeckWidget()
+    LastPlayedWidget()
+    OnAirWidget()
+    ModeWidget()
+    StatsWidget()
+    // No `else` here, and there must never be one — see the note above.
+    if #available(iOSApplicationExtension 16.0, *) {
+      LockScreenWidget()
     }
   }
 }

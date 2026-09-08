@@ -191,8 +191,12 @@ jobs:
           # The full Xcode log is an artifact EAS keeps a signed URL for. Print
           # the real `error:` lines instead of guessing at mechanisms — which is
           # this project's own most-repeated lesson.
+          # NESTED UNDER `artifacts`, not top level — read out of eas-cli's own
+          # GraphQL fragment (graphql/types/Build.js) rather than guessed, which
+          # is the same shape trap the runtime guard hit on 01.09: a field whose
+          # name implies a string and is actually an object.
           LOGS=$(eas build:list --platform ios --limit 1 --json --non-interactive 2>/dev/null \
-            | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print(b.get("xcodeBuildLogsUrl") or "")' || true)
+            | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; a=b.get("artifacts") or {}; print(a.get("xcodeBuildLogsUrl") or "")' || true)
           if [ -n "$LOGS" ]; then
             echo "log: $LOGS"
             # curl, never Node fetch — this environment's proxy is picked up by

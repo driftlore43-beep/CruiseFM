@@ -201,19 +201,30 @@ jobs:
             echo "log: $LOGS"
             # curl, never Node fetch — this environment's proxy is picked up by
             # one and not the other (04.09).
-            curl -sSL --max-time 120 "$LOGS" -o /tmp/xcode.log 2>/dev/null || true
+            # --compressed matters: GCS serves this content-encoded, and
+            # without it curl hands back the encoded bytes, which look exactly
+            # like a corrupt file.
+            curl -sSL --compressed --max-time 120 "$LOGS" -o /tmp/xcode.log 2>/dev/null || true
             if [ -s /tmp/xcode.log ]; then
               echo "size: $(wc -c < /tmp/xcode.log) bytes"
-              # THE FILE IS GZIP, despite the .txt name and despite curl -L.
-              # The first read of it printed 2000 characters of binary and the
-              # parser reported "no errors matched" — which is what a clean
-              # build also looks like, so test the magic bytes rather than
-              # trusting the extension.
+              echo "magic: $(head -c 8 /tmp/xcode.log | od -An -tx1 | tr -d ' \n')"
+              # DESPITE THE .txt NAME the file has arrived compressed more than
+              # once, so try each decompressor rather than trusting the
+              # extension — and say which one worked, because "no errors found"
+              # and "could not read the file" look identical otherwise.
+              rm -f /tmp/xcode.txt
               if gzip -t /tmp/xcode.log 2>/dev/null; then
-                echo "(gzip — decompressing)"
-                gunzip -c /tmp/xcode.log > /tmp/xcode.txt
-              else
+                gunzip -c /tmp/xcode.log > /tmp/xcode.txt && echo "(gzip)"
+              elif command -v zstd >/dev/null && zstd -t /tmp/xcode.log 2>/dev/null; then
+                zstd -dc /tmp/xcode.log > /tmp/xcode.txt && echo "(zstd)"
+              elif command -v brotli >/dev/null && brotli -dc /tmp/xcode.log > /tmp/xcode.txt 2>/dev/null; then
+                echo "(brotli)"
+              elif command -v xz >/dev/null && xz -dc /tmp/xcode.log > /tmp/xcode.txt 2>/dev/null; then
+                echo "(xz)"
+              fi
+              if [ ! -s /tmp/xcode.txt ]; then
                 cp /tmp/xcode.log /tmp/xcode.txt
+                echo "(no decompressor matched — reading raw)"
               fi
               echo "--- compiler errors ---"
               node scripts/xcode-errors.mjs /tmp/xcode.txt || true

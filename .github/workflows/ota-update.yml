@@ -203,8 +203,28 @@ jobs:
             # one and not the other (04.09).
             curl -sSL --max-time 120 "$LOGS" -o /tmp/xcode.log 2>/dev/null || true
             if [ -s /tmp/xcode.log ]; then
+              echo "size: $(wc -c < /tmp/xcode.log) bytes"
               echo "--- compiler errors ---"
-              grep -aE "error:" /tmp/xcode.log | grep -avE "linker command|clang: error: the following" | sort -u | head -40
+              # The log is JSON-lines, so an error is inside a quoted field and
+              # carries \n escapes — plain `grep error:` finds nothing, which is
+              # exactly the vacuous-pass shape this repo keeps recording. Decode
+              # each line's text fields first, then look.
+              python3 -c "$(printf '%s\n' \
+                'import json,sys,re' \
+                'out=[]' \
+                'for raw in open(\"/tmp/xcode.log\",errors=\"replace\"):' \
+                '    t=raw' \
+                '    try:' \
+                '        o=json.loads(raw)' \
+                '        t=\" \".join(str(v) for v in o.values() if isinstance(v,str))' \
+                '    except Exception: pass' \
+                '    for line in t.split(chr(10)):' \
+                '        if re.search(r\"(error:|cannot be used on type|\\.swift:[0-9]+)\", line):' \
+                '            line=line.strip()' \
+                '            if line and line not in out: out.append(line)' \
+                'print(chr(10).join(out[:60]) or \"(no error lines found — printing tail instead)\")' \
+                'if not out:' \
+                '    print(open(\"/tmp/xcode.log\",errors=\"replace\").read()[-2500:])')"
               echo "--- end ---"
             else
               echo "(log fetch returned nothing — open the url by hand)"

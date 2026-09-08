@@ -267,3 +267,4 @@ At ~3–5 downloads/day and ~87 total, the constraint is discovery, not features
 8. After approval and release: check the store page actually loads. An approved,
    released app whose page 404s is set to *removed from sale* under Pricing and
    Availability
+- [ ] **Build 41 is in the oven, and a widget can never arrive over the air.** Build 39 (2 Sept) predates all ten widget designs, so the owner's phone could not have shown them however many times the app updated itself. Build 40 errored on a `WidgetBundleBuilder` `else` (fixed in `f7f7d4d`). When 41 lands: install from TestFlight, **open the app once** so the snapshot is written, then check the widgets — and look at whether the medium Deck still shows a record with no text beside it, which is undiagnosed.

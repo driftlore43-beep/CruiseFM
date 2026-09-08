@@ -159,12 +159,46 @@ for (const f of files.sort()) {
 
     // The floor the whole shape exists to clear. A pure white photograph is
     // the worst picture anyone can supply, and it needs this much behind
-    // white type to reach 4.5:1 — derived in ModeScrim's own note.
-    const NEEDED = 0.467;
-    for (const key of ['header', 'foot']) {
-      const worst = Math.min(...span(user, bands[key]));
-      check(`user photo: white type is safe across the ${key}`, worst >= NEEDED,
-        `thinnest point is ${worst.toFixed(3)}, needs >= ${NEEDED}`);
+    // white type to reach 4.5:1.
+    //
+    // THIS READ 0.467 FROM 02.09 TO 08.09 AND IT WAS THE WRONG QUANTITY.
+    // 4.5:1 against white needs a background at relative luminance 0.1833,
+    // i.e. sRGB 0.465 — and that is what got written down as the ALPHA. A
+    // scrim of alpha `a` over white leaves 255(1-a) + 5a, so reaching sRGB
+    // 0.465 takes a = 0.5405; at 0.467 the real ratio is 3.49:1. The check
+    // fired correctly against its threshold for a week and proved nothing,
+    // because the threshold was the thing that was wrong. Derived here rather
+    // than copied so it can be re-checked instead of trusted.
+    const NEEDED = (() => {
+      const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+      const lum = ([r, g, b]) =>
+        0.2126 * lin(r / 255) + 0.7152 * lin(g / 255) + 0.0722 * lin(b / 255);
+      const over = (a) => [0, 1, 2].map((i) => 255 * (1 - a) + [2, 2, 12][i] * a);
+      let lo = 0, hi = 1;
+      for (let i = 0; i < 60; i++) {
+        const m = (lo + hi) / 2;
+        if (1.05 / (lum(over(m)) + 0.05) >= 4.5) hi = m; else lo = m;
+      }
+      return hi;
+    })();
+    check('the white-type floor is derived, not remembered',
+      NEEDED > 0.53 && NEEDED < 0.55, `solved ${NEEDED.toFixed(4)}`);
+
+    // BOTH RAMPS, not just the user's. Leaving the built-in one out is the
+    // exact gap that let three stations ship with an unreadable header:
+    // Coastal at 2.45:1, Mountain Pass at 2.23:1 and Daylight at 1.39:1,
+    // measured on real screenshots. "The built-ins are shot dark" was true of
+    // seven of the ten, and this check is what stops that being assumed again.
+    for (const [name, r] of Object.entries(ramps)) {
+      for (const key of ['header', 'foot']) {
+        // The foot on a built-in is deliberately lighter: the type there is
+        // the song title, which is large, and the 03.08 values were approved
+        // against the real photographs rather than against a white frame.
+        if (name === 'built-in' && key === 'foot') continue;
+        const worst = Math.min(...span(r, bands[key]));
+        check(`${name}: white type is safe across the ${key}`, worst >= NEEDED,
+          `thinnest point is ${worst.toFixed(3)}, needs >= ${NEEDED.toFixed(4)}`);
+      }
     }
 
     // …and the openness that shading pays for. This is the whole trade: if the
@@ -176,8 +210,21 @@ for (const f of files.sort()) {
     check("user photo: the picture is more open than a built-in's",
       span(user, bands.picture).every((v, i) => v <= span(built, bands.picture)[i]));
 
+    // THE SHAPE, stated as what it is for rather than as where its biggest
+    // number sits. This read "heaviest at the foot" until 08.09, which was a
+    // fair description while the built-in ramp's top stop was 0.10 — and it
+    // would have REFUSED the header band that ramp needed, because a header
+    // heavy enough to read on Daylight is heavier than a foot tuned for
+    // photographs that are already dark. The property worth holding is that
+    // the shading sits where the words are and gets out of the way where the
+    // picture is, which is what both ramps are actually built to do.
     for (const [name, r] of Object.entries(ramps)) {
-      check(`${name}: heaviest at the foot`, r.a.at(-1) === Math.max(...r.a));
+      const open = Math.max(...span(r, bands.picture));
+      for (const key of ['header', 'foot']) {
+        const band = Math.min(...span(r, bands[key]));
+        check(`${name}: the ${key} is shaded more than the picture`, band > open,
+          `${key} thinnest ${band.toFixed(3)} vs picture heaviest ${open.toFixed(3)}`);
+      }
     }
   }
 }

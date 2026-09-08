@@ -27,22 +27,27 @@ const png = f => 'data:image/png;base64,' + fs.readFileSync(`${SHOTS}/${f}.png`)
 // Tints are sampled from each screenshot by tints.py — never hand-picked, so
 // the surround always belongs to the picture it frames.
 const SLIDES = [
-  { f: '01-mirrorball-downtown',  t: '#453564', s: 'B', a: 'Your music,',            b: 'wrapped in a drive' },
+  { f: '01-mirrorball-downtown',  t: '#453663', s: 'B', a: 'Your music,',            b: 'wrapped in a drive' },
   // Amber, not the old teal: the re-shot page is the dial itself, and amber is
   // the dial's own colour (tints.py re-sampled it after the reshoot).
-  { f: '03-stations-dial',        t: '#753f24', s: 'A', a: 'Ten moods.',             b: 'Not ten genres.' },
+  { f: '03-stations-dial',        t: '#774222', s: 'A', a: 'Ten moods.',             b: 'Not ten genres.' },
   // 1.3.0's headline, placed third on purpose: Apple shows the first two or
   // three in search results, and nothing else on the listing shows that the
   // picture behind a drive can be YOURS. The framing screen says it better
   // than a finished mode does — a mode with a photo behind it just looks
   // like the built-in stations, whereas a viewfinder can only mean one thing.
   { f: '08-yourphoto-framing',    t: '#685531', s: 'A', a: 'Your own photo,',        b: 'behind your own station' },
-  { f: '02-vinyl-sunset',         t: '#63363c', s: 'A', a: 'Your Apple Music',       b: 'or Spotify playlists' },
-  { f: '05-cassette-daylight',    t: '#675332', s: 'A', a: 'Eight ways to',          b: 'watch your music' },
-  { f: '06-cd-coastal',           t: '#366357', s: 'A', a: 'Every disc',             b: 'catches the light' },
-  { f: '07-tuner-nightrun',       t: '#234476', s: 'A', a: 'Tune the dial.',         b: 'Find the feeling.' },
-  { f: '04-horizon-afterhours',   t: '#772228', s: 'A', a: 'Drive into',             b: 'the sunset' },
-  { f: '09-equalizer-mountainpass', t: '#2d586c', s: 'A', a: 'The meter from',       b: 'an old hi-fi' },
+  { f: '02-vinyl-sunset',         t: '#653437', s: 'A', a: 'Your Apple Music',       b: 'or Spotify playlists' },
+  { f: '05-cassette-daylight',    t: '#635436', s: 'A', a: 'Eight ways to',          b: 'watch your music' },
+  { f: '06-cd-coastal',           t: '#365163', s: 'A', a: 'Every disc',             b: 'catches the light' },
+  // Teal, not the blue it wore until 08.09: Night Run's whole palette moved to
+  // teal on 19.08 (sampled from its own photograph) and this tint had been
+  // sampled before that, so the slide framed the station in a colour the app
+  // had stopped using. Re-running tints.py after a reshoot is what caught it —
+  // which is the reason that step is not optional.
+  { f: '07-tuner-nightrun',       t: '#226977', s: 'A', a: 'Tune the dial.',         b: 'Find the feeling.' },
+  { f: '04-horizon-afterhours',   t: '#772227', s: 'A', a: 'Drive into',             b: 'the sunset' },
+  { f: '09-equalizer-mountainpass', t: '#365463', s: 'A', a: 'The meter from',       b: 'an old hi-fi' },
   // The share cards, and there is more than one — so the slide shows two
   // (owner, 12.08: "id like to have the y2k share card option displayed on the
   // preview cards"). The Y2K one leads because it is the newest and the one

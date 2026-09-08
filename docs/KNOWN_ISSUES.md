@@ -83,6 +83,28 @@ They sit on a station **photograph**, which is an absolutely-positioned sibling
 the ancestor walk cannot see. Verified by sampling the real pixels behind the
 glyphs: 5.4:1, 5.9:1, 7.9:1, 11.6:1, 19.8:1. **All pass.** Do not "fix" them.
 
+### 1.9 The iPad layout is a stretched phone, and the home page is the bad one
+
+`supportsTablet: true` has been in `app.json` since `13a5b11` and has never
+shipped. Apple **requires** a 13-inch iPad screenshot set (**2064 x 2752**
+portrait) the moment it does.
+
+Rendered at that size on 08.09 — **zero page errors, so nothing is broken** —
+but it is uneven rather than uniformly bad, and the difference is what decides
+how much work this is:
+
+| Page | At 1032 x 1376 |
+|---|---|
+| **Modes** | **Good.** Rows stretch to the full width, the hero centres, the ball sits correctly |
+| **Stations** | **Good.** The dial rows stretch and read; the on-air hero's photo reads as a dark band |
+| **Profile** | Passable. Badges reflow to three columns, though the tiles go very tall |
+| **Home** | **Poor.** Hero, greeting and Recommended cards all stay phone-sized against the left edge, with the bottom two-fifths of the screen empty |
+
+**Do not put the home page on the listing** — it is the first thing an iPad
+browser sees. Two honest options and it is the owner's call: ship 1.4.0 with
+`supportsTablet: false` and stay iPhone-only, or give the home page a tablet
+layout first. Recorded in `TODO.md` §3.
+
 ### 1.8 Technical debt, catalogued
 
 | Item | Where | Note |

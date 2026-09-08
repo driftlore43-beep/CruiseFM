@@ -97,7 +97,7 @@ one such record. They are cheap and each names its own fix.
 | # | Item | State |
 |---|---|---|
 | 1 | **The widget extension** — 10 designs, 7 rows | Written, wired, never run |
-| 2 | **iPad full screen** (`supportsTablet: true`) | **Already in `app.json`** — needs looking at on a real iPad, and iPad screenshots become *required* |
+| 2 | **iPad full screen** (`supportsTablet: true`) | **Already in `app.json`, and now looked at** (08.09, rendered at 2064x2752): runs clean, Modes and Stations hold up, **the home page is a stretched phone**. Required iPad screenshots are blocked on that — see §3 |
 | 3 | **Apple Music repeat/shuffle** | Swift committed 26.08 (`665d30c`). Verify by pressing repeat twice on a real song |
 | 4 | **Native rating prompt** | **NOT DONE.** `RateCard.tsx` still uses `Linking.openURL(REVIEW_URL)`. Swapping to StoreKit's in-place prompt needs a native piece. The rules in `rateApp.ts` do not change — only where the tap goes |
 | 5 | **Store listing rewrite** | Drafted in `docs/launch/store-listing-next-build.md`. A new name/subtitle can only ship attached to a new version |
@@ -114,12 +114,23 @@ push needs a server, which contradicts the privacy promise.
 
 Both were asked for directly by the owner and are **not** parked:
 
-- [ ] **App Store screenshots.** The current set (`screenshots-appstore/`, built
-      by `scripts/marketing/build-slides.mjs`) predates the widget work, the
-      light theme, the broadcast schedule and the drive stub. **iPad
-      screenshots become REQUIRED** the moment `supportsTablet` ships.
-      Re-run `scripts/marketing/tints.py` after **any** screenshot change — the
-      surround colour is sampled from the picture, not picked.
+- [x] **App Store screenshots — DONE 08.09.** All eight raw shots retaken from
+      the current build (`scripts/harness/shots.mjs`) and the ten marketing
+      slides rebuilt (`scripts/marketing/build-slides.mjs`). The reshoot found
+      a real contrast bug in three stations' headers, fixed in the same round —
+      see `AGENTS.md`. Re-run `scripts/marketing/tints.py` after **any**
+      screenshot change; it is what caught the tuner slide still wearing Night
+      Run's pre-19.08 blue.
+- [ ] **iPad screenshots — BLOCKED, and this is a decision rather than a task.**
+      Apple **requires** a 13-inch set (**2064 x 2752** portrait) the moment
+      `supportsTablet: true` ships, which is queued for 1.4.0. The app was
+      rendered at that size on 08.09: it runs with **zero page errors**, and
+      **Modes and Stations hold up well** while **the home page does not** —
+      hero, greeting and cards all stay phone-sized against the left edge with
+      the bottom two-fifths empty. A screenshot of that would cost downloads.
+      Two honest options, and the owner picks:
+      **(a)** ship 1.4.0 with `supportsTablet: false` and stay iPhone-only, or
+      **(b)** give the home page a tablet layout first.
 - [ ] **The app preview video.** Full plan, shot list and technical spec are
       already in `docs/launch/store-listing-next-build.md` under **"THE APP
       PREVIEW VIDEO — how to actually make it"**. Read that rather than

@@ -178,20 +178,22 @@ jobs:
           # One-line python on purpose: a multi-line -c string starting at
           # column 0 breaks this step's YAML block scalar.
           eas build:list --platform ios --limit 1 --json --non-interactive 2>/dev/null \
-            | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print("build", b.get("appBuildVersion"), b.get("status"), "| profile", b.get("buildProfile"), "| channel", b.get("channel")); print("url  ", b.get("buildUrl") or b.get("id")); print("error", json.dumps(b.get("error"), indent=2)); subs=b.get("submissions") or []; print("submitted to App Store Connect:", "no submission recorded against this build" if not subs else ""); [print("  submission", x.get("status"), "| code", (x.get("error") or {}).get("errorCode"), "| said:", (x.get("error") or {}).get("message")) for x in subs]' || true
-          # A SUBMISSION FAILS THE SAME WAY A BUILD DOES: `eas submit` prints
-          # "Something went wrong when submitting your app" and exits, naming
-          # nothing at all. The reason is in the submission's own error fields
-          # above, and the detail behind it is in `logFiles` — both read out of
-          # eas-cli's SubmissionFragment (graphql/types/Submission.js) rather
-          # than guessed. Printed here for the same reason as the Xcode log.
-          SUBLOG=$(eas build:list --platform ios --limit 1 --json --non-interactive 2>/dev/null | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print(next((f for x in (b.get("submissions") or []) for f in (x.get("logFiles") or [])), ""))' || true)
-          if [ -n "$SUBLOG" ]; then
-            echo "──── what App Store Connect actually said ────"
-            # --compressed for the same reason as the Xcode log below.
-            curl -sSL --compressed --max-time 60 "$SUBLOG" -o /tmp/sub.log || true
-            node scripts/submission-log.mjs /tmp/sub.log || true
-          fi
+            | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print("build", b.get("appBuildVersion"), b.get("status"), "| profile", b.get("buildProfile"), "| channel", b.get("channel")); print("url  ", b.get("buildUrl") or b.get("id")); print("error", json.dumps(b.get("error"), indent=2)); print("submitted to App Store Connect: THIS LINE CANNOT ANSWER THAT — see note")' || true
+          # THAT LINE HAS NEVER WORKED, AND IT TOOK UNTIL 08.09 TO NOTICE.
+          # It used to read `b["submissions"]` and print "no submission
+          # recorded against this build" — but `eas build:list` sends
+          # BuildFragment, and `submissions` lives only on
+          # BuildWithSubmissionsFragment, which NO cli command exposes as json
+          # (grep withSubmissionsByIdAsync: its one caller is runBuildAndSubmit).
+          # So the key was always absent and the line always printed the same
+          # words whatever the truth — which is exactly why the 29.08 entry
+          # records it saying "no submission recorded" about build 32 the day
+          # after build 32 was demonstrably submitted.
+          #
+          # A check that can only ever give one answer is worse than none,
+          # because it gets read as evidence. Deleting the claim rather than
+          # dressing it up: run `submit` mode, which now passes --verbose and
+          # prints the real reason from eas-cli's own submission logs.
           echo "════════ what Xcode actually said, with file and line ════════"
           # WHY THIS EXISTS: EAS's `error.message` is a SUMMARY — it names the
           # compiler complaint and never the file or the line. Builds 40 and 41
@@ -381,7 +383,12 @@ jobs:
         run: |
           set -euo pipefail
           echo "Submitting the newest ${{ env.BUILD_PROFILE }} iOS build."
-          eas submit --platform ios --profile ${{ env.BUILD_PROFILE }} \
+          # --verbose forces eas-cli's own downloadAndPrintSubmissionLogsAsync
+          # (submit/utils/logs.js) to run whatever the error code. Without it a
+          # failure prints "Something went wrong when submitting your app" and
+          # nothing else, which is unactionable — the same summary-with-no-file
+          # problem the Xcode log block below exists to solve.
+          eas submit --platform ios --profile ${{ env.BUILD_PROFILE }} --verbose \
             --latest --non-interactive
           echo "::notice::Submitted. Apple takes 5-15 minutes to process before TestFlight lists it."
 

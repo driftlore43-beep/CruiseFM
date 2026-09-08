@@ -204,8 +204,19 @@ jobs:
             curl -sSL --max-time 120 "$LOGS" -o /tmp/xcode.log 2>/dev/null || true
             if [ -s /tmp/xcode.log ]; then
               echo "size: $(wc -c < /tmp/xcode.log) bytes"
+              # THE FILE IS GZIP, despite the .txt name and despite curl -L.
+              # The first read of it printed 2000 characters of binary and the
+              # parser reported "no errors matched" — which is what a clean
+              # build also looks like, so test the magic bytes rather than
+              # trusting the extension.
+              if gzip -t /tmp/xcode.log 2>/dev/null; then
+                echo "(gzip — decompressing)"
+                gunzip -c /tmp/xcode.log > /tmp/xcode.txt
+              else
+                cp /tmp/xcode.log /tmp/xcode.txt
+              fi
               echo "--- compiler errors ---"
-              node scripts/xcode-errors.mjs /tmp/xcode.log || true
+              node scripts/xcode-errors.mjs /tmp/xcode.txt || true
               echo "--- end ---"
             else
               echo "(log fetch returned nothing — open the url by hand)"

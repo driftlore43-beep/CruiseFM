@@ -179,6 +179,35 @@ jobs:
           # column 0 breaks this step's YAML block scalar.
           eas build:list --platform ios --limit 1 --json --non-interactive 2>/dev/null \
             | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print("build", b.get("appBuildVersion"), b.get("status"), "| profile", b.get("buildProfile"), "| channel", b.get("channel")); print("url  ", b.get("buildUrl") or b.get("id")); print("error", json.dumps(b.get("error"), indent=2)); subs=b.get("submissions") or []; print("submitted to App Store Connect:", [(x.get("status"), x.get("submittedBuildId") and "y") for x in subs] or "no submission recorded against this build")' || true
+          echo "════════ what Xcode actually said, with file and line ════════"
+          # WHY THIS EXISTS: EAS's `error.message` is a SUMMARY — it names the
+          # compiler complaint and never the file or the line. Builds 40 and 41
+          # both died on "instance member 'padding' cannot be used on type
+          # 'View'", and two rounds were spent reasoning about which of eleven
+          # Swift files could produce it. Swift cannot be compiled in this
+          # environment, so the build IS the compiler, and a compiler that will
+          # not tell you where is barely a compiler at all.
+          #
+          # The full Xcode log is an artifact EAS keeps a signed URL for. Print
+          # the real `error:` lines instead of guessing at mechanisms — which is
+          # this project's own most-repeated lesson.
+          LOGS=$(eas build:list --platform ios --limit 1 --json --non-interactive 2>/dev/null \
+            | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print(b.get("xcodeBuildLogsUrl") or "")' || true)
+          if [ -n "$LOGS" ]; then
+            echo "log: $LOGS"
+            # curl, never Node fetch — this environment's proxy is picked up by
+            # one and not the other (04.09).
+            curl -sSL --max-time 120 "$LOGS" -o /tmp/xcode.log 2>/dev/null || true
+            if [ -s /tmp/xcode.log ]; then
+              echo "--- compiler errors ---"
+              grep -aE "error:" /tmp/xcode.log | grep -avE "linker command|clang: error: the following" | sort -u | head -40
+              echo "--- end ---"
+            else
+              echo "(log fetch returned nothing — open the url by hand)"
+            fi
+          else
+            echo "(no xcodeBuildLogsUrl on this build — nothing to fetch)"
+          fi
           echo "════════ runtime version this code publishes as ════════"
           npx expo config --type public --json 2>/dev/null \
             | python3 -c "import sys,json; print(json.load(sys.stdin).get('runtimeVersion'))" || true

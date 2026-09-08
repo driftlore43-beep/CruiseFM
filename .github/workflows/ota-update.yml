@@ -178,7 +178,20 @@ jobs:
           # One-line python on purpose: a multi-line -c string starting at
           # column 0 breaks this step's YAML block scalar.
           eas build:list --platform ios --limit 1 --json --non-interactive 2>/dev/null \
-            | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print("build", b.get("appBuildVersion"), b.get("status"), "| profile", b.get("buildProfile"), "| channel", b.get("channel")); print("url  ", b.get("buildUrl") or b.get("id")); print("error", json.dumps(b.get("error"), indent=2)); subs=b.get("submissions") or []; print("submitted to App Store Connect:", [(x.get("status"), x.get("submittedBuildId") and "y") for x in subs] or "no submission recorded against this build")' || true
+            | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print("build", b.get("appBuildVersion"), b.get("status"), "| profile", b.get("buildProfile"), "| channel", b.get("channel")); print("url  ", b.get("buildUrl") or b.get("id")); print("error", json.dumps(b.get("error"), indent=2)); subs=b.get("submissions") or []; print("submitted to App Store Connect:", "no submission recorded against this build" if not subs else ""); [print("  submission", x.get("status"), "| code", (x.get("error") or {}).get("errorCode"), "| said:", (x.get("error") or {}).get("message")) for x in subs]' || true
+          # A SUBMISSION FAILS THE SAME WAY A BUILD DOES: `eas submit` prints
+          # "Something went wrong when submitting your app" and exits, naming
+          # nothing at all. The reason is in the submission's own error fields
+          # above, and the detail behind it is in `logFiles` — both read out of
+          # eas-cli's SubmissionFragment (graphql/types/Submission.js) rather
+          # than guessed. Printed here for the same reason as the Xcode log.
+          SUBLOG=$(eas build:list --platform ios --limit 1 --json --non-interactive 2>/dev/null | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print(next((f for x in (b.get("submissions") or []) for f in (x.get("logFiles") or [])), ""))' || true)
+          if [ -n "$SUBLOG" ]; then
+            echo "──── what App Store Connect actually said ────"
+            # --compressed for the same reason as the Xcode log below.
+            curl -sSL --compressed --max-time 60 "$SUBLOG" -o /tmp/sub.log || true
+            node scripts/submission-log.mjs /tmp/sub.log || true
+          fi
           echo "════════ what Xcode actually said, with file and line ════════"
           # WHY THIS EXISTS: EAS's `error.message` is a SUMMARY — it names the
           # compiler complaint and never the file or the line. Builds 40 and 41

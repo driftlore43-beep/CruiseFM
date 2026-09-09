@@ -29,10 +29,10 @@ import type { Station } from '@/constants/stations';
  * exactly where the words are — see USER_PHOTO below, which is where the
  * reasoning for that lives.
  *
- * A USER'S OWN PHOTO GETS LESS WHERE THE PICTURE IS (owner, 10.08: "it's
- * their personalised image, it should be appreciated a bit more") and MORE
- * where the type is. Those pull opposite ways, which is exactly why both
- * halves are asserted rather than trusted.
+ * A USER'S OWN PHOTO GETS LESS DARKENING THAN A BUILT-IN WHERE THE PICTURE
+ * IS, and as of 09.09 less at the type as well — the owner picked the
+ * whole-frame lift (option 2) for bright AND dark photos after seeing them
+ * side by side. The built-in ramp is untouched.
  */
 /**
  * Built-in stations. The picture and the foot are the values approved on
@@ -86,57 +86,32 @@ const BUILT_IN = [
 const BUILT_IN_AT = [0, 0.15, 0.31, 0.4, 0.65, 0.85, 1] as const;
 
 /**
- * A photo of the user's own: the picture opens right up in the middle, and the
- * shading goes where the words are instead of over everything.
+ * A photo of the user's own.
  *
- * THREE ZONES, AND THE MIDDLE ONE IS THE POINT. A mode puts white type in two
- * places and nowhere else — the header (mode label, "YOU'RE LISTENING TO", the
- * station's name) across y 0.06-0.13, and the song title, seek bar and
- * transport across y 0.727-0.936. Measured in all eight modes rather than
- * assumed; they agree to within a percent, which is what lets one ramp serve
- * them all. Between those two bands there is nothing but the deck's own object
- * and the photograph, so that stretch can be left almost clear.
+ * THREE ZONES STILL — a mode puts white type in two places and nowhere else
+ * (header y 0.06-0.13, song / seek / transport y 0.727-0.936, measured in
+ * all eight). The picture lives between them.
  *
- * THE OLD RAMP WAS THE RIGHT IDEA MEASURED IN THE WRONG PLACE. It gathered
- * from 0.65 downward and reached 0.40 only at the very bottom edge — but the
- * song title starts at 0.727, where the ramp had only reached about 0.15. On a
- * bright photo that left white type at roughly 2.5:1, and the header, with a
- * top stop of 0.10, sat at 1.87:1 — genuinely unreadable. Both had been that
- * way in Vinyl, Equalizer and CD since this component was written on 10.08.
- * Nobody saw it because the ten built-in photographs are dark and measure
- * 18-20:1 there; a bright picture is something only a user can supply.
+ * 09.09 THE OWNER PICKED THE WHOLE-FRAME LIFT, ON BRIGHT PHOTOS AND DARK
+ * ONES. The comparison sheet showed today's look against (1) open the
+ * picture, keep the word bands and (2) lift the whole frame. She chose 2
+ * for both. So this ramp is lighter at the TYPE as well as in the middle
+ * (0.57/0.60 -> 0.38/0.40) and the extra flat wash in StationBackdrop is
+ * gone. A pure white frame will no longer clear 4.5:1 behind the words;
+ * that floor still sizes the ten built-ins, which are ours to shoot dark.
+ * Do not put the 0.54 bands back on a user photo to "fix contrast" without
+ * asking — that is the darkness she just rejected.
  *
- * SIZED AGAINST THE WORST PHOTO THERE IS, not against the one that was
- * reported: a pure white frame needs 0.5405 behind white type to clear 4.5:1,
- * so both bands sit above that. Checked across five extremes — a lime panel,
- * pure white, bright sky, sand, snow glare.
- *
- * THAT NUMBER READ 0.467 FROM 02.09 TO 08.09, AND IT WAS THE RIGHT QUANTITY
- * USED AS THE WRONG ONE. 4.5:1 against white type needs a background at
- * relative luminance 0.1833, which is sRGB 0.465 — and 0.465 is what got
- * written down as the ALPHA. It is not: a scrim of alpha `a` over white
- * leaves 255(1-a) + 5a, so reaching sRGB 0.465 takes a = 0.5405. At 0.467 the
- * real ratio is 3.49:1. So both this ramp and the test that guards it were
- * certifying 3.49:1 while the comment claimed 4.5:1, and the stops have been
- * lifted to match what the arithmetic actually asks for.
- *
- * THE TEST DID NOT CATCH IT BECAUSE THE TEST WAS BUILT ON THE SAME NUMBER —
- * which is this project's most-repeated lesson wearing new clothes. A check
- * fires correctly against its threshold and still proves nothing when the
- * threshold is the thing that is wrong.
- *
- * THE SHADING BELOW AND ABOVE IS WHAT BUYS THE OPENNESS BETWEEN, so they move
- * together or not at all. Raising the middle stops to "brighten it" without
- * touching the ends just makes the words unreadable again, which is the exact
- * fault this shape was built to fix.
+ * THE SHAPE IS STILL SHADE THE WORDS, OPEN THE PICTURE. The ends moved
+ * together with the middle so it does not collapse into an even wash.
  */
 const USER_PHOTO = [
-  'rgba(2,2,12,0.57)',
-  'rgba(2,2,12,0.55)',
-  'rgba(2,2,12,0.03)',
-  'rgba(2,2,12,0.08)',
-  'rgba(2,2,12,0.55)',
-  'rgba(2,2,12,0.60)',
+  'rgba(2,2,12,0.38)',
+  'rgba(2,2,12,0.36)',
+  'rgba(2,2,12,0.00)',
+  'rgba(2,2,12,0.02)',
+  'rgba(2,2,12,0.36)',
+  'rgba(2,2,12,0.40)',
 ] as const;
 const USER_PHOTO_AT = [0, 0.16, 0.32, 0.58, 0.72, 1] as const;
 

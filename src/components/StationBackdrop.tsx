@@ -120,37 +120,11 @@ export function StationBackdrop({
         cachePolicy="memory-disk"
         style={StyleSheet.absoluteFill}
       />
-      <UserPhotoVeil station={station} />
+      {/* 09.09: the extra 14% wash over every user photo is gone. Owner
+          chose the whole-frame lift for bright AND dark photos, so a
+          second even layer would put the darkness straight back. The
+          shaped ModeScrim still sits on top in every mode. */}
       <DaylightVeil />
     </>
-  );
-}
-
-/**
- * An extra knock-back for a photo of the user's own.
- *
- * The ten built-in stations are photographed dark on purpose — dusk, tunnels,
- * night roads — and every white label in the app leans on that. Someone's own
- * photo has no such discipline: a bright beach shot swallows the song title
- * whole. A file path means a user photo (the built-ins are bundled assets, so
- * numbers), which makes the check free and needs no extra field.
- *
- * 0.30 -> 0.14 on 10.08 (owner: "reduce the darkness layer that goes on top of
- * the custom image"). It was doing too much of the work and doing it in the
- * wrong shape: this veil is FLAT, so it dims the whole picture evenly, while
- * the station page and the modes already lay GRADIENTS over the photograph
- * that deepen exactly where white type sits. Legibility was never this layer's
- * job alone — it only has to stop the brightest photos blowing out, and the
- * shaped scrims underneath handle the rest.
- *
- * This is the one number to move if a pale photo ever proves unreadable.
- */
-function UserPhotoVeil({ station }: { station: Station }) {
-  if (typeof station.image !== 'string') return null;
-  return (
-    <View
-      style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,6,14,0.14)' }]}
-      pointerEvents="none"
-    />
   );
 }

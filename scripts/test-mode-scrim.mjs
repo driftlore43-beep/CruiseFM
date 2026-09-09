@@ -23,8 +23,9 @@
 // screen — not any particular colour.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = '/home/user/CruiseFM';
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODES = `${ROOT}/src/components`;
 
 /**
@@ -184,22 +185,30 @@ for (const f of files.sort()) {
     check('the white-type floor is derived, not remembered',
       NEEDED > 0.53 && NEEDED < 0.55, `solved ${NEEDED.toFixed(4)}`);
 
-    // BOTH RAMPS, not just the user's. Leaving the built-in one out is the
-    // exact gap that let three stations ship with an unreadable header:
-    // Coastal at 2.45:1, Mountain Pass at 2.23:1 and Daylight at 1.39:1,
-    // measured on real screenshots. "The built-ins are shot dark" was true of
-    // seven of the ten, and this check is what stops that being assumed again.
-    for (const [name, r] of Object.entries(ramps)) {
-      for (const key of ['header', 'foot']) {
-        // The foot on a built-in is deliberately lighter: the type there is
-        // the song title, which is large, and the 03.08 values were approved
-        // against the real photographs rather than against a white frame.
-        if (name === 'built-in' && key === 'foot') continue;
-        const worst = Math.min(...span(r, bands[key]));
-        check(`${name}: white type is safe across the ${key}`, worst >= NEEDED,
-          `thinnest point is ${worst.toFixed(3)}, needs >= ${NEEDED.toFixed(4)}`);
-      }
+    // BUILT-IN ONLY. The user-photo ramp used to share this floor, and that
+    // is what made a photo of the owner's own look much darker than the file
+    // she picked. On 09.09 she compared the current look against two lifts
+    // and chose option 2 for bright AND dark photos: lift the whole frame,
+    // including behind the words. The white-frame 4.5:1 number still sizes
+    // the ten built-ins — those photographs are ours, not hers.
+    for (const key of ['header', 'foot']) {
+      if (key === 'foot') continue; // 03.08 foot, approved against real photos
+      const worst = Math.min(...span(built, bands[key]));
+      check(`built-in: white type is safe across the ${key}`, worst >= NEEDED,
+        `thinnest point is ${worst.toFixed(3)}, needs >= ${NEEDED.toFixed(4)}`);
     }
+
+    // Option 2, pinned as numbers rather than as "lighter than before" — a
+    // relative check would still pass if both ends drifted back up together.
+    // Header 0.38 / foot 0.40, middle essentially clear. Restoring the 0.57
+    // / 0.60 bands is the regression this exists to catch.
+    check('user photo: option 2 lifts the type bands',
+      user.a[0] >= 0.35 && user.a[0] <= 0.40 &&
+      user.a.at(-1) >= 0.36 && user.a.at(-1) <= 0.42,
+      `ends ${user.a[0]}/${user.a.at(-1)} — want ~0.38 / ~0.40`);
+    check('user photo: option 2 is below the white-frame floor',
+      Math.min(...span(user, bands.header), ...span(user, bands.foot)) < NEEDED,
+      'type bands drifted back onto the 4.5:1 floor the owner declined');
 
     // …and the openness that shading pays for. This is the whole trade: if the
     // middle is not clearly lighter than the bands, the shape has collapsed
@@ -227,6 +236,17 @@ for (const f of files.sort()) {
       }
     }
   }
+}
+
+// The extra flat wash over every user photo (rgba(4,6,14,0.14)) is what made
+// a dark picture muddier and a bright one look unlike the file. Option 2
+// dropped it; putting it back would undo the whole round even with the
+// lighter ramp in place.
+{
+  const src = fs.readFileSync(path.join(MODES, 'StationBackdrop.tsx'), 'utf8');
+  check('user photos carry no extra flat wash',
+    !src.includes('UserPhotoVeil') && !/rgba\(\s*4\s*,\s*6\s*,\s*14/.test(src),
+    'StationBackdrop still paints a veil over a file-path photo');
 }
 
 console.log(fails ? `\n  ${fails} failure(s)\n`

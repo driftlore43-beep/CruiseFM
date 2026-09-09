@@ -51,14 +51,29 @@ struct WidgetStation: Codable {
   let at: Double?
 }
 
+/**
+ * NOTHING DRAWS THIS ANY MORE. The streak widget was deleted on 09.09 —
+ * owner: "we don't need trackers, aren't Cruise FM's style" — and this is
+ * kept ONLY so that the app can go on sending the field harmlessly.
+ *
+ * IT IS OPTIONAL, AND THAT IS THE WHOLE POINT OF LEAVING IT HERE. Swift's
+ * decoder is all or nothing: one required property missing and the whole
+ * snapshot decodes to nil, which blanks every widget at once with nothing
+ * logged anywhere. The app updates OVER THE AIR and the extension does not,
+ * so a binary already on a phone keeps reading whatever the newer app writes
+ * — and build 44's copy of this struct declares `stats` as REQUIRED. Dropping
+ * the field from the JSON today would empty that phone's Home Screen.
+ *
+ * So the order is: optional here first, ship a build, and only then may the
+ * JS side stop sending it. Until that build is on real phones, leave
+ * `stats` in widgetData.ts alone.
+ */
 struct WidgetStats: Codable {
-  let streakDays: Int
-  let sessionsThisWeek: Int
-  let totalMinutes: Int
-  /// "DRIVES" or "SESSIONS" — decided in JS so a desk listener is never told
-  /// they drove (the app's standing wording rule).
-  let countLabel: String
-  let timeLabel: String
+  let streakDays: Int?
+  let sessionsThisWeek: Int?
+  let totalMinutes: Int?
+  let countLabel: String?
+  let timeLabel: String?
 }
 
 struct Snapshot: Codable {
@@ -72,7 +87,7 @@ struct Snapshot: Codable {
   /// of the time anyone reads it; "last played" is a claim about the past and
   /// stays true however stale this gets. Any view drawing it must say so.
   let lastPlayed: LastPlayedInfo?
-  let stats: WidgetStats
+  let stats: WidgetStats?
 }
 
 /// The newest shape this binary knows how to draw.

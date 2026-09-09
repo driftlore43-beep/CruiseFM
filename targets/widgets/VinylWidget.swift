@@ -113,6 +113,17 @@ struct DeckView: View {
   var entry: DeckEntry
   @Environment(\.widgetFamily) var family
 
+  // THE DECK IS MEDIUM-ONLY NOW (owner, 09.09: "the vinyl square widget
+  // should be categorised in the 'look' section with the CD and mirror
+  // ball"). A small record lives in The Mode's Record look instead, bigger
+  // and with no type on it, so this widget no longer offers a square tile
+  // and two ways to get the same picture cannot drift apart.
+  //
+  // The small branch below is left standing rather than cut out: it is
+  // unreachable but still referenced, so it costs nothing, and deleting
+  // reachable-looking Swift in an environment with no compiler is how a
+  // build cycle gets burned. Cut it the next time this file is opened on a
+  // machine that can build it.
   private var isSmall: Bool { family == .systemSmall }
 
   var body: some View {
@@ -402,7 +413,7 @@ struct DeckConfigurableWidget: Widget {
     }
     .configurationDisplayName("On the Deck")
     .description("Your station as a record, with the last song on it. Long-press to change the look.")
-    .supportedFamilies([.systemSmall, .systemMedium])
+    .supportedFamilies([.systemMedium])
     .cruiseFullBleed()
   }
 }
@@ -418,7 +429,7 @@ struct DeckWidget: Widget {
     }
     .configurationDisplayName("On the Deck")
     .description("Your station as a record, with the last song on the label.")
-    .supportedFamilies([.systemSmall, .systemMedium])
+    .supportedFamilies([.systemMedium])
     .cruiseFullBleed()
   }
 }

@@ -5,14 +5,22 @@ import WidgetKit
 /**
  * THE MODE, AS AN OBJECT — a small tile carrying the thing itself.
  *
- * Two looks of one idea, so one gallery row rather than two: the mirror ball
- * and the CD are both "your station's mode, drawn as the object it is named
- * after". A third (the record) already lives on the Deck's own small tile and
- * is deliberately not repeated here.
+ * THREE LOOKS OF ONE IDEA, so one gallery row rather than three: the mirror
+ * ball, the CD and the record all answer "your station's mode, drawn as the
+ * object it is named after". The record joined them on 09.09 (owner: "the
+ * vinyl square widget should be categorised in the 'look' section with the CD
+ * and mirror ball") — it had been the Deck's own small family, in a different
+ * row, answering the same question. THE DECK IS MEDIUM-ONLY NOW.
  *
- * NEITHER OF THEM SAYS ANYTHING IT CANNOT KNOW. The ball carries the station's
+ * NONE OF THEM SAYS ANYTHING IT CANNOT KNOW. The ball carries the station's
  * name; the CD carries no words at all (owner, 03.09: "the CD Mode should
- * remove all texts"). Nothing here claims to be playing.
+ * remove all texts"); the record carries its frequency on the label, which is
+ * the only thing naming the station once its name comes off. Nothing here
+ * claims to be playing.
+ *
+ * ALL THREE FILL THE TILE. They were drawn small enough to leave room for a
+ * caption underneath, which is backwards for a widget whose whole subject is
+ * the object (owner, 09.09: "where it takes up most of the widget's space").
  *
  * THE DISC IS THE ONE PLACE THE SONG'S COVER COMES FIRST. Everything else in
  * the set draws the station's photograph, so a listener's own custom-station
@@ -30,6 +38,7 @@ import WidgetKit
 enum ModeLook: String, AppEnum {
   case mirrorBall
   case cd
+  case record
 
   static let defaultLook: ModeLook = .mirrorBall
 
@@ -39,6 +48,8 @@ enum ModeLook: String, AppEnum {
                                        subtitle: "The ball, lit the way the app draws it"),
     .cd: DisplayRepresentation(title: "CD",
                                subtitle: "The last song, printed on a disc in its case"),
+    .record: DisplayRepresentation(title: "Record",
+                                   subtitle: "The station's own pressing, and nothing else"),
   ]
 }
 
@@ -54,7 +65,7 @@ struct ModeLookIntent: WidgetConfigurationIntent {
   init(look: ModeLook) { self.look = look }
 }
 
-enum ModeStyle { case mirrorBall, cd }
+enum ModeStyle { case mirrorBall, cd, record }
 
 struct ModeEntry: TimelineEntry {
   let date: Date
@@ -104,6 +115,7 @@ struct ModeIntentProvider: AppIntentTimelineProvider {
     switch look {
     case .mirrorBall: return .mirrorBall
     case .cd:         return .cd
+    case .record:     return .record
     }
   }
 }
@@ -121,40 +133,97 @@ struct ModeView: View {
       switch entry.style {
       case .mirrorBall: ball(s)
       case .cd:         disc(s)
+      case .record:     record(s)
       }
     }
   }
 
+  /**
+   * THE BALL IS CENTRED IN THE TILE, NOT STACKED ABOVE A CAPTION.
+   *
+   * It used to sit in a VStack with its stem, a spacer and the station's name,
+   * which came to about 162pt inside a ~158pt tile — so the ball was squeezed
+   * to 108 AND pushed high, which is what the owner saw ("let it sit more
+   * central in the widget"). The name is now an OVERLAY at the foot rather
+   * than a row that has to be paid for out of the ball's height, so the ball
+   * takes the whole tile to centre itself in and can be much larger.
+   *
+   * The stem hangs off the ball itself for the same reason: a ball hangs from
+   * something, but that something must not push it down the tile.
+   */
   private func ball(_ s: WidgetStation) -> some View {
     ZStack {
       RadialGradient(colors: [Color(hex: "#241a2b"), Color(hex: "#07050b")],
                      center: .init(x: 0.5, y: 0.34), startRadius: 0, endRadius: 150)
       BeamField()
-      VStack(spacing: 0) {
-        // The stem. A ball hangs from something; without it this is a sphere
-        // floating in a box.
-        Rectangle().fill(.white.opacity(0.30)).frame(width: 1.5, height: 13)
-        MirrorBall(size: 108)
-        Spacer(minLength: 5)
+      MirrorBall(size: 126, rows: 17, cols: 30)
+        .overlay(alignment: .top) {
+          Rectangle().fill(.white.opacity(0.30))
+            .frame(width: 1.5, height: 30).offset(y: -28)
+        }
+        // Nudged up by the small amount the stem needs, so the BALL reads as
+        // centred rather than the ball-and-stem together.
+        .offset(y: 4)
+      VStack {
+        Spacer(minLength: 0)
         Text(s.name).font(.system(size: 13, weight: .heavy))
-          .foregroundColor(.white).lineLimit(1).minimumScaleFactor(0.75)
+          .foregroundColor(.white).lineLimit(1).minimumScaleFactor(0.7)
+          .shadow(color: .black.opacity(0.75), radius: 5)
+          .padding(.horizontal, 10).padding(.bottom, 9)
       }
-      .padding(.top, 9).padding(.bottom, 11).padding(.horizontal, 8)
     }
     .widgetURL(s.url(mode: "disco"))
   }
 
   // NOT ONE WORD ON IT. The disc carries a picture and nothing else; the
   // case is what says which app it belongs to.
+  //
+  // HOW BIG THE CASE CAN BE IS SET BY THE TILE'S OWN CORNERS, not by taste.
+  // A widget clips its content to a rounded rectangle of about 22pt radius,
+  // so a case drawn with a 4pt radius close to the edge has its four corners
+  // sliced off — which is the owner's "ensure the CD case is not cut off from
+  // the widget shape". A corner survives when its own inset plus its own
+  // radius reach the tile's: JewelCase is inset 10 with a 14pt radius, i.e.
+  // 24 against the tile's ~22, so it clears with a little to spare and is
+  // still very nearly the whole tile.
   private func disc(_ s: WidgetStation) -> some View {
     ZStack {
       LinearGradient(colors: [Color(hex: "#1c1f26"), Color(hex: "#080a0e")],
                      startPoint: .topLeading, endPoint: .bottomTrailing)
       JewelCase()
-      CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 104)
-        .offset(x: 5)
+      // Centred on the case's own interior rather than on the tile: the hinge
+      // spine takes 17pt off the left, so dead centre would leave the disc
+      // visibly closer to the hinge than to the opposite wall.
+      CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 110)
+        .offset(x: 8)
     }
     .widgetURL(s.url(mode: "cd"))
+  }
+
+  /**
+   * THE RECORD, AND NOTHING ELSE (owner, 09.09: "remove the station's text so
+   * it's just the vinyl").
+   *
+   * This tile used to be the Deck's own small family, sitting in a different
+   * gallery row from the ball and the disc even though it answers exactly the
+   * same question — "your mode, as the object it is named after". It belongs
+   * here, and moving it is what let the record grow: with no caption to pay
+   * for it takes the whole tile.
+   *
+   * The frequency stays ON the label, because with the station's name gone it
+   * is the only thing naming the station, and the label is the one place on a
+   * record where type belongs.
+   */
+  private func record(_ s: WidgetStation) -> some View {
+    ZStack {
+      RadialGradient(colors: [Color(hex: "#1a1a1f"), Color(hex: "#08080a")],
+                     center: .init(x: 0.38, y: 0.30), startRadius: 0, endRadius: 150)
+      ZStack {
+        RecordView(accent: s.accentColor, label: nil, size: 132, plainLabel: true)
+        DialText(dial: s.dial, size: 132 * 0.105, color: Color(hex: "#ffe7c2"))
+      }
+    }
+    .widgetURL(s.url(mode: "vinyl"))
   }
 }
 
@@ -280,15 +349,30 @@ struct MirrorBall: View {
         let n = norm((ax / 4, ay / 4, az / 4))
         let ndv = n.2                                    // n · (0,0,1)
         let refl = norm((2 * ndv * n.0, 2 * ndv * n.1, 2 * ndv * n.2 - 1))
-        var b = 0.20
+        // LIGHTER, AND WITH MORE COLOUR IN THE CATCHES (owner, 09.09: "lighten
+        // up the tiles, enhance details on the reflections"). MEASURED across
+        // all 209 visible mirrors rather than eyeballed: median brightness
+        // 104.5 -> 117.0, mirrors above 200 3.3% -> 9.1%, mirrors carrying a
+        // lamp's colour 18.2% -> 26.3%, mean colour spread 8.6 -> 15.7.
+        //
+        // THE LOBE WIDENS RATHER THAN THE FLOOR RISING, and that is the whole
+        // trick — the app's own ball proved on 18.08 that lifting the ambient
+        // alone raises the median AND kills the highlights (its share above
+        // 200 fell 4.1% -> 0.6%, i.e. a uniform grey sphere). A wider lobe
+        // means MORE MIRRORS CATCHING A LAMP, so the median, the highlights
+        // and the colour all rise together and a lit mirror stays plainly
+        // brighter than its neighbour, which is the cue that reads as chrome.
+        // The extra scatter is the other half of that: neighbouring mirrors
+        // reflect different parts of the room, so they must disagree.
+        var b = 0.23
         var w: [Double] = []
         for L in lamps {
           let d = max(0, refl.0 * L.0 + refl.1 * L.1 + refl.2 * L.2)
-          let lw = pow(d, 9)
+          let lw = pow(d, 6)
           w.append(lw)
           b += 0.86 * lw
         }
-        b += rnd() * 0.26          // each mirror catches its own bit of room
+        b += rnd() * 0.36          // each mirror catches its own bit of room
         b = min(1, max(0.05, b))
         let v = 0.10 + 0.90 * pow(b, 0.72)
         let wsum = w.reduce(0, +)
@@ -300,7 +384,7 @@ struct MirrorBall: View {
             cr += weight * lc.0; cg += weight * lc.1; cb += weight * lc.2
           }
           cr /= wsum; cg /= wsum; cb /= wsum
-          let k = min(1.0, wsum * 1.5) * 0.68
+          let k = min(1.0, wsum * 2.0) * 0.78
           tint = Color(red:   min(1, max(0, (g * (1 - k) + cr * k) / 255)),
                        green: min(1, max(0, (g * (1 - k) + cg * k) / 255)),
                        blue:  min(1, max(0, (g * (1 - k) + cb * k) / 255)))
@@ -328,10 +412,10 @@ struct MirrorBall: View {
 private struct JewelCase: View {
   var body: some View {
     ZStack {
-      RoundedRectangle(cornerRadius: 4)
+      RoundedRectangle(cornerRadius: caseRadius)
         .fill(LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.02), .white.opacity(0.10)],
                              startPoint: .topLeading, endPoint: .bottomTrailing))
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(.white.opacity(0.30), lineWidth: 2))
+        .overlay(RoundedRectangle(cornerRadius: caseRadius).stroke(.white.opacity(0.30), lineWidth: 2))
 
       // hinge spine
       HStack(spacing: 0) {
@@ -360,7 +444,7 @@ private struct JewelCase: View {
       .padding(7)
 
       // one diagonal sweep of light on the plastic
-      RoundedRectangle(cornerRadius: 4)
+      RoundedRectangle(cornerRadius: caseRadius)
         .fill(LinearGradient(stops: [
           .init(color: .white.opacity(0.20), location: 0.04),
           .init(color: .clear, location: 0.26),
@@ -368,9 +452,18 @@ private struct JewelCase: View {
           .init(color: .white.opacity(0.10), location: 0.96),
         ], startPoint: .topLeading, endPoint: .bottomTrailing))
     }
-    .padding(11)
+    .padding(caseInset)
     .allowsHitTesting(false)
   }
+
+  /// A CORNER SURVIVES WHEN ITS INSET PLUS ITS RADIUS REACH THE TILE'S.
+  /// A widget clips to a rounded rectangle of roughly 22pt, so the old
+  /// 4pt-radius case sitting 11pt in had its four corners sliced off by the
+  /// tile — the owner's "ensure the CD case is not cut off from the widget
+  /// shape". 10 + 14 = 24 clears it, and a real slimline case has generous
+  /// corners anyway (the app's own CD deck settled that on 03.08).
+  private var caseInset: CGFloat { 10 }
+  private var caseRadius: CGFloat { 14 }
 
   private func post(_ corner: Alignment) -> some View {
     let top = corner == .topLeading || corner == .topTrailing
@@ -455,15 +548,68 @@ struct CompactDisc: View {
           .init(color: .clear, location: 0.68),
           .init(color: .white.opacity(0.20), location: 0.92),
         ], startPoint: .topLeading, endPoint: .bottomTrailing))
-      // hub, stacking ring, spindle
+
+      // ── WHAT MAKES IT READ AS AN OBJECT RATHER THAN A PRINTED CIRCLE ────
+      //
+      // Owner, 09.09: "make sure that the CD has the same shading and
+      // reflections as the one in the app. It currently lacks dimensions."
+      // Everything below is either a REAL FEATURE OF A DISC or a lighting
+      // behaviour — none of it is a mark drawn on top, which is the rule the
+      // app's own decks arrived at (04.09: at this size premium can only come
+      // from how the object behaves in light).
+
+      // THE DISC IS DOMED, so it falls away at the rim. A flat fill lit
+      // evenly is exactly what "lacks dimension" describes.
+      Circle().fill(
+        RadialGradient(stops: [
+          .init(color: .clear, location: 0),
+          .init(color: .clear, location: 0.72),
+          .init(color: .black.opacity(0.30), location: 1),
+        ], center: .init(x: 0.40, y: 0.34), startRadius: 0, endRadius: size * 0.56))
+
+      // THE STACKING RING at 0.62R — the moulded step a real CD carries so a
+      // stack of them never touches face to face. A trough with a lit wall
+      // just outside it, which is what makes a step read as pressed in
+      // rather than drawn on (the app's Classic vinyl grooves, 25.08).
+      Circle().stroke(.black.opacity(0.34), lineWidth: 1.6)
+        .frame(width: size * 0.62, height: size * 0.62)
+      Circle().stroke(.white.opacity(0.26), lineWidth: 1)
+        .frame(width: size * 0.655, height: size * 0.655)
+
+      // THE CLEAR MIRROR BAND just outside the hub: a pressing is not coated
+      // edge to edge, and that glassy land is the second-strongest cue after
+      // the rainbow that this is a disc.
+      Circle().stroke(.white.opacity(0.20), lineWidth: size * 0.035)
+        .frame(width: size * 0.375, height: size * 0.375)
+
+      // hub ring and the four gripper holes the tray's spindle grips by
       Circle().fill(Color(white: 0.88).opacity(0.60))
         .frame(width: size * 0.31, height: size * 0.31)
         .overlay(Circle().stroke(.white.opacity(0.45), lineWidth: 1)
                    .frame(width: size * 0.31, height: size * 0.31))
+      ForEach(0..<4, id: \.self) { i in
+        Circle().fill(.black.opacity(0.34))
+          .frame(width: size * 0.030, height: size * 0.030)
+          .offset(x: 0, y: -size * 0.1175)
+          .rotationEffect(.degrees(Double(i) * 90 + 45))
+      }
       Circle().fill(Color(hex: "#090a0e"))
         .frame(width: size * 0.14, height: size * 0.14)
         .overlay(Circle().stroke(.white.opacity(0.18), lineWidth: 1)
                    .frame(width: size * 0.14, height: size * 0.14))
+
+      // THE RIM IS DIRECTIONAL. A `Circle().stroke(.white.opacity(x))` is one
+      // brightness the whole way round, which is a drawn circle — this file
+      // has now talked three components out of exactly that. An edge is
+      // bright where the lamp is and dark opposite, so it is a sweep.
+      Circle().strokeBorder(
+        AngularGradient(stops: [
+          .init(color: .white.opacity(0.55), location: 0),
+          .init(color: .white.opacity(0.10), location: 0.28),
+          .init(color: .white.opacity(0.34), location: 0.55),
+          .init(color: .white.opacity(0.06), location: 0.80),
+          .init(color: .white.opacity(0.55), location: 1),
+        ], center: .center, angle: .degrees(-125)), lineWidth: 1.4)
     }
     .frame(width: size, height: size)
     .clipShape(Circle())

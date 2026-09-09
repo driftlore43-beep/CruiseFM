@@ -331,15 +331,42 @@ struct LastPlayedView: View {
   // that is broken.
   private func player(_ s: WidgetStation) -> some View {
     ZStack {
-      LinearGradient(colors: [Color(white: 0.95), Color(white: 0.85),
-                              Color(white: 0.93), Color(white: 0.79)],
-                     startPoint: .topLeading, endPoint: .bottomTrailing)
+      // BRUSHED SILVER, NOT A FLAT WASH (owner, 09.09: "the surface is looking
+      // too flat, enhance detail with silver and shading"). The old face was
+      // one four-stop diagonal ramp across the whole widget, which is a
+      // painted panel — a real metal case is lit from ABOVE, catches one broad
+      // sheen across its middle, and turns out of the light at every edge.
+      //
+      // EVERY LAYER IS FALLOFF AND NOTHING IS A STROKE, which is this file's
+      // own rule (03.09): a hard edge anywhere on the face reads as a drawn
+      // border, and the owner has now made that note twice about the Winamp.
+      // The sheen fades to nothing at both ends for the same reason.
+      LinearGradient(colors: [Color(white: 0.97), Color(white: 0.90),
+                              Color(white: 0.83), Color(white: 0.78)],
+                     startPoint: .top, endPoint: .bottom)
+      LinearGradient(stops: [
+        .init(color: .clear, location: 0.10),
+        .init(color: .white.opacity(0.42), location: 0.32),
+        .init(color: .clear, location: 0.54),
+      ], startPoint: .topLeading, endPoint: .bottomTrailing)
+      LinearGradient(stops: [
+        .init(color: .clear, location: 0.58),
+        .init(color: .white.opacity(0.20), location: 0.74),
+        .init(color: .clear, location: 0.92),
+      ], startPoint: .topLeading, endPoint: .bottomTrailing)
+      MetalShading()
 
       HStack(spacing: 0) {
         // the screen
         ZStack {
           RoundedRectangle(cornerRadius: 5).fill(Color(hex: "#0a0c12"))
-          RoundedRectangle(cornerRadius: 5).stroke(Color(white: 0.62), lineWidth: 2)
+          // THE SCREEN IS SUNK INTO THE CASE, so its surround is dark where
+          // the metal turns down into the well and lit where it comes back
+          // up on the far side. One even grey stroke reads as a drawn box.
+          RoundedRectangle(cornerRadius: 5).stroke(
+            LinearGradient(colors: [Color(white: 0.34), Color(white: 0.58),
+                                    Color(white: 0.96)],
+                           startPoint: .top, endPoint: .bottom), lineWidth: 2)
 
           VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 11) {
@@ -403,12 +430,34 @@ struct LastPlayedView: View {
           Circle().fill(
             LinearGradient(colors: [Color(white: 0.99), Color(white: 0.86), Color(white: 0.77)],
                            startPoint: .topLeading, endPoint: .bottomTrailing))
-          Circle().stroke(Color.black.opacity(0.07), lineWidth: 1)
+          // A MACHINED RING IS BRIGHT WHERE THE LAMP IS AND DARK OPPOSITE, so
+          // its edge is a sweep rather than one flat line — the same argument
+          // that took the record's rim off a plain stroke on 04.09.
+          Circle().strokeBorder(
+            AngularGradient(stops: [
+              .init(color: .white.opacity(0.95), location: 0),
+              .init(color: .black.opacity(0.10), location: 0.30),
+              .init(color: .white.opacity(0.55), location: 0.56),
+              .init(color: .black.opacity(0.14), location: 0.82),
+              .init(color: .white.opacity(0.95), location: 1),
+            ], center: .center, angle: .degrees(-130)), lineWidth: 1.6)
+          // the dish: the wheel's face falls away toward its middle
           Circle().fill(
-            LinearGradient(colors: [Color(white: 0.95), Color(white: 0.82)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing))
+            RadialGradient(colors: [.black.opacity(0.13), .clear],
+                           center: .center, startRadius: 0, endRadius: 46))
+          Circle().fill(
+            LinearGradient(colors: [Color(white: 0.97), Color(white: 0.86), Color(white: 0.80)],
+                           startPoint: .top, endPoint: .bottom))
             .frame(width: 40, height: 40)
-          Circle().stroke(Color.black.opacity(0.06), lineWidth: 1).frame(width: 40, height: 40)
+          // the hub sits proud: a lit crown, a shadow under its far side
+          Circle().strokeBorder(
+            LinearGradient(colors: [.white.opacity(0.90), .black.opacity(0.12)],
+                           startPoint: .top, endPoint: .bottom), lineWidth: 1.2)
+            .frame(width: 40, height: 40)
+          Circle().fill(
+            RadialGradient(colors: [.clear, .black.opacity(0.16)],
+                           center: .init(x: 0.5, y: 0.16), startRadius: 14, endRadius: 34))
+            .frame(width: 52, height: 52)
         }
         // SMALLER THAN IT WAS (112 / 17), because it was winning an argument
         // it should not have been in: at 112 plus its padding the ring took
@@ -520,9 +569,14 @@ struct LastPlayedView: View {
   }
 }
 
-/// The light on a moulded panel: a catch along the top, the surface falling
-/// away at the foot, and the two sides turning out of the light. Gradients
-/// only — see the note at the call site.
+/// The light on a moulded panel: a catch along the top and the two sides
+/// turning out of the light. Gradients only — see the note at the call site.
+///
+/// THERE IS NO FOOT BAND, and its absence is a decision (owner, 09.09:
+/// "remove the bottom shading -- its not necessary"). It was added on 03.09
+/// to give the window depth after the raised rim came off, and on a tile that
+/// now fills its own edges it only darkened the row the song sits on. The top
+/// catch and the two sides carry the moulding on their own.
 private struct WindowShading: View {
   var body: some View {
     ZStack {
@@ -532,12 +586,6 @@ private struct WindowShading: View {
           .frame(height: 10)
         Spacer(minLength: 0)
       }
-      // foot: the surface curving away
-      VStack(spacing: 0) {
-        Spacer(minLength: 0)
-        LinearGradient(colors: [.clear, .black.opacity(0.22)], startPoint: .top, endPoint: .bottom)
-          .frame(height: 18)
-      }
       // sides: turning out of the light, the right harder than the left
       HStack(spacing: 0) {
         LinearGradient(colors: [.white.opacity(0.16), .clear], startPoint: .leading, endPoint: .trailing)
@@ -545,6 +593,32 @@ private struct WindowShading: View {
         Spacer(minLength: 0)
         LinearGradient(colors: [.clear, .black.opacity(0.18)], startPoint: .leading, endPoint: .trailing)
           .frame(width: 14)
+      }
+    }
+    .allowsHitTesting(false)
+  }
+}
+
+/// The light on a brushed metal case. Heavier than `WindowShading` in both
+/// directions, because a metal edge catches harder than a moulded plastic one
+/// and the shadow under it is sharper. Still pure falloff — nothing here is a
+/// stroke, so there is no boundary anywhere to read as a drawn border.
+private struct MetalShading: View {
+  var body: some View {
+    ZStack {
+      VStack(spacing: 0) {
+        LinearGradient(colors: [.white.opacity(0.55), .clear], startPoint: .top, endPoint: .bottom)
+          .frame(height: 9)
+        Spacer(minLength: 0)
+        LinearGradient(colors: [.clear, .black.opacity(0.20)], startPoint: .top, endPoint: .bottom)
+          .frame(height: 14)
+      }
+      HStack(spacing: 0) {
+        LinearGradient(colors: [.white.opacity(0.30), .clear], startPoint: .leading, endPoint: .trailing)
+          .frame(width: 10)
+        Spacer(minLength: 0)
+        LinearGradient(colors: [.clear, .black.opacity(0.16)], startPoint: .leading, endPoint: .trailing)
+          .frame(width: 12)
       }
     }
     .allowsHitTesting(false)

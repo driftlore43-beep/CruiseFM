@@ -4,13 +4,18 @@ import WidgetKit
 /**
  * Everything the extension offers, in the order it reads in the gallery:
  * start a drive, the record, the song you last heard, what's on, the mode as
- * an object, how you're doing, then the Lock Screen.
+ * an object, then the Lock Screen.
  *
- * SEVEN ROWS FOR TEN DESIGNS, and that is the point of the Look settings. The
- * Deck carries two looks, Last Played carries three and The Mode carries two;
- * each would otherwise be its own row and the gallery would be a scroll rather
- * than a choice. A look is a different way of drawing the SAME idea — where
- * two designs answer different questions they get their own row instead.
+ * FIVE ROWS FOR NINE DESIGNS, and that is the point of the Look settings. The
+ * Deck carries two looks, Last Played carries three and The Mode carries
+ * three; each would otherwise be its own row and the gallery would be a
+ * scroll rather than a choice. A look is a different way of drawing the SAME
+ * idea — where two designs answer different questions they get their own row.
+ *
+ * THERE IS NO STREAK WIDGET, and its absence is a decision rather than an
+ * omission (owner, 09.09): "we don't need trackers, aren't Cruise FM's
+ * style." Days-in-a-row is a habit meter, and this app is about what a drive
+ * feels like. Do not add one back.
  *
  * ── WHY THERE ARE TWO BUNDLES AND A LAUNCHER ──────────────────────────────
  *
@@ -57,7 +62,7 @@ struct CruiseWidgets {
 }
 
 /// iOS 17 and later: the three widgets whose look can be changed from
-/// Edit Widget, plus the four that never had a setting.
+/// Edit Widget, plus the two that never had a setting.
 @available(iOSApplicationExtension 17.0, *)
 struct ModernWidgets: WidgetBundle {
   @WidgetBundleBuilder
@@ -67,12 +72,11 @@ struct ModernWidgets: WidgetBundle {
     LastPlayedConfigurableWidget()
     OnAirWidget()
     ModeConfigurableWidget()
-    StatsWidget()
     LockScreenWidget()
   }
 }
 
-/// iOS 16 and older: the same seven rows, with the plain version of each pair.
+/// iOS 16 and older: the same five rows, with the plain version of each pair.
 /// Someone here gets one fixed look rather than a setting — the alternative is
 /// the widget not existing for them at all.
 struct LegacyWidgets: WidgetBundle {
@@ -83,7 +87,6 @@ struct LegacyWidgets: WidgetBundle {
     LastPlayedWidget()
     OnAirWidget()
     ModeWidget()
-    StatsWidget()
     // No `else` here, and there must never be one — see the note above.
     if #available(iOSApplicationExtension 16.0, *) {
       LockScreenWidget()

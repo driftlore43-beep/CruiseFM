@@ -195,6 +195,30 @@ console.log('\n  the subset still covers every icon a station can use:');
   check('and it actually read the helpers', helpers >= 4, `found ${helpers}`);
 }
 
+// ── THE TEN STATIONS' PHOTOGRAPHS ARE WHERE THE FONTS ARE ────────────────
+//
+// The extension cannot read the app's bundle, so the built-ins' blurred
+// backdrops are carried as its OWN resources, named by station id. They sat in
+// a `stations/` subfolder from 01.09 to 09.09 and never rendered: the On Air
+// tile on build 44 drew After Hours FM as its flat gradient (hue 235) where
+// the photograph is a teal road (hue 197), while the same recording showed a
+// CUSTOM station's photo — which arrives through the App Group container —
+// perfectly. A ttf at the folder's ROOT demonstrably reaches the bundle, so
+// that is where these go too: the same arrangement as the thing known to work,
+// rather than a bet on how Xcode copies a subfolder.
+console.log('\n  every built-in station carries its photograph into the extension:');
+{
+  const ids = [...fs.readFileSync(`${ROOT}/src/constants/stations.ts`, 'utf8')
+    .matchAll(/^\s{4}id: '([a-z0-9-]+)',/gm)].map((m) => m[1]);
+  check('and it actually read the stations', ids.length >= 10, `found ${ids.length}`);
+  const missing = ids.filter((id) => !fs.existsSync(`${DIR}/${id}.jpg`));
+  check('each one has a .jpg beside the fonts', missing.length === 0,
+    missing.join(', ') + ' — a subfolder is not proven to reach the bundle');
+  const stray = fs.existsSync(`${DIR}/stations`);
+  check('and none are hidden in a subfolder', !stray,
+    'targets/widgets/stations still exists — move them to the folder root');
+}
+
 console.log(fails ? `\n  ${fails} failure(s)\n`
   : '\n  the widgets ship the fonts they draw with, under the names they ask for\n');
 process.exit(fails ? 1 : 0);

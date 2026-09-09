@@ -78,7 +78,7 @@ export type WidgetStation = {
    *
    * This is just the station id, and it means "there is a backdrop for this
    * one" rather than naming a file. The extension looks in two places for it:
-   * its own bundled copies (the ten built-ins, in `targets/widgets/stations/`,
+   * its own bundled copies (the ten built-ins, loose in `targets/widgets/`,
    * named by id precisely so nothing carries a filename) and then the App
    * Group container, where a CUSTOM station's photo is copied when saved.
    *

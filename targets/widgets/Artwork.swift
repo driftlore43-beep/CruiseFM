@@ -44,9 +44,45 @@ enum Art {
    * Nil is a perfectly good answer: a custom station with no photo, or one
    * saved by a build older than the copying, falls back to its gradient.
    */
+  /**
+   * A BUILT-IN STATION'S BUNDLED PHOTOGRAPH.
+   *
+   * THE PHOTOGRAPHS LIVE AT THE ROOT OF THIS TARGET'S FOLDER, beside the
+   * ttf files, and that is not tidiness — it is the one arrangement in this
+   * target KNOWN to reach the built bundle. They sat in a `stations/`
+   * subfolder from 01.09 to 09.09 and never appeared: measured off the
+   * owner's build-44 recording, the On Air tile drew After Hours FM as a
+   * smooth navy ramp — its `gradient` — at hue 235, where the bundled
+   * photograph is a teal-lit road at hue 197 with plainly visible street
+   * lamps and lane markings. Every other tile in that same recording showed
+   * her CUSTOM station's photo correctly, and that one arrives by a
+   * completely different route (the App Group container, below), which is
+   * what pointed at the bundle rather than at the drawing.
+   *
+   * The fonts learned this first (01.09) and are the control: a ttf at the
+   * folder's root is picked up as a bundle resource and the dial genuinely
+   * renders in DSEG on a real phone. A loose file in a SUBFOLDER of a
+   * file-system-synchronized group is a different question, and one that
+   * cannot be settled from here — there is no Swift compiler, and a prebuild
+   * produces the project rather than the built bundle. So this stops asking
+   * it: same folder as the thing that works.
+   *
+   * The path lookups below cost nothing and cover a bundle that preserved a
+   * directory anyway, so a future move cannot silently blank the photographs
+   * again.
+   */
+  private static func bundledStation(_ id: String) -> UIImage? {
+    if let ui = UIImage(named: id) { return ui }
+    if let path = Bundle.main.path(forResource: id, ofType: "jpg"),
+       let ui = UIImage(contentsOfFile: path) { return ui }
+    if let path = Bundle.main.path(forResource: id, ofType: "jpg", inDirectory: "stations"),
+       let ui = UIImage(contentsOfFile: path) { return ui }
+    return nil
+  }
+
   static func station(_ id: String?) -> Image? {
     guard let id else { return nil }
-    if let ui = UIImage(named: id) { return Image(uiImage: ui) }
+    if let ui = bundledStation(id) { return Image(uiImage: ui) }
     guard
       let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup),
       let ui = UIImage(contentsOfFile: dir.appendingPathComponent(stationFile(id)).path)

@@ -127,7 +127,7 @@ struct ModeView: View {
 
   private func ball(_ s: WidgetStation) -> some View {
     ZStack {
-      RadialGradient(colors: [Color(hex: "#191c26"), Color(hex: "#05060a")],
+      RadialGradient(colors: [Color(hex: "#241a2b"), Color(hex: "#07050b")],
                      center: .init(x: 0.5, y: 0.34), startRadius: 0, endRadius: 150)
       BeamField()
       VStack(spacing: 0) {
@@ -206,8 +206,10 @@ struct MirrorBall: View {
 
   var body: some View {
     ZStack {
+      // The body warms with the lamps — the prototype's party ball sits on
+      // #332536, not the neutral #2a2c33 an unlit one does.
       Circle().fill(
-        RadialGradient(colors: [Color(hex: "#2a2c33"), Color(hex: "#08090c")],
+        RadialGradient(colors: [Color(hex: "#332536"), Color(hex: "#0d0812")],
                        center: .init(x: 0.38, y: 0.30), startRadius: 0, endRadius: size * 0.62))
       ForEach(tiles, id: \.id) { t in
         Path { p in
@@ -215,20 +217,36 @@ struct MirrorBall: View {
           for q in t.pts.dropFirst() { p.addLine(to: q) }
           p.closeSubpath()
         }
-        .fill(Color(white: t.v))
+        .fill(t.tint)
       }
       Circle().stroke(.white.opacity(0.10), lineWidth: 1)
     }
     .frame(width: size, height: size)
-    .shadow(color: Color(hex: "#bed7ff").opacity(0.30), radius: 18)
+    .shadow(color: Color(hex: "#e696e6").opacity(0.40), radius: 18)
   }
 
-  private struct Tile { let id: Int; let pts: [CGPoint]; let v: Double }
+  private struct Tile { let id: Int; let pts: [CGPoint]; let v: Double; let tint: Color }
 
   private var tiles: [Tile] {
     let r = size / 2, tilt = -0.16, shrink = 0.91
     let lamps: [(Double, Double, Double)] = [
       norm((-0.58, -0.55, 0.60)), norm((0.66, -0.10, 0.74)), norm((0.06, 0.62, 0.78)),
+    ]
+    // ONE COLOUR PER LAMP — pink, blue, purple. Owner, 03.09: "reflect off
+    // pretty pink, blue and purple colours - as if it's a party happening."
+    // The prototype has carried this since round 3 and the Swift never did:
+    // every tile was filled `Color(white:)`, so the ball shipped as plain
+    // silver and she photographed it that way.
+    //
+    // THE TINT GOES WHERE THE LIGHT LANDS, WHICH IS THE WHOLE RULE. A mirror
+    // no lamp catches stays silver; one caught square-on goes nearly its
+    // lamp's own colour; one between two blends — the same weights that
+    // already decide its brightness, carried into colour. That keeps the
+    // material neutral chrome and puts the mood entirely in the lighting,
+    // which is the app's own Mirror Ball rule (round 20, and round 22's
+    // "nothing structural on this ball may carry a hue").
+    let lampColors: [(Double, Double, Double)] = [
+      (255, 120, 190), (120, 175, 255), (190, 125, 255),
     ]
     var out: [Tile] = []
     var seed = 11
@@ -263,13 +281,31 @@ struct MirrorBall: View {
         let ndv = n.2                                    // n · (0,0,1)
         let refl = norm((2 * ndv * n.0, 2 * ndv * n.1, 2 * ndv * n.2 - 1))
         var b = 0.20
+        var w: [Double] = []
         for L in lamps {
           let d = max(0, refl.0 * L.0 + refl.1 * L.1 + refl.2 * L.2)
-          b += 0.86 * pow(d, 9)
+          let lw = pow(d, 9)
+          w.append(lw)
+          b += 0.86 * lw
         }
         b += rnd() * 0.26          // each mirror catches its own bit of room
         b = min(1, max(0.05, b))
-        out.append(Tile(id: i * cols + j, pts: quad, v: 0.10 + 0.90 * pow(b, 0.72)))
+        let v = 0.10 + 0.90 * pow(b, 0.72)
+        let wsum = w.reduce(0, +)
+        var tint = Color(white: v)
+        if wsum > 0.002 {
+          let g = 255.0 * v
+          var cr = 0.0, cg = 0.0, cb = 0.0
+          for (weight, lc) in zip(w, lampColors) {
+            cr += weight * lc.0; cg += weight * lc.1; cb += weight * lc.2
+          }
+          cr /= wsum; cg /= wsum; cb /= wsum
+          let k = min(1.0, wsum * 1.5) * 0.68
+          tint = Color(red:   min(1, max(0, (g * (1 - k) + cr * k) / 255)),
+                       green: min(1, max(0, (g * (1 - k) + cg * k) / 255)),
+                       blue:  min(1, max(0, (g * (1 - k) + cb * k) / 255)))
+        }
+        out.append(Tile(id: i * cols + j, pts: quad, v: v, tint: tint))
       }
     }
     return out
@@ -354,24 +390,63 @@ private struct JewelCase: View {
 struct CompactDisc: View {
   let cover: Image?
   let accent: Color
+
+  /// The pressed rings, as explicit stops. Built here rather than inline so
+  /// the locations are unambiguously CGFloat — an implicit Double bridge is
+  /// the kind of thing that compiles locally and costs a build cycle when it
+  /// does not, and Swift cannot be compiled in the environment this is
+  /// written in.
+  private func ringStops() -> [Gradient.Stop] {
+    var out: [Gradient.Stop] = []
+    var t: CGFloat = 0
+    while t < 1 {
+      out.append(Gradient.Stop(color: .white.opacity(0.08), location: t))
+      out.append(Gradient.Stop(color: .clear, location: min(1, t + 0.0225)))
+      t += 0.045
+    }
+    return out
+  }
   let size: CGFloat
 
   var body: some View {
     ZStack {
       Circle().fill(Color(white: 0.08))
       if let cover {
+        // DARKER THAN LOOKS RIGHT ON ITS OWN, deliberately. The rainbow is an
+        // `overlay` blend, which mutes against a bright ground — the disc
+        // shipped as a pale wash for exactly this reason, and no amount of
+        // opacity on the gradient fixes it while the photo underneath is
+        // near full brightness. The prototype takes the art to .72 first,
+        // and that is what gives the sheen something to sit on.
         cover.resizable().aspectRatio(contentMode: .fill)
           .frame(width: size, height: size)
           .clipShape(Circle())
-          .brightness(-0.06).saturation(1.1)
+          .brightness(-0.22).saturation(1.15)
       } else {
         Circle().fill(accent.opacity(0.55))
       }
+      // TWO PASSES, NOT ONE. `overlay` carries the hue but darkens as it goes;
+      // a second, weaker pass in `screen` puts the light back without washing
+      // the colour out. Offset 180° from the first so the two do not stack
+      // their own peaks on top of each other.
       Circle().fill(
         AngularGradient(colors: [Color(hex: "#6ad0ff"), Color(hex: "#b98cff"), Color(hex: "#ff9ad0"),
                                  Color(hex: "#ffd68a"), Color(hex: "#a8ffcf"), Color(hex: "#6ad0ff")],
                         center: .center, angle: .degrees(20)))
         .blendMode(.overlay)
+      Circle().fill(
+        AngularGradient(colors: [Color(hex: "#6ad0ff"), Color(hex: "#b98cff"), Color(hex: "#ff9ad0"),
+                                 Color(hex: "#ffd68a"), Color(hex: "#a8ffcf"), Color(hex: "#6ad0ff")],
+                        center: .center, angle: .degrees(200)))
+        .blendMode(.screen)
+        .opacity(0.5)
+      // The pressed rings. Fine enough to read as texture rather than as
+      // drawn circles — the same pitch rule the app's Classic vinyl settled
+      // on (25.08): below about 1.2pt apart they moiré, above ~4 they read
+      // as a target printed on a disc.
+      Circle().fill(
+        RadialGradient(stops: ringStops(), center: .center,
+                       startRadius: 0, endRadius: size / 2))
       // the single specular sweep
       Circle().fill(
         LinearGradient(stops: [

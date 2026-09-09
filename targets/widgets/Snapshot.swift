@@ -156,8 +156,29 @@ extension WidgetStation {
   }
 }
 
+/**
+ * WHY EVERY ONE OF THESE IS `fixedSize:` AND NOT `size:`
+ *
+ * `Font.custom(_:size:)` SCALES WITH THE READER'S TEXT-SIZE SETTING. That is
+ * the right default for body copy in an app and completely wrong here: a
+ * widget is a fixed rectangle drawn to a hand-measured layout, and there is
+ * no scroll view to absorb the extra. `.system(size:)` does NOT scale, so
+ * these four helpers were the only text in the target that grew — which is
+ * why layouts came apart in a way that looked arbitrary rather than uniform.
+ *
+ * MEASURED ON THE OWNER'S OWN SCREENSHOTS 08.09: the ticket's seven-segment
+ * digits ran about 38% wider, relative to the widget, than the prototype they
+ * were drawn from. At that scale "Artist:" (38.5pt of glyph at 11pt, in a
+ * 40pt column) overflows and iOS truncates the LABEL — the "Arti···" she
+ * photographed — and the Player's song and artist lose most of their
+ * characters. Neither is a layout mistake; both are one line of API.
+ *
+ * So: any face asked for by name in this target goes through these helpers,
+ * and these helpers always ask for a fixed size.
+ */
+
 /// The seven-segment face the app sets every dial number in.
-func dialFont(_ size: CGFloat) -> Font { .custom("DSEG7Classic-Bold", size: size) }
+func dialFont(_ size: CGFloat) -> Font { .custom("DSEG7Classic-Bold", fixedSize: size) }
 
 /**
  * The band letters — AM, FM — in the FOURTEEN-segment face.
@@ -173,7 +194,7 @@ func dialFont(_ size: CGFloat) -> Font { .custom("DSEG7Classic-Bold", size: size
  *
  * So numbers go through `dialFont` and letters through this one, always.
  */
-func bandFont(_ size: CGFloat) -> Font { .custom("DSEG14Classic-Bold", size: size) }
+func bandFont(_ size: CGFloat) -> Font { .custom("DSEG14Classic-Bold", fixedSize: size) }
 
 /**
  * "810 AM" split into the part a seven-segment display can show and the part
@@ -211,7 +232,7 @@ struct DialText: View {
 /// every station icon rendered as the missing-glyph box. Read it out of the
 /// ttf's own name table rather than assuming; `scripts/test-widget-fonts.mjs`
 /// pins both names so a future font swap cannot quietly break this again.
-func iconFont(_ size: CGFloat) -> Font { .custom("MaterialDesignIcons", size: size) }
+func iconFont(_ size: CGFloat) -> Font { .custom("MaterialDesignIcons", fixedSize: size) }
 
 /**
  * The pixel face, for the CD Player look.
@@ -226,7 +247,7 @@ func iconFont(_ size: CGFloat) -> Font { .custom("MaterialDesignIcons", size: si
  * Subset to Latin (1.6 MB -> 37 KB); the licence travels with it in
  * DotGothic16-OFL.txt, as the OFL requires.
  */
-func pixelFont(_ size: CGFloat) -> Font { .custom("DotGothic16-Regular", size: size) }
+func pixelFont(_ size: CGFloat) -> Font { .custom("DotGothic16-Regular", fixedSize: size) }
 
 /// Shown when there is no snapshot yet — an honest empty state rather than a
 /// made-up station. Deliberately says what to do about it.

@@ -222,8 +222,12 @@ struct LastPlayedView: View {
                 Triangle().fill(paperInk).frame(width: 11, height: 13).offset(x: 1)
               }
               .frame(width: 52, height: 27)
+              // faceDim is a grey tuned for the chrome around it, and against
+              // the panel it sat at roughly 1.9:1 — present, unreadable, and
+              // reading as disabled rather than quiet. paperInk at 0.62 is the
+              // same ink the fields use, stepped back.
               Text("\(s.name) · \(s.dial)").font(pixelFont(10))
-                .foregroundColor(faceDim).lineLimit(1)
+                .foregroundColor(paperInk.opacity(0.62)).lineLimit(1)
             }
           }
         }
@@ -251,7 +255,14 @@ struct LastPlayedView: View {
 
   private func field(_ caption: String, _ value: String) -> some View {
     HStack(spacing: 7) {
-      Text(caption).font(pixelFont(11)).foregroundColor(paperInk).frame(width: 40, alignment: .leading)
+      // 46, NOT 40. "Artist:" measures 38.5pt of glyph at 11pt in DotGothic16
+      // (measured off the ttf's own hmtx, not guessed), so a 40pt column left
+      // 1.5pt of headroom and iOS spent it truncating the label to "Arti···".
+      // `fixedSize` on top of that: this is a static label, so it must never
+      // be the thing that gives way — if anything has to shrink it is the
+      // value beside it, which is already free to.
+      Text(caption).font(pixelFont(11)).foregroundColor(paperInk)
+        .fixedSize().frame(width: 46, alignment: .leading)
       ZStack {
         Color.white
         bevel(raised: false, width: 2)
@@ -424,7 +435,13 @@ struct LastPlayedView: View {
           }
           Spacer(minLength: 4)
 
-          HStack(alignment: .bottom) {
+          // THE BARCODE IS ITS OWN ROW, under the song rather than beside it.
+          // Sharing a row meant the two competed for the same width: a long
+          // title squeezed the barcode into a stamp in the corner, and a short
+          // one left it stranded. Stacked, the song gets the full width it is
+          // the subject of, and the barcode gets the full width that makes it
+          // read as printed — which is how the prototype has it.
+          VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
               Text("LAST PLAYED").font(.system(size: 8, design: .monospaced)).tracking(1.6)
                 .foregroundColor(paperInk.opacity(0.45))
@@ -438,7 +455,6 @@ struct LastPlayedView: View {
                   .foregroundColor(paperInk.opacity(0.55)).lineLimit(2)
               }
             }
-            Spacer(minLength: 8)
             barcode
           }
           .padding(.horizontal, 15)
@@ -449,13 +465,21 @@ struct LastPlayedView: View {
     .widgetURL(s.url(mode: s.mode))
   }
 
+  /// THE BARCODE RUNS THE TICKET'S FULL WIDTH, which is the whole reason it
+  /// reads as printed rather than as an icon of a barcode. Eighteen bars in
+  /// the bottom-right corner was a stamp; the prototype's runs edge to edge,
+  /// and a real stub's does too. `maxWidth: .infinity` with a flexible spacer
+  /// between bars lets it fill whatever width it is given, so it stays right
+  /// on both widget widths without a hardcoded count per size.
   private var barcode: some View {
-    HStack(alignment: .bottom, spacing: 1.5) {
-      ForEach(0..<18, id: \.self) { i in
+    HStack(alignment: .bottom, spacing: 0) {
+      ForEach(0..<46, id: \.self) { i in
         Rectangle().fill(paperInk)
           .frame(width: i % 3 == 0 ? 2.5 : 1.5, height: i % 4 == 0 ? 20 : 27)
+        if i < 45 { Spacer(minLength: 0.5) }
       }
     }
+    .frame(maxWidth: .infinity)
   }
 }
 

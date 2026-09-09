@@ -169,6 +169,30 @@ console.log('\n  the subset still covers every icon a station can use:');
   const fourteen = coverage(`${DIR}/DSEG14Classic-Bold.ttf`);
   const gaps = [...'AMF'].filter((c) => !fourteen.has(c.charCodeAt(0)));
   check('the 14-segment font covers the band letters', gaps.length === 0, JSON.stringify(gaps));
+
+  // ── EVERY CUSTOM FACE IS ASKED FOR AT A FIXED SIZE ───────────────────────
+  // `Font.custom(_:size:)` scales with the reader's text-size setting;
+  // `Font.custom(_:fixedSize:)` does not. A widget is a fixed rectangle drawn
+  // to a hand-measured layout with no scroll view to absorb the extra, and
+  // `.system(size:)` does not scale — so these helpers were the only text in
+  // the target that grew, which is what made the layouts come apart unevenly
+  // rather than uniformly.
+  //
+  // MEASURED OFF THE OWNER'S OWN SCREENSHOTS 08.09: the ticket's seven-segment
+  // digits ran ~38% wider relative to the widget than the prototype's. At that
+  // scale "Artist:" (38.5pt of glyph at 11pt) overflowed its column and iOS
+  // truncated the LABEL — the "Arti···" she photographed.
+  console.log('\n  a widget never lets the reader resize its layout:');
+  const scaled = [];
+  for (const m of snap.matchAll(/func (\w*Font)\(([\s\S]{0,160}?)\}/g)) {
+    if (/\.custom\([^)]*,\s*size:/.test(m[2])) scaled.push(m[1]);
+  }
+  check('every custom-font helper asks for a fixed size', scaled.length === 0,
+    scaled.join(', ') + ' — use .custom(_:fixedSize:), or Dynamic Type resizes the widget\'s text');
+  // And it has to find them at all: a regex that quietly matches nothing
+  // would pass this vacuously, which is the trap this repo keeps re-learning.
+  const helpers = [...snap.matchAll(/func \w*Font\(/g)].length;
+  check('and it actually read the helpers', helpers >= 4, `found ${helpers}`);
 }
 
 console.log(fails ? `\n  ${fails} failure(s)\n`

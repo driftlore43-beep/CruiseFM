@@ -55,7 +55,21 @@ struct StartDriveView: View {
     } else {
       let s = entry.station!
       ZStack(alignment: .topLeading) {
-        s.gradient
+        // THE GROUND IS ALWAYS DARK, and the station tints it rather than
+        // being it. `s.gradient` is the station's own card ramp, which for the
+        // ten built-ins is dark and for a CUSTOM station is whatever colour
+        // its owner picked — so a pale one (the owner's "Party" is a cream)
+        // put the accent-coloured eyebrow and the 62%-white station line on a
+        // near-white ground, where both simply disappeared. She photographed
+        // the result and read it as two missing lines; they were rendering
+        // the whole time.
+        //
+        // This is the app's own `readableOn` rule (14.08) in widget form: a
+        // colour arriving from outside the palette may tint a surface, but it
+        // may never decide whether the type on it can be read. The prototype
+        // draws this card on near-black for exactly that reason.
+        Color(hex: "#0d0f14")
+        s.gradient.opacity(0.55)
         // THE STATION'S OWN PHOTOGRAPH, when this target bundles one — the
         // ten built-ins do, a custom station does not and keeps the gradient
         // above. Already blurred in the asset, exactly as the app's decks
@@ -102,8 +116,8 @@ struct StartDriveView: View {
                 .fixedSize(horizontal: false, vertical: true)
               Spacer(minLength: 6)
               Text(s.mode == nil ? s.name : "\(s.name) · \(modeLabel(s.mode))")
-                .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.62)).lineLimit(1)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.78)).lineLimit(1)
             }
             .padding(.vertical, 16)
             .padding(.leading, 16)

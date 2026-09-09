@@ -106,5 +106,6 @@ struct StatsWidget: Widget {
     .configurationDisplayName("Your Streak")
     .description("Days in a row, and what you've listened to this week.")
     .supportedFamilies([.systemSmall])
+    .cruiseFullBleed()
   }
 }

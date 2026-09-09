@@ -310,5 +310,102 @@ if (declared.length < 5 || Object.keys(kinds).length < 5) {
     Object.keys(src_).length >= 8, `${Object.keys(src_).length} files`);
 }
 
+// ── a Home Screen widget fills its tile ──────────────────────────────────
+//
+// From iOS 17 WidgetKit insets a widget's content before drawing it, and the
+// ring left over shows the container background — which every view here hands
+// back as `.clear`, so on a Home Screen it reads as a pale border around the
+// design. That is what build 43 looked like on the owner's phone, and it also
+// quietly broke an instruction from 03.09 ("create the Winamp as if it's the
+// shape of the widget"), because a window that fills its VIEW still cannot
+// fill the TILE while the system is holding the view away from the edges.
+//
+// The property, rather than the call: any configuration offering a `.system`
+// family disables the margin, and the Lock Screen's accessory families must
+// NOT — their margin is what keeps text off the system's own curve.
+{
+  let seen = 0;
+  for (const [f, s] of Object.entries(src_)) {
+    const L = s.split('\n');
+    for (let i = 0; i < L.length; i++) {
+      const m = L[i].match(/\.supportedFamilies\(\[([^\]]*)\]\)/);
+      if (!m) continue;
+      seen += 1;
+      // the next line that is neither blank nor a comment
+      let j = i + 1;
+      while (j < L.length && (!L[j].trim() || L[j].trim().startsWith('//'))) j++;
+      const next = j < L.length ? L[j].trim() : '';
+      const bleeds = next === '.cruiseFullBleed()';
+      const home = /\.system/.test(m[1]);
+      check(`${f}:${i + 1} ${home ? 'fills its tile' : 'keeps the accessory margin'}`,
+        home ? bleeds : !bleeds,
+        home ? `add .cruiseFullBleed() after supportedFamilies` : `remove .cruiseFullBleed()`);
+    }
+  }
+  // A regex that quietly matched nothing would pass every case vacuously —
+  // the seventh time this file has had to say so.
+  check('and it actually found the configurations', seen >= 9, `${seen} found`);
+  check('cruiseFullBleed is defined once, unguarded',
+    (all.match(/func cruiseFullBleed\(/g) || []).length === 1
+      && /func cruiseFullBleed\(\)\s*->\s*some WidgetConfiguration\s*\{\s*\n\s*contentMarginsDisabled\(\)/.test(all),
+    'it must not branch on availability — the two arms return different types');
+}
+
+// ── a fill-mode image may not enlarge what it sits in ────────────────────
+//
+// `.aspectRatio(contentMode: .fill)` returns a size that COVERS the proposal,
+// which is usually LARGER than it. So the image reports the bigger size as its
+// own, and anything that trims it to its own bounds trims nothing.
+//
+// BUILD 43 SHIPPED BOTH WAYS OF GETTING THIS WRONG:
+//
+//   img.resizable().aspectRatio(contentMode: .fill).clipped()
+//     — clips to the enlarged size, i.e. does nothing. The Start Drive small
+//       tile rendered as a bare photograph with NO type on it at all: the
+//       eyebrow, the dial and the name were drawn into a stack taller than
+//       the tile, so WidgetKit centred it and the top and bottom rows fell
+//       outside the widget's bounds.
+//
+//   img.resizable().aspectRatio(contentMode: .fill).clipShape(...)   <- on the
+//   ...                                                                 IMAGE
+//   .frame(width: 74, height: 74)                                    <- later
+//     — the clip is applied before anything has fixed a size, and `.frame`
+//       fixes what the stack REPORTS without trimming what is drawn inside
+//       it. The Pocket Player's 74pt photo slot drew a photograph a widget
+//       and a half tall, over the tile's rounded corners.
+//
+// So the property is ORDER: fix the size, THEN clip. Or use cruiseBackdrop,
+// which is that order written down once.
+{
+  let seen = 0;
+  for (const [f, s] of Object.entries(src_)) {
+    const L = s.split('\n');
+    for (let i = 0; i < L.length; i++) {
+      if (!/contentMode:\s*\.fill/.test(L[i])) continue;
+      // the doc comments above the helper and here quote the broken idiom
+      if (/^(\/\/|\*|\/\*)/.test(L[i].trim())) continue;
+      if (/func cruiseBackdrop/.test(L.slice(Math.max(0, i - 3), i).join('\n'))) continue;
+      seen += 1;
+      const win = L.slice(i, i + 40);
+      const frameAt = win.findIndex((l) => /\.frame\(width:/.test(l));
+      const clipAfter = frameAt < 0 ? -1
+        : win.slice(frameAt).findIndex((l) => /\.clipped\(\)|\.clipShape\(/.test(l));
+      check(`${f}:${i + 1} is sized before it is clipped`,
+        frameAt >= 0 && clipAfter >= 0,
+        frameAt < 0
+          ? 'no .frame(width:height:) — use cruiseBackdrop()'
+          : 'the clip must come AFTER the frame, or it trims the enlarged size');
+      check(`${f}:${i + 1} does not clip on the same line as the fill`,
+        !/contentMode:\s*\.fill\)\s*\.clipp?e?d?/.test(L[i]),
+        'that clips to the enlarged size, i.e. to nothing');
+    }
+  }
+  // A regex that quietly matched nothing would pass every case vacuously.
+  check('and it actually found the images', seen >= 4, `${seen} found`);
+  check('cruiseBackdrop clips against a box that accepts the proposal',
+    /func cruiseBackdrop\(\)\s*->\s*some View\s*\{\s*\n\s*Color\.clear\.overlay\([^\n]*contentMode:\s*\.fill\)\)\.clipped\(\)/.test(all),
+    'it must be Color.clear.overlay(...).clipped()');
+}
+
 console.log(fails ? `\n  ${fails} failure(s)\n` : '\n  the widget bundle hangs together\n');
 process.exit(fails ? 1 : 0);

@@ -192,9 +192,22 @@ struct LastPlayedView: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 32)
+        // THE PROTOTYPE'S OWN GOLD, and putting the station's accent in the
+        // middle of it was the divergence. A title bar ramps ONE WAY, dark to
+        // light; dropping an arbitrary colour into the middle stop breaks that
+        // — and for a pale custom station (the owner's "Party" is a cream) it
+        // put a near-white band under white type, which is this app's oldest
+        // rule broken again: a station's colour may tint a surface and may
+        // never decide whether the words on it can be read.
+        //
+        // The station is not lost from this look — it prints its name and its
+        // dial under the transport, and the photograph beside them is its own.
         .background(
-          LinearGradient(colors: [Color(hex: "#7a4a12"), s.accentColor, Color(hex: "#e0a24e")],
-                         startPoint: .leading, endPoint: .trailing))
+          LinearGradient(stops: [
+            .init(color: Color(hex: "#7a4a12"), location: 0),
+            .init(color: Color(hex: "#c2761a"), location: 0.62),
+            .init(color: Color(hex: "#e0a24e"), location: 1),
+          ], startPoint: .leading, endPoint: .trailing))
 
         HStack(alignment: .top, spacing: 11) {
           ZStack {
@@ -330,16 +343,34 @@ struct LastPlayedView: View {
 
           VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 11) {
+              // THE PHOTOGRAPH SPILLED OFF THE WHOLE WIDGET ON BUILD 43, and
+              // this is the shape that did it:
+              //
+              //     art.resizable().aspectRatio(contentMode: .fill)
+              //       .clipShape(RoundedRectangle(cornerRadius: 3))
+              //     ...
+              //     .frame(width: 74, height: 74)
+              //
+              // `.clipShape` here trims the image to ITS OWN bounds, which
+              // `.fill` has already made larger than the slot, so it clips
+              // nothing at all; and `.frame` on the ZStack fixes the size
+              // this stack REPORTS without clipping what is drawn inside it.
+              // So a 74pt slot drew a photograph a widget and a half tall,
+              // over the tile's rounded corners and across LAST PLAYED.
+              //
+              // The order is the fix: size first, then clip. cruiseBackdrop
+              // gives the image a box that accepts the proposal, and the
+              // corner rounding moves onto the stack where it can bite.
               ZStack {
                 RoundedRectangle(cornerRadius: 3).fill(Color(white: 0.16))
                 if let art = Art.cover(station: s.image) {
-                  art.resizable().aspectRatio(contentMode: .fill)
-                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                  art.cruiseBackdrop()
                 } else {
-                  s.gradient.clipShape(RoundedRectangle(cornerRadius: 3))
+                  s.gradient
                 }
               }
               .frame(width: 74, height: 74)
+              .clipShape(RoundedRectangle(cornerRadius: 3))
 
               VStack(alignment: .leading, spacing: 4) {
                 Text(entry.lastPlayed?.title ?? s.name)
@@ -379,8 +410,14 @@ struct LastPlayedView: View {
             .frame(width: 40, height: 40)
           Circle().stroke(Color.black.opacity(0.06), lineWidth: 1).frame(width: 40, height: 40)
         }
-        .frame(width: 112, height: 112)
-        .padding(.horizontal, 17)
+        // SMALLER THAN IT WAS (112 / 17), because it was winning an argument
+        // it should not have been in: at 112 plus its padding the ring took
+        // 146 of the widget's 338 points — 43% of the tile for something that
+        // is deliberately ornament — and the SONG, which is what this widget
+        // is about, was left with about 73 and printed "Breaka…". This gives
+        // the title back 24 points and costs the ring nothing anyone reads.
+        .frame(width: 96, height: 96)
+        .padding(.horizontal, 13)
       }
     }
     .widgetURL(s.url(mode: s.mode))
@@ -541,6 +578,7 @@ struct LastPlayedConfigurableWidget: Widget {
     .configurationDisplayName("Last Played")
     .description("The last song you heard. Long-press to change the look — CD player, pocket player or ticket stub.")
     .supportedFamilies([.systemMedium])
+    .cruiseFullBleed()
   }
 }
 
@@ -552,5 +590,6 @@ struct LastPlayedWidget: Widget {
     .configurationDisplayName("Last Played")
     .description("The last song you heard, in a desktop CD player.")
     .supportedFamilies([.systemMedium])
+    .cruiseFullBleed()
   }
 }

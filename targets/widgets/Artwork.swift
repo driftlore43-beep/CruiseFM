@@ -236,3 +236,70 @@ struct RecordView: View {
     .frame(width: size, height: size)
   }
 }
+
+/**
+ * ── A BACKDROP THAT CANNOT ENLARGE WHAT IT SITS IN ────────────────────────
+ *
+ * `img.resizable().aspectRatio(contentMode: .fill).clipped()` reads as "fill
+ * this box and trim the overflow", and it does not do that. `.fill` returns a
+ * size that COVERS the proposal, which is usually LARGER than the proposal —
+ * so the image reports the bigger size as its own layout size, `.clipped()`
+ * trims to that same bigger size and does nothing at all, and the ZStack
+ * around it takes the largest child and grows past the widget.
+ *
+ * WHAT THAT LOOKED LIKE ON BUILD 43, and it was read as a missing feature
+ * rather than a layout fault: the Start Drive small tile rendered as a bare
+ * photograph with NO type on it whatsoever. The eyebrow, the station's dial
+ * and its name were all being drawn — into a stack taller than the tile, so
+ * WidgetKit centred it and the top and bottom rows fell outside the widget's
+ * bounds. A photograph bleeding past the corners is the tell: look for a
+ * picture that overruns the rounded corner while the sides sit inside it.
+ *
+ * `Color.clear` accepts the proposed size exactly, the overlay is drawn at
+ * that frame's bounds however large the image scales itself, and `.clipped()`
+ * finally has a real box to trim against.
+ *
+ * NOT NEEDED where the image already sits under an explicit
+ * `.frame(width:height:)` — the record's label, the CD, the jewel-case tile
+ * and the sleeve all fix their own size, so the aspect ratio has nothing left
+ * to enlarge. This is for the full-bleed cases only.
+ */
+extension Image {
+  func cruiseBackdrop() -> some View {
+    Color.clear.overlay(resizable().aspectRatio(contentMode: .fill)).clipped()
+  }
+}
+
+/**
+ * The shading between a station's photograph and the white type standing on
+ * it, shared by every tile that puts type over a picture.
+ *
+ * THE SHAPE IS WHERE THE WORDS ARE, not a wash over the whole tile — the rule
+ * the app's own decks were rebuilt around on 02.09 and corrected again on
+ * 08.09. These tiles carry type at the crown and at the foot with nothing but
+ * picture between, so the ramp is heavy at both ends and opens across
+ * 0.60–0.82. A flat wash costs the photograph everywhere and still leaves the
+ * type short.
+ *
+ * THE PROTOTYPE'S OWN NUMBERS WOULD NOT HAVE HELD. Its ramp
+ * (0.62 / 0.20 / 0.24 / 0.66) was drawn over one photograph; measured across
+ * all ten of the bundled backdrops it leaves a station's name at 2.29:1 on
+ * Coastal, which is present and unreadable. Worst case of the ten under this
+ * one: medium crown 8.02, name 6.79, dial 5.39, up-next 5.03; small eyebrow
+ * 4.51, dial 4.97, name 9.32. The bar for normal white type is 4.5.
+ *
+ * MEASURE AGAIN IF ANY INK CHANGES. Several of these lines are translucent
+ * white, so their contrast is not the background's — a line at 0.46 over a
+ * background measuring 10:1 reads at 3.5:1.
+ */
+struct StationScrim: View {
+  var body: some View {
+    LinearGradient(stops: [
+      .init(color: Color(hex: "#06070c").opacity(0.72), location: 0),
+      .init(color: Color(hex: "#06070c").opacity(0.56), location: 0.44),
+      .init(color: Color(hex: "#06070c").opacity(0.30), location: 0.60),
+      .init(color: Color(hex: "#06070c").opacity(0.34), location: 0.82),
+      .init(color: Color(hex: "#06070c").opacity(0.72), location: 1),
+    ], startPoint: .top, endPoint: .bottom)
+  }
+}

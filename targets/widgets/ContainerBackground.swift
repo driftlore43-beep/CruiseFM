@@ -33,3 +33,46 @@ extension View {
     }
   }
 }
+
+/**
+ * ── WHY EVERY HOME SCREEN WIDGET ENDS WITH THIS ───────────────────────────
+ *
+ * From iOS 17 WidgetKit INSETS a widget's content by a default margin before
+ * it draws it. The view is handed a smaller box than the tile, and whatever is
+ * left over shows the container background instead — which is `.clear` above,
+ * so on a Home Screen it reads as a pale ring around every widget.
+ *
+ * THAT IS WHAT BUILD 43 LOOKED LIKE, and it is the whole of the owner's
+ * "they're still not fitting with the widgets' dimensions": each design sat in
+ * the middle of a larger white rounded tile. It also quietly contradicted an
+ * instruction — 03.09, "create the Winamp as if it's the shape of the widget"
+ * — because a window that fills its view still cannot fill the tile while the
+ * system is holding the view away from the edges.
+ *
+ * Every view in this target already carries its OWN outer padding (13 on the
+ * small tiles, 15-16 on the mediums), which is what keeps type off the curve,
+ * so the system margin was a second one on top of a margin that already
+ * existed. Disabling it is what makes a photograph, a gradient or a drawn
+ * object reach the tile's real edges.
+ *
+ * NO AVAILABILITY CHECK, AND THAT IS DELIBERATE RATHER THAN AN OVERSIGHT:
+ * this extension's deployment target is iOS 18.0 — set by
+ * @bacons/apple-targets, confirmed by reading IPHONEOS_DEPLOYMENT_TARGET out
+ * of a generated project rather than assumed — so a method added in 17 is
+ * always there. The check would not have compiled anyway: `contentMarginsDisabled`
+ * returns a DIFFERENT concrete type from `self`, and `some WidgetConfiguration`
+ * needs one underlying type, so the `if #available { … } else { … }` shape
+ * that works for views (see above) is rejected here. There is no public
+ * `AnyWidgetConfiguration` to erase it with. If the deployment target is ever
+ * lowered below 17, the answer is a second availability-gated Widget struct
+ * sharing the same `kind`, NOT a branch inside this function.
+ *
+ * THE LOCK SCREEN DELIBERATELY DOES NOT CALL THIS. Accessory widgets are drawn
+ * inside a system shape a few points across, and their margins are what keeps
+ * text off that curve; there is no photograph to bleed there anyway.
+ */
+extension WidgetConfiguration {
+  func cruiseFullBleed() -> some WidgetConfiguration {
+    contentMarginsDisabled()
+  }
+}

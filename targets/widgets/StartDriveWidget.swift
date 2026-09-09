@@ -76,11 +76,17 @@ struct StartDriveView: View {
         // draw it; re-blurring at runtime is what got the app killed once.
         if family == .systemSmall {
           if let img = Art.station(s.image) {
-            img.resizable().aspectRatio(contentMode: .fill).clipped()
-              .overlay(Color.black.opacity(0.42))
+            img.cruiseBackdrop()
           }
-          LinearGradient(colors: [.white.opacity(0.16), .clear],
-                         startPoint: .topLeading, endPoint: .center)
+          // THE SAME RAMP THE ON AIR TILE USES, and for the same reason: the
+          // type on this tile sits in two places, an eyebrow at the crown and
+          // the dial and the station's name at the foot, with nothing but
+          // picture between them. A FLAT 0.42 wash — which is what this was,
+          // under a lightening sheen at the top-left — dimmed the photograph
+          // everywhere and still left "START DRIVE" at 2.56:1 on Daylight.
+          // Measured after, worst of the ten: eyebrow 4.51, dial 5.37 (its
+          // ink went 0.55 -> 0.72 to get there), name 9.32.
+          StationScrim()
           VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
               Text(s.mode == nil ? "TUNE IN" : "START DRIVE")
@@ -92,7 +98,7 @@ struct StartDriveView: View {
               }
             }
             Spacer(minLength: 4)
-            DialText(dial: s.dial, size: 15, color: .white.opacity(0.55))
+            DialText(dial: s.dial, size: 15, color: .white.opacity(0.72))
             Text(s.name).font(.system(size: 16, weight: .bold))
               .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.8)
           }
@@ -124,7 +130,7 @@ struct StartDriveView: View {
             Spacer(minLength: 8)
             ZStack(alignment: .trailing) {
               if let img = Art.station(s.image) {
-                img.resizable().aspectRatio(contentMode: .fill)
+                img.cruiseBackdrop()
               } else {
                 s.gradient
               }
@@ -176,5 +182,6 @@ struct StartDriveWidget: Widget {
     .configurationDisplayName("Start Drive")
     .description("Your last station, one tap away.")
     .supportedFamilies([.systemSmall, .systemMedium])
+    .cruiseFullBleed()
   }
 }

@@ -135,7 +135,7 @@ struct DeckView: View {
     ZStack {
       s.gradient
       if let img = Art.station(s.image) {
-        img.resizable().aspectRatio(contentMode: .fill).clipped()
+        img.cruiseBackdrop()
       }
       // Shading gathered where the words are and opened where the picture is
       // — the rule the app's own decks were rebuilt around on 02.09. A flat
@@ -403,6 +403,7 @@ struct DeckConfigurableWidget: Widget {
     .configurationDisplayName("On the Deck")
     .description("Your station as a record, with the last song on it. Long-press to change the look.")
     .supportedFamilies([.systemSmall, .systemMedium])
+    .cruiseFullBleed()
   }
 }
 
@@ -418,5 +419,6 @@ struct DeckWidget: Widget {
     .configurationDisplayName("On the Deck")
     .description("Your station as a record, with the last song on the label.")
     .supportedFamilies([.systemSmall, .systemMedium])
+    .cruiseFullBleed()
   }
 }

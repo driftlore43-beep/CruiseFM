@@ -81,8 +81,20 @@ struct OnAirView: View {
       let s = entry.station!
       ZStack(alignment: .topLeading) {
         s.gradient
-        LinearGradient(colors: [.white.opacity(0.14), .clear],
-                       startPoint: .topLeading, endPoint: .center)
+        // THE STATION'S OWN PLACE, which is what the prototype draws and what
+        // this widget shipped without — a flat colour panel announcing a
+        // station, where the sheet showed a dial standing on a photograph.
+        // A custom station has no picture bundled here and keeps the gradient.
+        if let img = Art.station(s.image) {
+          img.cruiseBackdrop()
+        } else {
+          LinearGradient(colors: [.white.opacity(0.14), .clear],
+                         startPoint: .topLeading, endPoint: .center)
+        }
+        // Heavy where this tile puts words, open where it puts picture. The
+        // shape, the numbers behind it and why the prototype's own ramp would
+        // not have held are all in StationScrim (Artwork.swift).
+        StationScrim()
 
         // EACH BRANCH OWNS ITS OWN PADDING, and that is what makes this
         // compile at all. It used to be one `.padding(family == .systemSmall
@@ -98,7 +110,7 @@ struct OnAirView: View {
           VStack(alignment: .leading, spacing: 0) {
             onAirLamp(s)
             Spacer(minLength: 4)
-            DialText(dial: s.dial, size: 15, color: .white.opacity(0.55))
+            DialText(dial: s.dial, size: 15, color: .white.opacity(0.72))
             Text(s.name).font(.system(size: 16, weight: .bold))
               .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.8)
           }
@@ -125,7 +137,11 @@ struct OnAirView: View {
             if let next = entry.upNext {
               Text("UP NEXT · \(next)")
                 .font(.system(size: 9, weight: .bold)).tracking(1)
-                .foregroundColor(.white.opacity(0.46)).lineLimit(1)
+                // 0.46 was tuned against a flat colour panel. Over a
+                // photograph the worst of the ten (Rain Drive) puts it at
+                // 3.52:1; 0.62 lands it at 5.03, which is the bar for type
+                // this small.
+                .foregroundColor(.white.opacity(0.62)).lineLimit(1)
             } else {
               Text(s.tagline).font(.system(size: 12))
                 .foregroundColor(.white.opacity(0.66)).lineLimit(1)
@@ -238,5 +254,6 @@ struct OnAirWidget: Widget {
     .configurationDisplayName("On Air Now")
     .description("Whichever station is broadcasting this hour.")
     .supportedFamilies([.systemSmall, .systemMedium])
+    .cruiseFullBleed()
   }
 }

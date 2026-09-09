@@ -483,6 +483,7 @@ struct ModeConfigurableWidget: Widget {
     .configurationDisplayName("The Mode")
     .description("Your mode as an object. Long-press to switch between the mirror ball and the CD.")
     .supportedFamilies([.systemSmall])
+    .cruiseFullBleed()
   }
 }
 
@@ -494,5 +495,6 @@ struct ModeWidget: Widget {
     .configurationDisplayName("The Mode")
     .description("The mirror ball, lit the way the app draws it.")
     .supportedFamilies([.systemSmall])
+    .cruiseFullBleed()
   }
 }

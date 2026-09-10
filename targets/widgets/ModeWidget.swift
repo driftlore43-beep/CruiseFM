@@ -168,7 +168,7 @@ struct ModeView: View {
       RadialGradient(colors: [Color(hex: "#4a3160"), Color(hex: "#241a2b"), Color(hex: "#050308")],
                      center: .init(x: 0.5, y: 0.34), startRadius: 0, endRadius: 100)
       BeamField()
-      MirrorBall(size: 126, rows: 17, cols: 30)
+      MirrorBall(size: 126, rows: 17, cols: 30, eqColors: s.eqColors, accent: s.accent)
         .overlay(alignment: .top) {
           // THIN AND METALLIC, FADING INTO THE GLOW (owner, 10.09: "make it
           // thinner and slightly metallic instead of the current thick
@@ -298,31 +298,59 @@ private struct BeamField: View {
 }
 
 /**
- * The ball, built the way the APP builds it (owner, 03.09: "mirror ball needs
- * to reflect the same as it is on the app").
+ * THE BALL, ON THE APP'S OWN RECIPE — not a lookalike, this time genuinely.
  *
- * It is a real sphere projection, not a grid of squares squeezed at the edges:
- * each mirror is a quad between two latitudes and two longitudes, back-face
- * culled, so rows compress toward the poles and columns converge on their own.
+ * MEASURED BEFORE BEING REWRITTEN (owner: "still looks flat"). The earlier
+ * version here keyed brightness to a dot-product against three FIXED lamp
+ * colours plus a small UNIFORM random wobble, and spread colour on a WIDER
+ * lobe than brightness — both backwards from `MirrorBallFlipbook.tsx`, which
+ * is what the app actually draws. Ported that recipe's per-tile shading to a
+ * single static frame (`docs/design/ball_widget.py` — a WidgetKit tile can
+ * never turn, so the honest target is what the app's ball looks like PAUSED:
+ * chrome and fixed lamps, no flashing overlay) and measured 209 tiles: the
+ * old model here has 14.8% of tiles below 0.22 luminance, the app's real one
+ * has 24.9% — "flat" against "chrome", in one number. Owner: "wider, and
+ * more colourful — the one on the right", i.e. the app's own recipe with no
+ * glints (five static stars read as pasted on the moment real texture
+ * carries the surface, which is her own reading of the earlier round: "don't
+ * add any nice feature").
  *
- * BRIGHTNESS COMES FROM WHERE A MIRROR POINTS, NOT WHERE IT SITS. The
- * reflection direction is r = 2(n·v)n − v, and a mirror is bright when that
- * points at one of three fixed lamps. Neighbours point about eleven degrees
- * apart and reflection doubles that, so they land on completely different
- * parts of the room and come out wildly different — the dark-beside-bright
- * checkerboard is what reads as chrome. A positional gradient, which is what
- * this drew before, reads as a painted sphere.
+ * IT IS STILL A REAL SPHERE PROJECTION, UNCHANGED: each mirror a quad between
+ * two latitudes and two longitudes, back-face culled, brick bond, shrink
+ * toward each tile's own centre for the grout. None of that was the fault.
  *
- * BRICK BOND (alternate rows offset half a column) is how a real ball is
- * built, and it also stops the columns stacking into continuous vertical
- * seams that read as a drawn grid.
+ * BRIGHTNESS IS TWO SEPARATE LOBES OFF THE SAME REFLECTION r = 2(n·v)n − v,
+ * kept structurally apart rather than traded off against each other. A WIDE
+ * lobe decides how far a tile lifts toward white; a NARROW one, tracked
+ * independently (it can pick a DIFFERENT lamp from the one the wide lobe is
+ * responding to), decides how much of that lamp's own colour rides along. A
+ * tile can be bright without being coloured; colour never spreads further
+ * than the brightness that earns it.
  *
- * Everything here is computed once in `tiles` and never animated.
+ * AND EVERY TILE CARRIES ITS OWN TEXTURE, independent of the lamps: a 3D
+ * lattice value noise sampled over the REFLECTION direction — not the tile's
+ * screen position, the same "a mirror's character comes from what it points
+ * at, not where it sits" rule the whole recipe runs on — pushed toward the
+ * ENDS of its range rather than left clustered round the mean. That is the
+ * chrome: real mirrors each catching a different, unremarkable bit of a dim
+ * room. It is exactly what the old model never had — its only per-tile
+ * variance was a flat random wobble riding a near-uniform ambient floor.
+ *
+ * THE KEY LAMP IS NEAR-WHITE; the other two carry the mood. Colour itself
+ * comes from the STATION'S OWN eqColors when the snapshot carries them (see
+ * `eqTriple`) — this widget's earlier fixed pink/violet/icy-blue set was a
+ * placeholder for a station that had never sent its real palette across.
  */
 struct MirrorBall: View {
   let size: CGFloat
   var rows: Int = 15
   var cols: Int = 26
+  /// The station's own three eqColors — the real hues MirrorBallFlipbook.tsx
+  /// builds its palette from. Nil on a snapshot cut before this field
+  /// existed, in which case `eqTriple` falls back to a ramp off `accent`
+  /// alone.
+  var eqColors: [String]?
+  var accent: String = "#7B38E0"
 
   var body: some View {
     ZStack {
@@ -337,20 +365,7 @@ struct MirrorBall: View {
           for q in t.pts.dropFirst() { p.addLine(to: q) }
           p.closeSubpath()
         }
-        .fill(t.tint)
-      }
-      // A HANDFUL OF TINY GLINTS ON THE BRIGHTEST TILES (owner, 10.09: "a
-      // handful of very bright tiles or little star-like glints... don't put
-      // them everywhere — maybe 3-6 around the brightest area"). Picked from
-      // the SAME lighting model rather than guessed screen coordinates — the
-      // five brightest tiles the reflection math already produced — so a
-      // glint can never land somewhere the ball itself is dark. Built as pure
-      // falloff (a soft dot plus two hairline arms transparent at both tips),
-      // never a stroked shape: this file has already talked the CD's rim and
-      // the app's own mirror ball out of a plain stroked circle, because a
-      // hard edge on a light reads as a sticker rather than a shine.
-      ForEach(Array(brightestTiles.enumerated()), id: \.offset) { _, t in
-        Glint().position(t.center)
+        .fill(t.fill.opacity(t.opacity))
       }
       // THE RIM IS DIRECTIONAL LIGHT, NOT A DRAWN OUTLINE (owner, 10.09:
       // "softer edge lighting... a faint rim-light — especially violet on one
@@ -377,30 +392,85 @@ struct MirrorBall: View {
     .shadow(color: Color(hex: "#e696e6").opacity(0.40), radius: 18)
   }
 
-  /// A soft dot with two hairline arms, both fading to nothing at their own
-  /// tips — the recipe the app's own mirror ball settled on for a shine that
-  /// reads as light rather than as a sticker glued to the surface.
-  private struct Glint: View {
-    var body: some View {
-      ZStack {
-        Circle().fill(
-          RadialGradient(colors: [.white.opacity(0.9), Color(hex: "#e4d6ff").opacity(0.3), .clear],
-                         center: .center, startRadius: 0, endRadius: 4.5))
-          .frame(width: 9, height: 9)
-        LinearGradient(colors: [.clear, .white.opacity(0.85), .clear],
-                       startPoint: .top, endPoint: .bottom).frame(width: 1, height: 12)
-        LinearGradient(colors: [.clear, .white.opacity(0.85), .clear],
-                       startPoint: .leading, endPoint: .trailing).frame(width: 12, height: 1)
-      }
-      .allowsHitTesting(false)
-    }
+  private struct Tile { let id: Int; let pts: [CGPoint]; let fill: Color; let opacity: Double }
+
+  private struct AppLamp { let d: (Double, Double, Double); let power: Double; let sat: Double }
+
+  /// The three fixed lamps `MirrorBallFlipbook.tsx` shades against. The key
+  /// lamp (index 0, sat 0.06) is essentially white — it is what makes the
+  /// material read as silver rather than a coloured sphere; the other two
+  /// carry the station's own mood.
+  private var lamps: [AppLamp] {
+    [AppLamp(d: norm((-0.52, 0.62, 0.59)), power: 1.00, sat: 0.06),
+     AppLamp(d: norm((0.66, 0.28, 0.70)), power: 0.72, sat: 0.52),
+     AppLamp(d: norm((-0.18, -0.55, 0.81)), power: 0.58, sat: 0.40)]
   }
 
-  private struct Tile { let id: Int; let pts: [CGPoint]; let center: CGPoint; let v: Double; let tint: Color }
+  /// The metal ramp a shaded tile reads its final grey off — the app's own
+  /// seven-stop scale, walked by a tile's combined brightness `t`.
+  private let shadeAnchors = ["#0a0a0b", "#191a1b", "#343537", "#646568",
+                              "#a2a3a5", "#dcdcde", "#ffffff"]
 
-  /// The five tiles the lighting model itself made brightest — see `Glint`.
-  private var brightestTiles: [Tile] {
-    Array(tiles.sorted { $0.v > $1.v }.prefix(5))
+  private func mixRGB(_ a: (Double, Double, Double), _ b: (Double, Double, Double), _ t: Double)
+    -> (Double, Double, Double) {
+    (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t, a.2 + (b.2 - a.2) * t)
+  }
+
+  private func shadeAt(_ t: Double) -> (Double, Double, Double) {
+    let x = max(0, min(1, t)) * Double(shadeAnchors.count - 1)
+    let i = min(shadeAnchors.count - 2, Int(x))
+    return mixRGB(rgbOf(shadeAnchors[i]), rgbOf(shadeAnchors[i + 1]), x - Double(i))
+  }
+
+  /// The three hues the palette below is built from — the station's own
+  /// eqColors when the snapshot carries them, or a light/base/deep ramp off
+  /// `accent` alone otherwise. The same convention `rampFromColor()` already
+  /// uses in the app for a custom station that only ever chose one colour.
+  private var eqTriple: [(Double, Double, Double)] {
+    if let eq = eqColors, eq.count == 3 { return eq.map { rgbOf($0) } }
+    let a = rgbOf(accent)
+    return [mixRGB(a, (1, 1, 1), 0.30), a, mixRGB(a, rgbOf("#161617"), 0.34)]
+  }
+
+  /// A NINE-ENTRY PALETTE — each of the station's three hues at its own
+  /// colour, lightened, and deepened — the same construction
+  /// MirrorBallFlipbook.tsx runs off a station's real eqColors.
+  private var palette: [(Double, Double, Double)] {
+    var out: [(Double, Double, Double)] = []
+    for base in eqTriple {
+      out.append(base)
+      out.append(mixRGB(base, (1, 1, 1), 0.28))
+      out.append(mixRGB(base, rgbOf("#161617"), 0.42))
+    }
+    return out
+  }
+
+  private func hash01(_ n: Double) -> Double {
+    let x = sin(n * 12.9898) * 43758.5453
+    return x - floor(x)
+  }
+  private func lattice(_ i: Double, _ j: Double, _ k: Double) -> Double {
+    hash01(i * 127.1 + j * 311.7 + k * 74.7)
+  }
+  private func smoothstepT(_ t: Double) -> Double { t * t * (3 - 2 * t) }
+
+  /// Trilinear 3D value noise over the REFLECTION direction, not the tile's
+  /// own screen position — the chrome texture belongs to what a mirror
+  /// catches, not to where it hangs on the ball.
+  private func envNoise(_ x: Double, _ y: Double, _ z: Double, scale: Double) -> Double {
+    let X = x * scale, Y = y * scale, Z = z * scale
+    let i = floor(X), j = floor(Y), k = floor(Z)
+    let fx = smoothstepT(X - i), fy = smoothstepT(Y - j), fz = smoothstepT(Z - k)
+    var acc = 0.0
+    for dz in 0...1 {
+      for dy in 0...1 {
+        for dx in 0...1 {
+          let w = (dx == 1 ? fx : 1 - fx) * (dy == 1 ? fy : 1 - fy) * (dz == 1 ? fz : 1 - fz)
+          acc += w * lattice(i + Double(dx), j + Double(dy), k + Double(dz))
+        }
+      }
+    }
+    return acc
   }
 
   private var tiles: [Tile] {
@@ -412,32 +482,11 @@ struct MirrorBall: View {
     // every quad toward its own centre, so the grout is thinned by shrinking
     // LESS (0.91 -> 0.955, a narrower gap) and the body colour it reveals is
     // lifted a step (see the RadialGradient above) so what remains reads as a
-    // seam rather than a black line.
+    // seam rather than a black line. UNCHANGED by this round.
     let shrink = 0.955
-    let lamps: [(Double, Double, Double)] = [
-      norm((-0.58, -0.55, 0.60)), norm((0.66, -0.10, 0.74)), norm((0.06, 0.62, 0.78)),
-    ]
-    // PINK -> VIOLET -> ICY BLUE, and the falloff between them is smoother
-    // than the brightness itself (owner, 10.09: "a smoother pink -> violet ->
-    // icy blue falloff... almost white/lavender in a few tiles"). Colour and
-    // brightness now use TWO DIFFERENT lobes off the same reflection: `lw`
-    // stays a steep pow(d,5.4) so the ball is still dark between the lamps —
-    // "keep the outer tiles darker" — while `cw` is a wider pow(d,3) used only
-    // for how far the TINT reaches. A steep colour lobe would patch the hue
-    // in small hard-edged islands; a wide one lets neighbouring mirrors blend
-    // from one hue into the next, which is what "smoother falloff" means.
-    // Blending pink and icy blue at close range is also what produces the
-    // pale lavender she asked for at the brightest catches, with no fourth
-    // colour invented for it.
-    let lampColors: [(Double, Double, Double)] = [
-      (255, 145, 200), (185, 140, 255), (150, 215, 255),
-    ]
+    let pal = palette
+    let key = lamps[0].d
     var out: [Tile] = []
-    var seed = 11
-    func rnd() -> Double {                   // a fixed shuffle, so the ball is
-      seed = (seed &* 1103515245 &+ 12345) & 0x7fffffff   // the same every draw
-      return Double(seed % 1000) / 1000.0 - 0.5
-    }
     for i in 0..<rows {
       let la0 = .pi * (Double(i) / Double(rows)) - .pi / 2
       let la1 = .pi * (Double(i + 1) / Double(rows)) - .pi / 2
@@ -461,60 +510,46 @@ struct MirrorBall: View {
         let mx = pts.map(\.x).reduce(0, +) / 4, my = pts.map(\.y).reduce(0, +) / 4
         let quad = pts.map { CGPoint(x: r + (mx + ($0.x - mx) * shrink) * r,
                                      y: r - (my + ($0.y - my) * shrink) * r) }
-        let center = CGPoint(x: quad.map(\.x).reduce(0, +) / 4,
-                             y: quad.map(\.y).reduce(0, +) / 4)
         let n = norm((ax / 4, ay / 4, az / 4))
         let ndv = n.2                                    // n · (0,0,1)
         let refl = norm((2 * ndv * n.0, 2 * ndv * n.1, 2 * ndv * n.2 - 1))
-        // STRONGER DEPTH: DARK BETWEEN THE LAMPS, WHITE-HOT WHERE THEY CATCH
-        // (owner, 10.09: "keep the outer tiles darker, but make the centre
-        // reflection much brighter... that will make it feel reflective
-        // rather than painted"). MEASURED with a Python port of this exact
-        // loop (scratchpad/ball/measure.py) rather than eyeballed: ambient
-        // 0.23 -> 0.13 and the lamp gain 0.86 -> 1.15 moves the median off
-        // 209 tiles 117.0 -> 91.2 (the ball reads darker overall — "outer
-        // tiles darker") while mirrors above 245 (near-white) go 2.4% -> 4.8%
-        // and mirrors carrying real colour 23.9% -> 34.0% (the smoother
-        // falloff above). The exponent stays STEEP (6 -> 5.4, barely
-        // softened) so the bright zone stays SMALL rather than spreading —
-        // "a few tiles", not most of the ball.
-        //
-        // THIS IS STILL THE REFLECTION MODEL, NOT A SCREEN-SPACE SPOTLIGHT. A
-        // positional brightness gradient was tried and measured first and
-        // read exactly like the file's own standing warning against one: it
-        // crushed the median to 64.8 and left NOTHING near-white, because
-        // "distance from the tile's centre" does not correlate with which
-        // mirror is actually catching a lamp. Contrast comes from the SAME
-        // lamp maths that already decides colour, which is why a bright tile
-        // and a coloured tile are so often the same tile.
-        var b = 0.13
-        var w: [Double] = []          // brightness weight — stays steep
-        var cw: [Double] = []         // colour weight — wider, for the falloff
-        for L in lamps {
-          let d = max(0, refl.0 * L.0 + refl.1 * L.1 + refl.2 * L.2)
-          let lw = pow(d, 5.4)
-          w.append(lw)
-          cw.append(pow(d, 3))
-          b += 1.15 * lw
+        let env = envNoise(refl.0, refl.1, refl.2, scale: 3.1)
+
+        // THE TWO LOBES — see the struct's own doc comment. `flare` (wide,
+        // pow 10) is the brightest match across all three lamps; `cLobe`
+        // (narrow, pow 28) is tracked SEPARATELY, so the lamp that wins the
+        // colour need not be the one that wins the brightness.
+        var flare = 0.0, cLobe = 0.0, flareHue = 0, flareSat = 0.0
+        for (idx, L) in lamps.enumerated() {
+          let dot = refl.0 * L.d.0 + refl.1 * L.d.1 + refl.2 * L.d.2
+          guard dot > 0 else { continue }
+          let wide = pow(dot, 10) * L.power
+          if wide > flare { flare = wide }
+          let narrow = pow(dot, 28) * L.power
+          if narrow > cLobe { cLobe = narrow; flareHue = idx; flareSat = L.sat }
         }
-        b += rnd() * 0.28          // each mirror catches its own bit of room
-        b = min(1, max(0.05, b))
-        let v = 0.10 + 0.90 * pow(b, 0.72)
-        let cwsum = cw.reduce(0, +)
-        var tint = Color(white: v)
-        if cwsum > 0.002 {
-          let g = 255.0 * v
-          var cr = 0.0, cg = 0.0, cb = 0.0
-          for (weight, lc) in zip(cw, lampColors) {
-            cr += weight * lc.0; cg += weight * lc.1; cb += weight * lc.2
-          }
-          cr /= cwsum; cg /= cwsum; cb /= cwsum
-          let k = min(1.0, cwsum * 1.4) * 0.78
-          tint = Color(red:   min(1, max(0, (g * (1 - k) + cr * k) / 255)),
-                       green: min(1, max(0, (g * (1 - k) + cg * k) / 255)),
-                       blue:  min(1, max(0, (g * (1 - k) + cb * k) / 255)))
-        }
-        out.append(Tile(id: i * cols + j, pts: quad, center: center, v: v, tint: tint))
+        let lambert = max(0, n.0 * key.0 + n.1 * key.1 + n.2 * key.2)
+        let depth = min(1, n.2 * 1.35)
+        // PUSHED TOWARD THE ENDS OF ITS RANGE, not left clustered round the
+        // mean — a real mirror is either catching something or it isn't.
+        let sign = env - 0.5 >= 0 ? 1.0 : -1.0
+        let spread = sign * pow(abs(env - 0.5) * 2, 0.68) * 0.5
+        let t = max(0, min(1, 0.34 + lambert * 0.22 + spread * 0.80 + flare * 1.20))
+        let hueIdx = (flareHue * 3 + Int(env * Double(pal.count))) % pal.count
+        let hue = pal[hueIdx]
+        let lifted = mixRGB(hue, (1, 1, 1), 0.30)
+        let cast = cLobe > 0.06 ? min(0.72, cLobe * flareSat * 2.4) : 0.0
+        let baseT = cast > 0 ? min(1, t + cast * 0.42) : t
+        let fillRGB = cast > 0 ? mixRGB(shadeAt(baseT), lifted, cast) : shadeAt(t)
+        // OPACITY, NOT A PRE-BLENDED COLOUR: SwiftUI already composites this
+        // fill over the body Circle beneath it (source-over alpha blending),
+        // which is exactly the same arithmetic the prototype does by hand
+        // against a flat backdrop — there is nothing to gain by doing it
+        // twice.
+        let op = min(1, (0.56 + 0.50 * t) * (0.82 + 0.18 * depth))
+        out.append(Tile(id: i * cols + j, pts: quad,
+                        fill: Color(red: fillRGB.0, green: fillRGB.1, blue: fillRGB.2),
+                        opacity: op))
       }
     }
     return out

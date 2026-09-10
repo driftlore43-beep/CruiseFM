@@ -74,6 +74,18 @@ export type WidgetStation = {
   colors: [string, string, string];
   accent: string;
   /**
+   * The station's own three eqColors, the real hues the app's mirror ball
+   * reflects (`MirrorBallFlipbook.tsx` builds its whole palette off these
+   * three). `colors` above is the MUTED card ramp and was the only station
+   * colour the widget's own mirror ball ever had — which is why its recipe
+   * had to fall back to a fixed pink/violet/blue "party" set rather than the
+   * station's own mood. Optional: a widget binary built before this field
+   * existed simply ignores it, and a station somehow missing eqColors (there
+   * is none in practice — see customToStation's rampFromColor) still draws,
+   * off a ramp derived from `accent` alone.
+   */
+  eqColors?: [string, string, string];
+  /**
    * The station's own blurred backdrop, if the widget has one bundled.
    *
    * This is just the station id, and it means "there is a backdrop for this
@@ -181,6 +193,10 @@ export function toWidgetStation(id: string): WidgetStation {
     // ramp, its mid gradient stop otherwise. Same rule as the app itself, so
     // a widget can never disagree with the screen it links into.
     accent: s.eqColors?.[1] ?? s.cardGradient[1],
+    // The mirror ball's real palette (see MirrorBall in ModeWidget.swift) —
+    // in practice always present, since customToStation derives one even for
+    // a colours-only custom station.
+    eqColors: s.eqColors,
   };
 }
 

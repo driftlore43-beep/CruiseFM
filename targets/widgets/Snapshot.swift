@@ -45,6 +45,13 @@ struct WidgetStation: Codable {
   /// Deep, mid, black — the station's own card ramp.
   let colors: [String]
   let accent: String
+  /// The station's own three eqColors — the real hues the app's mirror ball
+  /// reflects, distinct from `colors` above (the MUTED card ramp, the only
+  /// station colour this target had before). Optional because it is a new
+  /// field: a widget binary built before it existed keeps reading a snapshot
+  /// this app already sends over the air, and just ignores the key it does
+  /// not know.
+  let eqColors: [String]?
   /// Only on lastDrive: which deck to reopen.
   let mode: String?
   /// Only on timeline entries: epoch MILLISECONDS this becomes current.

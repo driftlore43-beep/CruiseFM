@@ -120,9 +120,13 @@ def disc(option, size=DISC):
         grey = img.mean(axis=2, keepdims=True)
         img = np.clip(grey + (img - grey) * 1.15, 0, 1)
     else:
-        img = np.clip(img - 0.30, 0, 1)
+        # -0.14 / 0.95 — lifted 10.09 from -0.30/0.80. The old pair was
+        # tuned for a full-circle OVERLAY rainbow that muted against a
+        # bright ground; the fans are a SCREEN blend now, which only ever
+        # brightens, so darkening the art ahead of it just cost the cover.
+        img = np.clip(img - 0.14, 0, 1)
         grey = img.mean(axis=2, keepdims=True)
-        img = np.clip(grey + (img - grey) * 0.80, 0, 1)
+        img = np.clip(grey + (img - grey) * 0.95, 0, 1)
 
     fans = OPTIONS[option]
     if fans is None:
@@ -154,10 +158,13 @@ def disc(option, size=DISC):
         _, ma = stops_at(METAL, mloc)
         img = screen(img, np.ones_like(img), ma * 0.55)
 
-    # pressed rings
+    # pressed rings, EASED 10.09 — opacity 0.08 -> 0.04, pitch 0.045 -> 0.07
+    # of the radius. A real CD's groove pitch is nanometres, far below
+    # anything a photo resolves; the old numbers read as countable rings,
+    # which is the "too textured" she named.
     ring_t = d / R
-    phase = (ring_t % 0.045) / 0.045
-    ring_a = np.where(phase < 0.5, 0.08, 0.0)
+    phase = (ring_t % 0.07) / 0.07
+    ring_a = np.where(phase < 0.5, 0.04, 0.0)
     img = over(img, np.ones_like(img), ring_a)
 
     # specular sweep, topLeading -> bottomTrailing
@@ -180,8 +187,8 @@ def disc(option, size=DISC):
     def ring(frac, width, col):
         r = frac * n / 2
         dr.ellipse([cx - r, cy - r, cx + r, cy + r], outline=col, width=max(1, int(width)))
-    ring(0.62, 1.6 * SS, (0, 0, 0, 87))
-    ring(0.655, 1.0 * SS, (255, 255, 255, 66))
+    # the stacking ring is gone 10.09 — owner: "remove the circle that's
+    # between the centre and the edge"
     ring(0.375, 0.035 * n, (255, 255, 255, 51))
     r = 0.31 * n / 2
     dr.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(224, 224, 224, 153), outline=(255, 255, 255, 115), width=SS)

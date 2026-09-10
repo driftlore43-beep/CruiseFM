@@ -690,18 +690,27 @@ struct CompactDisc: View {
   let cover: Image?
   let accent: Color
 
-  /// The pressed rings, as explicit stops. Built here rather than inline so
-  /// the locations are unambiguously CGFloat — an implicit Double bridge is
-  /// the kind of thing that compiles locally and costs a build cycle when it
-  /// does not, and Swift cannot be compiled in the environment this is
-  /// written in.
+  /// The pressed rings, EASED (owner, 10.09: "ease on the CD's crevices' CDs
+  /// are that textured" — she means the opposite of "are", the grooves read
+  /// as a target printed on the disc rather than the near-invisible sheen a
+  /// real pressing has). A real CD's data pitch is a few hundred nanometres —
+  /// thousands of grooves per millimetre, far below anything a screen can
+  /// resolve, so what a photo of one actually shows is a soft, barely-there
+  /// shimmer, not rings you could count. This halves the opacity (0.08 ->
+  /// 0.04) and widens the pitch (0.045 -> 0.07 of the radius), which is what
+  /// turns individually countable rings into texture.
+  ///
+  /// Built here rather than inline so the locations are unambiguously
+  /// CGFloat — an implicit Double bridge is the kind of thing that compiles
+  /// locally and costs a build cycle when it does not, and Swift cannot be
+  /// compiled in the environment this is written in.
   private func ringStops() -> [Gradient.Stop] {
     var out: [Gradient.Stop] = []
     var t: CGFloat = 0
     while t < 1 {
-      out.append(Gradient.Stop(color: .white.opacity(0.08), location: t))
-      out.append(Gradient.Stop(color: .clear, location: min(1, t + 0.0225)))
-      t += 0.045
+      out.append(Gradient.Stop(color: .white.opacity(0.04), location: t))
+      out.append(Gradient.Stop(color: .clear, location: min(1, t + 0.035)))
+      t += 0.07
     }
     return out
   }
@@ -711,12 +720,18 @@ struct CompactDisc: View {
     ZStack {
       Circle().fill(Color(white: 0.08))
       if let cover {
-        // DARKER THAN LOOKS RIGHT ON ITS OWN, deliberately. The rainbow is an
-        // `overlay` blend, which mutes against a bright ground — the disc
-        // shipped as a pale wash for exactly this reason, and no amount of
-        // opacity on the gradient fixes it while the photo underneath is
-        // near full brightness. The prototype takes the art to .72 first,
-        // and that is what gives the sheen something to sit on.
+        // NOT AS DARK AS THE OLD OVERLAY-BLEND VERSION NEEDED, because that
+        // reasoning no longer applies. The rainbow used to be a full-circle
+        // OVERLAY wash covering the whole face, which mutes against a bright
+        // ground — hence pushing the art down first. It is confined to a
+        // couple of narrow SCREEN-blend fans now (10.09, the diffraction
+        // rebuild), which only ever brighten, so darkening the art ahead of
+        // it just cost the cover: measured on the prototype
+        // (docs/design/cd_widget.py), the old -0.30/0.80 pair put the disc's
+        // median luminance at 45 against the pre-rebuild look's 102 — the
+        // photo was closer to lost than "personal". -0.14/0.95 lands at 96,
+        // matching the old look, while the fans still read clearly because
+        // they no longer have a wash to fight.
         cover.resizable().aspectRatio(contentMode: .fill)
           .frame(width: size, height: size)
           .clipShape(Circle())
@@ -726,7 +741,7 @@ struct CompactDisc: View {
           // over it rather than as a disc. The art is still plainly the
           // cover — it is printed under a mirror, and that is what a printed
           // face under a mirror looks like.
-          .brightness(-0.30).saturation(0.80)
+          .brightness(-0.14).saturation(0.95)
       } else {
         Circle().fill(accent.opacity(0.55))
       }
@@ -819,14 +834,13 @@ struct CompactDisc: View {
           .init(color: .black.opacity(0.30), location: 1),
         ], center: .init(x: 0.40, y: 0.34), startRadius: 0, endRadius: size * 0.56))
 
-      // THE STACKING RING at 0.62R — the moulded step a real CD carries so a
-      // stack of them never touches face to face. A trough with a lit wall
-      // just outside it, which is what makes a step read as pressed in
-      // rather than drawn on (the app's Classic vinyl grooves, 25.08).
-      Circle().stroke(.black.opacity(0.34), lineWidth: 1.6)
-        .frame(width: size * 0.62, height: size * 0.62)
-      Circle().stroke(.white.opacity(0.26), lineWidth: 1)
-        .frame(width: size * 0.655, height: size * 0.655)
+      // THE STACKING RING IS GONE (owner, 10.09: "remove the circle that's
+      // between the centre and the edge"). It was the moulded step a real CD
+      // carries so a stack of discs never touches face to face — true of the
+      // object, and still the wrong thing to draw here: at this size a real
+      // feature and a decorative ring look identical, and hers is the more
+      // honest read. One fewer drawn circle is also one fewer thing to be
+      // told is "UI-like" (the rim went through exactly this on 10.09).
 
       // THE CLEAR MIRROR BAND just outside the hub: a pressing is not coated
       // edge to edge, and that glassy land is the second-strongest cue after

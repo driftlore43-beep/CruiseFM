@@ -177,9 +177,17 @@ console.log('\n  the subset still covers every icon a station can use:');
   for (const f of fs.readdirSync(DIR).filter((n) => n.endsWith('.swift'))) {
     const src = fs.readFileSync(`${DIR}/${f}`, 'utf8');
     // Text(<anything>.dial<anything>) followed by .font(dialFont(...)) — the
-    // whole string in the numbers-only face.
+    // whole string in the numbers-only face. Deliberately loose about what
+    // sits around `.dial` — a nested call must be caught too — so the ONE
+    // legitimate shape is excused by name below rather than by the pattern.
     const re = /Text\(([^)]*\.dial[^)]*)\)[\s\S]{0,120}?\.font\(dialFont\(/g;
-    for (const m of src.matchAll(re)) offenders.push(`${f}: Text(${m[1].trim()})`);
+    for (const m of src.matchAll(re)) {
+      // `Text(splitDial(x).number)` IS the split — digits only, with the band
+      // drawn elsewhere or deliberately absent. It trips the pattern only
+      // because the capture truncates at splitDial's own closing bracket.
+      if (/^Text\(\s*splitDial\([^()]*\)\.number\s*\)/.test(src.slice(m.index))) continue;
+      offenders.push(`${f}: Text(${m[1].trim()})`);
+    }
   }
   check('no widget sets a whole dial string in ' + glyphless, offenders.length === 0,
     offenders.join('; ') + ' — split it with splitDial/DialText so the band gets bandFont');

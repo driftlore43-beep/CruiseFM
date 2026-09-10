@@ -472,99 +472,138 @@ struct LastPlayedView: View {
   }
 
   // ── THE STUB ────────────────────────────────────────────────────────────
-  // The drive as a printed ticket. Owner, 03.09: "make the text bigger
-  // especially the artist and the song name" — the song is the subject of
-  // this widget, and it was set smaller than the station above it.
+  // THE TICKET IS A BOARDING PASS NOW (owner, 09.09: "the barcode is way too
+  // long... rearrange the ticket so the dotted line runs vertically, and the
+  // barcode is vertical and on the right — like a plane ticket. The text sits
+  // on the left"). She picked arrangement B off `docs/design/ticket.py`, drawn
+  // at this widget's real 338x158: the tear runs the FULL height, so the
+  // counterfoil is a genuinely detachable stub carrying its own slice of the
+  // banner rather than a strip hanging under one.
+  //
+  // THAT ALSO FIXES THE BARCODE BY GEOMETRY RATHER THAN BY TUNING. Across the
+  // ticket's width it had to be 46 bars to read as printed at all, which is
+  // the "far too long" she photographed; down a 58pt counterfoil the same
+  // idea needs a couple of dozen and cannot compete with the song, because it
+  // no longer shares an axis with it.
   private func stub(_ s: WidgetStation) -> some View {
-    ZStack(alignment: .topLeading) {
+    ZStack {
       LinearGradient(colors: [paper, paperDeep], startPoint: .top, endPoint: .bottom)
 
-      VStack(spacing: 0) {
-        HStack {
-          Text("CRUISE FM").font(.system(size: 10, weight: .heavy)).tracking(1.6)
-            .foregroundColor(.white)
-          Spacer()
-          Text("ADMIT ONE").font(.system(size: 8, weight: .heavy)).tracking(1.4)
-            .foregroundColor(.white.opacity(0.45))
-        }
-        .padding(.horizontal, 15)
-        .frame(height: 30)
-        .background(paperInk)
-
+      HStack(spacing: 0) {
+        // ── the half you keep ──────────────────────────────────────────────
         VStack(alignment: .leading, spacing: 0) {
-          HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 1) {
-              Text("STATION").font(.system(size: 8, design: .monospaced)).tracking(1.6)
-                .foregroundColor(paperInk.opacity(0.45))
-              Text(s.name).font(.system(size: 19, weight: .heavy))
-                .foregroundColor(paperInk).lineLimit(1).minimumScaleFactor(0.7)
-            }
-            Spacer(minLength: 6)
-            DialText(dial: s.dial, size: 19, color: paperInk)
+          HStack {
+            Text("CRUISE FM").font(.system(size: 10, weight: .heavy)).tracking(1.6)
+              .foregroundColor(.white)
+            Spacer()
+            Text("ADMIT ONE").font(.system(size: 8, weight: .heavy)).tracking(1.4)
+              .foregroundColor(.white.opacity(0.45))
           }
           .padding(.horizontal, 15)
-          .padding(.top, 9)
+          .frame(height: 30)
+          .background(paperInk)
 
-          Spacer(minLength: 4)
-          // The tear: a dashed rule with a notch bitten out of each edge.
-          ZStack {
-            Rectangle().fill(paperInk.opacity(0.22)).frame(height: 1)
-              .mask(HStack(spacing: 4) {
-                ForEach(0..<40, id: \.self) { _ in Rectangle().frame(width: 5) }
-              })
-            HStack {
-              Circle().fill(Color.black.opacity(0.30)).frame(width: 13, height: 13).offset(x: -6.5)
-              Spacer()
-              Circle().fill(Color.black.opacity(0.30)).frame(width: 13, height: 13).offset(x: 6.5)
+          VStack(alignment: .leading, spacing: 0) {
+            Text("LAST PLAYED").font(.system(size: 8, design: .monospaced)).tracking(1.6)
+              .foregroundColor(paperInk.opacity(0.45))
+            if let lp = entry.lastPlayed {
+              Text(lp.title).font(.system(size: 21, weight: .heavy))
+                .foregroundColor(paperInk).lineLimit(1).minimumScaleFactor(0.6)
+                .padding(.top, 1)
+              Text(lp.artist).font(.system(size: 14))
+                .foregroundColor(paperInk.opacity(0.62)).lineLimit(1).minimumScaleFactor(0.7)
+            } else {
+              Text(s.tagline).font(.system(size: 14))
+                .foregroundColor(paperInk.opacity(0.55)).lineLimit(2).padding(.top, 2)
             }
-          }
-          Spacer(minLength: 4)
 
-          // THE BARCODE IS ITS OWN ROW, under the song rather than beside it.
-          // Sharing a row meant the two competed for the same width: a long
-          // title squeezed the barcode into a stamp in the corner, and a short
-          // one left it stranded. Stacked, the song gets the full width it is
-          // the subject of, and the barcode gets the full width that makes it
-          // read as printed — which is how the prototype has it.
-          VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 1) {
-              Text("LAST PLAYED").font(.system(size: 8, design: .monospaced)).tracking(1.6)
-                .foregroundColor(paperInk.opacity(0.45))
-              if let lp = entry.lastPlayed {
-                Text(lp.title).font(.system(size: 21, weight: .heavy))
-                  .foregroundColor(paperInk).lineLimit(1).minimumScaleFactor(0.6)
-                Text(lp.artist).font(.system(size: 15))
-                  .foregroundColor(paperInk.opacity(0.62)).lineLimit(1).minimumScaleFactor(0.7)
-              } else {
-                Text(s.tagline).font(.system(size: 14))
-                  .foregroundColor(paperInk.opacity(0.55)).lineLimit(2)
+            Spacer(minLength: 4)
+
+            // The station and its dial sit at the foot, where a pass prints
+            // the route. The dial is NOT ink-aligned here: nothing is stacked
+            // above or below it, so there is no column for it to line up with.
+            HStack(alignment: .bottom) {
+              VStack(alignment: .leading, spacing: 1) {
+                Text("STATION").font(.system(size: 8, design: .monospaced)).tracking(1.6)
+                  .foregroundColor(paperInk.opacity(0.45))
+                Text(s.name).font(.system(size: 15, weight: .heavy))
+                  .foregroundColor(paperInk).lineLimit(1).minimumScaleFactor(0.7)
               }
+              Spacer(minLength: 6)
+              DialText(dial: s.dial, size: 14, color: paperInk)
             }
-            barcode
           }
-          .padding(.horizontal, 15)
-          .padding(.bottom, 12)
+          .padding(.horizontal, 14)
+          .padding(.top, 10)
+          .padding(.bottom, 11)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+        tear
+
+        // ── the counterfoil ────────────────────────────────────────────────
+        VStack(spacing: 0) {
+          paperInk.frame(height: 30)
+          barcode.padding(.top, 9).padding(.bottom, 3)
+          Text(splitDial(s.dial).number).font(dialFont(9))
+            .foregroundColor(paperInk.opacity(0.55))
+            .padding(.bottom, 8)
+        }
+        .frame(width: 58)
       }
     }
     .widgetURL(s.url(mode: s.mode))
   }
 
-  /// THE BARCODE RUNS THE TICKET'S FULL WIDTH, which is the whole reason it
-  /// reads as printed rather than as an icon of a barcode. Eighteen bars in
-  /// the bottom-right corner was a stamp; the prototype's runs edge to edge,
-  /// and a real stub's does too. `maxWidth: .infinity` with a flexible spacer
-  /// between bars lets it fill whatever width it is given, so it stays right
-  /// on both widget widths without a hardcoded count per size.
-  private var barcode: some View {
-    HStack(alignment: .bottom, spacing: 0) {
-      ForEach(0..<46, id: \.self) { i in
-        Rectangle().fill(paperInk)
-          .frame(width: i % 3 == 0 ? 2.5 : 1.5, height: i % 4 == 0 ? 20 : 27)
-        if i < 45 { Spacer(minLength: 0.5) }
+  /// THE TEAR RUNS THE WHOLE HEIGHT, and it changes colour half way down
+  /// because what it crosses changes. Over the paper it is ink; over the
+  /// banner an ink dash on an ink ground is invisible, so that stretch is
+  /// white — the same hairline the prototype puts between the two halves of
+  /// the banner. One colour the whole way would simply vanish at the top.
+  ///
+  /// Drawn as a stack of real dashes rather than a masked rule: a mask that
+  /// does not size exactly to its host shifts the pattern, and there is no
+  /// compiler here to catch it. The notches deliberately hang half off each
+  /// edge — the tile clips them, which is what makes them read as bitten out.
+  private var tear: some View {
+    ZStack {
+      VStack(spacing: 0) {
+        dashes(4, color: .white.opacity(0.18)).frame(height: 30)
+        dashes(15, color: paperInk.opacity(0.30)).frame(maxHeight: .infinity)
+      }
+      VStack(spacing: 0) {
+        notch.offset(y: -6.5)
+        Spacer(minLength: 0)
+        notch.offset(y: 6.5)
       }
     }
-    .frame(maxWidth: .infinity)
+    .frame(width: 1)
+  }
+
+  private var notch: some View {
+    Circle().fill(Color.black.opacity(0.30)).frame(width: 13, height: 13)
+  }
+
+  private func dashes(_ count: Int, color: Color) -> some View {
+    VStack(spacing: 4) {
+      ForEach(0..<count, id: \.self) { _ in
+        Rectangle().fill(color).frame(width: 1, height: 5)
+      }
+    }
+  }
+
+  /// THE BARCODE STANDS UP, down the counterfoil, which is where a boarding
+  /// pass keeps it. Flexible spacers between the bars let it fill whatever
+  /// height it is handed, so the count is not tied to the widget's size.
+  private var barcode: some View {
+    VStack(spacing: 0) {
+      ForEach(0..<24, id: \.self) { i in
+        Rectangle().fill(paperInk)
+          .frame(width: i % 4 == 0 ? 22 : 30, height: i % 3 == 0 ? 3 : 2)
+        if i < 23 { Spacer(minLength: 0.5) }
+      }
+    }
+    .frame(maxHeight: .infinity)
   }
 }
 

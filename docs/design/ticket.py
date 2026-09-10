@@ -6,6 +6,10 @@ so the dotted line runs vertically, and the barcode is vertical and on the
 right — like a plane ticket. The text sits on the left. The top CruiseFM text
 in the banner can stay where it is. Create a prototype for this."
 
+SHE PICKED B (09.09), and it is built: the tear runs the full height, so the
+counterfoil is a genuinely detachable stub with its own slice of the banner.
+A and C are kept here as the record of what the choice was between.
+
 Three arrangements of the same idea, so the choice is a look rather than an
 argument. Everything is drawn at the widget's REAL size (338 x 158 points) and
 then scaled up, so a size that does not fit here will not fit on a phone.

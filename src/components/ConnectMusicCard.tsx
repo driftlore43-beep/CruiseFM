@@ -9,13 +9,15 @@ import {
   connectAppleMusic,
   isAppleMusicConnected,
 } from '@/utils/appleMusic';
-import { getSavedPlatform } from '@/utils/musicPlatform';
+import { getSavedPlatform, offersAppleMusicConnect, savePlatform } from '@/utils/musicPlatform';
 
 const APPLE_RED = '#FC3C44';
 
 /**
  * The Apple Music front door — the peer of ConnectSpotifyCard, shown on the
- * home screen to listeners who chose Apple Music.
+ * home screen to anyone the platform picker still offers Apple Music to:
+ * they chose it, they skipped, or they have not chosen yet. Spotify's
+ * five-account cap is why that offer is Apple, not a second connect card.
  *
  * THE PROMPT IS NEVER AUTOMATIC (owner decision, 29.07). Apple shows exactly
  * one system dialog, and a reflexive "Don't Allow" on app launch costs the
@@ -36,11 +38,12 @@ export function ConnectMusicCard() {
     useCallback(() => {
       let active = true;
       (async () => {
-        // Only for Apple Music people, and only on builds that can actually
-        // do it — everywhere else this card does not exist.
+        // First-run and skipped too — not only people who already tapped
+        // Apple Music. YouTube / Amazon / Tidal chose a companion, so they
+        // do not get this errand.
         if (!appleMusicAvailable()) { if (active) setShow(false); return; }
         const platform = await getSavedPlatform();
-        if (platform !== 'appleMusic') { if (active) setShow(false); return; }
+        if (!offersAppleMusicConnect(platform)) { if (active) setShow(false); return; }
         const connected = await isAppleMusicConnected();
         if (active) setShow(!connected);
       })();
@@ -54,6 +57,7 @@ export function ConnectMusicCard() {
     setLoading(true);
     const status = await connectAppleMusic();
     if (status === 'authorized') {
+      await savePlatform('appleMusic');
       // Authorised is not subscribed. Say which one they've got.
       const canPlay = await canPlayAppleMusic();
       if (canPlay) setShow(false);

@@ -5,7 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DECK_FRAC } from '@/components/LandscapeChrome';
 import { appleMusicAvailable } from '@/utils/appleMusic';
-import { getSavedPlatform } from '@/utils/musicPlatform';
+import {
+  getSavedPlatform,
+  offersAppleMusicConnect,
+  offersSpotifyPlaylist,
+} from '@/utils/musicPlatform';
 
 const SPOTIFY_GREEN = '#1DB954';
 
@@ -28,9 +32,30 @@ export function WakeSpotifyHint({ show, connected = true }: { show: boolean; con
   // not the listener's to work around. Self-checked here so all eight
   // call sites are covered without threading another prop through them.
   const [applePlatform, setApplePlatform] = useState(false);
+  // Visuals-only copy used to send EVERY unconnected listener to Spotify,
+  // including first-run and skipped people the picker no longer offers it
+  // to (owner, 11.09). Spotify stays only for people already on it.
+  const [companionLine, setCompanionLine] = useState(
+    'Visuals only for now — play music in any app and cruise on.',
+  );
   useEffect(() => {
     getSavedPlatform()
-      .then((pf) => setApplePlatform(pf === 'appleMusic' && appleMusicAvailable()))
+      .then((pf) => {
+        setApplePlatform(pf === 'appleMusic' && appleMusicAvailable());
+        if (offersSpotifyPlaylist(pf)) {
+          setCompanionLine(
+            'Visuals only for now — play music in any app and cruise on. Connect Spotify from the home page for full control.',
+          );
+        } else if (offersAppleMusicConnect(pf) && appleMusicAvailable()) {
+          setCompanionLine(
+            'Visuals only for now — play music in any app and cruise on. Connect Apple Music from the home page for full control.',
+          );
+        } else {
+          setCompanionLine(
+            'Visuals only for now — play music in any app and cruise on. The visuals work without a music connection.',
+          );
+        }
+      })
       .catch(() => {});
   }, []);
   const { width: winW, height: winH } = useWindowDimensions();
@@ -94,7 +119,7 @@ export function WakeSpotifyHint({ show, connected = true }: { show: boolean; con
         <Text style={ws.text}>
           {connected
             ? 'Spotify asleep? Open it, play any song for a second, then press play here.'
-            : 'Visuals only for now — play music in any app and cruise on. Connect Spotify from the home page for full control.'}
+            : companionLine}
         </Text>
       </View>
     </Animated.View>

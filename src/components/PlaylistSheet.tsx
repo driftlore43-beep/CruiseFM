@@ -5,10 +5,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   appleMusicAvailable,
+  connectAppleMusic,
   getAppleUserPlaylists,
   isAppleMusicConnected,
 } from '@/utils/appleMusic';
-import { getSavedPlatform } from '@/utils/musicPlatform';
+import {
+  getSavedPlatform,
+  playlistSheetKind,
+  savePlatform,
+  type PlaylistSheetKind,
+} from '@/utils/musicPlatform';
 import { getUserPlaylists, isSpotifyConnected } from '@/utils/spotify';
 import { parseSpotifyPlaylistLink } from '@/utils/spotifyHandoff';
 import { type LinkedPlaylist } from '@/utils/stationPlaylists';
@@ -60,9 +66,15 @@ function PasteLinkRow({ onPick }: { onPick: (pl: LinkedPlaylist) => void }) {
 /**
  * Bottom-sheet playlist picker shared by every visual mode.
  *
- * Lists the user's Spotify playlists when the API allows; the paste-a-link
- * row underneath works for everyone else. The parent owns persistence
- * (setStationPlaylist) via `onPick`.
+ * Apple Music is the in-app offer for everyone the platform picker still
+ * shows. Spotify's list + paste-a-link row appear ONLY for listeners who
+ * already saved Spotify — asking anyone else to paste a Spotify link is an
+ * errand the five-account cap will refuse. YouTube / Amazon / Tidal get a
+ * companion note and no paste box.
+ *
+ * The parent owns persistence (setStationPlaylist) via `onPick`. Picking an
+ * Apple playlist also saves the platform, so a skipped first-run listener
+ * who links one is on Apple Music for the drive that follows.
  */
 export function PlaylistSheet({
   stationName, current, onClose, onPick,
@@ -93,34 +105,53 @@ export function PlaylistSheet({
   })).current;
 
   const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState(false);
   const [connected, setConnected] = useState(false);
   const [playlists, setPlaylists] = useState<LinkedPlaylist[]>([]);
-  // Apple Music people get their own library and no paste box — Apple has no
-  // shareable playlist link to paste, so offering one would be a dead end.
-  const [apple, setApple] = useState(false);
+  // Default companion until we know — never Spotify. Falling through to
+  // Spotify's list + paste box is how a skipped / first-run listener was
+  // asked for a link the five-account cap will refuse (owner, 11.09).
+  const [kind, setKind] = useState<PlaylistSheetKind>('companion');
+  const apple = kind === 'apple';
 
   useEffect(() => {
     (async () => {
       const platform = await getSavedPlatform();
-      if (platform === 'appleMusic' && appleMusicAvailable()) {
-        setApple(true);
+      const next = playlistSheetKind(platform, appleMusicAvailable());
+      setKind(next);
+      if (next === 'apple') {
         const isConn = await isAppleMusicConnected();
         setConnected(isConn);
         if (isConn) setPlaylists(await getAppleUserPlaylists());
-        setLoading(false);
-        return;
-      }
-      const isConn = await isSpotifyConnected();
-      setConnected(isConn);
-      if (isConn) {
-        const data = await getUserPlaylists();
-        const items: LinkedPlaylist[] =
-          data?.items?.map((p: any) => ({ uri: p.uri, name: p.name })) ?? [];
-        setPlaylists(items);
+      } else if (next === 'spotify') {
+        const isConn = await isSpotifyConnected();
+        setConnected(isConn);
+        if (isConn) {
+          const data = await getUserPlaylists();
+          const items: LinkedPlaylist[] =
+            data?.items?.map((p: any) => ({ uri: p.uri, name: p.name })) ?? [];
+          setPlaylists(items);
+        }
       }
       setLoading(false);
     })();
   }, []);
+
+  const handleConnectApple = async () => {
+    setConnecting(true);
+    const status = await connectAppleMusic();
+    if (status === 'authorized') {
+      await savePlatform('appleMusic');
+      setConnected(true);
+      setPlaylists(await getAppleUserPlaylists());
+    }
+    setConnecting(false);
+  };
+
+  const handlePick = async (pl: LinkedPlaylist) => {
+    if (kind === 'apple') await savePlatform('appleMusic');
+    onPick(pl);
+  };
 
   return (
     <View style={ps.backdrop}>
@@ -145,7 +176,7 @@ export function PlaylistSheet({
                     <Pressable
                       key={pl.uri}
                       style={[ps.row, active && ps.rowActive, active && apple && ps.rowActiveApple]}
-                      onPress={() => onPick(pl)}>
+                      onPress={() => handlePick(pl)}>
                       {/* The tick and highlight wear the platform's own colour
                           — Spotify green on an Apple Music list read as the
                           wrong service entirely (owner, 04.08). */}
@@ -162,7 +193,7 @@ export function PlaylistSheet({
                 })}
               </ScrollView>
             )}
-            {apple ? (
+            {kind === 'apple' && (
               <>
                 {connected && playlists.length === 0 && (
                   <Text style={ps.empty}>
@@ -170,12 +201,23 @@ export function PlaylistSheet({
                   </Text>
                 )}
                 {!connected && (
-                  <Text style={ps.empty}>
-                    Connect Apple Music from the home screen to pick one of your playlists for this station.
-                  </Text>
+                  <>
+                    <Text style={ps.empty}>
+                      Connect Apple Music to pick a playlist for this station. You can still start a drive without one — the visuals work either way.
+                    </Text>
+                    <Pressable
+                      style={[ps.connectBtn, connecting && { opacity: 0.7 }]}
+                      onPress={handleConnectApple}
+                      disabled={connecting}>
+                      {connecting
+                        ? <ActivityIndicator color="#fff" />
+                        : <Text style={ps.connectBtnText}>Connect Apple Music</Text>}
+                    </Pressable>
+                  </>
                 )}
               </>
-            ) : (
+            )}
+            {kind === 'spotify' && (
               <>
                 {connected && playlists.length === 0 && (
                   <Text style={ps.empty}>
@@ -189,6 +231,11 @@ export function PlaylistSheet({
                 )}
                 <PasteLinkRow onPick={onPick} />
               </>
+            )}
+            {kind === 'companion' && (
+              <Text style={ps.empty}>
+                Play music in your own app — Cruise FM is the visual layer. Nothing to link from here.
+              </Text>
             )}
           </>
         )}
@@ -246,4 +293,10 @@ const ps = StyleSheet.create({
   },
   pasteBtnText: { color: '#04220f', fontSize: 14.5, fontWeight: '800' },
   pasteHint: { color: 'rgba(255,255,255,0.4)', fontSize: 11.5, lineHeight: 16, marginTop: 8, marginBottom: 2 },
+  connectBtn: {
+    backgroundColor: APPLE_MUSIC_RED, borderRadius: 14,
+    paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
+    marginHorizontal: 16, marginBottom: 8,
+  },
+  connectBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 });

@@ -68,7 +68,12 @@ const SURFACES = [
     },
   },
   {
+    // The paste box is Spotify-only now — first-run / skipped listeners
+    // are offered Apple Music, and the web build has no MusicKit, so
+    // seeding `'none'` here finds no field. A saved Spotify listener is
+    // the only person this surface still exists for.
     name: 'playlist paste box',
+    platform: 'spotify',
     open: async (p) => {
       await p.getByText('STATIONS', { exact: true }).last().click({ force: true });
       await p.waitForTimeout(2400);
@@ -171,15 +176,15 @@ const problems = [];
 for (const theme of ['dark', 'light']) {
   for (const s of SURFACES) {
     const ctx = await b.newContext({ viewport: { width: 393, height: 852 } });
-    await ctx.addInitScript(([t]) => {
-      localStorage.setItem('cruisefm_platform', 'none');
+    await ctx.addInitScript(([t, plat]) => {
+      localStorage.setItem('cruisefm_platform', plat);
       // Past the one-off "what is this app" sheet, the same way this seeds
       // past the platform sheet above. scripts/harness/intro.mjs owns that
       // sheet; every other harness would otherwise run with a Modal over
       // the app, which is how a harness passes while testing nothing.
       localStorage.setItem('cruisefm_intro_seen', '1');
       localStorage.setItem('cruise_appearance', t);
-    }, [theme]);
+    }, [theme, s.platform ?? 'none']);
     const p = await ctx.newPage();
     const errs = [];
     p.on('pageerror', (e) => errs.push(e.message));

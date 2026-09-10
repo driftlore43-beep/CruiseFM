@@ -74,6 +74,53 @@ export async function setPlatformSkipped(): Promise<void> {
   await AsyncStorage.setItem(PLATFORM_SKIPPED_KEY, 'true');
 }
 
+/**
+ * Which playlist picker a station page / in-drive pill should open.
+ *
+ * Spotify linking is ONLY for listeners who already saved Spotify — the
+ * picker no longer offers it (01.09), because a development-tier app is
+ * capped at five authorised accounts. Asking anyone else to paste a
+ * Spotify link is an errand that cannot succeed.
+ *
+ * `null` (never chosen) and `'none'` (skipped) take Apple Music when the
+ * build can actually play it. YouTube / Amazon / Tidal stay visual
+ * companions — no paste box, no lock on Start Drive.
+ *
+ * `musicKit` is passed in rather than imported, so this file never
+ * cycles with appleMusic.ts.
+ */
+export type PlaylistSheetKind = 'spotify' | 'apple' | 'companion';
+
+export function offersSpotifyPlaylist(platform: PlatformId | null): boolean {
+  return platform === 'spotify';
+}
+
+/** Home's Connect Apple Music card — first-run and skipped, not YouTube. */
+export function offersAppleMusicConnect(platform: PlatformId | null): boolean {
+  return platform === 'appleMusic' || platform == null || platform === 'none';
+}
+
+/**
+ * Start Drive waits for a playlist only when this platform can play one
+ * in-app. `'none'` is a skip: the visuals still start. `null` (never
+ * chosen) is the onboarding offer, so it gates when MusicKit is present.
+ */
+export function gatesStartOnPlaylist(platform: PlatformId | null, musicKit: boolean): boolean {
+  if (platform === 'spotify') return true;
+  if (platform === 'youtubeMusic' || platform === 'amazonMusic' || platform === 'tidal') return false;
+  if (platform === 'none') return false;
+  // appleMusic, or never chosen
+  return musicKit;
+}
+
+export function playlistSheetKind(platform: PlatformId | null, musicKit: boolean): PlaylistSheetKind {
+  if (platform === 'spotify') return 'spotify';
+  if (platform === 'youtubeMusic' || platform === 'amazonMusic' || platform === 'tidal') {
+    return 'companion';
+  }
+  return musicKit ? 'apple' : 'companion';
+}
+
 export async function openMusicPlatform(stationName: string): Promise<void> {
   const platformId = await getSavedPlatform();
   if (!platformId || platformId === 'none') return;

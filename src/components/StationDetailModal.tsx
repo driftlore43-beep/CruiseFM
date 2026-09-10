@@ -30,8 +30,14 @@ import { useTheme } from '@/context/ThemeContext';
 import { useMotion } from '@/context/MotionContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { appleMusicAvailable, isApplePlaylist } from '@/utils/appleMusic';
-import { getSavedPlatform } from '@/utils/musicPlatform';
+import { appleMusicAvailable } from '@/utils/appleMusic';
+import {
+  getSavedPlatform,
+  gatesStartOnPlaylist,
+  offersSpotifyPlaylist,
+  playlistSheetKind,
+  type PlatformId,
+} from '@/utils/musicPlatform';
 import { useSessionKind, words } from '@/utils/sessionKind';
 import {
   getStationPlaylist,
@@ -119,8 +125,11 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   // Both services' choices, so the page can reassure rather than look empty.
   const [slots, setSlots] = useState<Partial<Record<string, LinkedPlaylist>>>({});
   const [linkToast, setLinkToast] = useState<string | null>(null);
-  const [spotifyPlatform, setSpotifyPlatform] = useState(true);
-  const [applePlatform, setApplePlatform] = useState(false);
+  // Default is NOT Spotify. Treating an unset platform as Spotify (the old
+  // `p === 'spotify' || p == null`) is why a first-run / skipped listener
+  // was asked to paste a Spotify link they cannot use (owner, 11.09).
+  const [savedPlatform, setSavedPlatform] = useState<PlatformId | null>(null);
+  const [platformReady, setPlatformReady] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -136,8 +145,8 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
         getStationPlaylistSlots(station.id).then(setSlots);
       }
       getSavedPlatform().then((p) => {
-        setSpotifyPlatform(p === 'spotify' || p == null);
-        setApplePlatform(p === 'appleMusic');
+        setSavedPlatform(p);
+        setPlatformReady(true);
       });
       slideY.setValue(0);
       slideX.setValue(SCREEN_W);
@@ -222,9 +231,13 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   }
 
   function handleStartDrive() {
-    // Strict rule: no playlist, no drive. Starting anyway used to inherit
-    // whatever Spotify was already playing, which made stations feel broken.
-    // Instead the button routes straight into the playlist picker.
+    // Don't start (or gate) until we know which service they actually use —
+    // a first paint used to treat "not loaded yet" as Spotify.
+    if (!platformReady) return;
+    // Strict rule: no playlist, no drive — but ONLY for a platform that
+    // can play one in-app. Starting anyway used to inherit whatever Spotify
+    // was already playing, which made stations feel broken. Instead the
+    // button routes straight into the playlist picker.
     if (needsPlaylist) {
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       setShowPicker(true);
@@ -267,14 +280,11 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   const live = isOnAir(station.id);
   const custom = isCustom ? (station as CustomStation) : null;
   // Every station — built-in or custom — needs its own playlist before a
-  // drive makes sound. The glowing playlist button + quiet Start Drive make
-  // that the obvious first step. Spotify people only: YouTube Music / Apple
-  // Music / other listeners run music in their own app, so Cruise FM is the
-  // visual companion and Start Drive always proceeds.
-  // Apple Music listeners get the same strict rule, but ONLY on builds that
-  // can actually play in-app — without MusicKit they're a visual-companion
-  // listener like any other, and gating them would block a drive we could
-  // have shown them.
+  // drive makes sound, but ONLY when this listener can actually play one
+  // in-app. Spotify people who are already on it, and Apple Music people
+  // on a MusicKit build, wait. Everyone else (skipped, YouTube, Amazon,
+  // Tidal, or a build without MusicKit) is a visual companion: Start Drive
+  // always proceeds, and we never ask them to paste a Spotify link.
   /**
    * A playlist saved for the OTHER platform is not a linked playlist.
    *
@@ -284,16 +294,22 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
    * Spotify uri. Judge it the way playback does, so the card and the drive
    * agree: a link only counts if it belongs to the platform in use.
    */
-  const appleActive = applePlatform && appleMusicAvailable();
+  const musicKit = appleMusicAvailable();
+  const sheetKind = playlistSheetKind(savedPlatform, musicKit);
+  const appleOffer = sheetKind === 'apple';
+  const spotifyOffer = offersSpotifyPlaylist(savedPlatform);
   // Playlists are stored PER SERVICE now, so `linked` can only ever be one this
   // platform can play — the 04.08 mismatch is impossible by construction rather
   // than caught after the fact. What survives is the useful half of that fix:
   // if the other service has one, say so, because "add a playlist" alone would
   // read as though their earlier choice had been thrown away. Which is what
   // used to happen.
-  const otherPlaylist = appleActive ? slots.spotify : slots.appleMusic;
-  const needsPlaylist = !linked && (spotifyPlatform || appleActive);
-  const tint = appleActive ? PLATFORM_TINT.apple : PLATFORM_TINT.spotify;
+  const otherPlaylist = appleOffer ? slots.spotify : spotifyOffer ? slots.appleMusic : undefined;
+  const needsPlaylist = platformReady && !linked && gatesStartOnPlaylist(savedPlatform, musicKit);
+  // Apple is the default tint. A custom station's cream on a first-run
+  // visitor must never decide the card is Spotify-green.
+  const tint = spotifyOffer ? PLATFORM_TINT.spotify : PLATFORM_TINT.apple;
+  const showPlaylistCard = sheetKind !== 'companion' || !!linked;
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={() => handleClose()}>
@@ -415,7 +431,11 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
           <Text style={styles.stationName}>{station.name}</Text>
           <Text style={styles.stationTagline}>{station.tagline}</Text>
 
-          {/* Add your playlist */}
+          {/* Add your playlist — Apple Music for everyone the picker still
+              offers; Spotify only if they already saved it. A first-run
+              visitor used to land on "Drop in your own Spotify playlist"
+              because an unset platform was treated as Spotify. */}
+          {showPlaylistCard && (
           <Pressable
             style={({ pressed }) => [
               styles.playlistBtn,
@@ -428,11 +448,11 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
             {/* Apple's mark is red, Spotify's green — showing the wrong one
                 is half of why a stale link read as usable. */}
             <MaterialCommunityIcons
-              name="music" size={20}
+              name={spotifyOffer ? 'music' : 'apple'} size={20}
               style={[styles.playlistBtnIcon, { color: tint.solid }]} />
             <View style={{ flex: 1 }}>
               <Text style={styles.playlistBtnText}>
-                {linked ? linked.name : 'Add your playlist'}
+                {linked ? linked.name : appleOffer ? 'Add your Apple Music playlist' : 'Add your playlist'}
               </Text>
               <Text style={styles.playlistBtnSub}>
                 {linked
@@ -440,18 +460,21 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
                   : otherPlaylist
                     // Their other service's choice is safe — say so, or this
                     // reads as though it had been lost.
-                    ? (appleActive
+                    ? (appleOffer
                         ? `“${otherPlaylist.name}” is saved for Spotify — pick an Apple Music one too`
                         : `“${otherPlaylist.name}” is saved for Apple Music — pick a Spotify one too`)
                     : needsPlaylist
                       ? 'Give your station its sound'
-                      : appleActive
+                      : appleOffer
                         ? 'Drop in your own Apple Music playlist'
-                        : 'Drop in your own Spotify playlist'}
+                        : spotifyOffer
+                          ? 'Drop in your own Spotify playlist'
+                          : 'Tap to change'}
               </Text>
             </View>
             <MaterialCommunityIcons name={linked ? 'pencil' : 'plus'} size={18} style={{ color: tint.solid }} />
           </Pressable>
+          )}
 
           {/* Mode picker */}
           <Text style={styles.sectionLabel}>VISUAL MODE</Text>
@@ -498,7 +521,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
               style={styles.startGradient}>
               <Text style={styles.startBtnText}>
                 {needsPlaylist
-                  ? 'Add a Playlist to Start'
+                  ? (appleOffer ? 'Add an Apple Music Playlist to Start' : 'Add a Playlist to Start')
                   : selectedIsLocked
                     ? `Preview ${MODES.find((m) => m.id === selectedMode)?.label}`
                     : words(kind).start}

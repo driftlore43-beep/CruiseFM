@@ -203,7 +203,7 @@ struct ModeView: View {
   // so a case drawn with a 4pt radius close to the edge has its four corners
   // sliced off — which is the owner's "ensure the CD case is not cut off from
   // the widget shape". A corner survives when its own inset plus its own
-  // radius reach the tile's: JewelCase is inset 10 with a 14pt radius, i.e.
+  // radius reach the tile's: JewelCase is inset 8 with a 16pt radius, i.e.
   // 24 against the tile's ~22, so it clears with a little to spare and is
   // still very nearly the whole tile.
   private func disc(_ s: WidgetStation) -> some View {
@@ -219,20 +219,29 @@ struct ModeView: View {
       // React Native SVG side of this app, which has none — so this is
       // genuine falloff rather than a stack of stepped rings.
       Circle().fill(s.accentColor.opacity(0.32))
-        .frame(width: 128, height: 128)
+        .frame(width: 138, height: 138)
         .blur(radius: 20)
-        .offset(x: 8)
-      // Centred on the case's own interior rather than on the tile: the hinge
-      // spine takes 17pt off the left, so dead centre would leave the disc
-      // visibly closer to the hinge than to the opposite wall.
+        .offset(x: 6)
+      // THE DISC ALL BUT FILLS THE CASE (owner, 10.09: "the CD is still quite
+      // small, I wanted the CD to fit like the 3rd image where the edges are
+      // close to the case"). 114 -> 124, and the ten points came from the two
+      // things standing in its way rather than from wishful thinking:
       //
-      // SLIGHTLY LARGER (owner, 10.09: "make the CD slightly larger") —
-      // 110 -> 114. Checked against the same clearance the case comment
-      // above already establishes: at this size the disc's left edge sits
-      // ~3pt clear of the hinge spine and its right edge ~4pt clear of the
-      // case wall, so it grows without touching either.
-      CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 114)
-        .offset(x: 8)
+      //   THE HORIZONTAL IS THE BINDING AXIS, because the hinge eats one side.
+      //   On a ~158pt tile the case now runs x 8..150, the spine takes 12 off
+      //   the left, so the INTERIOR is x 20..150 — 130 wide, centred at 85,
+      //   i.e. 6pt right of the tile's own centre, which is where the offset
+      //   below comes from. A 124 disc there leaves ~3pt clear of the hinge
+      //   and ~3pt clear of the far wall.
+      //
+      //   Vertically there is more room than that (~9pt top and bottom), and
+      //   it is deliberately not spent: a disc squeezed to the case's top and
+      //   bottom edges would foul the corner posts, which sit 7pt in.
+      //
+      // Centred on the case's INTERIOR rather than on the tile — dead centre
+      // would leave the disc visibly closer to the hinge than to the far wall.
+      CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 124)
+        .offset(x: 6)
     }
     .widgetURL(s.url(mode: "cd"))
   }
@@ -544,7 +553,7 @@ private struct JewelCase: View {
       HStack(spacing: 0) {
         LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.04)],
                        startPoint: .leading, endPoint: .trailing)
-          .frame(width: 17)
+          .frame(width: 12)
           .overlay(HStack { Spacer(); Rectangle().fill(.white.opacity(0.20)).frame(width: 1) })
           .overlay(
             VStack(spacing: 14) {
@@ -552,7 +561,7 @@ private struct JewelCase: View {
                 RoundedRectangle(cornerRadius: 2)
                   .fill(.white.opacity(0.09))
                   .overlay(RoundedRectangle(cornerRadius: 2).stroke(.white.opacity(0.14), lineWidth: 1))
-                  .frame(width: 11, height: 19)
+                  .frame(width: 8, height: 19)
               }
             })
         Spacer(minLength: 0)
@@ -585,8 +594,13 @@ private struct JewelCase: View {
   /// tile — the owner's "ensure the CD case is not cut off from the widget
   /// shape". 10 + 14 = 24 clears it, and a real slimline case has generous
   /// corners anyway (the app's own CD deck settled that on 03.08).
-  private var caseInset: CGFloat { 10 }
-  private var caseRadius: CGFloat { 14 }
+  ///
+  /// TIGHTENED AGAIN 10.09 to make room for a bigger disc (owner: "the CD is
+  /// still quite small, I wanted the CD to fit like the 3rd image where the
+  /// edges are close to the case"). 8 + 16 = 24 still clears the tile, and
+  /// the two points the case gives up go straight to the disc.
+  private var caseInset: CGFloat { 8 }
+  private var caseRadius: CGFloat { 16 }
 
   private func post(_ corner: Alignment) -> some View {
     let top = corner == .topLeading || corner == .topTrailing
@@ -597,6 +611,75 @@ private struct JewelCase: View {
     }
     .foregroundColor(.white.opacity(0.22))
     .frame(width: 15, height: 15)
+  }
+}
+
+/**
+ * ONE SPECTRAL FAN OFF A DISC.
+ *
+ * The colour comes from a RADIAL gradient — violet at the inner tracks out to
+ * red at the rim, which is the direction a grating actually spreads a
+ * spectrum — and an ANGULAR gradient is used only as a MASK, so the fan
+ * exists over one arc and is absent everywhere else.
+ *
+ * BOTH GRADIENTS FADE TO NOTHING AT THEIR OWN EDGES, which is this target's
+ * standing rule for anything that is light: the spectrum fades before the hub
+ * and before the rim, and the wedge fades to clear on both flanks. A hard
+ * boundary on a light reads as a sticker, and this file has already talked the
+ * CD's rim, the mirror ball's rim and the ball's glints out of exactly that.
+ *
+ * `bearing` is where the fan points, in degrees clockwise from straight up.
+ * `spread` is how much of the disc it covers, in degrees.
+ */
+private struct DiffractionFan: View {
+  let size: CGFloat
+  let bearing: Double
+  let spread: Double
+  let strength: Double
+
+  var body: some View {
+    Circle()
+      .fill(RadialGradient(stops: [
+        .init(color: .clear, location: 0.00),
+        .init(color: Color(hex: "#5b3bff").opacity(0.45), location: 0.12),
+        .init(color: Color(hex: "#2bc0ff"), location: 0.28),
+        .init(color: Color(hex: "#48ffc0"), location: 0.43),
+        .init(color: Color(hex: "#ffe86b"), location: 0.58),
+        .init(color: Color(hex: "#ff8a3c"), location: 0.72),
+        .init(color: Color(hex: "#ff4d8f").opacity(0.55), location: 0.87),
+        .init(color: .clear, location: 1.00),
+      ], center: .center, startRadius: size * 0.13, endRadius: size * 0.52))
+      // The trailing-closure `mask(alignment:content:)`, not the older
+      // `mask(_:)` that takes a view — that one has been deprecated since
+      // iOS 15, and a deprecation warning in a build log is one more line
+      // to read past when something real goes wrong.
+      .mask {
+        // The wedge is built with its peak at location 0.5 and the whole
+        // gradient then TURNED so that 0.5 lands on the bearing — an
+        // AngularGradient's location 0 sits at its own `angle`, so half a
+        // turn back is what puts the peak where it was asked for. Writing
+        // the wedge across the 0/1 seam instead would need two stop runs and
+        // is the kind of thing that is invisibly wrong without a compiler to
+        // argue with.
+        Circle().fill(
+          AngularGradient(stops: wedgeStops(), center: .center,
+                          angle: .degrees(bearing - 180)))
+      }
+      .blendMode(.screen)
+      .opacity(strength)
+  }
+
+  private func wedgeStops() -> [Gradient.Stop] {
+    let half = CGFloat(spread) / 720
+    return [
+      .init(color: .clear, location: 0),
+      .init(color: .clear, location: max(0, 0.5 - half)),
+      .init(color: .white.opacity(0.35), location: max(0, 0.5 - half * 0.55)),
+      .init(color: .white, location: 0.5),
+      .init(color: .white.opacity(0.35), location: min(1, 0.5 + half * 0.55)),
+      .init(color: .clear, location: min(1, 0.5 + half)),
+      .init(color: .clear, location: 1),
+    ]
   }
 }
 
@@ -637,33 +720,68 @@ struct CompactDisc: View {
         cover.resizable().aspectRatio(contentMode: .fill)
           .frame(width: size, height: size)
           .clipShape(Circle())
-          .brightness(-0.22).saturation(1.15)
+          // PUSHED FURTHER DOWN AND DESATURATED since the rainbow stopped
+          // covering the whole face: with only two fans on it, a bright
+          // saturated photograph reads as a picture with some colour laid
+          // over it rather than as a disc. The art is still plainly the
+          // cover — it is printed under a mirror, and that is what a printed
+          // face under a mirror looks like.
+          .brightness(-0.30).saturation(0.80)
       } else {
         Circle().fill(accent.opacity(0.55))
       }
-      // TWO PASSES, NOT ONE. `overlay` carries the hue but darkens as it goes;
-      // a second, weaker pass in `screen` puts the light back without washing
-      // the colour out. Offset 180° from the first so the two do not stack
-      // their own peaks on top of each other.
+      // ── THE RAINBOW IS DIFFRACTION, NOT A COLOUR WHEEL ────────────────
       //
-      // THE FIRST PASS IS TURNED DOWN A STEP (owner, 10.09: "make the disc
-      // reflection a little cleaner and more glossy") — a full-strength
-      // six-stop rainbow over the whole face reads as a printed pattern; a
-      // disc's iridescence is a THIN skin of colour over the light, not the
-      // dominant thing on it, so it now sits at .82 rather than full
-      // strength. The specular sweep below is what carries "glossy" instead.
+      // Owner, 10.09: "the rainbow light effect is currently just painted on
+      // where in reality it should look like the last image", with a
+      // photograph of a real disc beside it.
+      //
+      // SHE IS DESCRIBING A GEOMETRY MISTAKE RATHER THAN A COLOUR ONE, and
+      // that is why no amount of tuning the old version fixed it. What shipped
+      // was TWO FULL-CIRCLE AngularGradients — six hues wrapped evenly all the
+      // way round the face. That is a colour wheel, and a colour wheel is a
+      // pattern printed on a disc.
+      //
+      // A CD's tracks are concentric, so the disc is a circular DIFFRACTION
+      // GRATING, and a grating does two things an angular wheel does neither
+      // of:
+      //
+      //   THE SPECTRUM RUNS ALONG THE RADIUS. The angle a wavelength leaves at
+      //   depends on the track spacing, so violet through red spreads OUTWARD
+      //   from the hub — never around it.
+      //
+      //   IT IS LOCALISED IN ANGLE. Only the arc of the disc oriented right
+      //   for the lamp throws colour at the eye at all; everywhere else is
+      //   plain mirror. That is why the reference photograph is a couple of
+      //   bright fans on silver rather than an even ring of colour.
+      //
+      // So the RADIAL gradient carries the spectrum and an ANGULAR gradient is
+      // used as a MASK to confine it to a fan, which is the exact inversion of
+      // what was here before.
+      DiffractionFan(size: size, bearing: 34, spread: 84, strength: 0.95)
+      DiffractionFan(size: size, bearing: 214, spread: 72, strength: 0.78)
+      // A third, much fainter fan — a real disc catches a weaker second source
+      // (a window, a wall) as well as the main one, and one lone fan reads as
+      // a mistake rather than as light.
+      DiffractionFan(size: size, bearing: 128, spread: 44, strength: 0.34)
+
+      // AND THE FACE BETWEEN THE FANS HAS TO READ AS METAL, or the fans are
+      // simply sitting on a photograph. Neutral on purpose — no hue anywhere
+      // in it, which is the same rule the app's mirror ball settled on (28.07:
+      // the material carries no colour, the LIGHT does).
       Circle().fill(
-        AngularGradient(colors: [Color(hex: "#6ad0ff"), Color(hex: "#b98cff"), Color(hex: "#ff9ad0"),
-                                 Color(hex: "#ffd68a"), Color(hex: "#a8ffcf"), Color(hex: "#6ad0ff")],
-                        center: .center, angle: .degrees(20)))
-        .blendMode(.overlay)
-        .opacity(0.82)
-      Circle().fill(
-        AngularGradient(colors: [Color(hex: "#6ad0ff"), Color(hex: "#b98cff"), Color(hex: "#ff9ad0"),
-                                 Color(hex: "#ffd68a"), Color(hex: "#a8ffcf"), Color(hex: "#6ad0ff")],
-                        center: .center, angle: .degrees(200)))
+        AngularGradient(stops: [
+          .init(color: .white.opacity(0.20), location: 0.00),
+          .init(color: .white.opacity(0.02), location: 0.17),
+          .init(color: .white.opacity(0.26), location: 0.34),
+          .init(color: .white.opacity(0.04), location: 0.55),
+          .init(color: .white.opacity(0.22), location: 0.74),
+          .init(color: .white.opacity(0.03), location: 0.88),
+          .init(color: .white.opacity(0.20), location: 1.00),
+        ], center: .center, angle: .degrees(-30)))
         .blendMode(.screen)
-        .opacity(0.5)
+        .opacity(0.55)
+
       // The pressed rings. Fine enough to read as texture rather than as
       // drawn circles — the same pitch rule the app's Classic vinyl settled
       // on (25.08): below about 1.2pt apart they moiré, above ~4 they read

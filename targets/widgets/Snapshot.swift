@@ -184,47 +184,37 @@ extension WidgetStation {
     )
   }
 
-  /// THE WINAMP'S TITLE BAR, IN THE STATION'S OWN COLOUR (owner, 09.09:
-  /// "im not sure where that yellow top banner is coming from — change it to
-  /// the colour of the chosen station").
+  /// THE WINAMP'S TITLE BAR IS THE STATION'S OWN COLOUR, UNCHANGED (owner,
+  /// 10.09: "the Winamp top banner still comes with this murkey-yellow top
+  /// banner. We need to stop guessing and re[mo]ve the yellow colour").
   ///
-  /// IT IS NOT THE ACCENT DROPPED INTO A RAMP, and that distinction is the
-  /// whole of why this is arithmetic rather than one line. Build 42 did
-  /// exactly that — the station's colour as the MIDDLE stop of the gold —
-  /// and for a pale custom station (the owner's "Party" is a cream) it put a
-  /// near-white band under white type, which is this app's oldest rule
-  /// broken. A title bar also ramps ONE WAY, dark to light, so a colour
-  /// dropped into its middle breaks the ramp as well as the contrast.
+  /// SHE WAS RIGHT AND THE YELLOW WAS OURS, not build lag. The previous
+  /// version took the station's HUE only, replaced its brightness outright,
+  /// floored saturation at 0.42, and then scaled the whole ramp down against
+  /// the prototype gold's own luminance. Follow that through on her "Party"
+  /// station, which is a CREAM: a cream's hue is around 45 degrees, so
+  /// forcing it to 42% saturation at mid brightness produces a murky gold —
+  /// arithmetically, every time. The bar was never showing the old fixed
+  /// gold; it was manufacturing a new one, which is why no screenshot could
+  /// tell the two builds apart.
   ///
-  /// So the station gives its HUE and its SATURATION and nothing else: the
-  /// brightness is replaced outright, which makes it safe for any colour
-  /// anyone can invent. Saturation is floored at 0.42 so a near-grey station
-  /// still reads as a colour rather than as another grey bar, and the whole
-  /// ramp is then scaled down if its bright end would out-shine the
-  /// prototype's own gold — so white type on this bar is never worse than on
-  /// the look that was approved.
+  /// SO NOTHING IS INVENTED HERE ANY MORE. This is the app's own rule for a
+  /// coloured control, settled on 01.09 for the shuffle and repeat pills and
+  /// re-proved by measurement there: the FILL is the accent exactly as
+  /// chosen, and the INK adapts to it. A colour that is never mixed with
+  /// anything can never come out murky.
+  ///
+  /// What is left is a gentle ONE-WAY ramp — a title bar of that era runs
+  /// dark at the hinge to light at the buttons — built by darkening and
+  /// lightening the accent itself, so hue AND saturation survive intact.
   private var titleBarRGB: [(Double, Double, Double)] {
     let src = !accent.isEmpty ? accent : (colors.count > 1 ? colors[1] : "#7B38E0")
     let (r, g, b) = rgbOf(src)
-    let mx = max(r, max(g, b)), mn = min(r, min(g, b))
-    let c = mx - mn
-    // hue alone: the colour at full brightness and full saturation
-    let hr = c == 0 ? 1.0 : (r - mn) / c
-    let hg = c == 0 ? 1.0 : (g - mn) / c
-    let hb = c == 0 ? 1.0 : (b - mn) / c
-    let sat = max(0.42, min(0.92, mx == 0 ? 0 : c / mx))
-    func at(_ v: Double) -> (Double, Double, Double) {
-      (v * (1 - sat + sat * hr), v * (1 - sat + sat * hg), v * (1 - sat + sat * hb))
+    func scaled(_ f: Double) -> (Double, Double, Double) { (r * f, g * f, b * f) }
+    func lifted(_ t: Double) -> (Double, Double, Double) {
+      (r + (1 - r) * t, g + (1 - g) * t, b + (1 - b) * t)
     }
-    // #e0a24e — the prototype's own bright end — sits at relative luminance
-    // 0.42, i.e. 2.23:1 against white. Anything brighter than that is a
-    // regression on a look the owner has already signed off, so the ramp is
-    // pulled down by the gamma-correct factor rather than clamped per stop,
-    // which would flatten it.
-    var top = 0.66
-    let lum = srgbLuminance(at(top))
-    if lum > 0.427 { top *= pow(0.427 / lum, 1.0 / 2.4) }
-    return [at(top * 0.40), at(top * 0.72), at(top)]
+    return [scaled(0.82), scaled(0.94), lifted(0.12)]
   }
 
   /// The title bar itself: dark at the hinge, light at the buttons, the way
@@ -233,6 +223,21 @@ extension WidgetStation {
     LinearGradient(
       colors: titleBarRGB.map { Color(red: $0.0, green: $0.1, blue: $0.2) },
       startPoint: .leading, endPoint: .trailing)
+  }
+
+  /// The type ON that bar, chosen by MEASURED contrast rather than assumed to
+  /// be white. This is the half that makes an honest fill safe: a cream
+  /// station gets near-black lettering and a navy one gets white, so the
+  /// station keeps its own colour and the name stays readable on all of them.
+  ///
+  /// Judged against the ramp's MIDDLE stop, which is where the text sits.
+  var titleBarInk: Color {
+    let mid = titleBarRGB[1]
+    let lum = srgbLuminance(mid)
+    let onWhite = 1.05 / (lum + 0.05)
+    // #0d0f14, the app's own near-black, at relative luminance 0.00522.
+    let onDark = (lum + 0.05) / (0.00522 + 0.05)
+    return onDark > onWhite ? Color(red: 0.051, green: 0.059, blue: 0.078) : .white
   }
 
   /// Where tapping this station goes. The app's /drive route resolves and

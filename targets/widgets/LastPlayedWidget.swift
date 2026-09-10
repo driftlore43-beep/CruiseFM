@@ -179,7 +179,10 @@ struct LastPlayedView: View {
         // title bar
         HStack(spacing: 8) {
           discGlyph(size: 18)
-          Text("Cruise FM").font(pixelFont(15)).foregroundColor(.white)
+          // NOT hardcoded white: the bar is the station's own colour now, so
+          // a cream station gets near-black lettering and a navy one white.
+          // See titleBarInk in Snapshot.swift for why that is measured.
+          Text("Cruise FM").font(pixelFont(15)).foregroundColor(s.titleBarInk)
           Spacer(minLength: 4)
           ForEach(["_", "[]", "X"], id: \.self) { c in
             ZStack {

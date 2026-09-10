@@ -144,33 +144,53 @@ struct ModeView: View {
    * It used to sit in a VStack with its stem, a spacer and the station's name,
    * which came to about 162pt inside a ~158pt tile — so the ball was squeezed
    * to 108 AND pushed high, which is what the owner saw ("let it sit more
-   * central in the widget"). The name is now an OVERLAY at the foot rather
-   * than a row that has to be paid for out of the ball's height, so the ball
-   * takes the whole tile to centre itself in and can be much larger.
+   * central in the widget"). The name is now gone entirely (owner, 10.09:
+   * "the mirror ball should remove the station name at the bottom") — she had
+   * asked for the name once, on 09.09, and dropping it is a straight reversal
+   * of that, kept because it is the newer instruction. Every other widget in
+   * this row (the record, the CD) already carries no words at all, so the
+   * ball now matches: JUST THE BALL, which is also what let it grow in the
+   * first place.
    *
-   * The stem hangs off the ball itself for the same reason: a ball hangs from
-   * something, but that something must not push it down the tile.
+   * The stem hangs off the ball itself for the same reason as before: a ball
+   * hangs from something, but that something must not push it down the tile.
    */
   private func ball(_ s: WidgetStation) -> some View {
     ZStack {
-      RadialGradient(colors: [Color(hex: "#241a2b"), Color(hex: "#07050b")],
-                     center: .init(x: 0.5, y: 0.34), startRadius: 0, endRadius: 150)
+      // A GENUINE HALO, NOT A UNIFORM WASH (owner, 10.09: "a soft radial
+      // purple halo behind it rather than the current more uniform purple
+      // haze. The centre should glow and the corners should stay almost
+      // black"). The old radius (150, against a ~158pt tile) meant the
+      // gradient barely moved across the visible area — the corners sat at
+      // about 75% of the way to black rather than genuinely dark, which is
+      // exactly "uniform" rather than "glowing". A tighter radius plus a
+      // brighter, more saturated core stop is what turns a wash into a glow.
+      RadialGradient(colors: [Color(hex: "#4a3160"), Color(hex: "#241a2b"), Color(hex: "#050308")],
+                     center: .init(x: 0.5, y: 0.34), startRadius: 0, endRadius: 100)
       BeamField()
       MirrorBall(size: 126, rows: 17, cols: 30)
         .overlay(alignment: .top) {
-          Rectangle().fill(.white.opacity(0.30))
-            .frame(width: 1.5, height: 30).offset(y: -28)
+          // THIN AND METALLIC, FADING INTO THE GLOW (owner, 10.09: "make it
+          // thinner and slightly metallic instead of the current thick
+          // grey-purple strip. It could disappear subtly into the top glow").
+          // A flat 1.5pt rectangle at one flat opacity reads as a drawn bar
+          // at this scale; a wire is round and catches light along its
+          // length, so it needs a highlight in its OWN middle rather than one
+          // flat tone, and it must fade to nothing at both ends — into the
+          // glow at the top, and short of where it meets the ball, so there
+          // is no hard seam where metal supposedly meets chrome.
+          LinearGradient(stops: [
+            .init(color: .clear, location: 0),
+            .init(color: Color(hex: "#c7d2e8").opacity(0.55), location: 0.35),
+            .init(color: Color(hex: "#eef3ff").opacity(0.80), location: 0.55),
+            .init(color: Color(hex: "#c7d2e8").opacity(0.40), location: 0.80),
+            .init(color: .clear, location: 1),
+          ], startPoint: .top, endPoint: .bottom)
+            .frame(width: 1, height: 30).offset(y: -28)
         }
         // Nudged up by the small amount the stem needs, so the BALL reads as
         // centred rather than the ball-and-stem together.
         .offset(y: 4)
-      VStack {
-        Spacer(minLength: 0)
-        Text(s.name).font(.system(size: 13, weight: .heavy))
-          .foregroundColor(.white).lineLimit(1).minimumScaleFactor(0.7)
-          .shadow(color: .black.opacity(0.75), radius: 5)
-          .padding(.horizontal, 10).padding(.bottom, 9)
-      }
     }
     .widgetURL(s.url(mode: "disco"))
   }
@@ -191,10 +211,27 @@ struct ModeView: View {
       LinearGradient(colors: [Color(hex: "#1c1f26"), Color(hex: "#080a0e")],
                      startPoint: .topLeading, endPoint: .bottomTrailing)
       JewelCase()
+      // A SOFT GLOW BEHIND THE DISC (owner, 10.09: "add a soft glow/shadow
+      // behind the CD"). The disc already casts a contact shadow onto the
+      // case, which is depth — this is light, the same distinction the app's
+      // own decks draw everywhere else, so it is the station's own colour
+      // rather than plain black. `.blur` is a real modifier here, unlike the
+      // React Native SVG side of this app, which has none — so this is
+      // genuine falloff rather than a stack of stepped rings.
+      Circle().fill(s.accentColor.opacity(0.32))
+        .frame(width: 128, height: 128)
+        .blur(radius: 20)
+        .offset(x: 8)
       // Centred on the case's own interior rather than on the tile: the hinge
       // spine takes 17pt off the left, so dead centre would leave the disc
       // visibly closer to the hinge than to the opposite wall.
-      CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 110)
+      //
+      // SLIGHTLY LARGER (owner, 10.09: "make the CD slightly larger") —
+      // 110 -> 114. Checked against the same clearance the case comment
+      // above already establishes: at this size the disc's left edge sits
+      // ~3pt clear of the hinge spine and its right edge ~4pt clear of the
+      // case wall, so it grows without touching either.
+      CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 114)
         .offset(x: 8)
     }
     .widgetURL(s.url(mode: "cd"))
@@ -283,7 +320,7 @@ struct MirrorBall: View {
       // The body warms with the lamps — the prototype's party ball sits on
       // #332536, not the neutral #2a2c33 an unlit one does.
       Circle().fill(
-        RadialGradient(colors: [Color(hex: "#332536"), Color(hex: "#0d0812")],
+        RadialGradient(colors: [Color(hex: "#332536"), Color(hex: "#150f1c")],
                        center: .init(x: 0.38, y: 0.30), startRadius: 0, endRadius: size * 0.62))
       ForEach(tiles, id: \.id) { t in
         Path { p in
@@ -293,34 +330,98 @@ struct MirrorBall: View {
         }
         .fill(t.tint)
       }
-      Circle().stroke(.white.opacity(0.10), lineWidth: 1)
+      // A HANDFUL OF TINY GLINTS ON THE BRIGHTEST TILES (owner, 10.09: "a
+      // handful of very bright tiles or little star-like glints... don't put
+      // them everywhere — maybe 3-6 around the brightest area"). Picked from
+      // the SAME lighting model rather than guessed screen coordinates — the
+      // five brightest tiles the reflection math already produced — so a
+      // glint can never land somewhere the ball itself is dark. Built as pure
+      // falloff (a soft dot plus two hairline arms transparent at both tips),
+      // never a stroked shape: this file has already talked the CD's rim and
+      // the app's own mirror ball out of a plain stroked circle, because a
+      // hard edge on a light reads as a sticker rather than a shine.
+      ForEach(Array(brightestTiles.enumerated()), id: \.offset) { _, t in
+        Glint().position(t.center)
+      }
+      // THE RIM IS DIRECTIONAL LIGHT, NOT A DRAWN OUTLINE (owner, 10.09:
+      // "softer edge lighting... a faint rim-light — especially violet on one
+      // side and blue on the other — would separate it from the background",
+      // and the same message's separate note that the tile's own light
+      // outline "feels somewhat UI-like"). Both are this one stroke: a flat
+      // `Circle().stroke(.white.opacity(x))` is one brightness the whole way
+      // round, which is exactly a drawn ring — the file has already talked
+      // the CD and the Pocket Player's rims out of that shape. An
+      // `AngularGradient` sweep puts violet on one arc and icy blue on the
+      // opposite one, fading to nothing everywhere else, so it reads as two
+      // lamps catching the silhouette rather than a UI border.
+      Circle().strokeBorder(
+        AngularGradient(stops: [
+          .init(color: Color(hex: "#b98cff").opacity(0.50), location: 0.00),
+          .init(color: .clear, location: 0.20),
+          .init(color: .clear, location: 0.44),
+          .init(color: Color(hex: "#8fd8ff").opacity(0.46), location: 0.60),
+          .init(color: .clear, location: 0.80),
+          .init(color: Color(hex: "#b98cff").opacity(0.50), location: 1.00),
+        ], center: .center, angle: .degrees(-35)), lineWidth: 1.6)
     }
     .frame(width: size, height: size)
     .shadow(color: Color(hex: "#e696e6").opacity(0.40), radius: 18)
   }
 
-  private struct Tile { let id: Int; let pts: [CGPoint]; let v: Double; let tint: Color }
+  /// A soft dot with two hairline arms, both fading to nothing at their own
+  /// tips — the recipe the app's own mirror ball settled on for a shine that
+  /// reads as light rather than as a sticker glued to the surface.
+  private struct Glint: View {
+    var body: some View {
+      ZStack {
+        Circle().fill(
+          RadialGradient(colors: [.white.opacity(0.9), Color(hex: "#e4d6ff").opacity(0.3), .clear],
+                         center: .center, startRadius: 0, endRadius: 4.5))
+          .frame(width: 9, height: 9)
+        LinearGradient(colors: [.clear, .white.opacity(0.85), .clear],
+                       startPoint: .top, endPoint: .bottom).frame(width: 1, height: 12)
+        LinearGradient(colors: [.clear, .white.opacity(0.85), .clear],
+                       startPoint: .leading, endPoint: .trailing).frame(width: 12, height: 1)
+      }
+      .allowsHitTesting(false)
+    }
+  }
+
+  private struct Tile { let id: Int; let pts: [CGPoint]; let center: CGPoint; let v: Double; let tint: Color }
+
+  /// The five tiles the lighting model itself made brightest — see `Glint`.
+  private var brightestTiles: [Tile] {
+    Array(tiles.sorted { $0.v > $1.v }.prefix(5))
+  }
 
   private var tiles: [Tile] {
-    let r = size / 2, tilt = -0.16, shrink = 0.91
+    let r = size / 2, tilt = -0.16
+    // GROUT, THINNED (owner, 10.09: "reduce the heavy tile outlines. The dark
+    // grid around every mirror tile is quite dominant... lower-opacity so the
+    // lighting becomes the focus"). Nothing here strokes a tile — the "grid"
+    // is the ball's own dark body showing through the gap left by shrinking
+    // every quad toward its own centre, so the grout is thinned by shrinking
+    // LESS (0.91 -> 0.955, a narrower gap) and the body colour it reveals is
+    // lifted a step (see the RadialGradient above) so what remains reads as a
+    // seam rather than a black line.
+    let shrink = 0.955
     let lamps: [(Double, Double, Double)] = [
       norm((-0.58, -0.55, 0.60)), norm((0.66, -0.10, 0.74)), norm((0.06, 0.62, 0.78)),
     ]
-    // ONE COLOUR PER LAMP — pink, blue, purple. Owner, 03.09: "reflect off
-    // pretty pink, blue and purple colours - as if it's a party happening."
-    // The prototype has carried this since round 3 and the Swift never did:
-    // every tile was filled `Color(white:)`, so the ball shipped as plain
-    // silver and she photographed it that way.
-    //
-    // THE TINT GOES WHERE THE LIGHT LANDS, WHICH IS THE WHOLE RULE. A mirror
-    // no lamp catches stays silver; one caught square-on goes nearly its
-    // lamp's own colour; one between two blends — the same weights that
-    // already decide its brightness, carried into colour. That keeps the
-    // material neutral chrome and puts the mood entirely in the lighting,
-    // which is the app's own Mirror Ball rule (round 20, and round 22's
-    // "nothing structural on this ball may carry a hue").
+    // PINK -> VIOLET -> ICY BLUE, and the falloff between them is smoother
+    // than the brightness itself (owner, 10.09: "a smoother pink -> violet ->
+    // icy blue falloff... almost white/lavender in a few tiles"). Colour and
+    // brightness now use TWO DIFFERENT lobes off the same reflection: `lw`
+    // stays a steep pow(d,5.4) so the ball is still dark between the lamps —
+    // "keep the outer tiles darker" — while `cw` is a wider pow(d,3) used only
+    // for how far the TINT reaches. A steep colour lobe would patch the hue
+    // in small hard-edged islands; a wide one lets neighbouring mirrors blend
+    // from one hue into the next, which is what "smoother falloff" means.
+    // Blending pink and icy blue at close range is also what produces the
+    // pale lavender she asked for at the brightest catches, with no fourth
+    // colour invented for it.
     let lampColors: [(Double, Double, Double)] = [
-      (255, 120, 190), (120, 175, 255), (190, 125, 255),
+      (255, 145, 200), (185, 140, 255), (150, 215, 255),
     ]
     var out: [Tile] = []
     var seed = 11
@@ -351,50 +452,60 @@ struct MirrorBall: View {
         let mx = pts.map(\.x).reduce(0, +) / 4, my = pts.map(\.y).reduce(0, +) / 4
         let quad = pts.map { CGPoint(x: r + (mx + ($0.x - mx) * shrink) * r,
                                      y: r - (my + ($0.y - my) * shrink) * r) }
+        let center = CGPoint(x: quad.map(\.x).reduce(0, +) / 4,
+                             y: quad.map(\.y).reduce(0, +) / 4)
         let n = norm((ax / 4, ay / 4, az / 4))
         let ndv = n.2                                    // n · (0,0,1)
         let refl = norm((2 * ndv * n.0, 2 * ndv * n.1, 2 * ndv * n.2 - 1))
-        // LIGHTER, AND WITH MORE COLOUR IN THE CATCHES (owner, 09.09: "lighten
-        // up the tiles, enhance details on the reflections"). MEASURED across
-        // all 209 visible mirrors rather than eyeballed: median brightness
-        // 104.5 -> 117.0, mirrors above 200 3.3% -> 9.1%, mirrors carrying a
-        // lamp's colour 18.2% -> 26.3%, mean colour spread 8.6 -> 15.7.
+        // STRONGER DEPTH: DARK BETWEEN THE LAMPS, WHITE-HOT WHERE THEY CATCH
+        // (owner, 10.09: "keep the outer tiles darker, but make the centre
+        // reflection much brighter... that will make it feel reflective
+        // rather than painted"). MEASURED with a Python port of this exact
+        // loop (scratchpad/ball/measure.py) rather than eyeballed: ambient
+        // 0.23 -> 0.13 and the lamp gain 0.86 -> 1.15 moves the median off
+        // 209 tiles 117.0 -> 91.2 (the ball reads darker overall — "outer
+        // tiles darker") while mirrors above 245 (near-white) go 2.4% -> 4.8%
+        // and mirrors carrying real colour 23.9% -> 34.0% (the smoother
+        // falloff above). The exponent stays STEEP (6 -> 5.4, barely
+        // softened) so the bright zone stays SMALL rather than spreading —
+        // "a few tiles", not most of the ball.
         //
-        // THE LOBE WIDENS RATHER THAN THE FLOOR RISING, and that is the whole
-        // trick — the app's own ball proved on 18.08 that lifting the ambient
-        // alone raises the median AND kills the highlights (its share above
-        // 200 fell 4.1% -> 0.6%, i.e. a uniform grey sphere). A wider lobe
-        // means MORE MIRRORS CATCHING A LAMP, so the median, the highlights
-        // and the colour all rise together and a lit mirror stays plainly
-        // brighter than its neighbour, which is the cue that reads as chrome.
-        // The extra scatter is the other half of that: neighbouring mirrors
-        // reflect different parts of the room, so they must disagree.
-        var b = 0.23
-        var w: [Double] = []
+        // THIS IS STILL THE REFLECTION MODEL, NOT A SCREEN-SPACE SPOTLIGHT. A
+        // positional brightness gradient was tried and measured first and
+        // read exactly like the file's own standing warning against one: it
+        // crushed the median to 64.8 and left NOTHING near-white, because
+        // "distance from the tile's centre" does not correlate with which
+        // mirror is actually catching a lamp. Contrast comes from the SAME
+        // lamp maths that already decides colour, which is why a bright tile
+        // and a coloured tile are so often the same tile.
+        var b = 0.13
+        var w: [Double] = []          // brightness weight — stays steep
+        var cw: [Double] = []         // colour weight — wider, for the falloff
         for L in lamps {
           let d = max(0, refl.0 * L.0 + refl.1 * L.1 + refl.2 * L.2)
-          let lw = pow(d, 6)
+          let lw = pow(d, 5.4)
           w.append(lw)
-          b += 0.86 * lw
+          cw.append(pow(d, 3))
+          b += 1.15 * lw
         }
-        b += rnd() * 0.36          // each mirror catches its own bit of room
+        b += rnd() * 0.28          // each mirror catches its own bit of room
         b = min(1, max(0.05, b))
         let v = 0.10 + 0.90 * pow(b, 0.72)
-        let wsum = w.reduce(0, +)
+        let cwsum = cw.reduce(0, +)
         var tint = Color(white: v)
-        if wsum > 0.002 {
+        if cwsum > 0.002 {
           let g = 255.0 * v
           var cr = 0.0, cg = 0.0, cb = 0.0
-          for (weight, lc) in zip(w, lampColors) {
+          for (weight, lc) in zip(cw, lampColors) {
             cr += weight * lc.0; cg += weight * lc.1; cb += weight * lc.2
           }
-          cr /= wsum; cg /= wsum; cb /= wsum
-          let k = min(1.0, wsum * 2.0) * 0.78
+          cr /= cwsum; cg /= cwsum; cb /= cwsum
+          let k = min(1.0, cwsum * 1.4) * 0.78
           tint = Color(red:   min(1, max(0, (g * (1 - k) + cr * k) / 255)),
                        green: min(1, max(0, (g * (1 - k) + cg * k) / 255)),
                        blue:  min(1, max(0, (g * (1 - k) + cb * k) / 255)))
         }
-        out.append(Tile(id: i * cols + j, pts: quad, v: v, tint: tint))
+        out.append(Tile(id: i * cols + j, pts: quad, center: center, v: v, tint: tint))
       }
     }
     return out
@@ -420,9 +531,16 @@ private struct JewelCase: View {
       RoundedRectangle(cornerRadius: caseRadius)
         .fill(LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.02), .white.opacity(0.10)],
                              startPoint: .topLeading, endPoint: .bottomTrailing))
-        .overlay(RoundedRectangle(cornerRadius: caseRadius).stroke(.white.opacity(0.30), lineWidth: 2))
+        // THE OUTER STROKE, LIGHTENED (owner, 10.09: "reduce the heavy outer
+        // frame/borders"). 2pt at 0.30 is a genuinely bold line at this
+        // scale; the plastic is already carried by the fill and the diagonal
+        // sweep below, so the stroke only needs to mark the edge, not draw
+        // it. Halved on both counts.
+        .overlay(RoundedRectangle(cornerRadius: caseRadius).stroke(.white.opacity(0.16), lineWidth: 1))
 
-      // hinge spine
+      // hinge spine — the tabs down it are the "side buttons" (owner, 10.09:
+      // "make the side buttons more subtle"), quieted the same way as the
+      // frame: less fill, less stroke.
       HStack(spacing: 0) {
         LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.04)],
                        startPoint: .leading, endPoint: .trailing)
@@ -432,15 +550,15 @@ private struct JewelCase: View {
             VStack(spacing: 14) {
               ForEach(0..<3, id: \.self) { _ in
                 RoundedRectangle(cornerRadius: 2)
-                  .fill(.white.opacity(0.16))
-                  .overlay(RoundedRectangle(cornerRadius: 2).stroke(.white.opacity(0.24), lineWidth: 1))
+                  .fill(.white.opacity(0.09))
+                  .overlay(RoundedRectangle(cornerRadius: 2).stroke(.white.opacity(0.14), lineWidth: 1))
                   .frame(width: 11, height: 19)
               }
             })
         Spacer(minLength: 0)
       }
 
-      // corner posts
+      // corner posts, also quieted with the rest of the frame
       VStack {
         HStack { post(.topLeading); Spacer(); post(.topTrailing) }
         Spacer()
@@ -474,10 +592,10 @@ private struct JewelCase: View {
     let top = corner == .topLeading || corner == .topTrailing
     let leading = corner == .topLeading || corner == .bottomLeading
     return ZStack {
-      VStack { if !top { Spacer() }; Rectangle().frame(height: 2.5); if top { Spacer() } }
-      HStack { if !leading { Spacer() }; Rectangle().frame(width: 2.5); if leading { Spacer() } }
+      VStack { if !top { Spacer() }; Rectangle().frame(height: 1.8); if top { Spacer() } }
+      HStack { if !leading { Spacer() }; Rectangle().frame(width: 1.8); if leading { Spacer() } }
     }
-    .foregroundColor(.white.opacity(0.34))
+    .foregroundColor(.white.opacity(0.22))
     .frame(width: 15, height: 15)
   }
 }
@@ -527,11 +645,19 @@ struct CompactDisc: View {
       // a second, weaker pass in `screen` puts the light back without washing
       // the colour out. Offset 180° from the first so the two do not stack
       // their own peaks on top of each other.
+      //
+      // THE FIRST PASS IS TURNED DOWN A STEP (owner, 10.09: "make the disc
+      // reflection a little cleaner and more glossy") — a full-strength
+      // six-stop rainbow over the whole face reads as a printed pattern; a
+      // disc's iridescence is a THIN skin of colour over the light, not the
+      // dominant thing on it, so it now sits at .82 rather than full
+      // strength. The specular sweep below is what carries "glossy" instead.
       Circle().fill(
         AngularGradient(colors: [Color(hex: "#6ad0ff"), Color(hex: "#b98cff"), Color(hex: "#ff9ad0"),
                                  Color(hex: "#ffd68a"), Color(hex: "#a8ffcf"), Color(hex: "#6ad0ff")],
                         center: .center, angle: .degrees(20)))
         .blendMode(.overlay)
+        .opacity(0.82)
       Circle().fill(
         AngularGradient(colors: [Color(hex: "#6ad0ff"), Color(hex: "#b98cff"), Color(hex: "#ff9ad0"),
                                  Color(hex: "#ffd68a"), Color(hex: "#a8ffcf"), Color(hex: "#6ad0ff")],
@@ -545,13 +671,16 @@ struct CompactDisc: View {
       Circle().fill(
         RadialGradient(stops: ringStops(), center: .center,
                        startRadius: 0, endRadius: size / 2))
-      // the single specular sweep
+      // THE SPECULAR SWEEP, TIGHTENED for a crisper gloss rather than a broad
+      // soft wash — a narrower, brighter streak is what a genuine reflective
+      // sheen looks like, against a wide dim one that reads as a general
+      // brightening of the face.
       Circle().fill(
         LinearGradient(stops: [
-          .init(color: .white.opacity(0.34), location: 0.05),
-          .init(color: .clear, location: 0.28),
-          .init(color: .clear, location: 0.68),
-          .init(color: .white.opacity(0.20), location: 0.92),
+          .init(color: .white.opacity(0.52), location: 0.04),
+          .init(color: .clear, location: 0.20),
+          .init(color: .clear, location: 0.72),
+          .init(color: .white.opacity(0.30), location: 0.95),
         ], startPoint: .topLeading, endPoint: .bottomTrailing))
 
       // ── WHAT MAKES IT READ AS AN OBJECT RATHER THAN A PRINTED CIRCLE ────
@@ -609,12 +738,12 @@ struct CompactDisc: View {
       // bright where the lamp is and dark opposite, so it is a sweep.
       Circle().strokeBorder(
         AngularGradient(stops: [
-          .init(color: .white.opacity(0.55), location: 0),
-          .init(color: .white.opacity(0.10), location: 0.28),
-          .init(color: .white.opacity(0.34), location: 0.55),
-          .init(color: .white.opacity(0.06), location: 0.80),
-          .init(color: .white.opacity(0.55), location: 1),
-        ], center: .center, angle: .degrees(-125)), lineWidth: 1.4)
+          .init(color: .white.opacity(0.62), location: 0),
+          .init(color: .white.opacity(0.08), location: 0.28),
+          .init(color: .white.opacity(0.40), location: 0.55),
+          .init(color: .white.opacity(0.05), location: 0.80),
+          .init(color: .white.opacity(0.62), location: 1),
+        ], center: .center, angle: .degrees(-125)), lineWidth: 1.2)
     }
     .frame(width: size, height: size)
     .clipShape(Circle())

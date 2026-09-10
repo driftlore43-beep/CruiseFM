@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NowPlayingHost } from '@/components/NowPlayingHost';
 import { useStyles, usePalette } from '@/context/AppearanceContext';
 import type { Palette } from '@/utils/appearance';
-import { PAGE_GUTTER, TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
+import { PAGE_GUTTER, PAGE_MAX_W, TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -147,6 +147,13 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     width: '100%',
+    // THE BAR LINES UP WITH THE COLUMN ABOVE IT, on a tablet as on a phone.
+    // That rule is why the app has one gutter at all (31.07); left to run the
+    // full width of an iPad the four tabs spread a metre apart and the bar
+    // plainly belonged to a different page from the cards above it. The
+    // wrapper already insets by the gutter, so the cap is the card width.
+    // Never binds on a phone — see PAGE_MAX_W.
+    maxWidth: PAGE_MAX_W - PAGE_GUTTER * 2,
     borderWidth: 1,
     borderColor: p.ink(0.08),
     shadowColor: p.shadow,

@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 
-import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
+import { Cruise, TAB_SAFE_INSET, pageColumn } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { useTheme } from '@/context/ThemeContext';
 import { useMotion } from '@/context/MotionContext';
@@ -819,7 +819,9 @@ const makeStyles = (p: Palette) => StyleSheet.create({
 
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 22, paddingBottom: 48 },
+  // See theme's pageColumn — the same reading column every page uses, and
+  // the one the floating tab bar is capped to match.
+  content: { paddingHorizontal: 22, paddingBottom: 48, ...pageColumn },
   // A hairline ring, not the old violet drop-shadow halo: the avatar is 60pt
   // beside the name now rather than 80pt centred above it, and a glow at that
   // size just muddies the initials.

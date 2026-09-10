@@ -14,7 +14,7 @@ import { resolveAnyStation } from '@/utils/customStations';
 import { applyModeOrder, getModeOrder, moveModeWithinGroup, saveModeOrder } from '@/utils/modeOrder';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useEntitlements } from '@/context/EntitlementsContext';
-import { PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
+import { PAGE_GUTTER, TAB_SAFE_INSET, pageColumn } from '@/constants/theme';
 import { usePalette, useStyles } from '@/context/AppearanceContext';
 import type { Palette } from '@/utils/appearance';
 
@@ -244,7 +244,7 @@ export default function ModesScreen() {
     <View style={styles.root}>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: insets.top + 26, paddingBottom: TAB_SAFE_INSET + insets.bottom }}
+        contentContainerStyle={[pageColumn, { paddingTop: insets.top + 26, paddingBottom: TAB_SAFE_INSET + insets.bottom }]}
         showsVerticalScrollIndicator={false}>
 
         <View style={styles.titleRow}>

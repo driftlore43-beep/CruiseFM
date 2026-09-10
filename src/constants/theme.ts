@@ -1,6 +1,6 @@
 import '@/global.css';
 
-import { Platform } from 'react-native';
+import { Platform, type ViewStyle } from 'react-native';
 
 export const Cruise = {
   // Core palette
@@ -79,6 +79,45 @@ export const MaxContentWidth = 800;
  * 20 on Stations and 16 on the tab bar.
  */
 export const PAGE_GUTTER     = 20;
+
+/**
+ * WHERE A BIG PHONE STOPS AND A TABLET BEGINS.
+ *
+ * Every page in this app was laid out as one column against a side gutter,
+ * which is right on a phone and falls apart on an iPad: at 1032 points wide
+ * the hero becomes a 4:1 letterbox with its type huddled in one corner, the
+ * greeting wraps against the left edge for no reason, and a two-button row
+ * gives each button half a screen. Nothing is broken — it is simply a phone
+ * stretched, which is what an iPad screenshot would have shown Apple.
+ *
+ * The fix is a reading column rather than a rebuild: above `WIDE_MIN` the
+ * page's content is capped at `PAGE_MAX_W` and centred, so every card keeps
+ * the proportions it was designed at and the extra width becomes margin.
+ *
+ * BOTH NUMBERS ARE CHOSEN SO A PHONE CAN NEVER REACH THEM. The widest phone
+ * this app runs on is 430 points, so on any phone the cap never binds and the
+ * layout is byte-identical to what shipped — which is the whole safety of
+ * doing it this way rather than by rewriting the page.
+ */
+export const WIDE_MIN        = 700;
+export const PAGE_MAX_W      = 720;
+
+/** True when the window is a tablet's rather than a phone's. */
+export const isWide = (winW: number) => winW >= WIDE_MIN;
+
+/**
+ * The reading column itself, for a page's scroll content container.
+ *
+ * ONE OBJECT RATHER THAN FOUR COPIES, because the floating tab bar is capped
+ * to match it — so a page that opted out would put the bar visibly out of
+ * step with the content above it, which is the exact fault the single gutter
+ * was introduced to fix (31.07).
+ */
+export const pageColumn: ViewStyle = {
+  width: '100%',
+  maxWidth: PAGE_MAX_W,
+  alignSelf: 'center',
+};
 
 export const TAB_BAR_HEIGHT  = 84;
 export const TAB_BAR_BOTTOM  = 22;   // gap from screen edge

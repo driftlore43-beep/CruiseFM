@@ -2,11 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRef } from 'react';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { useMotion } from '@/context/MotionContext';
 import type { Station } from '@/constants/stations';
+import { isWide } from '@/constants/theme';
 
 function triggerHaptic() {
   if (Platform.OS !== 'web') {
@@ -45,6 +46,12 @@ type HeroCardProps = {
  * the mini player for attention. A disc reads as "play" without shouting.
  */
 export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start Drive', heroLine = 'Let’s cruise.', resuming = false }: HeroCardProps) {
+  // A TABLET'S HERO IS TALLER, because 250 points is a phone's number. Capped
+  // at 720 the card is 680 wide, so at 250 it is a 2.7:1 letterbox with its
+  // type in one corner and the play button stranded at the other; 340 brings
+  // it back to about 2:1, which reads as a banner rather than a slot.
+  const { width: winW } = useWindowDimensions();
+  const heroH = isWide(winW) ? 340 : HERO_H;
   const { dataSaver } = useMotion();
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -69,7 +76,7 @@ export function HeroCard({ onStartDrive, cueLabel, station, buttonLabel = 'Start
         onPressIn={() => press(0.985)}
         onPressOut={() => press(1)}
         accessibilityLabel={buttonLabel}>
-        <View style={styles.card}>
+        <View style={[styles.card, { height: heroH }]}>
           <StationBackdrop station={station} blurRadius={1.2} motionAllowed={!dataSaver} />
           {/* Deep at the bottom where the type lives, barely there at the top
               so the photograph is actually visible. */}

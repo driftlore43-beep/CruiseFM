@@ -22,7 +22,7 @@ import { StationDetailModal } from '@/components/StationDetailModal';
 import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
-import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET } from '@/constants/theme';
+import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET, pageColumn } from '@/constants/theme';
 import { useStyles } from '@/context/AppearanceContext';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { needsOffAirAsk } from '@/constants/schedule';
@@ -408,7 +408,16 @@ export default function CruiseScreen() {
 const makeStyles = (p: Palette) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
-  content: {},
+  // THE READING COLUMN, and it is the whole of the iPad fix. Every child of
+  // this ScrollView — the hero, the cards, the shelves — was laid out against
+  // a side gutter, so on a 1032-point iPad they stretched into shapes nobody
+  // designed: a 4:1 hero with its type in one corner, buttons half a screen
+  // wide. Capping the container and centring it means each one keeps the
+  // proportions it was drawn at and the spare width becomes margin.
+  //
+  // A PHONE CAN NEVER REACH THE CAP (the widest is 430 points), so this is
+  // byte-identical on every phone — see PAGE_MAX_W's own note.
+  content: pageColumn,
   // The page title, at the same weight and size as "Now tuning" and "Modes".
   // It was 15pt — smaller than the station names underneath it.
   greeting: {

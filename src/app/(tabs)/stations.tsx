@@ -11,7 +11,7 @@ import { useDaylight } from '@/context/MotionContext';
 import { StationDetailModal } from '@/components/StationDetailModal';
 import { GlossSheen } from '@/components/GlossSheen';
 import { useNowPlaying } from '@/context/NowPlayingContext';
-import { Cruise, Fonts, TAB_SAFE_INSET, PAGE_GUTTER } from '@/constants/theme';
+import { Cruise, Fonts, PAGE_GUTTER, TAB_SAFE_INSET, pageColumn } from '@/constants/theme';
 import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { deleteCustomStation, isCustomStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
@@ -609,7 +609,10 @@ const makeStyles = (p: Palette) => StyleSheet.create({
   scroll: { flex: 1 },
   // No horizontal padding here: the hero runs edge to edge, so the inset is
   // applied by the rows and headers instead.
-  content: { paddingBottom: 32 },
+  // Capped and centred on a tablet, so the dial does not stretch a station's
+  // name and its icon a foot apart — and so the floating tab bar, which is
+  // capped to match, still lines up with the column. See theme's pageColumn.
+  content: { paddingBottom: 32, ...pageColumn },
 
   // ── Hero ──────────────────────────────────────────────────────────────────
   title: {

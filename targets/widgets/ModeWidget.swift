@@ -218,10 +218,15 @@ struct ModeView: View {
     ZStack {
       RadialGradient(colors: [Color(hex: "#1a1a1f"), Color(hex: "#08080a")],
                      center: .init(x: 0.38, y: 0.30), startRadius: 0, endRadius: 150)
-      ZStack {
-        RecordView(accent: s.accentColor, label: nil, size: 132, plainLabel: true)
-        DialText(dial: s.dial, size: 132 * 0.105, color: Color(hex: "#ffe7c2"))
-      }
+      // NOT ONE WORD ON IT, AND AS BIG AS THE TILE ALLOWS (owner, 09.09:
+      // "increase the size of the vinyl too, remove the station's text so
+      // it's just the vinyl"). It carried the frequency on its label; a
+      // record on its own is the whole idea of this look, and the station
+      // still names itself on every other row in the gallery.
+      //
+      // 144 in a ~158pt tile leaves 7pt of room each side. The record's own
+      // shadow needs somewhere to fall, which is what stops it going wider.
+      RecordView(accent: s.accentColor, label: nil, size: 144, plainLabel: true)
     }
     .widgetURL(s.url(mode: "vinyl"))
   }

@@ -140,6 +140,29 @@ extension Color {
   }
 }
 
+/// The red, green and blue of a "#rrggbb", each 0-1. Anything unparseable
+/// comes back as the app's own violet rather than nil, so a bad value still
+/// draws something rather than nothing.
+func rgbOf(_ hex: String) -> (Double, Double, Double) {
+  let cleaned = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+  var value: UInt64 = 0
+  guard cleaned.count == 6, Scanner(string: cleaned).scanHexInt64(&value) else {
+    return (0.482, 0.220, 0.878)
+  }
+  return (Double((value & 0xFF0000) >> 16) / 255,
+          Double((value & 0x00FF00) >> 8) / 255,
+          Double(value & 0x0000FF) / 255)
+}
+
+/// Relative luminance, the sRGB definition WCAG uses. This is what lets a
+/// colour's readability be MEASURED rather than guessed at.
+func srgbLuminance(_ c: (Double, Double, Double)) -> Double {
+  func lin(_ x: Double) -> Double {
+    x <= 0.03928 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4)
+  }
+  return 0.2126 * lin(c.0) + 0.7152 * lin(c.1) + 0.0722 * lin(c.2)
+}
+
 extension WidgetStation {
   /// The accent slot every mode wears — eqColors[1] in the app, sent already
   /// resolved so a widget can never pick a different one from the screen it
@@ -161,12 +184,70 @@ extension WidgetStation {
     )
   }
 
+  /// THE WINAMP'S TITLE BAR, IN THE STATION'S OWN COLOUR (owner, 09.09:
+  /// "im not sure where that yellow top banner is coming from — change it to
+  /// the colour of the chosen station").
+  ///
+  /// IT IS NOT THE ACCENT DROPPED INTO A RAMP, and that distinction is the
+  /// whole of why this is arithmetic rather than one line. Build 42 did
+  /// exactly that — the station's colour as the MIDDLE stop of the gold —
+  /// and for a pale custom station (the owner's "Party" is a cream) it put a
+  /// near-white band under white type, which is this app's oldest rule
+  /// broken. A title bar also ramps ONE WAY, dark to light, so a colour
+  /// dropped into its middle breaks the ramp as well as the contrast.
+  ///
+  /// So the station gives its HUE and its SATURATION and nothing else: the
+  /// brightness is replaced outright, which makes it safe for any colour
+  /// anyone can invent. Saturation is floored at 0.42 so a near-grey station
+  /// still reads as a colour rather than as another grey bar, and the whole
+  /// ramp is then scaled down if its bright end would out-shine the
+  /// prototype's own gold — so white type on this bar is never worse than on
+  /// the look that was approved.
+  private var titleBarRGB: [(Double, Double, Double)] {
+    let src = !accent.isEmpty ? accent : (colors.count > 1 ? colors[1] : "#7B38E0")
+    let (r, g, b) = rgbOf(src)
+    let mx = max(r, max(g, b)), mn = min(r, min(g, b))
+    let c = mx - mn
+    // hue alone: the colour at full brightness and full saturation
+    let hr = c == 0 ? 1.0 : (r - mn) / c
+    let hg = c == 0 ? 1.0 : (g - mn) / c
+    let hb = c == 0 ? 1.0 : (b - mn) / c
+    let sat = max(0.42, min(0.92, mx == 0 ? 0 : c / mx))
+    func at(_ v: Double) -> (Double, Double, Double) {
+      (v * (1 - sat + sat * hr), v * (1 - sat + sat * hg), v * (1 - sat + sat * hb))
+    }
+    // #e0a24e — the prototype's own bright end — sits at relative luminance
+    // 0.42, i.e. 2.23:1 against white. Anything brighter than that is a
+    // regression on a look the owner has already signed off, so the ramp is
+    // pulled down by the gamma-correct factor rather than clamped per stop,
+    // which would flatten it.
+    var top = 0.66
+    let lum = srgbLuminance(at(top))
+    if lum > 0.427 { top *= pow(0.427 / lum, 1.0 / 2.4) }
+    return [at(top * 0.40), at(top * 0.72), at(top)]
+  }
+
+  /// The title bar itself: dark at the hinge, light at the buttons, the way
+  /// every window of that era was drawn.
+  var titleBarRamp: LinearGradient {
+    LinearGradient(
+      colors: titleBarRGB.map { Color(red: $0.0, green: $0.1, blue: $0.2) },
+      startPoint: .leading, endPoint: .trailing)
+  }
+
   /// Where tapping this station goes. The app's /drive route resolves and
   /// falls back, so a stale link (a station deleted since this was drawn)
   /// still lands in a real drive rather than a dead end.
-  func url(mode: String?) -> URL? {
+  /// `kind` says whether the tap means a DRIVE or a desk listen. Only the
+  /// Start Drive tile sends one — it is the widget whose whole name is the
+  /// answer to that question (owner, 09.09: "since it's for a start drive …
+  /// it should be in driving mode when this widget is selected"). Every other
+  /// widget leaves it off and the app keeps whatever the listener last chose,
+  /// which is right: a tap on the Deck is not a claim about where they are.
+  func url(mode: String?, kind: String? = nil) -> URL? {
     var s = "cruisefm://drive?station=\(id)"
     if let mode { s += "&mode=\(mode)" }
+    if let kind { s += "&kind=\(kind)" }
     return URL(string: s)
   }
 }
@@ -228,6 +309,11 @@ struct DialText: View {
   let dial: String
   var size: CGFloat = 15
   var color: Color = .white
+  /// Pull the digits left so their INK starts at this view's leading edge.
+  /// Only wanted when the dial sits directly above or below other type that
+  /// has to line up with it — see `dseg7InkInset`.
+  var alignInk: Bool = false
+
   var body: some View {
     let d = splitDial(dial)
     HStack(alignment: .firstTextBaseline, spacing: size * 0.28) {
@@ -236,7 +322,27 @@ struct DialText: View {
         Text(d.band).font(bandFont(size * 0.56)).foregroundColor(color.opacity(0.82))
       }
     }
+    .padding(.leading, alignInk ? -dseg7InkInset(d.number, size: size) : 0)
   }
+}
+
+/// HOW FAR A SEVEN-SEGMENT NUMBER'S INK SITS FROM ITS OWN TEXT ORIGIN.
+///
+/// Owner, 09.09: "the station's number and the name aligned, it currently
+/// looks staggered." It was, and the cause is the font rather than the
+/// layout — every glyph in that column really does start at the same x.
+///
+/// A seven-segment glyph is drawn where its segments are, and its box is
+/// sized for a full '8'. MEASURED off DSEG7's own hmtx: every digit carries a
+/// **0.099 em** left side bearing except **'1', which carries 0.593 em**,
+/// because a seven-segment one is only the two right-hand bars.
+///
+/// So the indent CHANGED FROM STATION TO STATION, which is exactly what
+/// "staggered" describes: at 15pt a dial reading 1240 sat 8.9pt in from the
+/// name beneath it and one reading 810 sat 1.5pt in. Shifting the number left
+/// by its own first glyph's bearing puts the ink where the eye expects it.
+func dseg7InkInset(_ number: String, size: CGFloat) -> CGFloat {
+  size * (number.first == "1" ? 0.593 : 0.099)
 }
 /// The icon set every station picks its glyph from.
 ///

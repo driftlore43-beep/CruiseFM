@@ -192,22 +192,21 @@ struct LastPlayedView: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 32)
-        // THE PROTOTYPE'S OWN GOLD, and putting the station's accent in the
-        // middle of it was the divergence. A title bar ramps ONE WAY, dark to
-        // light; dropping an arbitrary colour into the middle stop breaks that
-        // — and for a pale custom station (the owner's "Party" is a cream) it
-        // put a near-white band under white type, which is this app's oldest
-        // rule broken again: a station's colour may tint a surface and may
-        // never decide whether the words on it can be read.
+        // THE STATION'S OWN COLOUR (owner, 09.09: "im not sure where that
+        // yellow top banner is coming from — change it to the colour of the
+        // chosen station"). It replaces the prototype's fixed gold.
         //
-        // The station is not lost from this look — it prints its name and its
-        // dial under the transport, and the photograph beside them is its own.
-        .background(
-          LinearGradient(stops: [
-            .init(color: Color(hex: "#7a4a12"), location: 0),
-            .init(color: Color(hex: "#c2761a"), location: 0.62),
-            .init(color: Color(hex: "#e0a24e"), location: 1),
-          ], startPoint: .leading, endPoint: .trailing))
+        // IT IS A DERIVED RAMP, NOT THE ACCENT ITSELF, and the reason is a
+        // bug that already shipped once: build 42 dropped the station's
+        // accent into the MIDDLE stop of the gold, which broke the one-way
+        // dark-to-light ramp a title bar needs AND put a near-white band
+        // under white type for a pale custom station. `titleBarRamp` takes
+        // the station's hue and saturation and replaces the brightness
+        // outright, then pulls the whole ramp down if its bright end would
+        // out-shine the gold — so white type here is never worse than on the
+        // look that was signed off. MEASURED across the palette: the gold's
+        // bright end is 2.22:1 against white and the worst station is 2.37.
+        .background(s.titleBarRamp)
 
         HStack(alignment: .top, spacing: 11) {
           ZStack {

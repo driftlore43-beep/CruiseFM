@@ -6,9 +6,10 @@ import { knownMode } from '@/constants/modeCatalog';
 import { loadCustomStations, resolveAnyStation } from '@/utils/customStations';
 import { loadLastCruise, defaultStationForNow } from '@/utils/lastCruise';
 import { requestDrive } from '@/utils/driveRequest';
+import type { SessionKind } from '@/utils/sessionKind';
 
 /**
- * WHERE A WIDGET TAP LANDS: cruisefm://drive?station=<id>&mode=<id>
+ * WHERE A WIDGET TAP LANDS: cruisefm://drive?station=<id>&mode=<id>&kind=<k>
  *
  * A widget cannot start a drive itself — all it can do is open a URL — so
  * every widget that offers "Start Drive" points here, and this route does the
@@ -29,7 +30,7 @@ import { requestDrive } from '@/utils/driveRequest';
  * blank screen that only exists to have been passed through.
  */
 export default function DriveLink() {
-  const params = useLocalSearchParams<{ station?: string; mode?: string }>();
+  const params = useLocalSearchParams<{ station?: string; mode?: string; kind?: string }>();
   // The params are read once: a deep link is a single instruction, and
   // re-running it on a re-render would restart the music underneath someone.
   const done = useRef(false);
@@ -54,17 +55,22 @@ export default function DriveLink() {
         ? wanted
         : (last?.stationId ?? defaultStationForNow());
       const mode = knownMode(params.mode ?? last?.mode ?? 'equalizer');
+      // Nothing from a URL is trusted, this included: only the two words the
+      // app itself uses are accepted, and anything else leaves the remembered
+      // answer exactly where it was.
+      const kind: SessionKind | undefined =
+        params.kind === 'driving' || params.kind === 'listening' ? params.kind : undefined;
 
       // HAND OVER RATHER THAN OPEN HERE. The deck's host lives in the tabs
       // layout, which does not exist yet when a tap cold-starts the app into
       // this route — opening from here measured as a real session with the
       // right station and no deck on screen. See utils/driveRequest.
-      requestDrive({ stationId: station, mode });
+      requestDrive({ stationId: station, mode, kind });
       router.replace('/');
     })();
 
     return () => { cancelled = true; };
-  }, [params.station, params.mode]);
+  }, [params.station, params.mode, params.kind]);
 
   return <View style={{ flex: 1, backgroundColor: '#000' }} />;
 }

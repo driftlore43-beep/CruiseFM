@@ -129,6 +129,33 @@ console.log('\n  the subset still covers every icon a station can use:');
     `missing: ${JSON.stringify(missing)} — re-run the subset after adding an icon`);
   const unknown = [...names].filter((nm) => !glyphs[nm]);
   check('every icon name is a real glyph', unknown.length === 0, JSON.stringify(unknown));
+
+  // THE CAR ON THE START DRIVE TILE IS THE SEEK BAR'S OWN CAR, and it is the
+  // one icon in this target asked for by CODEPOINT rather than by name — the
+  // extension has no glyph-name table, since every other icon arrives in the
+  // snapshot as a character the app already resolved. So three things have to
+  // stay in step, and a hollow box is what it looks like when they do not:
+  // the app still draws `car-convertible`, that name still means this
+  // codepoint, and the subset still carries it.
+  const seek = fs.readFileSync(`${ROOT}/src/components/SeekBar.tsx`, 'utf8');
+  const drew = seek.match(/name="([a-z][a-z0-9-]+)"/);
+  check('the seek bar still draws a named car', !!drew && /car/.test(drew[1]),
+    `SeekBar's icon is ${JSON.stringify(drew && drew[1])}`);
+
+  const swift = fs.readFileSync(`${ROOT}/targets/widgets/StartDriveWidget.swift`, 'utf8');
+  const pinned = swift.match(/let CAR_GLYPH = "\\u\{([0-9A-Fa-f]+)\}"/);
+  check('the widget pins the car as a codepoint', !!pinned,
+    'CAR_GLYPH is not written as \\u{...} — the check cannot read it');
+  if (pinned && drew) {
+    const want = glyphs[drew[1]];
+    const got = parseInt(pinned[1], 16);
+    check('the widget and the seek bar draw the SAME car',
+      want === got,
+      `SeekBar draws ${drew[1]} = U+${want && want.toString(16).toUpperCase()}, ` +
+      `the widget pins U+${got.toString(16).toUpperCase()}`);
+    check('and that car is in the subset', covered.has(got),
+      `U+${got.toString(16).toUpperCase()} is not in ${sub} — it would draw a hollow box`);
+  }
 }
 
 // ── THE BAND LETTERS ──────────────────────────────────────────────────────

@@ -124,7 +124,15 @@ export default function CruiseScreen() {
       // is about to be taken away from. Reading it takes it, so a later
       // return to this tab cannot start a second drive.
       const wanted = consumeDriveRequest();
-      if (wanted) npRef.current.open(wanted.mode, wanted.stationId);
+      if (wanted) {
+        // A tap on the Start Drive tile is an answer to "heading anywhere?",
+        // so it is recorded before the drive starts rather than left for the
+        // card to ask about later. Written for next time too, not just this
+        // session — someone who reaches for that widget is telling the app
+        // what kind of listener they are.
+        if (wanted.kind) { setKind(wanted.kind); setSessionKind(wanted.kind); }
+        npRef.current.open(wanted.mode, wanted.stationId);
+      }
       setTonightPick(stationById(defaultStationForNow()));
       setStatsKey((k) => k + 1);
       getDriverName().then((n) => { if (active) setDriverName(n); });

@@ -17,7 +17,19 @@
  * would start a drive out of nowhere. Reading this takes it, so it cannot
  * fire twice.
  */
-export type DriveRequest = { stationId: string; mode: string };
+import type { SessionKind } from '@/utils/sessionKind';
+
+export type DriveRequest = {
+  stationId: string;
+  mode: string;
+  /**
+   * Set only by the Start Drive tile, which is the one widget whose own name
+   * answers the question the app otherwise has to ask. Everything else leaves
+   * it undefined and the remembered answer stands — a tap on the Deck says
+   * nothing about whether anyone is in a car.
+   */
+  kind?: SessionKind;
+};
 
 let pending: DriveRequest | null = null;
 

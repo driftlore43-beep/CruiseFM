@@ -88,74 +88,135 @@ struct StartDriveView: View {
           // ink went 0.55 -> 0.72 to get there), name 9.32.
           StationScrim()
           VStack(alignment: .leading, spacing: 0) {
+            // THE CAR OFF THE SEEK BAR (owner, 09.09: "since it's for a start
+            // drive, the car icon — the same one that sits on our scrub —
+            // should be there"). `car-convertible`, the glyph `SeekCar` draws,
+            // so the tile and the bar are the same little car rather than two
+            // that merely rhyme. It is already in the subset the extension
+            // ships, because the create sheet offers it as a station icon;
+            // test-widget-fonts pins that, since a codepoint with no glyph
+            // draws a hollow box and nothing anywhere logs it.
             HStack(alignment: .top) {
-              Text(s.mode == nil ? "TUNE IN" : "START DRIVE")
-                .font(.system(size: 9, weight: .heavy)).tracking(1.6)
-                .foregroundColor(.white.opacity(0.62))
+              Text(CAR_GLYPH).font(iconFont(22)).foregroundColor(.white)
               Spacer()
               if let ch = s.iconChar, !ch.isEmpty {
-                Text(ch).font(iconFont(17)).foregroundColor(.white.opacity(0.9))
+                Text(ch).font(iconFont(15)).foregroundColor(.white.opacity(0.62))
               }
             }
+            Spacer(minLength: 2)
+            // BIG, because it is what the tile is for ("make the start drive
+            // big also"). It was 9pt letterspaced small caps in the corner —
+            // a label on a photograph rather than an invitation. Two lines,
+            // so it can be large and still clear a narrow tile.
+            Text(s.mode == nil ? "TUNE\nIN" : "START\nDRIVE")
+              .font(.system(size: 24, weight: .heavy))
+              .foregroundColor(.white)
+              .lineSpacing(-1)
+              .shadow(color: .black.opacity(0.55), radius: 6)
+              .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
-            DialText(dial: s.dial, size: 15, color: .white.opacity(0.72))
-            Text(s.name).font(.system(size: 16, weight: .bold))
-              .foregroundColor(.white).lineLimit(2).minimumScaleFactor(0.8)
+            // `alignInk` is what stops these two reading as staggered: a
+            // seven-segment '1' is only the right-hand bars, so an unshifted
+            // 1240 sat visibly further in than the name beneath it while an
+            // 810 did not. See dseg7InkInset.
+            DialText(dial: s.dial, size: 13, color: .white.opacity(0.74), alignInk: true)
+            Text(s.name).font(.system(size: 13, weight: .bold))
+              .foregroundColor(.white).lineLimit(1).minimumScaleFactor(0.7)
           }
           .padding(13)
         } else {
           // THE MEDIUM IS AN INVITATION, not a label. This is the widget
-          // someone taps to get going, so it asks rather than announces —
-          // and the photograph bleeds in from the right instead of sitting
-          // under everything, which is what stops the type competing with it.
-          HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-              Text(s.mode == nil ? "TUNE IN" : "PICK UP WHERE YOU LEFT OFF")
-                .font(.system(size: 9, weight: .heavy)).tracking(1.5)
-                .foregroundColor(s.accentColor)
-                .lineLimit(1).minimumScaleFactor(0.8)
-              Spacer(minLength: 6)
-              Text("Let\u{2019}s put\nsomething on.")
-                .font(.system(size: 23, weight: .heavy))
-                .foregroundColor(.white)
-                .lineSpacing(1)
-                .fixedSize(horizontal: false, vertical: true)
-              Spacer(minLength: 6)
-              Text(s.mode == nil ? s.name : "\(s.name) · \(modeLabel(s.mode))")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.white.opacity(0.78)).lineLimit(1)
+          // someone taps to get going, so it asks rather than announces.
+          //
+          // THE PICTURE RUNS THE WHOLE CARD NOW, AND THE TYPE SITS IN A
+          // SHADOW ON IT (owner, 09.09: "remove that grey box on the left and
+          // replace it with a black gradient or vignette"). It used to be a
+          // 168pt photo panel butted against a flat slab, and the slab was
+          // the station's own ramp over near-black — which on a muted station
+          // is precisely a grey box, with a hard vertical seam where the two
+          // met. A boxed-off scrim is a rectangle; a scrim that fades to
+          // nothing has no edge to see, which is the rule this target already
+          // follows everywhere else.
+          ZStack {
+            if let img = Art.station(s.image) {
+              img.cruiseBackdrop()
+            } else {
+              // No photograph — a custom station. Its own colours, on the
+              // dark ground rather than as the ground, because a pale one
+              // must never decide whether the words on it can be read.
+              Color(hex: "#0d0f14")
+              s.gradient.opacity(0.55)
             }
-            .padding(.vertical, 16)
-            .padding(.leading, 16)
-            Spacer(minLength: 8)
-            ZStack(alignment: .trailing) {
-              if let img = Art.station(s.image) {
-                img.cruiseBackdrop()
-              } else {
-                s.gradient
+
+            // THE SHADOW THE TYPE STANDS IN. Opaque at the left edge, gone by
+            // the right, so the picture emerges under the play button and the
+            // words never have to compete with it.
+            LinearGradient(stops: [
+              .init(color: Color(hex: "#07080c"), location: 0),
+              .init(color: Color(hex: "#07080c").opacity(0.90), location: 0.42),
+              .init(color: Color(hex: "#07080c").opacity(0.46), location: 0.72),
+              .init(color: Color(hex: "#07080c").opacity(0.10), location: 1),
+            ], startPoint: .leading, endPoint: .trailing)
+
+            // A VIGNETTE, so the photograph is framed rather than cropped —
+            // it is what stops a bright sky running flat into the tile's own
+            // rounded edge. Both bands fade to nothing inward.
+            VStack(spacing: 0) {
+              LinearGradient(colors: [.black.opacity(0.30), .clear],
+                             startPoint: .top, endPoint: .bottom)
+                .frame(height: 30)
+              Spacer(minLength: 0)
+              LinearGradient(colors: [.clear, .black.opacity(0.38)],
+                             startPoint: .top, endPoint: .bottom)
+                .frame(height: 34)
+            }
+
+            HStack(spacing: 8) {
+              VStack(alignment: .leading, spacing: 0) {
+                Text(s.mode == nil ? "TUNE IN" : "PICK UP WHERE YOU LEFT OFF")
+                  .font(.system(size: 9, weight: .heavy)).tracking(1.5)
+                  .foregroundColor(s.accentColor)
+                  .lineLimit(1).minimumScaleFactor(0.8)
+                Spacer(minLength: 6)
+                Text("Let\u{2019}s put\nsomething on.")
+                  .font(.system(size: 23, weight: .heavy))
+                  .foregroundColor(.white)
+                  .lineSpacing(1)
+                  .shadow(color: .black.opacity(0.55), radius: 6)
+                  .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 6)
+                Text(s.mode == nil ? s.name : "\(s.name) · \(modeLabel(s.mode))")
+                  .font(.system(size: 12, weight: .medium))
+                  .foregroundColor(.white.opacity(0.80)).lineLimit(1)
+                  .shadow(color: .black.opacity(0.55), radius: 5)
               }
-              // The photograph fades OUT toward the type rather than being
-              // boxed off it — a scrim with a visible edge is a rectangle.
-              LinearGradient(stops: [
-                .init(color: Color(hex: "#0d0f14"), location: 0),
-                .init(color: Color(hex: "#0d0f14").opacity(0.55), location: 0.34),
-                .init(color: .clear, location: 1),
-              ], startPoint: .leading, endPoint: .trailing)
+              Spacer(minLength: 0)
               Circle().fill(.white)
                 .frame(width: 46, height: 46)
                 .overlay(Triangle().fill(Color(hex: "#111")).frame(width: 15, height: 18).offset(x: 2))
                 .shadow(color: .black.opacity(0.5), radius: 8, y: 3)
-                .padding(.trailing, 16)
             }
-            .frame(width: 168)
-            .clipped()
+            .padding(.vertical, 16)
+            .padding(.horizontal, 16)
           }
         }
       }
-      .widgetURL(s.url(mode: s.mode))
+      // A TAP HERE MEANS A DRIVE, so it says so. The app asks once whether
+      // someone is heading anywhere and remembers the answer, which decides
+      // what it COUNTS and what it CALLS things — and this is the one widget
+      // whose entire name answers that question, so leaving the app to guess
+      // would be the app guessing when it had been told.
+      .widgetURL(s.url(mode: s.mode, kind: "driving"))
     }
   }
 }
+
+/// `car-convertible` in MaterialCommunityIcons — the same glyph the seek
+/// bar's little car is drawn from. Written as a codepoint because the
+/// extension has no glyph-name table (the app resolves names and the
+/// snapshot carries the character), and pinned in test-widget-fonts so a
+/// renumbered glyph fails a check rather than drawing a hollow box.
+let CAR_GLYPH = "\u{F07A7}"
 
 /// The mode's own name, for the invitation line. The snapshot carries the id
 /// the app stores (`disco`, not "Mirror Ball"), and printing an id at someone

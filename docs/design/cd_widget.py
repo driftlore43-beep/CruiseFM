@@ -69,13 +69,18 @@ def screen(dst, src, a):
 # TURQUOISE/TEAL (~186-210). The yellow-gold in a raw photo is the silver metal
 # itself, not the diffraction — so the spectrum drops the generic green/yellow/
 # orange the old wheel carried and runs pink -> violet -> blue -> turquoise.
+# WEIGHTED TOWARD PINK/PURPLE 11.09 (owner: "add more pink and purple to the
+# rainbow"): pink now enters earlier and holds two stops, violet holds two more,
+# so pink+purple owns the inner ~0.6 of the fan and blue/turquoise are a thin
+# outer rim rather than half the sweep.
 SPECTRUM = [
     (0.00, (0, 0, 0), 0.0),
-    (0.12, hexc('#ff5ec8'), 0.5),
-    (0.30, hexc('#b57cff'), 1.0),
-    (0.50, hexc('#5a9cff'), 1.0),
-    (0.68, hexc('#2fd6dc'), 1.0),
-    (0.86, hexc('#9bede0'), 0.6),
+    (0.09, hexc('#ff4fbf'), 0.65),  # pink, in early
+    (0.26, hexc('#ff6ad6'), 1.0),   # bright pink
+    (0.44, hexc('#cf6dff'), 1.0),   # magenta-violet
+    (0.60, hexc('#9b7cff'), 1.0),   # violet
+    (0.80, hexc('#5a9cff'), 1.0),   # blue
+    (0.93, hexc('#2fd6dc'), 0.6),   # turquoise, thin outer rim
     (1.00, (0, 0, 0), 0.0),
 ]
 METAL = [(0.00, (1, 1, 1), 0.20), (0.17, (1, 1, 1), 0.02), (0.34, (1, 1, 1), 0.26),
@@ -150,11 +155,13 @@ def disc(option, size=DISC):
         r0, r1 = 0.13 * n, 0.52 * n
         t = np.clip((d - r0) / (r1 - r0), 0, 1)
         spec, sa = stops_at(SPECTRUM, t)
-        # Fine concentric tracks, THINNED (owner 11.09: "the grooves are too
-        # thick, thin them out a little") and made to CATCH THE LIGHT in the
-        # fans ("make them more visible near the reflected area on the
-        # rainbow"). Same pitch as the base rings below so the two align.
-        track = np.where(((d / R) % 0.085) / 0.085 < 0.26, 1.0, 0.0)
+        # Fine concentric tracks, now HAIRLINES (owner 11.09: "reduce the
+        # groove thickness significantly — make them hairline thickness"): the
+        # pitch is tighter (0.06 of the radius) and the lit band is only 0.10
+        # of that pitch, so each groove is roughly a single pixel wide. Made
+        # to CATCH THE LIGHT in the fans ("more visible near the reflected
+        # area"). Same pitch as the base rings below so the two align.
+        track = np.where(((d / R) % 0.06) / 0.06 < 0.10, 1.0, 0.0)
         for bearing, spread, strength in fans:
             # DiffractionFan turns the wedge back half a revolution so its
             # peak (location 0.5) lands on the bearing.
@@ -177,14 +184,15 @@ def disc(option, size=DISC):
         # into the flat colour-wheel of option A.
         img = screen(img, np.full_like(img, 0.62), np.full(ang.shape, 0.42))
 
-    # The base tracks everywhere on the silver — THINNED (owner 11.09: "too
-    # thick, thin them out a little"): the white band is now 0.26 of the
-    # pitch rather than half, at opacity 0.015. On plain metal they are a
-    # barely-there shimmer; the fan loop above lifts the SAME tracks where
-    # the rainbow lands, which is where a real disc shows them most.
+    # The base tracks everywhere on the silver — now HAIRLINES (owner 11.09:
+    # "reduce the groove thickness significantly — make them hairline
+    # thickness"): a tighter 0.06 pitch with the lit band only 0.10 of it, at
+    # opacity 0.015. On plain metal they are a barely-there shimmer; the fan
+    # loop above lifts the SAME tracks where the rainbow lands, which is where
+    # a real disc shows them most.
     ring_t = d / R
-    phase = (ring_t % 0.085) / 0.085
-    ring_a = np.where(phase < 0.26, 0.015, 0.0)
+    phase = (ring_t % 0.06) / 0.06
+    ring_a = np.where(phase < 0.10, 0.015, 0.0)
     img = over(img, np.ones_like(img), ring_a)
 
     # specular sweep, topLeading -> bottomTrailing

@@ -677,13 +677,18 @@ private struct DiffractionFan: View {
   // (~186-210). The yellow-gold a raw photo shows is the silver metal itself,
   // not the diffraction — so the spectrum drops the generic green/yellow/
   // orange the old wheel carried and runs pink -> violet -> blue -> turquoise.
+  // WEIGHTED TOWARD PINK/PURPLE 11.09 (owner: "add more pink and purple to
+  // the rainbow"): pink enters early and holds two stops, violet holds two
+  // more, so pink+purple owns the inner ~0.6 of the fan and blue/turquoise
+  // are a thin outer rim rather than half the sweep.
   private static let spectrumStops: [Gradient.Stop] = [
     .init(color: .clear, location: 0.00),
-    .init(color: Color(hex: "#ff5ec8").opacity(0.5), location: 0.12),
-    .init(color: Color(hex: "#b57cff"), location: 0.30),
-    .init(color: Color(hex: "#5a9cff"), location: 0.50),
-    .init(color: Color(hex: "#2fd6dc"), location: 0.68),
-    .init(color: Color(hex: "#9bede0").opacity(0.6), location: 0.86),
+    .init(color: Color(hex: "#ff4fbf").opacity(0.65), location: 0.09),
+    .init(color: Color(hex: "#ff6ad6"), location: 0.26),
+    .init(color: Color(hex: "#cf6dff"), location: 0.44),
+    .init(color: Color(hex: "#9b7cff"), location: 0.60),
+    .init(color: Color(hex: "#5a9cff"), location: 0.80),
+    .init(color: Color(hex: "#2fd6dc").opacity(0.6), location: 0.93),
     .init(color: .clear, location: 1.00),
   ]
 
@@ -745,8 +750,9 @@ private struct DiffractionFan: View {
 /// The pressed CD's fine concentric tracks, as gradient stops. A real disc's
 /// data pitch is a few hundred nanometres — far below anything a screen can
 /// resolve — so what a photo shows is a soft shimmer, not rings you could
-/// count. THINNED 11.09 (owner: "the grooves are too thick, thin them out a
-/// little"): the white band is 0.26 of the pitch rather than half.
+/// count. HAIRLINES 11.09 (owner: "reduce the groove thickness significantly —
+/// make them hairline thickness"): a tighter 0.06 pitch with the lit band only
+/// 0.006 wide, roughly a single pixel per groove.
 ///
 /// Shared by two callers at the SAME pitch and phase so they align instead of
 /// beating: the disc's faint base layer everywhere (low opacity), and each
@@ -763,8 +769,8 @@ fileprivate func pressedRingStops(_ opacity: Double) -> [Gradient.Stop] {
   var t: CGFloat = 0
   while t < 1 {
     out.append(Gradient.Stop(color: .white.opacity(opacity), location: t))
-    out.append(Gradient.Stop(color: .clear, location: min(1, t + 0.022)))
-    t += 0.085
+    out.append(Gradient.Stop(color: .clear, location: min(1, t + 0.006)))
+    t += 0.06
   }
   return out
 }

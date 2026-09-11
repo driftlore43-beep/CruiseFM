@@ -731,9 +731,11 @@ struct CompactDisc: View {
   /// real pressing has). A real CD's data pitch is a few hundred nanometres —
   /// thousands of grooves per millimetre, far below anything a screen can
   /// resolve, so what a photo of one actually shows is a soft, barely-there
-  /// shimmer, not rings you could count. This halves the opacity (0.08 ->
-  /// 0.04) and widens the pitch (0.045 -> 0.07 of the radius), which is what
-  /// turns individually countable rings into texture.
+  /// shimmer, not rings you could count. EASED AGAIN 11.09 (owner: "ease on
+  /// the CD grooves, they're not meant to be that significant") — opacity
+  /// 0.04 -> 0.02 and pitch 0.07 -> 0.085 of the radius, halving them once
+  /// more so they read as the barely-there shimmer a pressing shows rather
+  /// than a faint target.
   ///
   /// Built here rather than inline so the locations are unambiguously
   /// CGFloat — an implicit Double bridge is the kind of thing that compiles
@@ -743,9 +745,9 @@ struct CompactDisc: View {
     var out: [Gradient.Stop] = []
     var t: CGFloat = 0
     while t < 1 {
-      out.append(Gradient.Stop(color: .white.opacity(0.04), location: t))
-      out.append(Gradient.Stop(color: .clear, location: min(1, t + 0.035)))
-      t += 0.07
+      out.append(Gradient.Stop(color: .white.opacity(0.02), location: t))
+      out.append(Gradient.Stop(color: .clear, location: min(1, t + 0.0425)))
+      t += 0.085
     }
     return out
   }
@@ -770,13 +772,12 @@ struct CompactDisc: View {
         cover.resizable().aspectRatio(contentMode: .fill)
           .frame(width: size, height: size)
           .clipShape(Circle())
-          // PUSHED FURTHER DOWN AND DESATURATED since the rainbow stopped
-          // covering the whole face: with only two fans on it, a bright
-          // saturated photograph reads as a picture with some colour laid
-          // over it rather than as a disc. The art is still plainly the
-          // cover — it is printed under a mirror, and that is what a printed
-          // face under a mirror looks like.
-          .brightness(-0.14).saturation(0.95)
+          // ONLY A FAINT TINT UNDER THE MIRROR now that a clear-silver lift
+          // sits over the whole face (below, 11.09). Darkening the art hard
+          // was what made a clear disc read as a dark print; -0.10/0.92
+          // leaves the cover just legible under the silver rather than
+          // carrying the disc's brightness itself.
+          .brightness(-0.10).saturation(0.92)
       } else {
         Circle().fill(accent.opacity(0.55))
       }
@@ -831,6 +832,24 @@ struct CompactDisc: View {
         ], center: .center, angle: .degrees(-30)))
         .blendMode(.screen)
         .opacity(0.55)
+
+      // ── THE CLEAR-SILVER LIFT ─────────────────────────────────────────
+      //
+      // Owner, 11.09: "can the CD look more whiter — it currently looks too
+      // dark for a clear CD". A pressed disc's data land is bright silver
+      // metal, not a dark print, and the night-photo cover underneath was
+      // holding the whole face down (measured on the prototype
+      // docs/design/cd_widget.py, B's median luminance sat at ~48).
+      //
+      // A uniform silver SCREEN over the face lifts the darks toward silver
+      // while the fans and the specular sweep keep their own brightness
+      // (screen keeps the lighter of the two), so the disc reads as a clear
+      // pressing without washing the rainbow back into the flat colour-wheel
+      // of the old build-45 look. On the prototype this moves B's median
+      // luminance from ~48 to ~93 — a clear disc, the fans still localised.
+      Circle().fill(Color(white: 0.62))
+        .blendMode(.screen)
+        .opacity(0.42)
 
       // The pressed rings. Fine enough to read as texture rather than as
       // drawn circles — the same pitch rule the app's Classic vinyl settled

@@ -120,13 +120,12 @@ def disc(option, size=DISC):
         grey = img.mean(axis=2, keepdims=True)
         img = np.clip(grey + (img - grey) * 1.15, 0, 1)
     else:
-        # -0.14 / 0.95 — lifted 10.09 from -0.30/0.80. The old pair was
-        # tuned for a full-circle OVERLAY rainbow that muted against a
-        # bright ground; the fans are a SCREEN blend now, which only ever
-        # brightens, so darkening the art ahead of it just cost the cover.
-        img = np.clip(img - 0.14, 0, 1)
+        # -0.10 / 0.92 — the art is only a faint tint under the mirror now
+        # that a clear-silver lift sits over it (below). Darkening it hard
+        # was what made a clear disc read as a dark print.
+        img = np.clip(img - 0.10, 0, 1)
         grey = img.mean(axis=2, keepdims=True)
-        img = np.clip(grey + (img - grey) * 0.95, 0, 1)
+        img = np.clip(grey + (img - grey) * 0.92, 0, 1)
 
     fans = OPTIONS[option]
     if fans is None:
@@ -157,14 +156,24 @@ def disc(option, size=DISC):
         mloc = ((ang - (-30 - 90)) % 360) / 360.0
         _, ma = stops_at(METAL, mloc)
         img = screen(img, np.ones_like(img), ma * 0.55)
+        # CLEAR-SILVER LIFT (owner 11.09: "can the CD look more whiter — it
+        # currently looks too dark for a clear CD"). A pressed disc's data
+        # land is bright metal, not a dark print. A uniform silver SCREEN
+        # over the face lifts the darks toward silver while the fans and the
+        # specular sweep keep their own brightness (screen keeps the lighter
+        # of the two), so the disc reads clear without washing the rainbow
+        # into the flat colour-wheel of option A.
+        img = screen(img, np.full_like(img, 0.62), np.full(ang.shape, 0.42))
 
-    # pressed rings, EASED 10.09 — opacity 0.08 -> 0.04, pitch 0.045 -> 0.07
-    # of the radius. A real CD's groove pitch is nanometres, far below
-    # anything a photo resolves; the old numbers read as countable rings,
-    # which is the "too textured" she named.
+    # pressed rings, EASED AGAIN 11.09 — opacity 0.04 -> 0.02, pitch
+    # 0.07 -> 0.085 of the radius (owner: "ease on the CD grooves, they're
+    # not meant to be that significant"). A real CD's groove pitch is
+    # nanometres, far below anything a photo resolves; halving the opacity
+    # and widening the pitch again turns them from a faint target into the
+    # barely-there shimmer a pressing actually shows.
     ring_t = d / R
-    phase = (ring_t % 0.07) / 0.07
-    ring_a = np.where(phase < 0.5, 0.04, 0.0)
+    phase = (ring_t % 0.085) / 0.085
+    ring_a = np.where(phase < 0.5, 0.02, 0.0)
     img = over(img, np.ones_like(img), ring_a)
 
     # specular sweep, topLeading -> bottomTrailing

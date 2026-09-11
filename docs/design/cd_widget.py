@@ -108,6 +108,37 @@ OPTIONS = {
 
 WHEEL = ['#6ad0ff', '#b98cff', '#ff9ad0', '#ffd68a', '#a8ffcf', '#6ad0ff']
 
+# ── STREAKS ──────────────────────────────────────────────────────────────
+# Owner 11.09: "the colours [shouldn't] disperse just as a gradient... let's
+# try to make streaks of pink, orange, turquoise, purple that can overlap like
+# the image." So instead of one smooth radial spectrum per fan, each beam is
+# built from several narrow SINGLE-COLOUR rays laid side by side across the
+# beam and SCREEN-blended, so where two rays overlap their colours add into a
+# new hue — the way the reference photo's beams show a pink ray, an orange
+# ray, a turquoise ray and a purple ray sitting next to each other, blending
+# at their edges rather than melting into one gradient.
+STREAK_PALETTE = [
+    hexc('#ff7a3c'),   # orange
+    hexc('#ff5ec8'),   # pink
+    hexc('#a86cff'),   # purple
+    hexc('#2fd6dc'),   # turquoise
+]
+# radial brightness envelope shared by every ray: fades in off the hub, holds
+# across the reflective land, drops at the rim. Colour-independent, so all the
+# rays share one shape and only the hue changes across the beam.
+ENV_STOPS = [(0.00, (1, 1, 1), 0.0), (0.15, (1, 1, 1), 0.9),
+             (0.55, (1, 1, 1), 1.0), (0.85, (1, 1, 1), 0.55),
+             (1.00, (1, 1, 1), 0.0)]
+# beams are (bearing, spread, strength), matching the fan geometry.
+STREAKS = {
+    'S_streaks': [(34, 82, 0.95), (214, 74, 0.82), (128, 40, 0.30)],
+    'S_dense':   [(34, 82, 0.95), (214, 74, 0.82), (128, 40, 0.30)],
+    'S_wide':    [(38, 120, 1.00), (218, 108, 0.86)],
+}
+# per-option (rays across a 90deg beam, how far each ray is widened past its
+# slot so neighbours overlap): more/ wider = softer blending between colours.
+STREAK_PARAMS = {'S_streaks': (10, 2.2), 'S_dense': (14, 2.7), 'S_wide': (9, 2.4)}
+
 def disc(option, size=DISC):
     n = size
     y, x = np.mgrid[0:n, 0:n].astype(float)
@@ -136,8 +167,35 @@ def disc(option, size=DISC):
         grey = img.mean(axis=2, keepdims=True)
         img = np.clip(grey + (img - grey) * 0.92, 0, 1)
 
-    fans = OPTIONS[option]
-    if fans is None:
+    fans = OPTIONS.get(option)
+    if option in STREAKS:
+        # Side-by-side single-colour rays, screen-blended so overlaps add
+        # into new hues (owner 11.09: streaks that "overlap like the image").
+        r0, r1 = 0.13 * n, 0.52 * n
+        t = np.clip((d - r0) / (r1 - r0), 0, 1)
+        _, env = stops_at(ENV_STOPS, t)
+        # hairline tracks, same pitch/phase as the base rings below
+        track = np.where(((d / R) % 0.06) / 0.06 < 0.10, 1.0, 0.0)
+        rays_per_90, widen = STREAK_PARAMS[option]
+        for bearing, spread, strength in STREAKS[option]:
+            n_rays = max(4, int(round(spread / 90.0 * rays_per_90)))
+            width = (spread / n_rays) * widen
+            for k in range(n_rays):
+                frac = (k + 0.5) / n_rays
+                sub = bearing - spread / 2 + frac * spread
+                col = np.array(STREAK_PALETTE[k % len(STREAK_PALETTE)])
+                gangle = (sub - 90) - 180
+                loc = ((ang - gangle) % 360) / 360.0
+                _, wa = stops_at(wedge_stops(width), loc)
+                a = wa * env * strength * 0.85
+                img = screen(img, np.ones_like(img) * col, a)
+                # the ray's own hairlines catch its light
+                img = screen(img, np.ones_like(img), a * track * 0.55)
+        mloc = ((ang - (-30 - 90)) % 360) / 360.0
+        _, ma = stops_at(METAL, mloc)
+        img = screen(img, np.ones_like(img), ma * 0.55)
+        img = screen(img, np.full_like(img, 0.62), np.full(ang.shape, 0.42))
+    elif fans is None:
         # two full-circle angular rainbows — a colour wheel, which is what
         # she photographed and called "painted on"
         wheel = [(i / (len(WHEEL) - 1), hexc(c), 1.0) for i, c in enumerate(WHEEL)]
@@ -312,10 +370,10 @@ def tile(option):
     return base.resize((158 * 3, 158 * 3), Image.LANCZOS)
 
 if __name__ == '__main__':
-    names = [('A_build45', 'A  build 45/46 — the colour wheel she photographed'),
-             ('B_build47', 'B  build 47 (already committed) — 2 fans + 1 faint'),
-             ('C_four',    'C  four even fans'),
-             ('D_two_wide','D  two wide fans, nothing else')]
+    names = [('B_build47', 'A  current — one smooth gradient per beam'),
+             ('S_streaks', 'B  streaks — pink/orange/turquoise/purple, overlapping'),
+             ('S_dense',   'C  streaks — denser, softer overlap'),
+             ('S_wide',    'D  streaks — two wide beams')]
     W = 158 * 3
     sheet = Image.new('RGB', (W * 4 + 100, W + 130), (14, 14, 17))
     dd = ImageDraw.Draw(sheet)

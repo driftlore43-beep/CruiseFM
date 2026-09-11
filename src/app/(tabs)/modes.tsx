@@ -1,361 +1,448 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { GlossSheen } from '@/components/GlossSheen';
-import { PremiumShimmer } from '@/components/PremiumShimmer';
+import { ModeThumb, type ModeThumbId } from '@/components/ModeThumb';
+import { OffAirAsk } from '@/components/OffAirAsk';
+import { StationSheet } from '@/components/StationSheet';
+import { defaultStationForNow, loadLastCruise, saveLastCruise } from '@/utils/lastCruise';
+import { recordDriveStart } from '@/utils/driveStats';
+import { needsOffAirAsk } from '@/constants/schedule';
+import { resolveAnyStation } from '@/utils/customStations';
+import { applyModeOrder, getModeOrder, moveModeWithinGroup, saveModeOrder } from '@/utils/modeOrder';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useEntitlements } from '@/context/EntitlementsContext';
-import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
+import { PAGE_GUTTER, TAB_SAFE_INSET, pageColumn } from '@/constants/theme';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
 
-// ── Spinning cassette reel (featured card visual) ─────────────────────────────
-function Reel({ size = 64 }: { size?: number }) {
-  const spin = useRef(new Animated.Value(0)).current;
+/**
+ * SHOW THE MODE, DON'T DESCRIBE IT (owner's pick, 29.07 — "direction Q",
+ * replacing the glass gradient cards settled on 28.07).
+ *
+ * The old page gave every mode a coloured slab and a sentence, which meant a
+ * new user could not tell what Horizon or Circular EQ were without opening
+ * them — and the modes are the one part of Cruise FM nobody else has. Each
+ * one now carries a still picture of itself (ModeThumb), the newest gets a
+ * large hero, and everything else is a calm list.
+ *
+ * Retired with the slabs: the featured Cassette card, the spinning reels, the
+ * glass pane, the card glitter and the premium shimmer. Cassette is a row
+ * like the others now — the hero slot belongs to whatever is newest, which is
+ * a promise the page can keep, unlike "featured" which never changed.
+ */
 
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(spin, { toValue: 1, duration: 6000, easing: Easing.linear, useNativeDriver: true })
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
+type ModeDef = {
+  id: ModeThumbId;
+  title: string;
+  desc: string;
+  colors: [string, string, string];
+  pro: boolean;
+};
 
-  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+// Order is deliberate: the list reads free-first, and inside each group the
+// modes are ordered roughly by how much there is to look at.
+const MODES: ModeDef[] = [
+  { id: 'equalizer', title: 'Equalizer',   desc: "LED bars pulsing with your station's mood colours.", colors: ['#164a6a', '#2b7fa8', '#6fd6ff'], pro: false },
+  { id: 'orb',       title: 'Circular EQ', desc: 'A glowing orb that pulses and radiates to the beat.', colors: ['#2a1550', '#7a2ac0', '#e07aff'], pro: false },
+  { id: 'cassette',  title: 'Cassette',    desc: 'Spinning reels, retro tuner culture, purple cabin glow.', colors: ['#1c0f3a', '#4b2b8a', '#a07aff'], pro: false },
+  { id: 'vinyl',     title: 'Vinyl',       desc: 'A rotating analogue record with a silver tonearm.', colors: ['#3a180a', '#8a3a18', '#e0813d'], pro: true },
+  { id: 'radio',     title: 'Tuner',       desc: 'Drag the dial — glide between moods and lock on.', colors: ['#1a4a5a', '#3a6aa8', '#6ad6e0'], pro: true },
+  { id: 'horizon',   title: 'Horizon',     desc: 'An endless outrun grid rolling into a glowing sun.', colors: ['#200a45', '#8a2a7a', '#ff5aa0'], pro: true },
+  { id: 'cd',        title: 'CD',          desc: 'Your album on a mirrored disc behind jewel-case plastic.', colors: ['#141a2e', '#5a6f9a', '#b0c6ff'], pro: true },
+  { id: 'disco',     title: 'Mirror Ball', desc: 'A slow-turning mirror ball scattering light across the drive.', colors: ['#22242c', '#8a92a4', '#e8edf6'], pro: true },
+];
 
-  return (
-    <Animated.View style={[reel.wrap, { width: size, height: size, borderRadius: size / 2, transform: [{ rotate }] }]}>
-      {[0, 60, 120].map((deg) => (
-        <View key={deg} style={[reel.spoke, { transform: [{ rotate: `${deg}deg` }] }]} />
-      ))}
-      <View style={reel.hub} />
-    </Animated.View>
-  );
-}
+/** Whichever mode leads the page. Change this when a newer one lands. */
+const HERO_ID: ModeThumbId = 'disco';
 
-const reel = StyleSheet.create({
-  wrap: {
-    borderWidth: 3,
-    borderColor: 'rgba(150,90,255,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  spoke: {
-    position: 'absolute',
-    width: '86%',
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: 'rgba(150,90,255,0.45)',
-  },
-  hub: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(150,90,255,0.8)',
-  },
-});
-
-// ── Card with press-extend + scroll-shrink animation ─────────────────────────
-function AnimatedCard({
-  scrollY,
-  onPress,
-  children,
-  style,
+/**
+ * Press feedback (owner, 29.07 — "direction D"): everything you can tap
+ * settles under your thumb and springs back. It is felt rather than seen and
+ * it is a disproportionate share of what makes an app feel built rather than
+ * assembled. Native driver, so it never stutters against a scroll.
+ */
+function Pressy({
+  onPress, children, style, scaleTo = 0.97,
 }: {
-  scrollY: Animated.Value;
   onPress: () => void;
   children: React.ReactNode;
   style?: object;
+  scaleTo?: number;
 }) {
-  const [layoutY, setLayoutY] = useState(0);
-  const [layoutH, setLayoutH] = useState(1);
-  const pressScale = useRef(new Animated.Value(1)).current;
-
-  // As the card scrolls up toward/off the top edge, it "caves in".
-  const scrollScale = scrollY.interpolate({
-    inputRange: [layoutY - 80, layoutY + layoutH],
-    outputRange: [1, 0.88],
-    extrapolate: 'clamp',
-  });
-
+  const s = useRef(new Animated.Value(1)).current;
+  const to = (v: number) =>
+    Animated.spring(s, { toValue: v, useNativeDriver: true, speed: 42, bounciness: 5 }).start();
   return (
-    <Animated.View
-      onLayout={(e) => { setLayoutY(e.nativeEvent.layout.y); setLayoutH(e.nativeEvent.layout.height); }}
-      style={[{ transform: [{ scale: Animated.multiply(pressScale, scrollScale) }] }, style]}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={() => Animated.spring(pressScale, { toValue: 1.03, useNativeDriver: true, speed: 40, bounciness: 6 }).start()}
-        onPressOut={() => Animated.spring(pressScale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 6 }).start()}>
+    <Animated.View style={[{ transform: [{ scale: s }] }, style]}>
+      <Pressable onPress={onPress} onPressIn={() => to(scaleTo)} onPressOut={() => to(1)}>
         {children}
       </Pressable>
     </Animated.View>
   );
 }
 
-// ── Compact mode row card ─────────────────────────────────────────────────────
-function CompactModeCard({
-  title,
-  desc,
-  icon,
-  gradient,
-  locked,
-  premium = false,
-}: {
-  title: string;
-  desc: string;
-  icon: string;
-  gradient: [string, string, string];
-  locked: boolean;
-  premium?: boolean;
-}) {
+function HeroMode({ mode, locked, onPress }: { mode: ModeDef; locked: boolean; onPress: () => void }) {
+  const styles = useStyles(makeStyles);
   return (
-    <View style={styles.compactCard}>
-      <LinearGradient colors={gradient} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
-      {premium && <GlossSheen radius={18} />}
-      {locked && <PremiumShimmer />}
-      <View style={styles.compactIconWrap}>
-        <MaterialCommunityIcons name={icon as any} size={22} color="#fff" />
+    <Pressy onPress={onPress} style={styles.heroWrap} scaleTo={0.985}>
+      <View style={styles.hero}>
+        <ModeThumb mode={mode.id} size={HERO_ART} colors={mode.colors} uid={`hero${mode.id}`} />
+        {/* The thumb is square; the card is wider, so it is centred behind a
+            scrim that carries the type. A gradient, not a flat wash: a flat
+            one dulls the whole picture to pay for the two lines at the
+            bottom, which is the opposite of showing the mode off. */}
+        <LinearGradient
+          colors={['rgba(0,0,0,0.15)', 'rgba(0,0,0,0.30)', 'rgba(0,0,0,0.88)']}
+          locations={[0, 0.45, 1]}
+          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+          style={styles.heroScrim}
+          pointerEvents="none"
+        />
+        <View style={styles.heroFoot}>
+          <Text style={styles.heroEyebrow}>NEWEST</Text>
+          <Text style={styles.heroTitle}>{mode.title}</Text>
+          <Text style={styles.heroDesc} numberOfLines={1}>{mode.desc}</Text>
+        </View>
+        {locked && (
+          <View style={styles.heroLock}>
+            <Ionicons name="lock-closed" size={13} color="rgba(255,255,255,0.85)" />
+            <Text style={styles.heroLockText}>PREMIUM</Text>
+          </View>
+        )}
       </View>
-      <View style={{ flex: 1, gap: 3 }}>
-        <Text style={styles.compactTitle}>{title}</Text>
-        <Text style={styles.compactDesc} numberOfLines={2}>{desc}</Text>
-      </View>
-      {locked && <Ionicons name="lock-closed" size={16} color="rgba(255,255,255,0.55)" style={{ marginLeft: 8 }} />}
-    </View>
+    </Pressy>
   );
 }
 
-// ── Screen ────────────────────────────────────────────────────────────────────
-export default function ModesScreen() {
-  const insets = useSafeAreaInsets();
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const np = useNowPlaying();
+function ModeRow({ mode, locked, last, onPress, editing, onMoveUp, onMoveDown, canMoveUp, canMoveDown }: {
+  mode: ModeDef; locked: boolean; last: boolean; onPress: () => void;
+  editing?: boolean; onMoveUp?: () => void; onMoveDown?: () => void;
+  canMoveUp?: boolean; canMoveDown?: boolean;
+}) {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
+  const row = (
+    <View style={[styles.row, !last && styles.rowRule]}>
+      <View style={styles.thumbClip}>
+        <ModeThumb mode={mode.id} size={THUMB} colors={mode.colors} uid={`row${mode.id}`} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.rowTitle}>{mode.title}</Text>
+        <Text style={styles.rowDesc} numberOfLines={1}>{mode.desc}</Text>
+      </View>
+      {editing ? (
+        <View style={styles.orderBtns}>
+          <Pressable onPress={onMoveUp} disabled={!canMoveUp} hitSlop={8} style={styles.orderBtn}>
+            <Ionicons name="chevron-up" size={18} color={pal.ink(canMoveUp ? 0.75 : 0.2)} />
+          </Pressable>
+          <Pressable onPress={onMoveDown} disabled={!canMoveDown} hitSlop={8} style={styles.orderBtn}>
+            <Ionicons name="chevron-down" size={18} color={pal.ink(canMoveDown ? 0.75 : 0.2)} />
+          </Pressable>
+        </View>
+      ) : locked
+        ? <Ionicons name="lock-closed" size={14} color={pal.ink(0.45)} />
+        : <Ionicons name="chevron-forward" size={16} color={pal.ink(0.34)} />}
+    </View>
+  );
+  // While reordering, the row is a still picture — tapping it must not launch
+  // a drive out from under someone trying to move it.
+  return editing ? row : <Pressy onPress={onPress}>{row}</Pressy>;
+}
 
+const THUMB = 62;
+const HERO_H = 250;
+// The art sits above the type rather than behind it — a hero whose subject
+// is half-buried under its own caption reads as a cropped picture.
+const HERO_ART = 202;
+
+export default function ModesScreen() {
+  const styles = useStyles(makeStyles);
+  const insets = useSafeAreaInsets();
+  const np = useNowPlaying();
   const { isPro } = useEntitlements();
 
+  // Picking a mode asks which MOOD to open it on (owner, 03.08). It used to
+  // go straight in, and `np.open` defaults its stationId to a hardcoded
+  // 'night-run', so any other mood meant backing out to the Stations page and
+  // coming in the other way. The sheet is pre-ticked with the last cruise's
+  // station, or the hour's own pick on a first run, so the common case is one
+  // extra tap on something already highlighted.
+  const [pending, setPending] = useState<{ mode: string; locked: boolean } | null>(null);
+  // An off-air station picked in the mood sheet, waiting on the ask. It
+  // carries its OWN copy of the mode: StationSheet closes itself the instant
+  // it picks, which clears `pending`, so leaning on that would lose the mode.
+  const [askOffAir, setAskOffAir] = useState<{ stationId: string; mode: string; locked: boolean } | null>(null);
+  const [lastStation, setLastStation] = useState<string>(defaultStationForNow());
+  useEffect(() => {
+    loadLastCruise().then((c) => { if (c?.stationId) setLastStation(c.stationId); }).catch(() => {});
+  }, []);
+
+  // Ethan's ask (25.08): "I use the Tuner, CD, Vinyl, and Cassette the most
+  // so it would be nice to have the option move those to the front." A
+  // driver's own order, saved and reapplied — see modeOrder.ts for why it
+  // never lets a mode cross out of its own free/premium group.
+  const [order, setOrder] = useState<string[] | null>(null);
+  const [editingOrder, setEditingOrder] = useState(false);
+  useEffect(() => {
+    getModeOrder().then(setOrder).catch(() => {});
+  }, []);
+  const proOf = (id: string) => MODES.find((m) => m.id === id)?.pro ?? false;
+  const move = (id: string, dir: -1 | 1) => {
+    const base = order ?? MODES.map((m) => m.id);
+    const next = moveModeWithinGroup(base, id, dir, proOf);
+    if (next === base && order) return; // nowhere to go
+    setOrder(next);
+    saveModeOrder(next);
+  };
+
   function open(mode: string, locked: boolean) {
-    // Locked modes give a free taste — the gate handles the upsell after.
-    // Browsing modes opens them idle; previews auto-play so the taste moves.
-    np.open(mode, undefined, { preview: locked, paused: !locked });
+    setPending({ mode, locked });
   }
+
+  function start(stationId: string) {
+    if (!pending) return;
+    // Off air? Ask before starting (owner, 19.08) — never a refusal.
+    if (needsOffAirAsk(stationId)) {
+      setAskOffAir({ stationId, mode: pending.mode, locked: pending.locked });
+      return;
+    }
+    launch(stationId, pending.mode, pending.locked);
+  }
+
+  function launch(stationId: string, mode: string, locked: boolean) {
+    // A real drive, exactly like the Stations page. It used to open PAUSED,
+    // which made sense while tapping a mode meant "let me look at this one" —
+    // but since the mood sheet landed (03.08) you pick a mode AND a station
+    // before anything opens, which is a drive by any reading. Opening idle
+    // also meant `playStationMusic` never ran, so the station's playlist
+    // never started and Spotify was never woken (owner: "the redirect doesn't
+    // open for … modes page -> stations mood -> plain mode").
+    // AND IT COUNTS. This page never called recordDriveStart, so a drive begun
+    // from Modes was missing from the stats, the badges and the streak
+    // entirely — it only counted if you came in through Cruise or Stations.
+    // Found 13.08 building the stub, which is what made the omission visible:
+    // the drive ended and there was nothing to print. A preview is still a
+    // taste and still doesn't count.
+    if (!locked) {
+      saveLastCruise({ stationId, mode });
+      recordDriveStart(stationId, undefined, mode);
+    }
+    np.open(mode, stationId, { preview: locked });
+    setLastStation(stationId);
+    setPending(null);
+  }
+
+  const hero = MODES.find((m) => m.id === HERO_ID)!;
+  const ordered = applyModeOrder(MODES, order);
+  const free = ordered.filter((m) => !m.pro);
+  const pro = ordered.filter((m) => m.pro);
 
   return (
     <View style={styles.root}>
-      <Animated.ScrollView
+      <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 24, paddingBottom: TAB_SAFE_INSET + insets.bottom }]}
-        showsVerticalScrollIndicator={false}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
-        scrollEventThrottle={16}>
+        contentContainerStyle={[pageColumn, { paddingTop: insets.top + 26, paddingBottom: TAB_SAFE_INSET + insets.bottom }]}
+        showsVerticalScrollIndicator={false}>
 
-        <Text style={styles.pageTitle}>Playback Modes</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.pageTitle}>Modes</Text>
+          <Pressable onPress={() => setEditingOrder((v) => !v)} hitSlop={10} style={styles.editOrderBtn}>
+            <Text style={styles.editOrderText}>{editingOrder ? 'Done' : 'Edit order'}</Text>
+          </Pressable>
+        </View>
 
-        {/* ── Featured: Cassette ── */}
-        <AnimatedCard scrollY={scrollY} onPress={() => open('cassette', false)} style={{ marginBottom: 16 }}>
-          <View style={styles.featuredCard}>
-            <LinearGradient
-              colors={['#241238', '#170d28', '#0d0718']}
-              start={{ x: 0, y: 0 }} end={{ x: 0.8, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.featuredHeader}>
-              <Text style={styles.featuredTitle}>Cassette Tape Mode</Text>
-              <View style={styles.featuredBadge}>
-                <Text style={styles.featuredBadgeText}>FEATURED</Text>
-              </View>
-            </View>
+        {!editingOrder && (
+          <HeroMode mode={hero} locked={hero.pro && !isPro} onPress={() => open(hero.id, hero.pro && !isPro)} />
+        )}
 
-            <Text style={styles.tapeLabel}>CRUISE FM / SIDE A</Text>
-            <View style={styles.tapeWindow}>
-              <Reel />
-              <Reel />
-            </View>
+        <Text style={styles.section}>INCLUDED</Text>
+        {free.map((m, i) => (
+          <ModeRow key={m.id} mode={m} locked={false} last={i === free.length - 1}
+            onPress={() => open(m.id, false)}
+            editing={editingOrder}
+            onMoveUp={() => move(m.id, -1)} onMoveDown={() => move(m.id, 1)}
+            canMoveUp={i > 0} canMoveDown={i < free.length - 1} />
+        ))}
 
-            <Text style={styles.featuredDesc}>
-              Spinning reels, retro Japanese tuner culture, soft purple cabin glow.
-            </Text>
-          </View>
-        </AnimatedCard>
+        <Text style={styles.section}>PREMIUM</Text>
+        {pro.map((m, i) => (
+          <ModeRow key={m.id} mode={m} locked={!isPro} last={i === pro.length - 1}
+            onPress={() => open(m.id, !isPro)}
+            editing={editingOrder}
+            onMoveUp={() => move(m.id, -1)} onMoveDown={() => move(m.id, 1)}
+            canMoveUp={i > 0} canMoveDown={i < pro.length - 1} />
+        ))}
 
-        {/* ── Compact rows ── */}
-        <AnimatedCard scrollY={scrollY} onPress={() => open('equalizer', false)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Equalizer Mode"
-            desc="LED bars pulsing with every station's mood colours."
-            icon="equalizer"
-            gradient={['#164a6a', '#123049', '#0a1a2a']}
-            locked={false}
-          />
-        </AnimatedCard>
+      </ScrollView>
 
-        <AnimatedCard scrollY={scrollY} onPress={() => open('vinyl', !isPro)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Vinyl Record Mode"
-            desc="Rotating analogue record with warm ambient glow and tactile presence."
-            icon="album"
-            gradient={['#c05a20', '#8a3a18', '#3a180a']}
-            locked={!isPro}
-            premium
-          />
-        </AnimatedCard>
+      <StationSheet
+        visible={!!pending}
+        onClose={() => setPending(null)}
+        onPick={start}
+        currentId={lastStation}
+        modeLabel={MODES.find((m) => m.id === pending?.mode)?.title}
+        extraBottom={np.session ? 76 : 0}
+      />
 
-        <AnimatedCard scrollY={scrollY} onPress={() => open('radio', !isPro)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Tuner Mode"
-            desc="Drag the dial — glide between moods and lock onto a station."
-            icon="radio-tower"
-            gradient={['#6a3ae0', '#3a6aa8', '#1a8a9a']}
-            locked={!isPro}
-            premium
-          />
-        </AnimatedCard>
-
-        <AnimatedCard scrollY={scrollY} onPress={() => open('horizon', !isPro)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Horizon Mode"
-            desc="An endless outrun grid rolling into a glowing sun — all in your station's colours."
-            icon="weather-sunset-up"
-            gradient={['#b02a8a', '#5a1a8a', '#200a45']}
-            locked={!isPro}
-            premium
-          />
-        </AnimatedCard>
-
-        <AnimatedCard scrollY={scrollY} onPress={() => open('waves', false)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Sound Waves Mode"
-            desc="A flowing, glowing waveform that ripples in your station's mood colours."
-            icon="waveform"
-            gradient={['#22b8e6', '#2f6ad0', '#1a2a70']}
-            locked={false}
-          />
-        </AnimatedCard>
-
-        <AnimatedCard scrollY={scrollY} onPress={() => open('orb', !isPro)} style={{ marginBottom: 14 }}>
-          <CompactModeCard
-            title="Circular Equaliser Mode"
-            desc="A glowing orb of light that pulses and radiates to your station's mood."
-            icon="circle-slice-8"
-            gradient={['#b23ae6', '#7a2ac0', '#2a1550']}
-            locked={!isPro}
-            premium
-          />
-        </AnimatedCard>
-
-      </Animated.ScrollView>
-
+      <OffAirAsk
+        stationId={askOffAir?.stationId ?? null}
+        stationName={askOffAir ? resolveAnyStation(askOffAir.stationId).name : ''}
+        accent={askOffAir ? (resolveAnyStation(askOffAir.stationId).eqColors?.[1] ?? '#8A7CFF') : '#8A7CFF'}
+        onCancel={() => setAskOffAir(null)}
+        onPlay={() => {
+          const a = askOffAir;
+          setAskOffAir(null);
+          if (a) launch(a.stationId, a.mode, a.locked);
+        }}
+      />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * PAGE CHROME ONLY. The hero and the thumbnails are pictures of the modes and
+ * keep their own colours in either theme — that is the whole arrangement the
+ * owner asked for (13.08), and it is why this page needed almost nothing:
+ * its cards were already pictures rather than coloured slabs.
+ */
+const makeStyles = (p: Palette) => StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: 16 },
-  pageTitle: {
-    color: Cruise.textPrimary,
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    marginLeft: 4,
-    marginBottom: 18,
-  },
-
-  // Featured card
-  featuredCard: {
-    borderRadius: 22,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(150,90,255,0.25)',
-    padding: 20,
-  },
-  featuredHeader: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    paddingHorizontal: PAGE_GUTTER,
+    marginBottom: 24,
   },
-  featuredTitle: {
-    color: '#fff',
-    fontSize: 18,
+  pageTitle: {
+    color: p.text,
+    fontSize: 36,
     fontWeight: '800',
-    letterSpacing: -0.2,
+    letterSpacing: -1.3,
   },
-  featuredBadge: {
-    backgroundColor: 'rgba(60,220,230,0.15)',
+  editOrderBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: p.ink(0.06),
     borderWidth: 1,
-    borderColor: 'rgba(60,220,230,0.45)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    borderColor: p.ink(0.14),
   },
-  featuredBadgeText: {
-    color: '#3cdce6',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-  },
-  tapeLabel: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 10,
+  editOrderText: {
+    color: p.ink(0.75),
+    fontSize: 12.5,
     fontWeight: '700',
+  },
+  section: {
+    color: p.ink(0.9),
+    fontSize: 12.5,
+    fontWeight: '800',
     letterSpacing: 3,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  tapeWindow: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(150,90,255,0.35)',
-    borderRadius: 12,
-    paddingVertical: 18,
-    marginBottom: 18,
-    backgroundColor: 'rgba(150,90,255,0.05)',
-  },
-  featuredDesc: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 13,
-    lineHeight: 19,
+    paddingHorizontal: PAGE_GUTTER,
+    marginTop: 30,
+    marginBottom: 6,
   },
 
-  // Compact cards
-  compactCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderRadius: 18,
-    overflow: 'hidden',
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+  // ── Hero ──────────────────────────────────────────────────────────────────
+  heroWrap: {
+    marginHorizontal: 22,
+    borderRadius: 24,
+    shadowColor: p.shadow,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.5 * p.shadowOpacity,
+    shadowRadius: 26,
+    elevation: 10,
   },
-  compactIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+  hero: {
+    height: HERO_H,
+    borderRadius: 24,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingBottom: 46,
+    backgroundColor: '#07070c',
   },
-  compactTitle: {
-    color: '#fff',
-    fontSize: 15.5,
+  heroScrim: {
+    position: 'absolute',
+    left: 0, right: 0, top: 0, bottom: 0,
+  },
+  heroFoot: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 18,
+  },
+  heroEyebrow: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 9.5,
     fontWeight: '800',
+    letterSpacing: 2.4,
+    marginBottom: 6,
   },
-  compactDesc: {
-    color: 'rgba(255,255,255,0.65)',
-    fontSize: 12,
-    lineHeight: 17,
+  heroTitle: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: 0,
   },
+  heroDesc: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    marginTop: 3,
+  },
+  heroLock: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  heroLockText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+  },
+
+  // ── Rows ──────────────────────────────────────────────────────────────────
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingVertical: 16,
+    paddingHorizontal: PAGE_GUTTER,
+  },
+  rowRule: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: p.ink(0.14),
+  },
+  thumbClip: {
+    width: THUMB,
+    height: THUMB,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  rowTitle: {
+    color: p.text,
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: 0,
+  },
+  rowDesc: {
+    color: p.ink(0.52),
+    fontSize: 13,
+    marginTop: 2,
+  },
+  orderBtns: { gap: 2 },
+  orderBtn: { padding: 4 },
 });

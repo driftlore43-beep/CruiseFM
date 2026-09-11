@@ -41,14 +41,40 @@ features), just publish an update:
 
 ```
 git pull origin claude/cruise-fm-v4wk5f
-eas update --branch preview -m "short note about what changed"
+eas update --branch preview --environment preview -m "short note about what changed"
 ```
 
 Testers get it automatically the next time they close and reopen the app —
 usually within minutes. No new build, no Play Store, no reinstalling.
 
 Use `-m` to leave yourself a note, e.g.
-`eas update --branch preview -m "new badges + vinyl polish"`.
+`eas update --branch preview --environment preview -m "new badges + vinyl polish"`.
+
+### `--environment preview` is not optional — and leaving it off fails quietly
+
+The Spotify keys are not in the project folder. They live on Expo's servers,
+and `--environment preview` is what fetches them. From Expo SDK 55 onwards
+this flag is **required**, and Cruise FM is on SDK 56.
+
+Leave it off and you get asked to pick an environment from a list — and
+**picking the right one does not help**. The keys are only loaded when the
+flag was typed on the command line; the prompt's answer is used for the log
+entry and nothing else. So the update publishes happily with blank Spotify
+keys and sign-in breaks for everyone on the channel.
+
+**If a list of environments appears, the flag was forgotten.** Ctrl+C and run
+it again properly.
+
+To confirm the keys are on the server before publishing:
+```
+eas env:list --environment preview
+```
+Both `EXPO_PUBLIC_SPOTIFY_CLIENT_ID` and `EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET`
+must be listed **and stored as `plaintext` or `sensitive`**. A key stored as
+`secret` still appears in that list but cannot be read by anything except
+Expo's build machines — so the update would ship it blank while the check
+looked green. Fix the visibility at expo.dev → the Cruise FM project →
+Environment variables before publishing.
 
 ---
 
@@ -56,12 +82,37 @@ Use `-m` to leave yourself a note, e.g.
 
 If a change adds a **new native feature** (a new device permission, a new
 native library — I'll always tell you when that's the case), an OTA update
-won't cover it. The system is built to notice this automatically and simply
-withhold the update rather than ship something broken.
+won't cover it: the update is only the app's *instructions*, and a new native
+feature needs new *machinery* underneath.
 
 The fix is the same as step 3 above — one fresh `eas build` — then updates
 resume as normal. You'll never have to guess: if I add something native, I'll
 say "this one needs a new build," otherwise assume `eas update` is all it takes.
+
+### How the app decides an update is meant for it
+
+Every build carries a **runtime version**, and every update is stamped with
+one. A phone only accepts an update whose stamp matches its build exactly —
+that's the seatbelt that stops an update landing on a build that can't run it.
+
+Ours is now written down literally in `app.json`:
+
+```
+"runtimeVersion": "1.0.0"
+```
+
+It used to be *calculated* from the app's ingredients (`"policy":
+"fingerprint"`), which is cleverer and was the recommended setting — until
+Expo's build servers and the publishing tool started calculating it
+differently from each other. Builds ended up listening on one number while
+every update we published carried another, so updates published perfectly and
+reached nobody. That cost a full day on 30.07 before it was measured properly.
+
+**The trade:** the seatbelt is no longer automatic. When something native
+changes, that number has to be raised by hand *in the same change* — bump both
+`version` and `runtimeVersion`, then build. That's on Claude to remember, and
+the GitHub workflow now refuses to publish when no real build is listening on
+the current number, so a silent no-op can't happen twice.
 
 ---
 
@@ -69,8 +120,10 @@ say "this one needs a new build," otherwise assume `eas update` is all it takes.
 
 Same idea, different branch name so live users and testers stay separate:
 
-- Testers on the closed-test build: `eas update --branch preview -m "..."`
-- Real users after launch:          `eas update --branch production -m "..."`
+- Testers on the closed-test build:
+  `eas update --branch preview --environment preview -m "..."`
+- Real users after launch:
+  `eas update --branch production --environment production -m "..."`
 
 Keep test changes on `preview` until you've seen them yourself, then publish
 the same to `production` when you're happy.

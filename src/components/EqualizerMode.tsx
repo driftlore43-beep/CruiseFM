@@ -1,8 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Brightness from 'expo-brightness';
-import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -19,43 +17,60 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Cruise } from '@/constants/theme';
+import { Cruise, Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
+import { mmss } from '@/utils/formatTime';
+import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { ModeScrim } from '@/components/ModeScrim';
+import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
-import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
-import { PlatformIcon } from '@/components/icons/PlatformIcon';
-import { MoodSheet } from '@/components/MoodSheet';
+import { ModeSheet } from '@/components/ModeSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
-import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { AmbientGlow } from '@/components/AmbientGlow';
+import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
+import { PreviewGate } from '@/components/PreviewGate';
+import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
+import { MarqueeText } from '@/components/MarqueeText';
+import { ModeActionRow } from '@/components/ModeActionRow';
+import { RepeatButton, ShuffleButton } from '@/components/TransportToggle';
+import { ModeCloseButton } from '@/components/ModeCloseButton';
+import { SeekBar } from '@/components/SeekBar';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // ── Card bar geometry ─────────────────────────────────────────────────────────
 const BAR_COUNT   = 30;
+// Chunkier segments with a wider dark gap than before — on a real LED meter
+// the gap is a substantial fraction of the pitch, and that is most of what
+// makes it read as discrete lamps rather than a striped bar.
 const SEGMENT_H   = 5;
-const GAP_H       = 2;
-const UNIT        = SEGMENT_H + GAP_H;   // 7px per LED segment
+const GAP_H       = 3;
+const UNIT        = SEGMENT_H + GAP_H;   // 8px per LED segment
 const MAX_SEGS    = 16;
 const MIN_SEGS    = 2;
 const MAX_H       = MAX_SEGS * UNIT;
 const MIN_H       = MIN_SEGS * UNIT;
 const CARD_BAR_W  = Math.floor((SCREEN_W - 48) / BAR_COUNT) - 2;
-const CARD_GAPS   = Array.from({ length: MAX_SEGS - 1 }, (_, i) => SEGMENT_H + i * UNIT);
 
 // ── Fullscreen bar geometry — must match the vizSection height below,
 // otherwise the tallest bars get clipped at the top ─────────────────────────
-const VIZ_H       = Math.round(SCREEN_H * 0.26);
-const FS_MAX_SEGS = Math.max(20, Math.floor(VIZ_H / UNIT));
+// 0.285 of the screen (was 0.26): the meter had room to grow upright too,
+// not only sideways (owner, 30.07 — "we can still buff it out"). Anything
+// much taller starts crowding the song title on a short phone; checked at
+// 667pt.
+const VIZ_H       = Math.round(SCREEN_H * 0.285);
+const FS_MAX_SEGS = Math.max(14, Math.floor(VIZ_H / UNIT));
 const FS_MAX_H    = FS_MAX_SEGS * UNIT;
 const FS_MIN_H    = MIN_H;
 // 24px side margins + the row's 2px gaps, so the first/last bars never clip.
 const FS_BAR_W    = Math.floor((SCREEN_W - 48 - (BAR_COUNT - 1) * 2) / BAR_COUNT);
-const FS_GAPS     = Array.from({ length: FS_MAX_SEGS - 1 }, (_, i) => SEGMENT_H + i * UNIT);
 
 // ── Bar animation helpers ─────────────────────────────────────────────────────
 
@@ -73,6 +88,12 @@ function barDur(i: number): number {
   return 380 + Math.floor(Math.abs(Math.sin(i * 1.7 + 0.4)) * 280);
 }
 
+/** Snap a bar height to a whole number of LED segments — a real meter lands on
+ *  a lamp, never half way up one. */
+function snap(h: number, minH: number): number {
+  return Math.max(minH, Math.round(h / UNIT) * UNIT);
+}
+
 function startBarAnims(
   values: Animated.Value[],
   bellFn: (i: number) => number,
@@ -83,11 +104,13 @@ function startBarAnims(
     const maxH = bellFn(i);
     const dur  = barDur(i);
     const t = setTimeout(() => {
+      // Native driver: the values only feed transform interpolations in Bars,
+      // so the whole loop runs off the JS thread — no per-frame layout work.
       Animated.loop(Animated.sequence([
-        Animated.timing(anim, { toValue: maxH,                         duration: dur,        easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-        Animated.timing(anim, { toValue: minH + (maxH - minH) * 0.18, duration: dur * 0.65, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-        Animated.timing(anim, { toValue: maxH * 0.6,                   duration: dur * 0.5,  easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-        Animated.timing(anim, { toValue: minH,                         duration: dur * 0.75, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+        Animated.timing(anim, { toValue: snap(maxH, minH),                         duration: dur,        easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: snap(minH + (maxH - minH) * 0.18, minH), duration: dur * 0.65, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: snap(maxH * 0.6, minH),                   duration: dur * 0.5,  easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: minH,                                     duration: dur * 0.75, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])).start();
     }, i * 14);
     timers.current.push(t);
@@ -105,147 +128,114 @@ function stopBarAnims(
 
 // ── Shared sub-components ─────────────────────────────────────────────────────
 
-function GapStrips({ gaps, bgColor }: { gaps: number[]; bgColor: string }) {
+function mixHex(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ar = (pa >> 16) & 255, ag = (pa >> 8) & 255, ab = pa & 255;
+  const br = (pb >> 16) & 255, bg = (pb >> 8) & 255, bb = pb & 255;
+  const r = Math.round(ar + (br - ar) * t), g = Math.round(ag + (bg - ag) * t), bl = Math.round(ab + (bb - ab) * t);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
+}
+
+/** One lamp's colour, sampled up the three-stop station palette. */
+function segColor(colors: [string, string, string], t: number): string {
+  return t < 0.5 ? mixHex(colors[0], colors[1], t * 2) : mixHex(colors[1], colors[2], (t - 0.5) * 2);
+}
+
+/** The lamps of one bar, bottom to top. Static — built once per geometry. */
+function buildSegments(maxH: number, colors: [string, string, string]) {
+  const n = Math.max(1, Math.floor(maxH / UNIT));
+  return Array.from({ length: n }, (_, i) => ({
+    bottom: i * UNIT,
+    color: segColor(colors, n === 1 ? 1 : i / (n - 1)),
+  }));
+}
+
+/** Lamps drawn as real rectangles with real gaps between them.
+ *
+ *  The old build faked the gaps by painting strips of the BACKGROUND colour
+ *  over a solid gradient — which meant that in fullscreen, where the
+ *  background is a photo and the strip colour was 'transparent', the gaps
+ *  simply never appeared and the bars were solid. Actual gaps also let the
+ *  station artwork through between lamps, which is most of the retro look. */
+function Lamps({ segs }: { segs: ReturnType<typeof buildSegments> }) {
   return (
     <>
-      {gaps.map((bottom) => (
-        <View key={bottom} style={{ position: 'absolute', left: 0, right: 0, height: GAP_H, bottom, backgroundColor: bgColor }} />
+      {segs.map((s) => (
+        <View
+          key={s.bottom}
+          style={{
+            position: 'absolute', left: 0, right: 0, bottom: s.bottom, height: SEGMENT_H,
+            borderRadius: 1.5, backgroundColor: s.color,
+          }}
+        />
       ))}
     </>
   );
 }
 
-function Bars({ values, barW, maxH, gaps, bgColor, colors }: {
+// Performance-critical: 30 of these animate continuously. The old version
+// animated `height` (JS-driven — a full native layout pass for every bar on
+// every frame, the source of visible lag). This version keeps every layout
+// static and animates only transforms on the native driver, so the whole
+// dance runs on the GPU: a clipping window slides up to reveal the bar while
+// an inner counter-slide keeps the gradient anchored to the bottom — same
+// look, no layout work. React.memo keeps the per-second clock re-renders of
+// the parent from rebuilding 30 gradient stacks.
+const Bars = React.memo(function Bars({ values, barW, maxH, colors, cap = true }: {
   values: Animated.Value[];
   barW: number;
   maxH: number;
-  gaps: number[];
-  bgColor: string;
   colors?: [string, string, string];
+  /** The peak lamp riding the top of the bar. */
+  cap?: boolean;
 }) {
   const barColors = colors ?? ['#00BFFF', '#8A2BE2', '#FF00AA'];
+  const segs = useMemo(() => buildSegments(maxH, barColors), [maxH, barColors.join()]);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: maxH }}>
-      {values.map((anim, i) => (
-        <Animated.View key={i} style={{ width: barW, height: anim, overflow: 'hidden' }}>
-          <View style={{ width: barW, height: maxH, position: 'absolute', bottom: 0 }}>
-            <LinearGradient
-              colors={barColors}
-              start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }}
-              style={[StyleSheet.absoluteFill, { borderRadius: 3 }]}
-            />
-            <GapStrips gaps={gaps} bgColor={bgColor} />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 3 }]} />
+      {values.map((anim, i) => {
+        const rise    = anim.interpolate({ inputRange: [0, maxH], outputRange: [maxH, 0] });
+        const counter = anim.interpolate({ inputRange: [0, maxH], outputRange: [-maxH, 0] });
+        const capY    = anim.interpolate({ inputRange: [0, maxH], outputRange: [0, -(maxH - UNIT)], extrapolate: 'clamp' });
+        return (
+          <View key={i} style={{ width: barW, height: maxH }}>
+            {/* The window itself must clip — it slides down while the content
+                counter-slides up, so the lamps stay anchored to the bottom and
+                only the lit ones show. Without overflow here the two motions
+                cancel and the bar renders full-height. */}
+            <View style={{ width: barW, height: maxH, overflow: 'hidden' }}>
+              <Animated.View style={{ width: barW, height: maxH, overflow: 'hidden', transform: [{ translateY: rise }] }}>
+                <Animated.View style={{ width: barW, height: maxH, transform: [{ translateY: counter }] }}>
+                  <Lamps segs={segs} />
+                </Animated.View>
+              </Animated.View>
+            </View>
+            {cap && (
+              <Animated.View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute', left: 0, right: 0, bottom: 0, height: SEGMENT_H, borderRadius: 1.5,
+                  backgroundColor: '#ffffff', opacity: 0.82,
+                  transform: [{ translateY: capY }],
+                }}
+              />
+            )}
           </View>
-        </Animated.View>
-      ))}
+        );
+      })}
     </View>
   );
-}
-
-function Marquee({ text, textStyle }: { text: string; textStyle?: object }) {
-  const tx   = useRef(new Animated.Value(0)).current;
-  const [textW, setTextW] = useState(0);
-  const [boxW,  setBoxW]  = useState(0);
-  const loop = useRef<Animated.CompositeAnimation | null>(null);
-
-  useEffect(() => {
-    loop.current?.stop();
-    tx.setValue(0);
-    if (textW > boxW && boxW > 0) {
-      const travel = textW + 32;
-      loop.current = Animated.loop(Animated.sequence([
-        Animated.delay(1800),
-        Animated.timing(tx, { toValue: -travel, duration: travel * 22, easing: Easing.linear, useNativeDriver: true }),
-        Animated.delay(500),
-        Animated.timing(tx, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ]));
-      loop.current.start();
-    }
-    return () => loop.current?.stop();
-  }, [textW, boxW]);
-
-  return (
-    <View style={{ overflow: 'hidden', width: '100%' }} onLayout={(e) => setBoxW(e.nativeEvent.layout.width)}>
-      <Animated.Text
-        style={[textStyle, { transform: [{ translateX: tx }] }]}
-        onLayout={(e) => setTextW(e.nativeEvent.layout.width)}
-        numberOfLines={1}>
-        {text}
-      </Animated.Text>
-    </View>
-  );
-}
-
-// Slim volume slider with fade-in-on-touch
-// ── Violet progress bar ───────────────────────────────────────────────────────
-function VioletProgressBar({ progress }: { progress: Animated.Value }) {
-  const [barW, setBarW] = useState(260);
-  const fillW = progress.interpolate({ inputRange: [0, 1], outputRange: [0, barW] });
-  const DOT = 14;
-  return (
-    <View
-      style={{ flex: 1, height: 36, justifyContent: 'center' }}
-      onLayout={(e) => setBarW(e.nativeEvent.layout.width)}
-    >
-      <View style={{ position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)' }} />
-      <Animated.View style={{ position: 'absolute', left: 0, height: 6, borderRadius: 3, width: fillW, backgroundColor: '#ffffff' }}>
-        <View style={{
-          position: 'absolute', right: -DOT / 2, top: -(DOT / 2 - 3),
-          width: DOT, height: DOT, borderRadius: DOT / 2,
-          backgroundColor: '#ffffff',
-          shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 5,
-          shadowOffset: { width: 0, height: 2 }, elevation: 4,
-        }} />
-      </Animated.View>
-    </View>
-  );
-}
-
-function VolumeSlider() {
-  const [vol, setVol] = useState(0.65);
-  const widthRef  = useRef(200);
-  const opacity   = useRef(new Animated.Value(0.3)).current;
-
-  const reveal = () => Animated.timing(opacity, { toValue: 1,   duration: 140, useNativeDriver: true }).start();
-  const dim    = () => Animated.timing(opacity, { toValue: 0.3, duration: 900, useNativeDriver: true }).start();
-
-  const pan = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder:  () => true,
-    onPanResponderGrant: (e) => { reveal(); setVol(Math.max(0, Math.min(1, e.nativeEvent.locationX / widthRef.current))); },
-    onPanResponderMove:  (e) => { setVol(Math.max(0, Math.min(1, e.nativeEvent.locationX / widthRef.current))); },
-    onPanResponderRelease: () => dim(),
-  })).current;
-
-  const pct = `${(vol * 100).toFixed(1)}%` as any;
-
-  return (
-    <Animated.View style={[fs.volWrap, { opacity }]}>
-      <View
-        style={fs.volTrack}
-        onLayout={(e) => { widthRef.current = e.nativeEvent.layout.width; }}
-        {...pan.panHandlers}>
-        <View style={[StyleSheet.absoluteFill, fs.volBg]} />
-        <LinearGradient
-          colors={['#6B28D4', '#9B5CFF']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={[StyleSheet.absoluteFill, { width: pct, borderRadius: 3 }]}
-        />
-        <View style={[fs.volThumb, { left: pct }]} />
-      </View>
-    </Animated.View>
-  );
-}
+}, (prev, next) =>
+  prev.values === next.values &&
+  prev.barW === next.barW &&
+  prev.maxH === next.maxH &&
+  prev.cap === next.cap &&
+  (prev.colors?.join() ?? '') === (next.colors?.join() ?? ''),
+);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatMs(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
+const formatMs = (ms: number) => mmss(ms);
 
 // ── Full-screen modal ─────────────────────────────────────────────────────────
 
@@ -255,13 +245,19 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const isLandscape = winW > winH;
 
   const fsValues = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(FS_MIN_H))).current;
+  // Drives the ambient glow's brightness/breath — a big, cheap element that
+  // reads the mic even on slow phones where 30 tiny bars are hard to see.
+  const glowPulse = useRef(new Animated.Value(0.3)).current;
 
-  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
+  // Declared here, above the meter's effect, because that effect now gates on
+  // the service's verdict rather than on our optimistic flag.
+  const spotify = useMusicPlayback(visible);
+  // The SCENE waits for the service's own verdict; the transport keeps the
+  // optimistic `playing`, because a button that hesitates reads as broken.
+  // See utils/confirmedPlaying for why, and for the clip that proved it.
+  const live = confirmedPlaying(playing, spotify.track, musicSwitching);
   const [activeStation, setActiveStation] = useState(stationId ?? 'night-run');
-  const [shuffle,       setShuffle]       = useState(false);
-  const [repeat,        setRepeat]        = useState(false);
-  const [platform,      setPlatform]      = useState<{ id: PlatformId; name: string; color: string } | null>(null);
-  const [dimmed,        setDimmed]        = useState(false);
   const [showMood,      setShowMood]      = useState(false);
   const [showPicker,    setShowPicker]    = useState(false);
   const [linked,        setLinked]        = useState<LinkedPlaylist | null>(null);
@@ -270,36 +266,30 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const slideY        = useRef(new Animated.Value(SCREEN_H)).current;
   const closePulse    = useRef(new Animated.Value(1)).current;
   const timers        = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const bannerOpacity = useRef(new Animated.Value(0)).current;
-  const origBrightness = useRef(1);
 
   const currentStation = resolveAnyStation(activeStation);
 
-  // ── Dynamic landscape bar geometry (computed every render from window dims) ──
-  const lsRightW   = winW * 0.56;
-  const lsBarW     = Math.max(3, Math.floor(lsRightW / BAR_COUNT) - 2);
-  const lsMaxSegs  = Math.max(20, Math.floor(winH / UNIT));
+  // ── Landscape bar geometry — full width along the bottom of the scene, the
+  // meter standing in front of the photograph (the approved L1 mock).
+  // Recomputed per render from the live window, since these only matter the
+  // moment the phone actually turns. ──
+  const lsSide     = 28;
+  const lsAvailW   = winW - lsSide * 2;
+  const lsBarW     = Math.max(3, Math.floor((lsAvailW - (BAR_COUNT - 1) * 2) / BAR_COUNT));
+  // 0.38 -> 0.60 of the height: the meter has a lot more room sideways and
+  // was barely using it — the bars now swing properly (owner, 30.07).
+  const lsMaxSegs  = Math.max(10, Math.floor((winH * 0.68) / UNIT));
   const lsMaxH     = lsMaxSegs * UNIT;
-  const lsGaps     = Array.from({ length: lsMaxSegs - 1 }, (_, i) => SEGMENT_H + i * UNIT);
   const lsBellMaxH = useCallback((i: number) => {
     const t = (i - (BAR_COUNT - 1) / 2) / (BAR_COUNT / 4.2);
     return Math.round(MIN_SEGS + (lsMaxSegs - MIN_SEGS) * Math.exp(-0.5 * t * t)) * UNIT;
   }, [lsMaxSegs]);
 
-  // ── Open: read platform, start bars, slide in ─────────────────────────────
+  // ── Open: start bars, slide in ────────────────────────────────────────────
   useEffect(() => {
     if (!visible) return;
     if (stationId) setActiveStation(stationId);
-    getSavedPlatform().then((id) => {
-      if (id && id !== 'none') {
-        const p = PLATFORMS[id as Exclude<PlatformId, 'none'>];
-        if (p) setPlatform({ id: id as PlatformId, name: p.name, color: p.color });
-      } else { setPlatform(null); }
-    });
-    slideY.setValue(SCREEN_H);
-    // Respect the session's play state — a browse from the Modes tab opens
-    // paused, so the bars hold still until the user presses play.
-    if (playing) startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
+    slideY.setValue(winH);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
     // Pulse the close button once to draw attention
     closePulse.setValue(1);
@@ -311,101 +301,141 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     }, 600);
     return () => {
       stopBarAnims(fsValues, timers);
-      if (Platform.OS !== 'web') deactivateKeepAwake();
     };
   }, [visible]);
 
-  // ── Restart bar heights when orientation flips ────────────────────────────
+  /**
+   * The meter follows `playing`, wherever it changed.
+   *
+   * It used to be driven only by the play button and by opening the mode, so
+   * anything ELSE that set the play state left the bars sitting dead: opening
+   * onto music that was already going, the mini-player's button, and the
+   * foreground re-sync adopting Spotify's own state. The owner's report was
+   * exactly that (03.08) — "it only animates when you press play even though
+   * a song is running… you'd have to stop the song and replay", which then
+   * looks like Spotify snoozing because the restart takes a beat.
+   *
+   * One effect for every path, so a new caller can't miss it. Orientation is
+   * in here too: the bell curve is sized per orientation, so a turn has to
+   * restart them anyway.
+   */
   useEffect(() => {
     if (!visible) return;
     stopBarAnims(fsValues, timers);
-    if (playing) {
-      startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
-    }
-  }, [isLandscape]);
+    if (live) startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
+    return () => stopBarAnims(fsValues, timers);
+  }, [visible, live, isLandscape]);
 
-  // ── Keep screen awake in landscape ───────────────────────────────────────
+  // ── Ambient glow breathes slowly while the music plays — steady and calm,
+  //    with no microphone involved. ──
   useEffect(() => {
-    if (Platform.OS === 'web') return;
-    if (visible && isLandscape) {
-      activateKeepAwakeAsync().catch(() => {});
-    } else {
-      deactivateKeepAwake();
-    }
-  }, [visible, isLandscape]);
+    if (!visible || !live) { glowPulse.setValue(0.3); return; }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(glowPulse, { toValue: 0.55, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(glowPulse, { toValue: 0.20, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [visible, live]);
 
-  // ── Safety banner: fade in on landscape, then out after 3s ───────────────
-  useEffect(() => {
-    if (!isLandscape) { bannerOpacity.setValue(0); return; }
-    bannerOpacity.setValue(1);
-    const t = setTimeout(() => {
-      Animated.timing(bannerOpacity, { toValue: 0, duration: 900, useNativeDriver: true }).start();
-    }, 3000);
-    return () => clearTimeout(t);
-  }, [isLandscape]);
-
-  // ── Dim toggle ────────────────────────────────────────────────────────────
-  const toggleDim = async () => {
-    if (Platform.OS === 'web') return;
-    try {
-      if (!dimmed) {
-        origBrightness.current = await Brightness.getBrightnessAsync();
-        await Brightness.setBrightnessAsync(0.12);
-        setDimmed(true);
-      } else {
-        await Brightness.setBrightnessAsync(origBrightness.current);
-        setDimmed(false);
-      }
-    } catch { /* permissions not granted */ }
-  };
-
-  const handleClose = async () => {
-    // Restore brightness if dimmed
-    if (dimmed && Platform.OS !== 'web') {
-      try { await Brightness.setBrightnessAsync(origBrightness.current); } catch {}
-      setDimmed(false);
-    }
-    if (Platform.OS !== 'web') deactivateKeepAwake();
+  const handleClose = () => {
     stopBarAnims(fsValues, timers);
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
+    Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
-  const spotify = useSpotifyPlayback(visible);
+  // Shuffle and repeat are READ STRAIGHT OFF THE PLAYER, not mirrored into
+  // local state. Each mode used to keep its own copy and sync it in an effect
+  // — eight copies of the same two lines, and the copy is what let the button
+  // disagree with the music. The player already flips optimistically and holds
+  // its answer against a stale poll, so there is nothing left for a mirror to
+  // do but drift.
+  const shuffle = spotify.shuffleOn;
+  const repeat = spotify.repeatMode;
 
   // Progress rides the shared track clock — real Spotify position when
   // connected, the classic 4-minute demo loop otherwise.
-  const { progress, elapsedMs: currentTimeMs, durationMs } = useTrackClock({
+  const { progress, elapsedMs: currentTimeMs, durationMs, scrub } = useTrackClock({
     visible, playing, track: spotify.track, demoDurationMs: 4 * 60 * 1000,
   });
 
   const togglePlay = () => {
-    if (playing) {
-      stopBarAnims(fsValues, timers);
-      setPlaying(false);
-      spotify.pause();
-    } else {
-      startBarAnims(fsValues, isLandscape ? lsBellMaxH : fsBellMaxH, FS_MIN_H, timers);
-      setPlaying(true);
-      spotify.play();
-    }
+    // The bars are not touched here — the effect above owns them, so every
+    // route into a play state animates, not just this button.
+    if (playing) { setPlaying(false); spotify.pause(); }
+    else { setPlaying(true); spotify.play(); }
   };
 
   const topPad    = Math.max(insets.top, 20);
-  const bottomPad = Math.max(insets.bottom, 24) + 20;
+  // +16 is THE shared bottom pad across the modes — the share capture's crop
+  // lines assume it (see grabModeSnapshot).
+  const bottomPad = Math.max(insets.bottom, 24) + 16;
+
+  // The landscape rest-and-wake cycle (L3). Inactive in portrait, where the
+  // controls stay put — only the sideways scene earns the fade.
+  const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
+    // BOTH orientations now. Landscape has rested since July; portrait does
+    // the same thing on the other axis — see useRestScene.
+    active: visible,
+    playing,
+    sheetOpen: showMood || showPicker,
+  });
+  // 0.62: the meter is full-width, so the generic 0.86 would poke under the
+  // docked panel.
+  const deckScene = useDeckScene(chrome, winW, 0.68, isLandscape);
+  // Measured, not guessed: where the scene sits inside the content box, and
+  // how tall that box is, together give the exact distance to the middle.
+  const [contentH, setContentH] = useState(0);
+  const [sceneBox, setSceneBox] = useState({ y: 0, h: 0 });
+  const restScene = useRestScene(chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape);
 
   useEffect(() => {
     if (visible) getStationPlaylist(activeStation).then(setLinked);
   }, [visible, activeStation]);
 
   // ── Swipe-down to dismiss (portrait) ─────────────────────────────────────
+  /**
+   * The dismiss gesture reaches handleClose through a ref because the
+   * responder below is built once — closing over the first render's copy
+   * would leave it using a stale window height after a rotation.
+   */
+  const dismissCloseRef = useRef(handleClose);
+  dismissCloseRef.current = handleClose;
+
+  /** Where the card ends up when the finger leaves — or is taken away. */
+  const settleDismiss = (g: { dy: number; vy: number }) => {
+    if (g.dy > 120 || g.vy > 0.8) dismissCloseRef.current();
+    else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+  };
+
+  /**
+   * A sheet above the card owns every gesture. Without this, a FAST flick
+   * that the song list declined bubbled down here (the sheet's React tree
+   * lives inside the mode's), the card dismissed UNDER the open sheet, and
+   * tearing down both iOS windows at once froze the whole screen (owner,
+   * 04.08: "the card collapses to the bottom and then whole screen
+   * freezes"). While any sheet is up, the dismiss gesture stands down.
+   */
+  const npSheetCount = useNowPlaying().sheetCount;
+  const sheetUpRef = useRef(false);
+  sheetUpRef.current = npSheetCount > 0;
+
   const dismissPan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder:  (_, g) => g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+    onMoveShouldSetPanResponder:  (_, g) => !sheetUpRef.current && g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
     onPanResponderMove:  (_, g) => { if (g.dy > 0) slideY.setValue(g.dy); },
-    onPanResponderRelease: (_, g) => {
-      if (g.dy > 120 || g.vy > 0.8) handleClose();
-      else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
-    },
+    onPanResponderRelease: (_, g) => settleDismiss(g),
+    /**
+     * iOS CANCELS a touch that leaves the bottom edge of the screen — which
+     * is exactly how you drag a card away. With no terminate handler the
+     * gesture just stopped: `slideY` stayed parked wherever the finger left
+     * it, so the mode was still "open" with its content off-screen and its
+     * modal window still over the app. Taps fell through to the page beneath
+     * (which is why the tab bar kept working) but scrolling did not, and the
+     * only ways out were to swipe again — re-grabbing the stranded card —
+     * or to kill the app. Terminating settles it exactly like a release.
+     */
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderTerminate: (_, g) => settleDismiss(g),
   })).current;
 
   // ── Shared background ─────────────────────────────────────────────────────
@@ -415,138 +445,95 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   const background = (
     <>
       <StationBackdrop station={currentStation} blurRadius={2.5} />
-      <LinearGradient
-        colors={[
-          'rgba(2,2,12,0.20)',
-          'rgba(2,2,12,0.15)',
-          'rgba(2,2,12,0.30)',
-          'rgba(2,2,12,0.46)',
-          'rgba(2,2,12,0.58)',
-        ]}
-        locations={[0, 0.4, 0.65, 0.85, 1]}
-        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+      {/* Eased 03.08 (owner: "all mood backgrounds have been heavily blurred
+          and darkened… it sort of makes the mood themes insignificant"). The
+          foot still has to carry white type and the transport, so it keeps
+          most of its weight; the top two thirds — which carry nothing but the
+          station's own picture — give theirs up. Paired with a lighter blur
+          on the assets themselves (radius ~8 -> 3.5). */}
+      <ModeScrim station={currentStation} />
     </>
   );
 
 
   // ─────────────────────────────────────────────────────────────────────────
-  // LANDSCAPE LAYOUT
+  // LANDSCAPE — the owner's L1+L3 pick (30.07): the scene keeps the whole
+  // screen, the portrait grammar redistributes along the bottom, and after a
+  // few untouched seconds of playback the chrome fades out entirely (the
+  // shared LandscapeChrome overlay owns all of that). The meter stands
+  // full-width in front of the photograph, just above where the chrome lives.
+  //
+  // This replaces the ORIGINAL landscape layout from early development (two
+  // columns, its own volume slider, safety banner and dim button) which
+  // never shipped — the app was portrait-locked until today — and predated
+  // every shared piece: ModeActionRow, SeekBar, the track clock, AutoDim.
   // ─────────────────────────────────────────────────────────────────────────
   if (isLandscape) {
-    const leftW  = winW * 0.44;
-    const rightW = winW - leftW;
-    const safeLeft  = insets.left  || 0;
-    const safeRight = insets.right || 0;
-
     return (
-      <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
-        <View style={ls.container} {...dismissPan.panHandlers}>
+      <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+        <Animated.View
+          style={[fs.container, { minHeight: winH, transform: [{ translateY: slideY }] }]}
+          {...dismissPan.panHandlers}
+          /* Passive touch sniffer — never claims the gesture, just brings the
+             rested chrome back. Must sit on the root so it sees taps on the
+             bars, the buttons and the empty scene alike. */
+          onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
           {background}
 
-          {/* Safety banner — fades out after 3s */}
+          {/* The meter — anchored LOW (owner, 30.07: "not dead centre"), a
+              meter rises from a baseline. Glides with the deck: shrunk into
+              the left pane while the panel is out, full width at rest. */}
           <Animated.View
-            style={[ls.safeBanner, { opacity: bannerOpacity, top: Math.max(insets.top, 8) }]}
+            style={[{ position: 'absolute', left: lsSide, right: lsSide, bottom: 74, alignItems: 'center' }, deckScene]}
             pointerEvents="none">
-            <MaterialCommunityIcons name="steering" size={14} color="rgba(255,255,255,0.75)" />
-            <Text style={ls.safeBannerText}>Drive safe — keep eyes on the road</Text>
+            <Bars
+              values={fsValues}
+              barW={lsBarW}
+              maxH={lsMaxH}
+              colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
+            />
           </Animated.View>
 
-          {/* Dim button — top left */}
-          <TouchableOpacity
-            style={[ls.dimBtn, { top: Math.max(insets.top, 8) + 2, left: safeLeft + 14 }]}
-            onPress={toggleDim}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons
-              name={dimmed ? 'sunny-outline' : 'moon-outline'}
-              size={17}
-              color={dimmed ? 'rgba(255,210,60,0.7)' : 'rgba(255,255,255,0.45)'}
+          <LandscapeChrome
+            chrome={chrome}
+            rested={chromeRested}
+            station={currentStation}
+            track={spotify.track}
+            playing={playing}
+            tagline={currentStation.tagline}
+            progress={progress}
+            scrub={scrub}
+            onPlayPause={togglePlay}
+            onPrev={spotify.prev}
+            onNext={spotify.next}
+            onClose={handleClose}
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
+          />
+
+          <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
+          <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
+          {handoff && !spotify.track && <HandoffOverlay />}
+          <PreviewGate onSilence={spotify.pause} />
+
+          <ModeSheet visible={showMood} onClose={() => setShowMood(false)} />
+
+          {showPicker && (
+            <PlaylistSheet
+              stationName={currentStation.name}
+              current={linked}
+              onClose={() => setShowPicker(false)}
+              onPick={async (pl) => {
+                await setStationPlaylist(activeStation, pl);
+                setLinked(pl);
+                setShowPicker(false);
+                relinkStationPlaylist(activeStation);
+              }}
             />
-          </TouchableOpacity>
-
-
-          {/* Two-column row */}
-          <View style={ls.columns}>
-
-            {/* ── LEFT COLUMN ── */}
-            <View style={[ls.leftCol, { width: leftW, paddingLeft: safeLeft + 20 }]}>
-
-              {/* Station identity */}
-              <View style={ls.leftIdentity}>
-                <Ionicons name="moon" size={13} color="rgba(123,56,224,0.7)" />
-                <Text style={ls.lsStation} numberOfLines={1}>{currentStation.name}</Text>
-              </View>
-              <Text style={ls.lsTrack} numberOfLines={1}>
-                {spotify.track ? `${spotify.track.title} — ${spotify.track.artist}` : 'Carbon Wing — Midnight Pilot'}
-              </Text>
-
-              {/* Spacer */}
-              <View style={{ flex: 1 }} />
-
-              {/* ── Large controls ── */}
-              <View style={ls.controls}>
-                <TouchableOpacity style={ls.prevNextBtn} activeOpacity={0.75}>
-                  <Ionicons name="play-skip-back" size={22} color="#fff" />
-                </TouchableOpacity>
-                <Animated.View style={{ transform: [{ scale: playBtnScale }] }}>
-                  <TouchableOpacity
-                    style={ls.lsPlayBtn}
-                    onPress={togglePlay}
-                    onPressIn={() => Animated.spring(playBtnScale, { toValue: 1.05, useNativeDriver: true, speed: 40, bounciness: 4 }).start()}
-                    onPressOut={() => Animated.spring(playBtnScale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 4 }).start()}
-                    activeOpacity={0.9}>
-                    <Ionicons name={playing ? 'pause' : 'play'} size={30} color="#0a0a12" style={playing ? undefined : { marginLeft: 3 }} />
-                  </TouchableOpacity>
-                </Animated.View>
-                <TouchableOpacity style={ls.prevNextBtn} activeOpacity={0.75}>
-                  <Ionicons name="play-skip-forward" size={22} color="#fff" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Volume */}
-              <View style={ls.volWrap}>
-                <VolumeSlider />
-              </View>
-
-              {/* Spacer */}
-              <View style={{ flex: 1 }} />
-
-              {/* Tagline */}
-              <Text style={ls.lsTagline} numberOfLines={2}>{currentStation.tagline}</Text>
-
-              {/* Platform row */}
-              {platform && (
-                <TouchableOpacity
-                  style={ls.lsPlatformRow}
-                  onPress={() => openMusicPlatform(currentStation.name)}
-                  activeOpacity={0.7}>
-                  <PlatformIcon id={platform.id} size={14} color={platform.color} />
-                  <Text style={[ls.lsPlatformText, { color: platform.color }]}>
-                    {platform.name}
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-            </View>
-
-            {/* ── RIGHT COLUMN — bars ── */}
-            <View style={[ls.rightCol, { width: rightW, paddingRight: safeRight }]}>
-              {/* Violet bloom behind bars */}
-              <View style={ls.lsVizGlow} pointerEvents="none" />
-              <Bars
-                values={fsValues}
-                barW={lsBarW}
-                maxH={lsMaxH}
-                gaps={lsGaps}
-                bgColor="#060612"
-                colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
-              />
-              <FloatingNotes playing={playing} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
-            </View>
-
-          </View>
-        </View>
+          )}
+        </Animated.View>
       </Modal>
     );
   }
@@ -555,8 +542,14 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   // PORTRAIT LAYOUT (unchanged)
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={() => {}} statusBarTranslucent>
-      <Animated.View style={[fs.container, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" onRequestClose={() => {}} statusBarTranslucent>
+      <Animated.View
+        style={[fs.container, { transform: [{ translateY: slideY }] }]}
+        {...dismissPan.panHandlers}
+        /* Passive touch sniffer — never claims the gesture, just brings the
+           rested chrome back. Must sit on the root so it sees taps on the
+           scene, the buttons and the empty backdrop alike. */
+        onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
 
         {background}
 
@@ -564,72 +557,125 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             tint → transparent) so it has NO hard edge and the blurred image
             stays visible all the way to the bottom. Tinted with the bright
             mid bar colour so it reads as light, never a dark cut-off. */}
-        <LinearGradient
-          colors={[
-            'transparent',
-            (currentStation.eqColors?.[1] ?? currentStation.glowColor) + '26',
-            'transparent',
+        <Animated.View
+          style={[
+            fs.glowBand,
+            { opacity: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }),
+              transform: [{ scaleY: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.4] }) }] },
           ]}
-          locations={[0, 0.5, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={fs.glowBand}
-          pointerEvents="none"
-        />
+          pointerEvents="none">
+          <LinearGradient
+            colors={[
+              'transparent',
+              (currentStation.eqColors?.[1] ?? currentStation.glowColor) + '59',
+              'transparent',
+            ]}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+        </Animated.View>
+
+        {/* Loud-transient bloom — near-invisible when quiet, a bright wash of
+            the station colour on the peaks, so the beat visibly lights the
+            scene even where the bars can't animate smoothly. */}
+        <Animated.View
+          style={[
+            fs.glowBand,
+            { opacity: glowPulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 0.72] }),
+              transform: [{ scaleY: glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.25] }) }] },
+          ]}
+          pointerEvents="none">
+          <LinearGradient
+            colors={[
+              'transparent',
+              (currentStation.eqColors?.[2] ?? currentStation.eqColors?.[1] ?? currentStation.glowColor) + 'B3',
+              'transparent',
+            ]}
+            locations={[0.2, 0.5, 0.8]}
+            start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+        </Animated.View>
 
         {/* Drag pill — swipe down hint */}
-        <View style={{ position: 'absolute', top: topPad + 6, left: 0, right: 0, alignItems: 'center', zIndex: 25 }} pointerEvents="none">
+        <Animated.View style={{ position: 'absolute', top: topPad + 6, left: 0, right: 0, alignItems: 'center', zIndex: 25, opacity: chrome }} pointerEvents="none">
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)' }} />
-        </View>
+        </Animated.View>
+
+        {/* Mode name — top-left corner tag, same treatment as every other mode */}
+        <Animated.View style={{ position: 'absolute', top: topPad + 14, left: 20, zIndex: 10, opacity: chrome }} pointerEvents="none">
+          <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', letterSpacing: 3, fontFamily: Fonts.mono }}>EQUALIZER</Text>
+        </Animated.View>
 
         {/* Close button — fixed top right, always visible */}
 
         {/* Content */}
-        <View style={[fs.content, { paddingTop: topPad + 52, paddingBottom: bottomPad }]}>
+        <View
+          style={[fs.content, { paddingTop: topPad + 52, paddingBottom: bottomPad }]}
+          onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
 
           {/* Station — small top-center label, Spotify "Playing From Playlist" style */}
-          <View style={fs.identity}>
-            <Text style={fs.identityEyebrow}>PLAYING FROM</Text>
-            <Text style={fs.identityStation}>{currentStation.name}</Text>
-          </View>
+          <Animated.View style={[fs.identity, { opacity: chrome }]}>
+            <StationIdentity station={currentStation} />
+          </Animated.View>
 
           {/* Flexible spacer — pushes the whole player cluster to the bottom,
               leaving the upper half as the mood image. */}
           <View style={{ flex: 1 }} pointerEvents="none" />
 
-          <View style={fs.vizSection}>
+          <Animated.View
+            style={[fs.vizSection, restScene]}
+            onLayout={(e) => setSceneBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
             <Bars
               values={fsValues}
               barW={FS_BAR_W}
               maxH={FS_MAX_H}
-              gaps={FS_GAPS}
-              bgColor="transparent"
               colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
             />
-            <FloatingNotes playing={playing} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
-          </View>
+            <FloatingNotes playing={live} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
+          </Animated.View>
 
-          {/* Song title — bottom-left, Spotify style */}
+          {/* THE BOTTOM STACK, in one wrapper. It fades and stops taking
+              touches together, and its measured height is what tells the
+              scene how far to move. `pointerEvents` matters as much as the
+              opacity: an invisible play button is still a play button, so a
+              tap meant to wake the controls would toggle playback instead. */}
+          <Animated.View
+            /* THE WRAPPER MUST BE TRANSPARENT TO LAYOUT. This container
+               stretches its children, and the song block relies on that —
+               it is full width with its text pushed to the left edge. Giving
+               the wrapper `alignItems: 'center'` shrank the block to its own
+               content and centred it, so the song titles moved to the middle
+               of the screen (owner, 18.08, on the Equalizer and the
+               cassette). Match the parent's alignment or impose none. */
+            style={{ alignSelf: 'stretch', opacity: chrome }}
+            pointerEvents={chromeRested ? 'none' : 'auto'}>
+
+          {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
-            <Text style={fs.trackTitle} numberOfLines={1}>{spotify.track?.title ?? 'Carbon Wing'}</Text>
-            <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track?.artist ?? 'Midnight Pilot'}</Text>
+            {spotify.track
+              ? <MarqueeText text={spotify.track.title} style={fs.trackTitle} />
+              : <Text style={[fs.trackTitle, { fontSize: 20 }]} numberOfLines={2}>{currentStation.tagline}</Text>}
+            {spotify.track && <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track.artist}</Text>}
           </View>
 
-          {/* Progress bar */}
+          {/* Progress bar — only when a real song is playing through */}
+          {spotify.track && (
           <View style={fs.progressWrap}>
-            <View style={fs.progressRow}>
+            <SeekBar progress={progress} scrub={scrub} />
+            <View style={fs.timesBelow}>
               <Text style={fs.timeText}>{formatMs(currentTimeMs)}</Text>
-              <VioletProgressBar progress={progress} />
-              <Text style={[fs.timeText, { textAlign: 'right' }]}>{formatMs(durationMs)}</Text>
+              <Text style={fs.timeText}>{formatMs(durationMs)}</Text>
             </View>
           </View>
+          )}
 
           <View style={fs.controls}>
-            <TouchableOpacity
-              style={fs.shuffleRepeatBtn}
-              onPress={() => setShuffle((s) => !s)}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={26} color={shuffle ? '#7B38E0' : '#ffffff'} />
-            </TouchableOpacity>
+            <ShuffleButton accent={currentStation.eqColors?.[1] ?? '#7B38E0'} size={26} on={shuffle}
+              onPress={() => spotify.shuffle(!shuffle)} />
 
             <TouchableOpacity style={fs.skipBtn} activeOpacity={0.75} onPress={spotify.prev}>
               <MaterialCommunityIcons name="skip-previous" size={48} color="#fff" />
@@ -657,36 +703,31 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               <MaterialCommunityIcons name="skip-next" size={48} color="#fff" />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={fs.shuffleRepeatBtn}
-              onPress={() => setRepeat((r) => !r)}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="repeat" size={26} color={repeat ? '#7B38E0' : '#ffffff'} />
-            </TouchableOpacity>
+            <RepeatButton accent={currentStation.eqColors?.[1] ?? '#7B38E0'} size={26} mode={repeat}
+              onPress={(next) => spotify.repeat(next)} />
           </View>
 
           {/* Left-aligned action pills — keep the bars the focus */}
-          <View style={fs.actionRow}>
-            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
-              <Text style={fs.actionPillBold}>Change Mood</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
-              <Text style={fs.actionPillText} numberOfLines={1}>
-                {linked ? linked.name : 'Add Playlist'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <ModeActionRow
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
+            track={spotify.track}
+            station={currentStation}
+          />
+          </Animated.View>
 
         </View>
 
-        <MoodSheet
-          visible={showMood}
-          activeId={activeStation}
-          onSelect={(id) => { setActiveStation(id); npSetStation(id); setShowMood(false); }}
-          onClose={() => setShowMood(false)}
-        />
+        <ModeCloseButton onPress={handleClose} chrome={chrome} rested={chromeRested} />
+
+        <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
+        <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
+        {handoff && !spotify.track && <HandoffOverlay />}
+        <PreviewGate onSilence={spotify.pause} />
+
+        <ModeSheet visible={showMood} onClose={() => setShowMood(false)} />
 
         {showPicker && (
           <PlaylistSheet
@@ -697,6 +738,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
               await setStationPlaylist(activeStation, pl);
               setLinked(pl);
               setShowPicker(false);
+              relinkStationPlaylist(activeStation);
             }}
           />
         )}
@@ -708,71 +750,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
 
 // ── Card ──────────────────────────────────────────────────────────────────────
 
-export function EqualizerModeCard() {
-  const cardValues = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(MIN_H))).current;
-  const [modalOpen, setModalOpen] = useState(false);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  useEffect(() => {
-    startBarAnims(cardValues, cardBellMaxH, MIN_H, timers);
-    return () => stopBarAnims(cardValues, timers);
-  }, []);
-
-  const handleOpen = () => {
-    stopBarAnims(cardValues, timers);
-    setModalOpen(true);
-  };
-
-  const handleClose = () => {
-    setModalOpen(false);
-    startBarAnims(cardValues, cardBellMaxH, MIN_H, timers);
-  };
-
-  return (
-    <View style={card.shell}>
-      <TouchableOpacity onPress={handleOpen} activeOpacity={0.9} style={card.scene}>
-        <View style={card.glowCyan} pointerEvents="none" />
-        <View style={card.glowPink} pointerEvents="none" />
-        <View style={card.tapHint}>
-          <Ionicons name="play" size={9} color="rgba(255,255,255,0.4)" />
-          <Text style={card.tapHintText}>tap to open</Text>
-        </View>
-        <Bars values={cardValues} barW={CARD_BAR_W} maxH={MAX_H} gaps={CARD_GAPS} bgColor="#111111" />
-      </TouchableOpacity>
-      <View style={card.footer}>
-        <View style={card.titleRow}>
-          <Text style={card.title}>Equalizer Mode</Text>
-          <View style={card.freeBadge}><Text style={card.freeBadgeText}>FREE</Text></View>
-        </View>
-        <Text style={card.sub}>Tap to open the full experience. LED bars. Full screen. All night.</Text>
-      </View>
-      <EqualizerFullscreen visible={modalOpen} onClose={handleClose} />
-    </View>
-  );
-}
-
-export function EqualizerModePreview() {
-  const values = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(MIN_H))).current;
-  const [active, setActive] = useState(false);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  return (
-    <TouchableOpacity
-      onPress={() => {
-        if (active) { stopBarAnims(values, timers); setActive(false); }
-        else        { startBarAnims(values, cardBellMaxH, MIN_H, timers); setActive(true); }
-      }}
-      activeOpacity={0.9}
-      style={card.scene}>
-      <View style={card.glowCyan} pointerEvents="none" />
-      <View style={card.glowPink} pointerEvents="none" />
-      <View style={card.tapHint}>
-        <Ionicons name={active ? 'pause' : 'play'} size={9} color="rgba(255,255,255,0.4)" />
-        <Text style={card.tapHintText}>{active ? 'tap to stop' : 'tap to play'}</Text>
-      </View>
-      <Bars values={values} barW={CARD_BAR_W} maxH={MAX_H} gaps={CARD_GAPS} bgColor="#111111" />
-    </TouchableOpacity>
-  );
-}
 
 // ── Card styles ───────────────────────────────────────────────────────────────
 const card = StyleSheet.create({
@@ -874,7 +852,7 @@ const fs = StyleSheet.create({
     paddingBottom: 4,
     alignItems: 'flex-start',
   },
-  trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+  trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: 0 },
   trackArtist: { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 },
 
   // ── Visualizer section — flex to fill available space ────────────────────
@@ -885,6 +863,15 @@ const fs = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     overflow: 'hidden',
+    // Floats the meter above the song title. Two owner rounds live in this
+    // number (05.08): 12 gave the share ticket's picture band a strip of
+    // backdrop under the bars (flush against the tear they read as cut
+    // off), then 52 lifted the meter into the band's middle — on quiet
+    // songs the bars are short and the composition read as empty sky over
+    // a meter glued to the bottom edge. Taller bars were considered and
+    // rejected by the owner ("might look a bit awkward") — lift, don't
+    // stretch.
+    marginBottom: 52,
   },
   vizBloomBottom: {
     position: 'absolute', bottom: -12, alignSelf: 'center',
@@ -899,17 +886,17 @@ const fs = StyleSheet.create({
     marginTop: 22,
     marginBottom: 0,
   },
-  progressRow: {
+  // Times sit underneath the bar — the shared layout across every mode.
+  timesBelow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginTop: -4,
   },
   timeText: {
     color: '#ffffff',
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.2,
-    width: 38,
   },
 
   // ── Controls ──────────────────────────────────────────────────────────────
@@ -948,31 +935,6 @@ const fs = StyleSheet.create({
     backgroundColor: '#0a0a12',
   },
 
-  // ── Volume ────────────────────────────────────────────────────────────────
-  volWrap: {
-    paddingHorizontal: 28,
-    marginBottom: 28,
-  },
-  volTrack: {
-    height: 4, borderRadius: 3,
-    position: 'relative', justifyContent: 'center',
-  },
-  volBg: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 3,
-  },
-  volThumb: {
-    position: 'absolute',
-    width: 13, height: 13, borderRadius: 7,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    marginLeft: -6,
-    shadowColor: '#9060FF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-
   // ── Mode chip ─────────────────────────────────────────────────────────────
   modeChip: {
     color: '#7B38E0',
@@ -984,16 +946,6 @@ const fs = StyleSheet.create({
   },
 
   // ── Action pills ──────────────────────────────────────────────────────────
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22 },
-  actionPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
-    maxWidth: '58%',
-  },
-  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
-  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
   // ── Playlist button ───────────────────────────────────────────────────────
   playlistBtn: {
     marginTop: 20,
@@ -1061,132 +1013,3 @@ const fs = StyleSheet.create({
 });
 
 // ── Landscape styles ──────────────────────────────────────────────────────────
-const ls = StyleSheet.create({
-  container: { flex: 1 },
-
-  columns: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-
-  leftCol: {
-    flexDirection: 'column',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 0,
-  },
-
-  rightCol: {
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-
-  lsVizGlow: {
-    position: 'absolute', bottom: 0, alignSelf: 'center',
-    width: '100%', height: '50%',
-    backgroundColor: 'rgba(80, 20, 180, 0.22)',
-    borderTopLeftRadius: 200, borderTopRightRadius: 200,
-  },
-
-  leftIdentity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 3,
-  },
-
-  lsStation: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: -0.2,
-  },
-
-  lsTrack: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    fontWeight: '400',
-    marginBottom: 12,
-  },
-
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 18,
-    marginBottom: 14,
-  },
-
-  prevNextBtn: {
-    width: 52, height: 52, borderRadius: 26,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#0d0d1a',
-    borderWidth: 1.5, borderColor: '#7B38E0',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4, shadowRadius: 6, elevation: 4,
-  },
-
-  lsPlayBtn: {
-    width: 68, height: 68, borderRadius: 34,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 12,
-  },
-
-  volWrap: { marginBottom: 12 },
-
-  lsTagline: {
-    color: 'rgba(255,255,255,0.2)',
-    fontSize: 11,
-    fontStyle: 'italic',
-    lineHeight: 16,
-    marginBottom: 6,
-  },
-
-  lsPlatformRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-
-  lsPlatformEmoji: { fontSize: 13 },
-
-  lsPlatformText: { fontSize: 12, fontWeight: '600' },
-
-  safeBanner: {
-    position: 'absolute',
-    alignSelf: 'center',
-    zIndex: 30,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-
-  safeBannerText: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-  },
-
-  dimBtn: {
-    position: 'absolute',
-    zIndex: 20,
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-  },
-});

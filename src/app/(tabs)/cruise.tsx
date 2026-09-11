@@ -1,19 +1,34 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useRouter } from 'expo-router';
 
+import { AlreadyPlayingCard, startAdoptedDrive } from '@/components/AlreadyPlayingCard';
+import { AppStoreUpdateCard } from '@/components/AppStoreUpdateCard';
+import { RateCard } from '@/components/RateCard';
+import { ModeSheet } from '@/components/ModeSheet';
+import { StationSheet } from '@/components/StationSheet';
+import { ConnectMusicCard } from '@/components/ConnectMusicCard';
+import { ConnectSpotifyCard } from '@/components/ConnectSpotifyCard';
+import { SpotifyNudgeCard } from '@/components/SpotifyNudgeCard';
+import { MakeStationCard } from '@/components/MakeStationCard';
+import { WhatsNewCard } from '@/components/WhatsNewCard';
+import { HeadingAnywhereCard, SessionKindSwitch } from '@/components/HeadingAnywhereCard';
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
 import { HeroCard } from '@/components/HeroCard';
-import { StationCard } from '@/components/StationCard';
+import { NewStationCard, ShelfCard, SHELF_CARD_W } from '@/components/ShelfCard';
 import { StationDetailModal } from '@/components/StationDetailModal';
+import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
-import { Cruise, TAB_SAFE_INSET } from '@/constants/theme';
+import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET, pageColumn } from '@/constants/theme';
+import { useStyles } from '@/context/AppearanceContext';
+import { confirmedPlaying } from '@/utils/confirmedPlaying';
+import { needsOffAirAsk } from '@/constants/schedule';
+import { OffAirAsk } from '@/components/OffAirAsk';
+import type { Palette } from '@/utils/appearance';
 import { RECOMMENDED_IDS, STATIONS, type Station } from '@/constants/stations';
-import { getPlatformSkipped } from '@/utils/musicPlatform';
 import {
   loadLastCruise,
   saveLastCruise,
@@ -21,7 +36,11 @@ import {
   type LastCruise,
 } from '@/utils/lastCruise';
 import { recordDriveStart } from '@/utils/driveStats';
-import { loadCustomStations, resolveAnyStation } from '@/utils/customStations';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
+import { customToStation, loadCustomStations, resolveAnyStation, type CustomStation, isCustomStation } from '@/utils/customStations';
+import { requestCreateStation, requestEditStation } from '@/utils/createStationRequest';
+import { consumeDriveRequest } from '@/utils/driveRequest';
+import { loadSessionKind, setSessionKind, words, type SessionKind } from '@/utils/sessionKind';
 import { DEFAULT_DRIVER_NAME, getDriverName } from '@/utils/driverName';
 
 const recommended = STATIONS.filter((s) => RECOMMENDED_IDS.includes(s.id));
@@ -41,24 +60,42 @@ function stationById(id: string): Station {
   return resolveAnyStation(id);
 }
 
-function SkipBanner({ onDismiss }: { onDismiss: () => void }) {
-  return (
-    <View style={styles.banner}>
-      <Ionicons name="musical-notes" size={16} color="rgba(255,255,255,0.75)" />
-      <Text style={styles.bannerText}>Connect your music platform in Profile settings</Text>
-      <Pressable onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Ionicons name="close" size={16} color="rgba(255,255,255,0.4)" />
-      </Pressable>
-    </View>
-  );
+/**
+ * The page title. Time-aware, because "Welcome back" said the same thing at
+ * 7am and midnight — and on a first launch it was simply untrue, which is why
+ * a driver with no saved cruise gets welcomed in rather than back.
+ */
+function greetingFor(hour: number, returning: boolean): string {
+  if (!returning) return 'Welcome';
+  if (hour < 5) return 'Still up';
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
 }
 
-
 export default function CruiseScreen() {
+  const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const np = useNowPlaying();
+  // The focus callback is memoised, so anything it calls must be read through
+  // a ref rather than captured (the stale-closure rule this repo keeps).
+  const npRef = useRef(np);
+  npRef.current = np;
+  /**
+   * Choosing a mood and a look for music that is already playing, when the
+   * app cannot tell which station owns it. Held HERE rather than in the card
+   * because both sheets are absolutely positioned: inside the ScrollView they
+   * would be placed against the scroll content and land off-screen.
+   *
+   * ONE object with an explicit step, not two independent flags. StationSheet
+   * calls `onClose()` immediately after `onPick()`, so a close handler that
+   * simply cancels wipes the choice the pick just made and the second sheet
+   * never opens — which looks exactly like a sheet that failed to render.
+   */
+  const [adopt, setAdopt] = useState<{ mode: string; station: string | null } | null>(null);
+  const [askOffAir, setAskOffAir] = useState(false);
   const { isPro } = useEntitlements();
-  const [showBanner, setShowBanner] = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   // One smart hero: it becomes your last cruise if you have one, otherwise
   // tonight's time-of-day pick. Scene, cue and button all track it.
@@ -66,78 +103,228 @@ export default function CruiseScreen() {
   const [lastCruise, setLastCruise] = useState<LastCruise | null>(null);
   const [statsKey, setStatsKey] = useState(0);
   const [driverName, setDriverName] = useState(DEFAULT_DRIVER_NAME);
-
-  useEffect(() => {
-    getPlatformSkipped().then((skipped) => { if (skipped) setShowBanner(true); });
-  }, []);
+  // The driver's own stations, which get the first shelf on this page — the
+  // more of yourself you have put into the app, the more of it should be yours
+  // when you open it.
+  const [mine, setMine] = useState<CustomStation[]>([]);
+  // Driving or just listening. Decides what gets counted and what things are
+  // called — never what anything DOES.
+  const [kind, setKind] = useState<SessionKind>('driving');
 
   // Refresh on every focus — the name, time of day, last cruise and stats move on.
+  const [focused, setFocused] = useState(false);
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      setFocused(true);
+      // A widget tap arrives as a request rather than an open call, because
+      // the deck's host is mounted in this layout and not at the root where
+      // the link lands (see utils/driveRequest). Consumed FIRST, so the drive
+      // starts before this page spends a frame refreshing things the driver
+      // is about to be taken away from. Reading it takes it, so a later
+      // return to this tab cannot start a second drive.
+      const wanted = consumeDriveRequest();
+      if (wanted) {
+        // A tap on the Start Drive tile is an answer to "heading anywhere?",
+        // so it is recorded before the drive starts rather than left for the
+        // card to ask about later. Written for next time too, not just this
+        // session — someone who reaches for that widget is telling the app
+        // what kind of listener they are.
+        if (wanted.kind) { setKind(wanted.kind); setSessionKind(wanted.kind); }
+        npRef.current.open(wanted.mode, wanted.stationId);
+      }
       setTonightPick(stationById(defaultStationForNow()));
       setStatsKey((k) => k + 1);
       getDriverName().then((n) => { if (active) setDriverName(n); });
-      loadCustomStations().then(() => loadLastCruise()).then((last) => { if (active) setLastCruise(last); });
-      return () => { active = false; };
+      // Unanswered reads as driving until the card gets its answer — which is
+      // also the right migration for everyone who used the app before the
+      // question existed, since all of their history was logged that way.
+      loadSessionKind().then((k) => { if (active && k) setKind(k); });
+      loadCustomStations()
+        .then((list) => { if (active) setMine(list); return loadLastCruise(); })
+        .then((last) => { if (active) setLastCruise(last); });
+      return () => { active = false; setFocused(false); };
     }, []),
   );
 
+  // Light Spotify pulse-check (slow poll, only while this tab is focused) so
+  // the header equalizer wakes up when music is playing — even before any
+  // Cruise drive has started.
+  const spotify = useMusicPlayback(focused, { pollMs: 15000 });
+
   async function launchCruise(cruise: LastCruise) {
-    await saveLastCruise(cruise);
-    setLastCruise(cruise);
-    recordDriveStart(cruise.stationId);
+    // A free user resuming a saved premium-mode drive only gets a taste — it
+    // shouldn't count as a drive or re-save the cruise. (The player enforces
+    // the preview clock either way; this keeps the stats honest too.)
+    const preview = !isPro && isProMode(cruise.mode);
+    if (!preview) {
+      await saveLastCruise(cruise);
+      setLastCruise(cruise);
+      recordDriveStart(cruise.stationId, undefined, cruise.mode);
+    }
     // np.open also kicks Spotify toward the station's linked playlist.
-    np.open(cruise.mode, cruise.stationId);
+    np.open(cruise.mode, cruise.stationId, { preview });
   }
 
   const heroCruise: LastCruise = lastCruise ?? { stationId: tonightPick.id, mode: 'equalizer' };
   const heroStation = stationById(heroCruise.stationId);
+  // The hero's eyebrow already says TONIGHT'S PICK / PICK UP WHERE YOU LEFT
+  // OFF, so the line underneath just names the station and mode. It used to
+  // read "Tonight's pick: <station>", which said the same words twice inside
+  // one card.
   const heroCue = lastCruise
     ? `${heroStation.name} · ${MODE_LABELS[heroCruise.mode] ?? 'Equalizer'} mode`
-    : `Tonight's pick: ${heroStation.name}`;
+    : heroStation.name;
 
-  const handleStartDrive = () => launchCruise(heroCruise);
+  // The hero resumes the LAST cruise, which may well name a station that is
+  // off air now — so it asks, exactly as the station page does (owner,
+  // 19.08). A first-time user's hero is the hour's own pick, so it is always
+  // on air and this never fires for them.
+  const handleStartDrive = () => {
+    if (needsOffAirAsk(heroCruise.stationId)) { setAskOffAir(true); return; }
+    launchCruise(heroCruise);
+  };
 
-  // The "NOW PLAYING" header follows the live drive if there is one, otherwise
-  // it previews tonight's pick — never a stale hardcoded name.
-  const nowStation = np.session ? stationById(np.session.stationId) : heroStation;
+  // The "NOW PLAYING" header belongs to a DRIVE, and only to a drive.
+  //
+  // It used to appear whenever the music service reported anything playing —
+  // and with no session there is no station to name, so it fell back to the
+  // hero's suggestion and announced a station that was not on (owner, 19.08:
+  // "sometimes the top now playing section plays when no station is really
+  // playing"). Music playing outside a drive already has an honest home
+  // directly below: the "I can hear …" card, which names the real song and
+  // offers to wrap a station around it.
+  const nowStation = np.session ? stationById(np.session.stationId) : null;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <View style={styles.safe}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: TAB_SAFE_INSET + insets.bottom }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + 18, paddingBottom: TAB_SAFE_INSET + insets.bottom },
+        ]}
         showsVerticalScrollIndicator={false}>
-        <EqualizerHeader
-          stationName={nowStation.name}
-          live={!!np.session}
-          accent={nowStation.eqColors?.[1]}
+        {/* Only while a station is on, and its bars move only while the audio
+            genuinely does — `confirmedPlaying` waits for the service's own
+            verdict rather than trusting the transport's optimism, the same
+            rule every mode's scene follows. */}
+        {!!nowStation && (
+          <EqualizerHeader
+            stationName={nowStation.name}
+            live={confirmedPlaying(np.playing, spotify.track, np.musicSwitching)}
+            accent={nowStation.eqColors?.[1]}
+          />
+        )}
+
+        {/* The title, then the one big thing. The connect cards used to sit
+            above this and pushed the greeting clean off the screen, so the
+            first thing a returning driver saw was a beta warning about
+            somebody else's service. They come after the hero now. */}
+        <Text style={styles.greeting}>
+          {greetingFor(new Date().getHours(), !!lastCruise)},{'\n'}{driverName}
+        </Text>
+
+        {/* ABOVE THE HERO, because it is the alternative to it: the hero
+            offers to start something, this offers to keep what is already
+            going, and someone with music on wants the second one. Owner's
+            words were "something at the top". */}
+        {/* A binary update, not an OTA one — the one gap OTA can never
+            close, since it can only carry JS/assets onto a build already on
+            the phone. Sits above the hero, same shelf as AlreadyPlayingCard,
+            because "you're behind" outranks "start a drive" without
+            blocking it — it's a dismissible card, not a wall. */}
+        <AppStoreUpdateCard />
+
+        <AlreadyPlayingCard
+          track={spotify.track}
+          contextUri={spotify.contextUri}
+          contextName={spotify.contextName}
+          onAsk={(mode) => setAdopt({ mode, station: null })}
         />
-        {showBanner && <SkipBanner onDismiss={() => setShowBanner(false)} />}
-        <Text style={styles.greeting}>Welcome back, {driverName}</Text>
+        <HeadingAnywhereCard onAnswered={setKind} />
+
         <HeroCard
           onStartDrive={handleStartDrive}
           cueLabel={heroCue}
           station={heroStation}
-          buttonLabel={lastCruise ? 'Continue Drive' : 'Start Drive'}
+          buttonLabel={lastCruise ? words(kind).resume : words(kind).start}
+          heroLine={words(kind).heroLine}
+          resuming={!!lastCruise}
         />
 
-        <DriveStatsStrip refreshKey={statsKey} />
+        <SessionKindSwitch
+          kind={kind}
+          onChange={(k) => { setKind(k); void setSessionKind(k); }}
+        />
+
+        <View style={styles.connects}>
+          <ConnectSpotifyCard />
+          <ConnectMusicCard />
+          <SpotifyNudgeCard />
+          {/* Only ever appears once someone has actually listened a couple of
+              times, and never again after they make one — see the component. */}
+          <MakeStationCard />
+          {/* NEWS, SO IT SITS DOWN HERE with the rating ask rather than up
+              with the update card. Everything above the hero is something the
+              driver needs before they set off; "the green is brighter" is
+              worth knowing and worth nobody's journey being delayed by. Above
+              RateCard because telling someone something outranks asking them
+              for something. Shows once per release note — see utils/whatsNew. */}
+          <WhatsNewCard />
+          {/* BELOW THE HERO ON PURPOSE. The cards above it are things the
+              driver needs (a binary update, music already playing, the
+              driving question); asking for a rating is something WE want, so
+              it must never sit between someone and Start Drive. Asked once,
+              after three real sessions — see utils/rateApp. */}
+          <RateCard />
+        </View>
+
+        {/* YOUR stations come before ours. This is the whole point of the
+            section: ten moods somebody else chose is a product, and four you
+            made is yours, so the page should open with the second one as soon
+            as it exists. Absent until it does — an empty shelf teaches nothing
+            that the invitation card above doesn't say better. */}
+        {mine.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeading}>Your stations</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={SHELF_CARD_W + 14}
+              decelerationRate="fast"
+              contentContainerStyle={styles.shelf}>
+              {mine.map((c) => {
+                const station = customToStation(c);
+                return (
+                  <ShelfCard
+                    key={c.id}
+                    station={station}
+                    onPress={() => setSelectedStation(station)}
+                  />
+                );
+              })}
+              {/* The end of your own shelf is where "one more" occurs to you. */}
+              <NewStationCard onPress={() => { requestCreateStation(); router.push('/stations'); }} />
+            </ScrollView>
+          </View>
+        )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>RECOMMENDED</Text>
+          <Text style={styles.sectionHeading}>Recommended</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            snapToInterval={264}
+            snapToInterval={SHELF_CARD_W + 14}
             decelerationRate="fast"
-            contentContainerStyle={styles.horizontal}>
+            contentContainerStyle={styles.shelf}>
             {recommended.map((station) => (
-              <StationCard key={station.id} station={station} compact onPress={() => setSelectedStation(station)} />
+              <ShelfCard key={station.id} station={station} onPress={() => setSelectedStation(station)} />
             ))}
           </ScrollView>
         </View>
+
+        <DriveStatsStrip refreshKey={statsKey} />
       </ScrollView>
 
       <StationDetailModal
@@ -151,39 +338,110 @@ export default function CruiseScreen() {
               const cruise = { stationId: selectedStation.id, mode };
               saveLastCruise(cruise);
               setLastCruise(cruise);
-              recordDriveStart(selectedStation.id);
+              recordDriveStart(selectedStation.id, undefined, mode);
             }
             np.open(mode, selectedStation.id, { preview });
           }
           setSelectedStation(null);
         }}
         isPro={isPro}
+        // EDITING REACHES THE HOME SHELF NOW. Until today the menu only
+        // existed when a station was opened from the Stations page, so a
+        // driver who reached one of their own stations from here had no way
+        // to change its colour at all — which is exactly how a listener came
+        // to report editing as a missing feature (23.08) when it was built.
+        // The sheet lives on the Stations page, so this hands over the same
+        // way the "make a station" invitation does.
+        onEdit={selectedStation && isCustomStation(selectedStation) ? () => {
+          const id = selectedStation.id;
+          setSelectedStation(null);
+          requestEditStation(id);
+          router.push('/stations');
+        } : undefined}
       />
-    </SafeAreaView>
+
+      <OffAirAsk
+        stationId={askOffAir ? heroCruise.stationId : null}
+        stationName={heroStation.name}
+        accent={heroStation.eqColors?.[1] ?? '#8A7CFF'}
+        onCancel={() => setAskOffAir(false)}
+        onPlay={() => { setAskOffAir(false); launchCruise(heroCruise); }}
+      />
+
+      {/* Cruising with music that is already on: the mood, then the look —
+          the same order the Modes tab asks in, so the pair is always chosen
+          the same way round. Siblings of the ScrollView, never inside it. */}
+      <StationSheet
+        visible={!!adopt && adopt.station === null}
+        /* Cancel ONLY if nothing was chosen — the sheet closes itself on pick,
+           and the updater form keeps the two in the right order. */
+        onClose={() => setAdopt((a) => (a && a.station === null ? null : a))}
+        onPick={(stationId) => setAdopt((a) => (a ? { ...a, station: stationId } : a))}
+        currentId={lastCruise?.stationId}
+        modeLabel={spotify.track?.title}
+      />
+      <ModeSheet
+        visible={!!adopt && adopt.station !== null}
+        onClose={() => setAdopt(null)}
+        currentId={adopt?.mode}
+        title="PICK A LOOK"
+        /* The floating tab bar hangs over this sheet on a page — without the
+           clearance the chip row sits UNDERNEATH it and cannot be tapped at
+           all. In a drive there is no tab bar, which is why the caller
+           supplies this rather than the sheet assuming one. */
+        extraBottom={TAB_SAFE_INSET}
+        onPick={(mode) => {
+          const stationId = adopt?.station;
+          setAdopt(null);
+          if (stationId) startAdoptedDrive(np, stationId, mode);
+        }}
+      />
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * PAGE CHROME ONLY — the greeting, the section headings and the two notice
+ * banners. The shelves are cards (HeroCard, ShelfCard, the connect cards) and
+ * keep their own colours in either theme, per the owner's rule of 13.08.
+ */
+const makeStyles = (p: Palette) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
-  content: { paddingTop: 4 },
+  // THE READING COLUMN, and it is the whole of the iPad fix. Every child of
+  // this ScrollView — the hero, the cards, the shelves — was laid out against
+  // a side gutter, so on a 1032-point iPad they stretched into shapes nobody
+  // designed: a 4:1 hero with its type in one corner, buttons half a screen
+  // wide. Capping the container and centring it means each one keeps the
+  // proportions it was drawn at and the spare width becomes margin.
+  //
+  // A PHONE CAN NEVER REACH THE CAP (the widest is 430 points), so this is
+  // byte-identical on every phone — see PAGE_MAX_W's own note.
+  content: pageColumn,
+  // The page title, at the same weight and size as "Now tuning" and "Modes".
+  // It was 15pt — smaller than the station names underneath it.
   greeting: {
-    color: Cruise.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-    marginHorizontal: 22,
-    marginBottom: 10,
+    color: p.text,
+    fontSize: 36,
+    fontWeight: '800',
+    letterSpacing: -1.3,
+    lineHeight: 39,
+    marginHorizontal: PAGE_GUTTER,
+    marginBottom: 22,
   },
-  section: { marginBottom: 30, gap: 14 },
-  sectionLabel: {
-    color: Cruise.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 2.5,
-    marginHorizontal: 22,
+  connects: { marginTop: 18 },
+  section: { marginTop: 30, marginBottom: 30, gap: 14 },
+  // Sentence case at 21pt, not letterspaced small caps: the eyebrow style is
+  // reserved for labels inside artwork now, so section headings can be read
+  // rather than deciphered.
+  sectionHeading: {
+    color: p.text,
+    fontSize: 21,
+    fontWeight: '800',
+    letterSpacing: 0,
+    marginHorizontal: PAGE_GUTTER,
   },
-  horizontal: { paddingHorizontal: 22, paddingBottom: 6 },
+  shelf: { paddingHorizontal: PAGE_GUTTER, gap: 14, paddingBottom: 2 },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -199,13 +457,13 @@ const styles = StyleSheet.create({
   },
   bannerText: {
     flex: 1,
-    color: 'rgba(255,255,255,0.75)',
+    color: p.ink(0.75),
     fontSize: 12.5,
     lineHeight: 18,
     fontWeight: '500',
   },
   bannerClose: {
-    color: 'rgba(255,255,255,0.35)',
+    color: p.ink(0.42),
     fontSize: 13,
     fontWeight: '600',
   },

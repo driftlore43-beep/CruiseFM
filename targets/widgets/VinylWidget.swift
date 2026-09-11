@@ -1,0 +1,435 @@
+import SwiftUI
+import WidgetKit
+
+/**
+ * THE DECK — the station as an object, with the last song on its label.
+ *
+ * ── WHAT IT DELIBERATELY DOES NOT DO ─────────────────────────────────────
+ *
+ * IT DOES NOT SPIN. iOS redraws a widget a handful of times a day, and the
+ * only thing allowed to animate on its own is countdown-style text. That is
+ * true of every app on the platform, not just this one. A record that moved
+ * only when you were not looking would be a lie told in motion, so this is
+ * drawn as a still deck — which is what a turntable looks like at a glance.
+ *
+ * IT DOES NOT SAY "NOW PLAYING". It cannot know: by the time anyone reads
+ * this, the song has usually changed. What it says is LAST PLAYED, which is a
+ * claim about the past and therefore still true however stale the widget gets.
+ * That single word is what makes showing a cover honest at all — the owner's
+ * own idea (01.09), and the thing to protect if this is ever redesigned.
+ *
+ * ── THREE LOOKS, ONE WIDGET ──────────────────────────────────────────────
+ *
+ * Long-press → Edit Widget picks between them; see DeckLook.swift for why it
+ * is a setting rather than three entries in the gallery. The looks differ in
+ * WHERE the record sits, never in what it claims:
+ *
+ *   road   the record over the station's own photograph
+ *   label  the pressing itself, song printed beside it on paper
+ *   set    the record next to a lit receiver window
+ *
+ * The distinction being drawn is against a record-collection app: those put a
+ * record on a clean studio table. This one belongs to a radio, so it sits on
+ * the road, or on the set, or is printed like a station's own pressing.
+ */
+
+/// The look, in a form every iOS version can compile. `DeckLook` is the
+/// user-facing setting and is iOS 17+; this is what the views actually take,
+/// so the drawing is shared rather than duplicated behind an availability gate.
+enum DeckStyle { case road, label }
+
+private let cream = Color(red: 0.945, green: 0.929, blue: 0.890)
+private let creamDeep = Color(red: 0.878, green: 0.863, blue: 0.812)
+private let ink = Color(red: 0.106, green: 0.122, blue: 0.153)
+
+struct DeckEntry: TimelineEntry {
+  let date: Date
+  let station: WidgetStation?
+  let lastPlayed: LastPlayedInfo?
+  let ready: Bool
+  let style: DeckStyle
+}
+
+/// Shared by both providers, so the two cannot drift into showing different
+/// things — only the look differs between them.
+private func deckEntry(_ style: DeckStyle) -> DeckEntry {
+  guard let snap = SnapshotStore.load() else {
+    return DeckEntry(date: Date(), station: nil, lastPlayed: nil, ready: false, style: style)
+  }
+  // Never driven? Show whatever is on air, so a first-time listener gets a
+  // real record rather than an empty square.
+  let station = snap.lastDrive ?? snap.onAir.first
+  return DeckEntry(date: Date(), station: station, lastPlayed: snap.lastPlayed,
+                   ready: true, style: style)
+}
+
+/// ONE ENTRY, AND A REFRESH IN AN HOUR. Unlike the On Air widget this does not
+/// walk the broadcast day: the record shows the station you last drove, which
+/// only changes when you drive again — and the app republishes the snapshot
+/// every time it is backgrounded, a far better signal than any schedule
+/// guessed at here.
+private func deckTimeline(_ style: DeckStyle) -> Timeline<DeckEntry> {
+  Timeline(entries: [deckEntry(style)], policy: .after(Date().addingTimeInterval(60 * 60)))
+}
+
+// ── iOS 16 and older: no setting, the default look ─────────────────────────
+
+struct DeckProvider: TimelineProvider {
+  func placeholder(in context: Context) -> DeckEntry {
+    DeckEntry(date: Date(), station: nil, lastPlayed: nil, ready: false, style: .road)
+  }
+  func getSnapshot(in context: Context, completion: @escaping (DeckEntry) -> Void) {
+    completion(deckEntry(.road))
+  }
+  func getTimeline(in context: Context, completion: @escaping (Timeline<DeckEntry>) -> Void) {
+    completion(deckTimeline(.road))
+  }
+}
+
+// ── iOS 17+: the look comes from the widget's own configuration ────────────
+
+@available(iOSApplicationExtension 17.0, *)
+struct DeckIntentProvider: AppIntentTimelineProvider {
+  func placeholder(in context: Context) -> DeckEntry {
+    DeckEntry(date: Date(), station: nil, lastPlayed: nil, ready: false, style: .road)
+  }
+  func snapshot(for configuration: DeckLookIntent, in context: Context) async -> DeckEntry {
+    deckEntry(style(configuration.look))
+  }
+  func timeline(for configuration: DeckLookIntent, in context: Context) async -> Timeline<DeckEntry> {
+    deckTimeline(style(configuration.look))
+  }
+  private func style(_ look: DeckLook) -> DeckStyle {
+    switch look {
+    case .road: return .road
+    case .label: return .label
+    }
+  }
+}
+
+// ── the drawing ────────────────────────────────────────────────────────────
+
+struct DeckView: View {
+  var entry: DeckEntry
+  @Environment(\.widgetFamily) var family
+
+  // THE DECK IS MEDIUM-ONLY NOW (owner, 09.09: "the vinyl square widget
+  // should be categorised in the 'look' section with the CD and mirror
+  // ball"). A small record lives in The Mode's Record look instead, bigger
+  // and with no type on it, so this widget no longer offers a square tile
+  // and two ways to get the same picture cannot drift apart.
+  //
+  // The small branch below is left standing rather than cut out: it is
+  // unreachable but still referenced, so it costs nothing, and deleting
+  // reachable-looking Swift in an environment with no compiler is how a
+  // build cycle gets burned. Cut it the next time this file is opened on a
+  // machine that can build it.
+  private var isSmall: Bool { family == .systemSmall }
+
+  var body: some View {
+    if !entry.ready || entry.station == nil {
+      NotReadyView()
+    } else {
+      let s = entry.station!
+      switch entry.style {
+      case .road:  road(s)
+      case .label: label(s)
+      }
+    }
+  }
+
+  // ── ON THE ROAD ─────────────────────────────────────────────────────────
+  // The record over the station's own place. A record-collection app puts the
+  // pressing on a clean table; the whole point of this one is which drive it
+  // belongs to, so the picture underneath is the subject as much as the disc.
+  private func road(_ s: WidgetStation) -> some View {
+    ZStack {
+      s.gradient
+      if let img = Art.station(s.image) {
+        img.cruiseBackdrop()
+      }
+      // Shading gathered where the words are and opened where the picture is
+      // — the rule the app's own decks were rebuilt around on 02.09. A flat
+      // wash over everything is what buried the photograph in the first place.
+      LinearGradient(
+        colors: [.black.opacity(0.90), .black.opacity(0.62), .black.opacity(0.34)],
+        startPoint: .leading, endPoint: .trailing)
+
+      if isSmall {
+        smallStack(s, ink: .white)
+      } else {
+        HStack(spacing: 0) {
+          VStack(alignment: .leading, spacing: 0) {
+            Text("ON THE DECK").font(.system(size: 8, weight: .heavy)).tracking(1.8)
+              .foregroundColor(s.accentColor)
+            Text(s.name).font(.system(size: 20, weight: .bold))
+              .foregroundColor(.white).lineLimit(1).padding(.top, 4)
+            DialText(dial: s.dial, size: 12, color: s.accentColor).padding(.top, 3)
+            Spacer(minLength: 6)
+            lastPlayed(ink: .white)
+          }
+          Spacer(minLength: 8)
+          // THE ONE THAT DOES NOT FALL BACK TO THE STATION PHOTO. It is
+          // already the backdrop here, so using it on the label too would
+          // print the same picture twice at two sizes. No cover means the
+          // printed pressing instead — the station's own label.
+          Group {
+            if let art = Art.lastPlayed() {
+              RecordView(accent: s.accentColor, label: art, size: 118)
+            } else {
+              pressing(s, size: 118)
+            }
+          }
+          .padding(.trailing, 2)
+        }
+        .padding(15)
+      }
+    }
+  }
+
+  // ── THE LABEL ───────────────────────────────────────────────────────────
+  // The pressing itself. The record runs off the edge so the label becomes
+  // the thing you read, printed with the station and its frequency the way a
+  // real one carries its own catalogue detail.
+  private func label(_ s: WidgetStation) -> some View {
+    ZStack {
+      LinearGradient(colors: [cream, creamDeep], startPoint: .topLeading, endPoint: .bottomTrailing)
+
+      // BOTH LOOKS SHARE ONE SMALL TILE. It is the same object either way —
+      // the pressing, its frequency, its name — and the only thing the look
+      // decides at this size is what it is sitting on. Two copies of it is
+      // how the two drifted apart the first time.
+      if isSmall {
+        smallStack(s, ink: ink)
+      } else {
+        ZStack(alignment: .leading) {
+          // LAID OUT LIKE A RECORD ON ITS SLEEVE, both slightly askew — the
+          // owner's own steer (03.09, with an MD Vinyl screenshot): "position
+          // the vinyl and the sleeve like they're on an angle where the vinyl
+          // sits on top of the vinyl sleeve".
+          //
+          // THE ORDER IS THE WHOLE THING. The sleeve goes down first and the
+          // record rests ON it. Drawn the other way round the record reads as
+          // sliding OUT of the sleeve, which is a different object and is
+          // what this card did before.
+          RecordSleeve(image: s.image, gradient: s.gradient, size: 116)
+            .rotationEffect(.degrees(-5))
+            .offset(x: 10)
+
+          // NOT ONE WORD ON THE DISC. The frequency went the way the rest of
+          // the text did (owner: "remove the station number in the vinyl
+          // disc") — what is left is the object itself, and everything
+          // readable lives on the card beside it. The SMALL tile still prints
+          // the frequency on its label, because there it is the only thing
+          // naming the station.
+          RecordView(accent: s.accentColor, label: nil, size: 116, plainLabel: true)
+            .rotationEffect(.degrees(4))
+            .shadow(color: .black.opacity(0.34), radius: 9, x: 3, y: 5)
+            .offset(x: 94)
+
+          VStack(alignment: .trailing, spacing: 2) {
+            Text("NOW ON THE DECK").font(.system(size: 7.5, weight: .heavy)).tracking(1.6)
+              .foregroundColor(ink.opacity(0.48))
+            if let lp = entry.lastPlayed {
+              Text(lp.title).font(.system(size: 17, weight: .heavy))
+                .foregroundColor(ink).lineLimit(1).minimumScaleFactor(0.6)
+              Text(lp.artist).font(.system(size: 11)).foregroundColor(ink.opacity(0.60))
+                .lineLimit(1).minimumScaleFactor(0.75)
+            } else {
+              Text(s.tagline).font(.system(size: 12))
+                .foregroundColor(ink.opacity(0.55)).lineLimit(3)
+            }
+            Spacer(minLength: 4)
+            // THE STATION AT THE FOOT (owner, 03.09). The concept sheet had
+            // the MODE printed here, which on the round she reviewed read
+            // "Cassette mode" underneath a picture of a RECORD — two objects
+            // contradicting each other on one card. The Swift had never said
+            // that (it printed the station's tagline), but her instruction
+            // stands either way: the foot names the station.
+            Text(s.name).font(.system(size: 14, weight: .heavy))
+              .foregroundColor(ink).lineLimit(1).minimumScaleFactor(0.7)
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+          .padding(.vertical, 15)
+          .padding(.trailing, 13)
+          .padding(.leading, 218)
+        }
+      }
+    }
+  }
+
+  /// A record whose label is printed rather than photographic — the station's
+  /// own pressing. Used only by the Label look; the other two want the cover.
+  private func pressing(_ s: WidgetStation, size: CGFloat) -> some View {
+    ZStack {
+      RecordView(accent: s.accentColor, label: nil, size: size, plainLabel: true)
+      // WHAT FITS ON A LABEL IS A FUNCTION OF THE LABEL, not of the design.
+      // The label is 42% of the disc, so at 92pt there is 38pt of room —
+      // "CRUISE FM" would set at under 4pt there, which is a grey smear
+      // rather than small type. The frequency alone, which is what the owner
+      // asked to see in the middle; the station's name goes at the foot of
+      // the card where it is legible, and printing it in both places is what
+      // made this circle unreadable in the first place.
+      DialText(dial: s.dial, size: size * 0.105, color: Color(hex: "#ffe7c2"))
+    }
+  }
+
+  // ── shared pieces ───────────────────────────────────────────────────────
+
+  /// THE SMALL TILE IS THE STATION'S OWN PRESSING (owner, 03.09: "increase the
+  /// size of the vinyl and put the station number in the centre of the vinyl,
+  /// and the name on the bottom. Remove the song name.")
+  ///
+  /// THE SONG COMING OFF IS WHAT MAKES THE RECORD BIGGER. At 78pt with a title
+  /// and a name underneath, the record was the smallest thing on a tile named
+  /// after it. With one line under it instead of two the disc takes 92 of a
+  /// 155pt tile and the widget finally reads as an object rather than a
+  /// caption with a picture above it.
+  private func smallStack(_ s: WidgetStation, ink: Color) -> some View {
+    VStack(spacing: 7) {
+      pressing(s, size: 92)
+      Text(s.name).font(.system(size: 13, weight: .heavy))
+        .foregroundColor(ink).lineLimit(1).minimumScaleFactor(0.75)
+    }
+    .padding(11)
+  }
+
+  /// THE HONEST LABEL. "LAST PLAYED", never "now playing" — see the note at
+  /// the top of this file. With nothing remembered it says nothing at all
+  /// rather than inventing a song.
+  @ViewBuilder private func lastPlayed(ink: Color) -> some View {
+    if let lp = entry.lastPlayed {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("LAST PLAYED").font(.system(size: 7.5, weight: .heavy)).tracking(1.4)
+          .foregroundColor(ink.opacity(0.42))
+        Text(lp.title).font(.system(size: 11, weight: .semibold))
+          .foregroundColor(ink.opacity(0.88)).lineLimit(1)
+        Text(lp.artist).font(.system(size: 9.5))
+          .foregroundColor(ink.opacity(0.56)).lineLimit(1)
+      }
+    }
+  }
+}
+
+/**
+ * A record sleeve carrying the station's own photograph.
+ *
+ * This is what makes the Label look read as a shelf rather than a diagram —
+ * and it is the owner's, not mine (03.09): "a vinyl sleeve (should be the
+ * station image) sits on the left". A custom station's own picture lands here
+ * too, which is the point of drawing the station rather than a cover.
+ *
+ * The three details that make card stock read as card stock: a hard edge all
+ * round, one diagonal sheen across the front, and a DARKER STRIP down the
+ * opening side, which is the shadow of the record inside it.
+ */
+/**
+ * The sleeve the record rests on — the station's own photograph.
+ *
+ * THREE DETAILS DO ALL THE WORK, and none of them is printed. At 116pt
+ * anything smaller than about 4pt is a grey smudge (which is why the station's
+ * name will not fit on the label), so premium at widget size has to come from
+ * how the object behaves in light rather than from more marks on it.
+ *
+ *   RING WEAR — the circle a record leaves on a sleeve it has lived in. One
+ *   faint ring, and it is the single detail that says OWNED rather than
+ *   printed. Borrowed straight from the share card's Sleeve style (03.08),
+ *   where it did the same job.
+ *
+ *   CARD STOCK HAS THICKNESS — lit along the top edge, shaded along the foot.
+ *   Without it a sleeve is a photograph lying flat on the widget.
+ *
+ *   THE OPENING — a sleeve is a pocket, not a card. It goes along the TOP,
+ *   which is a real way for a sleeve to open and, more to the point, the only
+ *   edge not hidden behind the record: an opening drawn on the right would be
+ *   perfectly correct and completely invisible. Drawn as the mouth's shadow
+ *   falling inward under a lit lip, never as a stroked line — a hard edge
+ *   anywhere on this reads as a border, which is the note the owner has
+ *   already made twice about the Winamp card.
+ */
+struct RecordSleeve: View {
+  let image: String?
+  let gradient: LinearGradient
+  let size: CGFloat
+
+  var body: some View {
+    ZStack {
+      if let img = Art.station(image) {
+        img.resizable().aspectRatio(contentMode: .fill)
+      } else {
+        gradient
+      }
+      LinearGradient(stops: [
+        .init(color: .white.opacity(0.16), location: 0),
+        .init(color: .clear, location: 0.46),
+      ], startPoint: .topLeading, endPoint: .bottomTrailing)
+      // ring wear
+      Circle()
+        .stroke(Color.white.opacity(0.13), lineWidth: 1)
+        .frame(width: size * 0.78, height: size * 0.78)
+      // card stock: lit top edge, shaded foot
+      VStack(spacing: 0) {
+        LinearGradient(colors: [.white.opacity(0.22), .clear],
+                       startPoint: .top, endPoint: .bottom)
+          .frame(height: 6)
+        Spacer(minLength: 0)
+        LinearGradient(colors: [.clear, .black.opacity(0.30)],
+                       startPoint: .top, endPoint: .bottom)
+          .frame(height: 7)
+      }
+      // the opening, along the top
+      VStack(spacing: 0) {
+        ZStack(alignment: .top) {
+          LinearGradient(colors: [.black.opacity(0.40), .clear],
+                         startPoint: .top, endPoint: .bottom)
+            .frame(height: size * 0.10)
+          LinearGradient(colors: [.white.opacity(0.34), .clear],
+                         startPoint: .top, endPoint: .bottom)
+            .frame(height: 3)
+        }
+        Spacer(minLength: 0)
+      }
+    }
+    .frame(width: size, height: size)
+    .clipped()
+    .overlay(Rectangle().stroke(.black.opacity(0.30), lineWidth: 1))
+    .shadow(color: .black.opacity(0.34), radius: 9, x: 3, y: 5)
+  }
+}
+
+// ── the two configurations ─────────────────────────────────────────────────
+//
+// SAME `kind` ON BOTH, and that is load-bearing: build 39 shipped
+// "CruiseFMVinyl", so anyone who has already put the Deck on a Home Screen
+// keeps it exactly where it is rather than watching it disappear. Only one of
+// the two is ever added to the bundle — see CruiseWidgetBundle.
+
+@available(iOSApplicationExtension 17.0, *)
+struct DeckConfigurableWidget: Widget {
+  var body: some WidgetConfiguration {
+    AppIntentConfiguration(kind: "CruiseFMVinyl", intent: DeckLookIntent.self,
+                           provider: DeckIntentProvider()) { entry in
+      DeckView(entry: entry).containerBackground(.clear, for: .widget)
+    }
+    .configurationDisplayName("On the Deck")
+    .description("Your station as a record, with the last song on it. Long-press to change the look.")
+    .supportedFamilies([.systemMedium])
+    .cruiseFullBleed()
+  }
+}
+
+struct DeckWidget: Widget {
+  var body: some WidgetConfiguration {
+    StaticConfiguration(kind: "CruiseFMVinyl", provider: DeckProvider()) { entry in
+      if #available(iOSApplicationExtension 17.0, *) {
+        DeckView(entry: entry).containerBackground(.clear, for: .widget)
+      } else {
+        DeckView(entry: entry)
+      }
+    }
+    .configurationDisplayName("On the Deck")
+    .description("Your station as a record, with the last song on the label.")
+    .supportedFamilies([.systemMedium])
+    .cruiseFullBleed()
+  }
+}

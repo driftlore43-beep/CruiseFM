@@ -1,10 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STATIONS, type Station } from '@/constants/stations';
+import { clearStationPlaylistAll } from '@/utils/stationPlaylists';
+import { deleteStationPhoto } from '@/utils/stationPhoto';
 
 const KEY = 'cruise_custom_stations';
 
-export type CustomStation = Omit<Station, 'image' | 'iconName' | 'bestTime' | 'duration' | 'trackCount' | 'spotifyUrl' | 'appleMusicUrl'> & {
-  image: null;
+export type CustomStation = Omit<Station, 'image' | 'imageBlur' | 'iconName' | 'bestTime' | 'duration' | 'trackCount' | 'spotifyUrl' | 'appleMusicUrl'> & {
+  /** A photo of the owner's own, saved by utils/stationPhoto. Null until they
+   *  pick one — which is every station made before that shipped, so every
+   *  reader has to cope with its absence. */
+  image: string | null;
+  imageBlur?: string | null;
   color: string;
   bestTime: string;
   duration: string;
@@ -22,6 +28,12 @@ async function persist(list: CustomStation[]): Promise<void> {
   await AsyncStorage.setItem(KEY, JSON.stringify(list));
 }
 
+/** The sync cache, for callers that must not wait — e.g. the Tuner placing its
+ *  needle on the frame it opens. May be empty before the first load. */
+export function cachedCustomStations(): CustomStation[] {
+  return cache;
+}
+
 export async function loadCustomStations(): Promise<CustomStation[]> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
@@ -30,6 +42,24 @@ export async function loadCustomStations(): Promise<CustomStation[]> {
   } catch {
     return cache;
   }
+}
+
+/**
+ * Is this one of the user's own stations?
+ *
+ * ASK THIS, never `!station.image`. That shortcut was true for the whole of
+ * the app's history — a custom station was the one with no photograph — and it
+ * stopped being true the moment custom stations could HAVE a photograph
+ * (10.08). The immediate symptom was the ⋯ menu vanishing from a station's own
+ * page the instant its owner gave it a picture, so there was no way left to
+ * edit or delete it.
+ *
+ * Membership rather than an id prefix: ids happen to be minted as
+ * `custom-<timestamp>`, but the built-in list is the thing that actually
+ * defines what is and isn't ours, and it cannot drift.
+ */
+export function isCustomStation(station: { id: string }): boolean {
+  return !STATIONS.some((s) => s.id === station.id);
 }
 
 export async function saveCustomStation(station: CustomStation): Promise<void> {
@@ -45,15 +75,76 @@ export async function updateCustomStation(station: CustomStation): Promise<void>
 export async function deleteCustomStation(id: string): Promise<void> {
   const existing = await loadCustomStations();
   await persist(existing.filter((s) => s.id !== id));
+  // Take its photo with it — otherwise a deleted station leaves a file on the
+  // phone forever, and nothing would ever go looking for it again.
+  await deleteStationPhoto(id).catch(() => {});
+  // …and its linked playlists, BOTH services'. Same reasoning: nothing would
+  // ever look them up again, and a recreated station would inherit a stranger.
+  await clearStationPlaylistAll(id).catch(() => {});
 }
 
-/** A custom station dressed as a full Station so modes can render it. */
+/** Blend two hex colours — used to spread one chosen colour into a mood ramp. */
+function mixHex(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ar = (pa >> 16) & 255, ag = (pa >> 8) & 255, ab = pa & 255;
+  const br = (pb >> 16) & 255, bg = (pb >> 8) & 255, bb = pb & 255;
+  const r = Math.round(ar + (br - ar) * t), g = Math.round(ag + (bg - ag) * t), bl = Math.round(ab + (bb - ab) * t);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
+}
+
+/** A custom station's three mood stops, spread from its one chosen colour.
+ *  Three IDENTICAL stops (what this used to return) give the visualisers
+ *  nothing to work with — flat bars, a one-tone mirror ball — so the chosen
+ *  colour becomes the middle of a light → base → deep ramp. Derived rather
+ *  than stored, so stations saved before this get it too. */
+export function rampFromColor(color: string): [string, string, string] {
+  return [mixHex(color, '#ffffff', 0.45), color, mixHex(color, '#0c0f1a', 0.42)];
+}
+
+/**
+ * Converted stations, cached by the object they were built from.
+ *
+ * THIS IS A PERFORMANCE FIX AND IT IS LOAD-BEARING. Every mode calls
+ * `resolveAnyStation(id)` DURING RENDER, and for a custom station that used to
+ * build a brand-new Station object — with a brand-new `eqColors` ramp — every
+ * single time. So each render handed every child new props by identity, and
+ * every `useMemo` keyed on them missed. The Mirror Ball was rebuilding its
+ * entire flipbook (six frames of sphere projection, ~1500 tiles) from scratch
+ * once a second.
+ *
+ * MEASURED on the Mirror Ball, 12 seconds of playback: a built-in station
+ * blocked the thread for 587ms, worst task 61ms; the SAME mode on a custom
+ * station blocked for 2394ms, worst task 243ms. Four times the work, and a
+ * quarter-second freeze once a second — which is the "response is a bit slow"
+ * the owner reported, on the kind of station she actually drives.
+ *
+ * A WeakMap keyed on the source object needs no invalidation: saving or
+ * reloading replaces the stored objects, so a changed station simply misses
+ * and is rebuilt, and dropped ones are collected.
+ */
+const converted = new WeakMap<CustomStation, Station>();
+
+/** A custom station dressed as a full Station so modes can render it.
+ *  Stable by identity — see `converted` above; do not make this return a fresh
+ *  object again. */
 export function customToStation(c: CustomStation): Station {
+  const hit = converted.get(c);
+  if (hit) return hit;
+  const out = buildStation(c);
+  converted.set(c, out);
+  return out;
+}
+
+function buildStation(c: CustomStation): Station {
   return {
     ...c,
-    image: null as unknown as Station['image'],
+    // A user photo is a file path; the ten built-in stations are bundled
+    // assets (numbers). Everything downstream — expo-image, the hero, the
+    // card — takes either, so nothing else needs to know the difference.
+    image: (c.image ?? null) as unknown as Station['image'],
+    imageBlur: (c.imageBlur ?? null) as unknown as Station['imageBlur'],
     iconName: /^[a-z]/.test(c.icon) ? c.icon : 'star-four-points',
-    eqColors: c.eqColors ?? [c.color, c.color, c.color],
+    eqColors: c.eqColors ?? rampFromColor(c.color),
   } as Station;
 }
 

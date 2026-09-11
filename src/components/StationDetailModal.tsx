@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  Easing,
   Modal,
   PanResponder,
   Platform,
@@ -17,22 +18,67 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import { type Station } from '@/constants/stations';
-import { type CustomStation } from '@/utils/customStations';
+import { stationDial, type Station } from '@/constants/stations';
+import { useDsegFonts } from '@/components/StationIdentity';
+import { isCustomStation, type CustomStation } from '@/utils/customStations';
+import { backOnLabel, isOnAir, needsOffAirAsk } from '@/constants/schedule';
+import { OffAirAsk } from '@/components/OffAirAsk';
 import { Cruise } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { useTheme } from '@/context/ThemeContext';
 import { useMotion } from '@/context/MotionContext';
+import { useNowPlaying } from '@/context/NowPlayingContext';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
+import { appleMusicAvailable } from '@/utils/appleMusic';
+import {
+  getSavedPlatform,
+  gatesStartOnPlaylist,
+  offersSpotifyPlaylist,
+  playlistSheetKind,
+  type PlatformId,
+} from '@/utils/musicPlatform';
+import { useSessionKind, words } from '@/utils/sessionKind';
 import {
   getStationPlaylist,
+  getStationPlaylistSlots,
   setStationPlaylist,
   type LinkedPlaylist,
 } from '@/utils/stationPlaylists';
 
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get('window');
+const APPLE_MUSIC_RED = '#FA243C';
 const SPOTIFY_GREEN = '#1DB954';
+
+/**
+ * The playlist card wears the platform's own mark — ALL of it, not just the
+ * little note icon (owner, 04.08: "I still haven't got the Apple Music colour
+ * on the playlists, they're still green"). A green card on an Apple Music
+ * drive says Spotify at a glance, which is exactly the confusion that has her
+ * linking the wrong thing.
+ *
+ * TRAP found fixing this: `styles.playlistBtnIcon` carried `color`, and
+ * react-native-vector-icons applies `style` AFTER the `color` prop — so a
+ * per-platform colour passed as a prop was being silently overridden by the
+ * stylesheet. Colour for these icons must come from the style, or from a
+ * style with no competing colour in it.
+ */
+const PLATFORM_TINT = {
+  apple: {
+    solid: APPLE_MUSIC_RED,
+    wash: 'rgba(250,36,60,0.12)',
+    washHero: 'rgba(250,36,60,0.30)',
+    rim: 'rgba(250,36,60,0.40)',
+    rimStrong: 'rgba(250,36,60,0.50)',
+  },
+  spotify: {
+    solid: SPOTIFY_GREEN,
+    wash: 'rgba(29,185,84,0.12)',
+    washHero: 'rgba(29,185,84,0.30)',
+    rim: 'rgba(29,185,84,0.40)',
+    rimStrong: 'rgba(29,185,84,0.50)',
+  },
+};
 
 /** Darken a hex colour toward black by `amount` (0–1) — used to build a
  * two-stop gradient from the user's chosen accent colour, whatever it is. */
@@ -44,17 +90,7 @@ function darken(hex: string, amount: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
-type Mode = { id: string; label: string; pro: boolean };
-
-const MODES: Mode[] = [
-  { id: 'cassette',  label: 'Cassette',    pro: false },
-  { id: 'equalizer', label: 'Equalizer',   pro: false },
-  { id: 'vinyl',     label: 'Vinyl',       pro: true  },
-  { id: 'radio',     label: 'Tuner',       pro: true  },
-  { id: 'horizon',   label: 'Horizon',     pro: true  },
-  { id: 'waves',     label: 'Sound Waves', pro: false },
-  { id: 'orb',       label: 'Circular EQ', pro: true  },
-];
+import { MODE_CATALOG as MODES } from '@/constants/modeCatalog';
 
 type Props = {
   station: Station | CustomStation | null;
@@ -68,12 +104,32 @@ type Props = {
 };
 
 export function StationDetailModal({ station, visible, onClose, onStartDrive, isPro, onEdit, onDelete }: Props) {
+  // The SAME button on the home page has said "Start Listening" since the
+  // switch landed, while this one still said "Start Drive" — one control, two
+  // answers depending on which screen you reached it from (owner, 14.08).
+  const kind = useSessionKind();
+  const { seg7: dseg, seg14 } = useDsegFonts();
+  // The modal renders with station null while closed.
+  const dial = station ? stationDial(station.id, !!station.premium, station.dialAm) : { band: 'AM' as const, label: '', value: 0 };
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { dataSaver } = useMotion();
-  const slideY = useRef(new Animated.Value(SCREEN_H)).current;
+  const { relinkStationPlaylist } = useNowPlaying();
+  // The station page pushes in from the RIGHT, like turning to a page rather
+  // than pulling up a sheet. slideY stays because the downward pull-to-dismiss
+  // is muscle memory and the drag pill at the top still promises it.
+  const slideX = useRef(new Animated.Value(SCREEN_W)).current;
+  const slideY = useRef(new Animated.Value(0)).current;
   const [selectedMode, setSelectedMode] = useState('cassette');
   const [linked, setLinked] = useState<LinkedPlaylist | null>(null);
+  // Both services' choices, so the page can reassure rather than look empty.
+  const [slots, setSlots] = useState<Partial<Record<string, LinkedPlaylist>>>({});
+  const [linkToast, setLinkToast] = useState<string | null>(null);
+  // Default is NOT Spotify. Treating an unset platform as Spotify (the old
+  // `p === 'spotify' || p == null`) is why a first-run / skipped listener
+  // was asked to paste a Spotify link they cannot use (owner, 11.09).
+  const [savedPlatform, setSavedPlatform] = useState<PlatformId | null>(null);
+  const [platformReady, setPlatformReady] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -83,33 +139,119 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
       setSelectedMode('cassette');
       setShowMenu(false);
       setConfirmDelete(false);
-      if (station) getStationPlaylist(station.id).then(setLinked);
-      Animated.spring(slideY, { toValue: 0, useNativeDriver: true, bounciness: 3 }).start();
+      if (station) {
+        getStationPlaylist(station.id).then(setLinked);
+        // What is saved for the OTHER service — only to offer a hint, never to play.
+        getStationPlaylistSlots(station.id).then(setSlots);
+      }
+      getSavedPlatform().then((p) => {
+        setSavedPlatform(p);
+        setPlatformReady(true);
+      });
+      slideY.setValue(0);
+      slideX.setValue(SCREEN_W);
+      // Timing rather than a spring: a page push wants to arrive and stop, not
+      // wobble at the end.
+      Animated.timing(slideX, {
+        toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      }).start();
     }
   }, [visible, station?.id]);
 
+  // Two ways out, each leaving the way it would have come in: swipe back from
+  // the left edge and it slides off to the right, pull down and it drops.
+  // Claiming on MOVE, never on start — capture-on-start is what killed the
+  // back button on the settings pages.
+  const swipeAxis = useRef<'x' | 'y' | null>(null);
+  /**
+   * How far the page is scrolled. A REF, because the responder below is built
+   * once and would otherwise read the first render's value for ever.
+   *
+   * PULL-TO-DISMISS IS ONLY AVAILABLE AT THE TOP (owner, 11.08: "scroll to the
+   * bottom and slightly scroll up — the whole card likes to come down, so then
+   * I have to be careful scrolling back down"). Scrolling back up MEANS
+   * dragging your finger down, which is the same gesture as throwing the card
+   * away — so anywhere but the top, that drag belongs to the list.
+   */
+  const scrollY = useRef(0);
+  const closeRef = useRef<(down?: boolean) => void>(() => {});
   const dismissPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
-      onPanResponderMove: (_, g) => { if (g.dy > 0) slideY.setValue(g.dy); },
+      onMoveShouldSetPanResponder: (_, g) => {
+        // Down = dismiss, but only from the top of the page — see scrollY.
+        if (g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx) && scrollY.current <= 0.5) return true;
+        // Edge-only, or a rightward drag would fight the horizontal mode strip.
+        return g.x0 < 44 && g.dx > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4;
+      },
+      onPanResponderGrant: () => { swipeAxis.current = null; },
+      onPanResponderMove: (_, g) => {
+        if (!swipeAxis.current) swipeAxis.current = Math.abs(g.dx) > Math.abs(g.dy) ? 'x' : 'y';
+        if (swipeAxis.current === 'x') { if (g.dx > 0) slideX.setValue(g.dx); }
+        else if (g.dy > 0) slideY.setValue(g.dy);
+      },
       onPanResponderRelease: (_, g) => {
-        if (g.dy > 120 || g.vy > 0.8) handleClose();
+        const axis = swipeAxis.current;
+        swipeAxis.current = null;
+        if (axis === 'x') {
+          if (g.dx > SCREEN_W * 0.3 || g.vx > 0.7) closeRef.current(false);
+          else Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
+          return;
+        }
+        if (g.dy > 120 || g.vy > 0.8) closeRef.current(true);
         else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+      },
+      onPanResponderTerminate: () => {
+        swipeAxis.current = null;
+        Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
+        Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
       },
     })
   ).current;
 
-  function handleClose() {
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 300, useNativeDriver: true }).start(onClose);
+  /** `down` sends it out of the bottom; everything else slides it off right. */
+  function handleClose(down = false) {
+    const [value, target] = down ? [slideY, SCREEN_H] : [slideX, SCREEN_W];
+    Animated.timing(value, {
+      toValue: target, duration: 280, easing: Easing.in(Easing.cubic), useNativeDriver: true,
+    }).start(onClose);
   }
+  // The pan responder is built once, so it reaches handleClose through a ref
+  // rather than closing over the first render's copy.
+  closeRef.current = handleClose;
 
   const selectedIsLocked = !isPro && !!MODES.find((m) => m.id === selectedMode)?.pro;
+  // Set when an off-air station is about to start — see OffAirAsk.
+  const [askOffAir, setAskOffAir] = useState(false);
 
-  function handleStartDrive() {
+  function beginDrive() {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     // Locked mode selected? Launch it anyway as a free preview.
     onStartDrive(selectedMode, selectedIsLocked);
+  }
+
+  function handleStartDrive() {
+    // Don't start (or gate) until we know which service they actually use —
+    // a first paint used to treat "not loaded yet" as Spotify.
+    if (!platformReady) return;
+    // Strict rule: no playlist, no drive — but ONLY for a platform that
+    // can play one in-app. Starting anyway used to inherit whatever Spotify
+    // was already playing, which made stations feel broken. Instead the
+    // button routes straight into the playlist picker.
+    if (needsPlaylist) {
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setShowPicker(true);
+      return;
+    }
+    // Off air? Say so before starting, rather than printing BACK AT 5PM and
+    // opening it anyway (owner, 19.08). Never a refusal — the mood is one
+    // more tap away.
+    if (station && needsOffAirAsk(station.id)) {
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setAskOffAir(true);
+      return;
+    }
+    beginDrive();
   }
 
   if (!station) return null;
@@ -117,16 +259,63 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   // The sheet's accent follows the station's own mood (its mid EQ colour —
   // the same hue the Tuner and cards use), not the app's fixed violet, so the
   // Visual Mode chips and Start Drive button match the station you're opening.
-  const stationAccent = (station as Station).eqColors?.[1] ?? theme.accentColor;
+  // A station the user made stores its chosen colour on `color` and reaches
+  // this sheet RAW — customToStation (which fills in eqColors) only runs when
+  // a mode resolves it. Without the `color` fallback every custom station's
+  // chips and Start Drive button came out the app's default violet instead of
+  // the colour the user picked.
+  const stationAccent =
+    (station as Station).eqColors?.[1]
+    ?? (station as CustomStation).color
+    ?? theme.accentColor;
 
-  const topPad = insets.top + 12;
-  const isCustom = !station.image;
+  // Floored, like every mode's header. Identical on any notched phone; it only
+  // bites if the inset ever reads zero inside the Modal, which is exactly how
+  // the settings header ended up alongside the clock (09.08).
+  const topPad = Math.max(insets.top, 20) + 12;
+  // NOT `!station.image` — see isCustomStation. Custom stations can have a
+  // photo since 10.08, and that shortcut hid the ⋯ menu the moment one did.
+  const isCustom = isCustomStation(station);
+  // Presentation only — an off-air station starts a drive exactly like any other.
+  const live = isOnAir(station.id);
   const custom = isCustom ? (station as CustomStation) : null;
-  const needsPlaylist = isCustom && !linked;
+  // Every station — built-in or custom — needs its own playlist before a
+  // drive makes sound, but ONLY when this listener can actually play one
+  // in-app. Spotify people who are already on it, and Apple Music people
+  // on a MusicKit build, wait. Everyone else (skipped, YouTube, Amazon,
+  // Tidal, or a build without MusicKit) is a visual companion: Start Drive
+  // always proceeds, and we never ask them to paste a Spotify link.
+  /**
+   * A playlist saved for the OTHER platform is not a linked playlist.
+   *
+   * The station kept showing a Spotify list while the listener was on Apple
+   * Music (owner, 04.08) — it looked linked, Start Drive went ahead, and
+   * playStationMusic then refused it because an Apple player cannot open a
+   * Spotify uri. Judge it the way playback does, so the card and the drive
+   * agree: a link only counts if it belongs to the platform in use.
+   */
+  const musicKit = appleMusicAvailable();
+  const sheetKind = playlistSheetKind(savedPlatform, musicKit);
+  const appleOffer = sheetKind === 'apple';
+  const spotifyOffer = offersSpotifyPlaylist(savedPlatform);
+  // Playlists are stored PER SERVICE now, so `linked` can only ever be one this
+  // platform can play — the 04.08 mismatch is impossible by construction rather
+  // than caught after the fact. What survives is the useful half of that fix:
+  // if the other service has one, say so, because "add a playlist" alone would
+  // read as though their earlier choice had been thrown away. Which is what
+  // used to happen.
+  const otherPlaylist = appleOffer ? slots.spotify : spotifyOffer ? slots.appleMusic : undefined;
+  const needsPlaylist = platformReady && !linked && gatesStartOnPlaylist(savedPlatform, musicKit);
+  // Apple is the default tint. A custom station's cream on a first-run
+  // visitor must never decide the card is Spotify-green.
+  const tint = spotifyOffer ? PLATFORM_TINT.spotify : PLATFORM_TINT.apple;
+  const showPlaylistCard = sheetKind !== 'companion' || !!linked;
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-      <Animated.View style={[styles.root, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={() => handleClose()}>
+      <Animated.View
+        style={[styles.root, { transform: [{ translateX: slideX }, { translateY: slideY }] }]}
+        {...dismissPan.panHandlers}>
 
         {/* Full-bleed blurred station background — motion is a Premium unlock */}
         <StationBackdrop station={station as Station} blurRadius={1.5} motionAllowed={isPro && !dataSaver} />
@@ -148,6 +337,13 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
         <View style={[styles.dragPill, { top: topPad - 8 }]}>
           <View style={styles.pillBar} />
         </View>
+
+        {/* Now that the page slides in from the right it needs the control that
+            goes with that: a back arrow where every pushed page keeps one. The
+            sheet had no visible way out at all before — only the gesture. */}
+        <Pressable style={[styles.backBtn, { top: topPad }]} onPress={() => handleClose()} hitSlop={14}>
+          <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.92)" />
+        </Pressable>
 
         {/* Custom stations: their icon becomes the hero, glowing in their colour */}
         {custom && (
@@ -175,7 +371,8 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
             style={[styles.menuBtn, { top: topPad }]}
             onPress={() => { setShowMenu((v) => !v); setConfirmDelete(false); }}
             hitSlop={12}>
-            <Ionicons name="ellipsis-horizontal" size={16} color="rgba(255,255,255,0.85)" />
+            <MaterialCommunityIcons name="pencil-outline" size={15} color="#fff" />
+            <Text style={styles.menuBtnLabel}>Edit</Text>
           </Pressable>
         )}
         {showMenu && (
@@ -210,33 +407,74 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[styles.content, { paddingTop: topPad + 40, paddingBottom: insets.bottom + 28 }]}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }}>
 
           {/* Push the title block just below the hero image */}
           <View style={{ flex: 1, minHeight: SCREEN_H * 0.50 }} />
 
+          {/* The dial position in the seven-segment face, above the title —
+              the receiver identity, same as the Stations page. */}
+          <Text style={[styles.dialLine, { fontFamily: dseg }]}>
+            {dial.label}
+            <Text style={[styles.dialBand, { fontFamily: seg14 }]}>  {dial.band}</Text>
+            {/* The schedule, on the row that already carries the receiver
+                identity — this page has the room the dial's fixed-height rows
+                do not. Custom stations are unscheduled and print nothing. */}
+            {!isCustom && (
+              <Text style={styles.schedNote}>
+                {'   '}{live ? '● ON AIR' : (backOnLabel(station.id) ?? '').toUpperCase()}
+              </Text>
+            )}
+          </Text>
           <Text style={styles.stationName}>{station.name}</Text>
           <Text style={styles.stationTagline}>{station.tagline}</Text>
 
-          {/* Add your playlist */}
+          {/* Add your playlist — Apple Music for everyone the picker still
+              offers; Spotify only if they already saved it. A first-run
+              visitor used to land on "Drop in your own Spotify playlist"
+              because an unset platform was treated as Spotify. */}
+          {showPlaylistCard && (
           <Pressable
-            style={({ pressed }) => [styles.playlistBtn, needsPlaylist && styles.playlistBtnHero, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [
+              styles.playlistBtn,
+              { backgroundColor: tint.wash, borderColor: tint.rim },
+              needsPlaylist && styles.playlistBtnHero,
+              needsPlaylist && { backgroundColor: tint.washHero, borderColor: tint.solid, shadowColor: tint.solid },
+              pressed && { opacity: 0.85 },
+            ]}
             onPress={() => setShowPicker(true)}>
-            <MaterialCommunityIcons name="music" size={20} color={SPOTIFY_GREEN} style={styles.playlistBtnIcon} />
+            {/* Apple's mark is red, Spotify's green — showing the wrong one
+                is half of why a stale link read as usable. */}
+            <MaterialCommunityIcons
+              name={spotifyOffer ? 'music' : 'apple'} size={20}
+              style={[styles.playlistBtnIcon, { color: tint.solid }]} />
             <View style={{ flex: 1 }}>
               <Text style={styles.playlistBtnText}>
-                {linked ? linked.name : 'Add your playlist'}
+                {linked ? linked.name : appleOffer ? 'Add your Apple Music playlist' : 'Add your playlist'}
               </Text>
               <Text style={styles.playlistBtnSub}>
                 {linked
                   ? 'Tap to change'
-                  : needsPlaylist
-                    ? 'Give your station its sound'
-                    : 'Drop in your own Spotify playlist'}
+                  : otherPlaylist
+                    // Their other service's choice is safe — say so, or this
+                    // reads as though it had been lost.
+                    ? (appleOffer
+                        ? `“${otherPlaylist.name}” is saved for Spotify — pick an Apple Music one too`
+                        : `“${otherPlaylist.name}” is saved for Apple Music — pick a Spotify one too`)
+                    : needsPlaylist
+                      ? 'Give your station its sound'
+                      : appleOffer
+                        ? 'Drop in your own Apple Music playlist'
+                        : spotifyOffer
+                          ? 'Drop in your own Spotify playlist'
+                          : 'Tap to change'}
               </Text>
             </View>
-            <MaterialCommunityIcons name={linked ? 'pencil' : 'plus'} size={18} color={SPOTIFY_GREEN} />
+            <MaterialCommunityIcons name={linked ? 'pencil' : 'plus'} size={18} style={{ color: tint.solid }} />
           </Pressable>
+          )}
 
           {/* Mode picker */}
           <Text style={styles.sectionLabel}>VISUAL MODE</Text>
@@ -282,13 +520,24 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.startGradient}>
               <Text style={styles.startBtnText}>
-                {selectedIsLocked ? `Preview ${MODES.find((m) => m.id === selectedMode)?.label}` : 'Start Drive'}
+                {needsPlaylist
+                  ? (appleOffer ? 'Add an Apple Music Playlist to Start' : 'Add a Playlist to Start')
+                  : selectedIsLocked
+                    ? `Preview ${MODES.find((m) => m.id === selectedMode)?.label}`
+                    : words(kind).start}
               </Text>
-              <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.9)" />
+              <Ionicons name={needsPlaylist ? 'musical-notes' : 'arrow-forward'} size={18} color="rgba(255,255,255,0.9)" />
             </LinearGradient>
           </Pressable>
 
         </ScrollView>
+
+        {linkToast && (
+          <View style={[styles.linkToast, { bottom: insets.bottom + 24, borderColor: tint.rimStrong }]} pointerEvents="none">
+            <MaterialCommunityIcons name="check-circle" size={16} style={{ color: tint.solid }} />
+            <Text style={styles.linkToastText} numberOfLines={1}>{linkToast}</Text>
+          </View>
+        )}
 
         {showPicker && (
           <PlaylistSheet
@@ -296,12 +545,32 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
             current={linked}
             onClose={() => setShowPicker(false)}
             onPick={async (pl) => {
+              const changed = linked?.uri !== pl.uri;
               await setStationPlaylist(station.id, pl);
+              getStationPlaylistSlots(station.id).then(setSlots);
               setLinked(pl);
               setShowPicker(false);
+              if (changed) {
+                if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                // If this station is the drive playing right now, switch to it
+                // live; otherwise it's queued for the next Start Drive.
+                relinkStationPlaylist(station.id);
+                setLinkToast(`Playlist set: ${pl.name}`);
+                setTimeout(() => setLinkToast(null), 2600);
+              }
             }}
           />
         )}
+
+        {/* Off-air ask — rendered LAST so it covers the sheet, and as an
+            in-page overlay rather than a Modal (this is already inside one). */}
+        <OffAirAsk
+          stationId={askOffAir ? station.id : null}
+          stationName={station.name}
+          accent={stationAccent}
+          onCancel={() => setAskOffAir(false)}
+          onPlay={() => { setAskOffAir(false); beginDrive(); }}
+        />
       </Animated.View>
     </Modal>
   );
@@ -325,33 +594,63 @@ const styles = StyleSheet.create({
     borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1,
   },
   mineBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 2 },
-  menuBtn: {
+  backBtn: {
     position: 'absolute', left: 20, zIndex: 10,
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
+  // Right-hand side: the left slot belongs to the back button now.
+  // A NAMED BUTTON, NOT A BARE '...'. A listener who wanted to change his
+  // station's colour reported it as missing (23.08) — it was there the whole
+  // time, behind a 16pt ellipsis that reads as decoration. A glyph asks you
+  // to guess; a word does not. Kept small and dark so it still sits quietly
+  // over the station's photograph.
+  menuBtn: {
+    position: 'absolute', right: 20, zIndex: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    height: 34, paddingHorizontal: 12, borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)',
+  },
+  menuBtnLabel: { color: '#fff', fontSize: 12.5, fontWeight: '700' },
   menuBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 19 },
   menuSheet: {
-    position: 'absolute', left: 20, zIndex: 20,
+    position: 'absolute', right: 20, zIndex: 20,
     minWidth: 190, borderRadius: 14, paddingVertical: 4,
     backgroundColor: 'rgba(16,16,30,0.97)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 18, elevation: 16,
   },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  menuRowText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  // 15/700, not 14/600 — owner, 10.08: the menu "should slightly have bolder
+  // lettering, it's not as clear as I like". It sits on a small dark panel
+  // over a photograph, which is the least forgiving place for thin type.
+  menuRowText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 },
   menuDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: 10 },
   playlistBtnHero: {
-    backgroundColor: 'rgba(29,185,84,0.30)',
-    borderColor: SPOTIFY_GREEN,
     paddingVertical: 20,
-    shadowColor: SPOTIFY_GREEN,
     shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 16, elevation: 10,
   },
   startBtnQuiet: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' },
+  linkToast: {
+    position: 'absolute', alignSelf: 'center', zIndex: 30,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    maxWidth: '86%',
+    backgroundColor: 'rgba(16,16,26,0.96)',
+    borderRadius: 999, paddingVertical: 11, paddingHorizontal: 18,
+    borderWidth: 1,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 12,
+  },
+  linkToastText: { color: '#fff', fontSize: 13.5, fontWeight: '600', flexShrink: 1 },
 
+  dialLine: { color: 'rgba(255,255,255,0.6)', fontSize: 15, marginBottom: 10 },
+  dialBand: { color: 'rgba(255,255,255,0.4)', fontSize: 12 },
+  // Plain face, not the segment one: seven segments cannot draw most of these
+  // letters (the 31.07 lesson), and this is printed text rather than a readout.
+  schedNote: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   stationName: {
     color: '#fff', fontSize: 40, fontWeight: '800',
     letterSpacing: -0.5, marginBottom: 8,
@@ -363,17 +662,17 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 8,
   },
 
+  // Colours here are placeholders — the card is tinted per platform at the
+  // call site (PLATFORM_TINT), which always wins over these.
   playlistBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: 'rgba(29,185,84,0.12)',
     borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: 'rgba(29,185,84,0.4)',
+    borderWidth: 1,
     marginBottom: 26,
   },
-  playlistBtnIcon: { fontSize: 20, color: SPOTIFY_GREEN, width: 24, textAlign: 'center' },
+  playlistBtnIcon: { fontSize: 20, width: 24, textAlign: 'center' },
   playlistBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 2 },
   playlistBtnSub: { color: 'rgba(255,255,255,0.55)', fontSize: 12 },
-  playlistBtnArrow: { color: SPOTIFY_GREEN, fontSize: 18, fontWeight: '700' },
 
   sectionLabel: {
     color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '700',

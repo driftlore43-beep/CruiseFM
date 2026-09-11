@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -13,10 +13,21 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Cruise } from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { useDsegFont } from '@/components/StationIdentity';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import type { Palette } from '@/utils/appearance';
+import { clampAm, stationAm, stationDial } from '@/constants/stations';
+import { Cruise, Fonts } from '@/constants/theme';
 import { saveCustomStation, updateCustomStation, type CustomStation } from '@/utils/customStations';
+import {
+  choosePhoto, deleteStationPhoto, saveStationPhoto, stationPhotoAvailable,
+  type ChosenPhoto, type CropRect, type StationPhoto,
+} from '@/utils/stationPhoto';
+import { PhotoFrameSheet } from '@/components/PhotoFrameSheet';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -27,14 +38,19 @@ const ICONS = [
   'road-variant', 'city-variant-outline', 'star-four-points', 'flash', 'sunglasses', 'drama-masks',
 ] as const;
 
-// Soft blue glass wash (~20% opacity) laid behind the sheet's cards.
-const CARD_BLUE = ['rgba(94,199,255,0.20)', 'rgba(26,107,181,0.20)'] as const;
-
+// Neutral glass wash — a faint light-catch from the top-left, same finish as
+// the app's other cards. On paper the same wash has to be INK rather than
+// white: a white gradient over an off-white sheet is nothing at all, so the
+// inputs and icon tiles would lose their faces entirely.
 function CardWash({ radius }: { radius: number }) {
+  const p = usePalette();
+  const colors = p.mode === 'light'
+    ? ([p.ink(0.05), p.ink(0.015)] as const)
+    : (['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.03)'] as const);
   return (
     <LinearGradient
-      colors={CARD_BLUE}
-      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      colors={colors}
+      start={{ x: 0, y: 0 }} end={{ x: 0.9, y: 1 }}
       style={[StyleSheet.absoluteFill, { borderRadius: radius }]}
       pointerEvents="none"
     />
@@ -42,6 +58,14 @@ function CardWash({ radius }: { radius: number }) {
 }
 
 const PALETTES: { label: string; color: string; gradientColors: [string, string, string]; glowColor: string; iconBg: string }[] = [
+  // First on purpose. Owner, 10.08: "they should include a transparent option,
+  // for users who prefer to have the same colour as the background". Not truly
+  // transparent — a station's colour is used for gradients, glows, the EQ ramp
+  // and the mode chips, and a see-through value would leave all of those with
+  // nothing to draw. This is the app's own near-black instead, which is what
+  // "same as the background" actually looks like, and it stays a real colour
+  // everything downstream can use.
+  { label: 'None',     color: '#2A2E3D', gradientColors: ['#0a0a10', '#181c28', '#000000'], glowColor: '#181c28', iconBg: '#14171f' },
   { label: 'Violet',   color: '#7B38E0', gradientColors: ['#1a0533', '#4a1a7a', '#000000'], glowColor: '#4a1a7a', iconBg: '#2d1060' },
   { label: 'Blue',     color: '#1a6bb5', gradientColors: ['#051530', '#0a3a5c', '#000000'], glowColor: '#0a3a5c', iconBg: '#0c2b45' },
   { label: 'Teal',     color: '#1D9E75', gradientColors: ['#032830', '#1a6b50', '#000000'], glowColor: '#1a6b50', iconBg: '#1a4030' },
@@ -50,7 +74,64 @@ const PALETTES: { label: string; color: string; gradientColors: [string, string,
   { label: 'Slate',    color: '#6b7a99', gradientColors: ['#111118', '#1e2240', '#000000'], glowColor: '#1e2240', iconBg: '#16162a' },
   { label: 'Crimson',  color: '#c0392b', gradientColors: ['#2a0505', '#6a1010', '#000000'], glowColor: '#6a1010', iconBg: '#3a0808' },
   { label: 'Forest',   color: '#27ae60', gradientColors: ['#021a05', '#0d4a1a', '#000000'], glowColor: '#0d4a1a', iconBg: '#0d3a10' },
+  { label: 'Orange',   color: '#FF7A3C', gradientColors: ['#2a1000', '#7a3510', '#000000'], glowColor: '#7a3510', iconBg: '#4a1e08' },
+  { label: 'Pink',     color: '#FF4FA3', gradientColors: ['#2a0518', '#7a1a4a', '#000000'], glowColor: '#7a1a4a', iconBg: '#45102b' },
+  { label: 'Cyan',     color: '#33C5FF', gradientColors: ['#01202e', '#0a5a7a', '#000000'], glowColor: '#0a5a7a', iconBg: '#083a4e' },
+  { label: 'Gold',     color: '#D4AF37', gradientColors: ['#241a02', '#6b5510', '#000000'], glowColor: '#6b5510', iconBg: '#443508' },
+  { label: 'Lavender', color: '#A78BFA', gradientColors: ['#160f2e', '#4a3a8a', '#000000'], glowColor: '#4a3a8a', iconBg: '#2c2158' },
+  { label: 'Coral',    color: '#FF6F61', gradientColors: ['#2a0c08', '#7a2a20', '#000000'], glowColor: '#7a2a20', iconBg: '#4a1710' },
+  // MINT IS BRIGHTER THAN THE REST OF THE SET ON PURPOSE (Ethan, 29.08:
+  // "the icon for the colour is like a lime green but the background when
+  // using the station is like a dark forest green"). He is right, and the
+  // gap is real: the swatch is 58% lightness and the backdrop was 25%.
+  //
+  // IT CANNOT MATCH THE SWATCH, and that is physics rather than taste —
+  // a custom station has no photograph, so this gradient IS the whole
+  // background with white type sitting straight on it, and #4ADE80 gives
+  // white 1.74:1. What it can do is take all the headroom there is.
+  //
+  // MEASURED, not guessed, on the real deck at 393x852: the binding
+  // constraint is the tagline/song-title line in EQUALIZER, which sits
+  // lowest and over the brightest part of the diagonal. Current 5.60:1,
+  // this 4.56:1, and the next step up (#1FA157) 4.34:1 — under the 4.5
+  // floor for normal text, so this is the last safe stop. Every other
+  // mode is far looser (Mirror Ball 11.67, Cassette 6.93, CD 6.19).
+  { label: 'Mint',     color: '#4ADE80', gradientColors: ['#05301A', '#1B8A4B', '#000000'], glowColor: '#1B8A4B', iconBg: '#125733' },
+  { label: 'Ice',      color: '#9AD6FF', gradientColors: ['#0e1a26', '#2e5a7a', '#000000'], glowColor: '#2e5a7a', iconBg: '#1c3a52' },
+  // Added 10.08 (owner: "browns and a wider colour selection... include a
+  // pearl white also that would look good in many images"). Earths and muted
+  // tones — the original set was all saturated, which left nothing that sits
+  // quietly under a photograph.
+  { label: 'Pearl',    color: '#EFE8DC', gradientColors: ['#15141a', '#3a3630', '#000000'], glowColor: '#3a3630', iconBg: '#272420' },
+  { label: 'Espresso', color: '#6B4A38', gradientColors: ['#1a0f0a', '#4a2f20', '#000000'], glowColor: '#4a2f20', iconBg: '#2e1d14' },
+  { label: 'Camel',    color: '#C08B5C', gradientColors: ['#241708', '#6b4522', '#000000'], glowColor: '#6b4522', iconBg: '#40290f' },
+  { label: 'Copper',   color: '#B87333', gradientColors: ['#210f02', '#63380f', '#000000'], glowColor: '#63380f', iconBg: '#3b2109' },
+  { label: 'Olive',    color: '#8A9A5B', gradientColors: ['#141705', '#3f4a1c', '#000000'], glowColor: '#3f4a1c', iconBg: '#252c10' },
+  { label: 'Sage',     color: '#A8BFA0', gradientColors: ['#101a10', '#33482f', '#000000'], glowColor: '#33482f', iconBg: '#1d2a1b' },
+  { label: 'Plum',     color: '#8E4B6E', gradientColors: ['#1c0716', '#54203f', '#000000'], glowColor: '#54203f', iconBg: '#331226' },
+  { label: 'Midnight', color: '#35508F', gradientColors: ['#070b1a', '#1e2c56', '#000000'], glowColor: '#1e2c56', iconBg: '#121a33' },
 ];
+
+/**
+ * Ink for the tick on the selected swatch. White is invisible on a pale colour
+ * — Pearl, Ice, Sage — so it flips to near-black on light swatches. (The RING
+ * no longer needs this: it sits outside the swatch on the dark sheet, so it is
+ * always white.)
+ * Perceived brightness, not a plain average: the eye weights green far more
+ * than blue, and a plain mean calls #33C5FF light when it plainly isn't.
+ */
+function ringOn(hex: string): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.slice(0, 2), 16), g = parseInt(c.slice(2, 4), 16), b = parseInt(c.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? '#0a0a10' : '#fff';
+}
+
+/**
+ * The default for a NEW station. Explicit, not PALETTES[0] — 'None' sits first
+ * in the list so it is easy to find, and indexing the default off position
+ * would silently make every new station grey.
+ */
+const DEFAULT_PALETTE = PALETTES.find((p) => p.label === 'Violet') ?? PALETTES[0];
 
 type Props = {
   visible: boolean;
@@ -66,17 +147,58 @@ type Props = {
 
 export function CreateStationModal({ visible, onClose, onCreated, existingCount, maxFree, isPro, editing, onUpdated }: Props) {
   const insets = useSafeAreaInsets();
+  const pal = usePalette();
+  const styles = useStyles(makeStyles);
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
 
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
   const [selectedIcon, setSelectedIcon] = useState<string>(ICONS[0]);
-  const [selectedPalette, setSelectedPalette] = useState(PALETTES[0]);
+  const [selectedPalette, setSelectedPalette] = useState(DEFAULT_PALETTE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // A photo of their own, behind the station. Null keeps today's behaviour —
+  // the chosen colour — which is what every station made before this had.
+  const [photo, setPhoto] = useState<StationPhoto | null>(null);
+  // The dial number, typed rather than left to the hash. Ethan's ask (25.08):
+  // colour-matched custom stations kept landing scattered across the AM band
+  // because the number was always derived from the id, with no way to put
+  // them next to each other. A blank string means "pick one automatically",
+  // same as every station before this.
+  const [amNumber, setAmNumber] = useState('');
+  // The photo they just chose, waiting to be framed. Held here rather than
+  // saved straight away, because the crop has to come off the ORIGINAL.
+  const [framing, setFraming] = useState<ChosenPhoto | null>(null);
+  const [picking, setPicking] = useState(false);
   // Once the slide-in settles we drop the transform entirely — a lingering
   // transform on the sheet stops iOS Safari from focusing the text inputs.
   const [settled, setSettled] = useState(false);
+
+  // OWN KEYBOARD TRACKING, NOT `KeyboardAvoidingView`. That component works
+  // by measuring its OWN frame via onLayout and computing padding from
+  // there — and its frame is exactly what's unreliable here: this sheet
+  // sits inside a Modal (its own native window) AND inside an Animated.View
+  // that is mid-transform while it slides in, and either one is enough for
+  // KeyboardAvoidingView's internal measurement to land on a stale or wrong
+  // number. That is the believable shape of "the tab keeps missing" coming
+  // back after the ScrollView fix (19.08) already addressed the other half
+  // of the same report — a genuinely different failure with the same
+  // symptom, on a path this component can't verify from a browser.
+  //
+  // Keyboard show/hide notifications are OS-level events, delivered to every
+  // listener regardless of which window or transform sits between the input
+  // and the app root — so reading the keyboard's own reported height and
+  // applying it directly as marginBottom sidesteps the measurement
+  // entirely, rather than trusting a component known to be flaky inside
+  // Modals. `flexShrink` (on the sheet and its ScrollView, 20.08) is what
+  // then lets the sheet actually give up that space instead of overflowing.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const show = Keyboard.addListener('keyboardWillShow', (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   const atLimit = !editing && !isPro && existingCount >= maxFree;
 
@@ -85,7 +207,9 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
       setName(editing.name);
       setTagline(editing.tagline === 'My custom station' ? '' : editing.tagline);
       setSelectedIcon(editing.icon);
-      setSelectedPalette(PALETTES.find((pal) => pal.color === editing.color) ?? PALETTES[0]);
+      setSelectedPalette(PALETTES.find((pal) => pal.color === editing.color) ?? DEFAULT_PALETTE);
+      setPhoto(editing.image ? { image: editing.image, imageBlur: editing.imageBlur ?? editing.image } : null);
+      setAmNumber(editing.dialAm != null ? String(editing.dialAm) : '');
     }
     setSettled(false);
     Animated.spring(slideY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start(
@@ -105,16 +229,29 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
     setName('');
     setTagline('');
     setSelectedIcon(ICONS[0]);
-    setSelectedPalette(PALETTES[0]);
+    setSelectedPalette(DEFAULT_PALETTE);
     setError('');
+    setPhoto(null);
+    setAmNumber('');
   }
+
+  // The dial number is a hash of the station's id, so the id is settled the
+  // moment the sheet opens rather than at save time — that way the number in
+  // the preview is the number the station actually gets, not a lookalike.
+  const newIdRef = useRef(`custom-${Date.now()}`);
+  useEffect(() => { if (visible && !editing) newIdRef.current = `custom-${Date.now()}`; }, [visible, editing]);
+  const previewId = editing ? editing.id : newIdRef.current;
+  const amTyped = amNumber.trim() ? Number(amNumber) : NaN;
+  const amOverride = Number.isFinite(amTyped) ? amTyped : undefined;
+  const dial = stationDial(previewId, false, amOverride);
+  const dsegFont = useDsegFont();
 
   async function handleSave() {
     const trimName = name.trim();
     if (!trimName) { setError('Give your station a name.'); return; }
     setSaving(true);
     const station: CustomStation = {
-      id: editing ? editing.id : `custom-${Date.now()}`,
+      id: previewId,
       name: trimName,
       tagline: tagline.trim() || 'My custom station',
       tags: [],
@@ -125,15 +262,23 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
       iconBg: selectedPalette.iconBg,
       color: selectedPalette.color,
       icon: selectedIcon,
-      image: null,
+      image: photo?.image ?? null,
+      imageBlur: photo?.imageBlur ?? null,
       bestTime: 'Any time',
       duration: 'Your playlist',
       trackCount: 0,
       spotifyUrl: `https://open.spotify.com/search/${encodeURIComponent(trimName)}`,
       appleMusicUrl: `https://music.apple.com/search?term=${encodeURIComponent(trimName)}`,
+      dialAm: amOverride != null ? clampAm(amOverride) : undefined,
     };
     if (editing) {
       await updateCustomStation(station);
+      // Tidy up a picture they took off the station. This has to happen on
+      // SAVE, not on the Remove tap — someone can hit Remove and then close
+      // the sheet without saving, and deleting there would destroy the photo
+      // of a station they never actually changed. Replacing a photo already
+      // cleans up after itself inside pickStationPhoto.
+      if (editing.image && !photo) await deleteStationPhoto(station.id).catch(() => {});
       setSaving(false);
       onUpdated?.(station);
     } else {
@@ -151,14 +296,18 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
       animationType="none"
       onRequestClose={() => handleHide(onClose)}
       onShow={handleShow}>
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => handleHide(onClose)} />
         <Animated.View
           style={[
             styles.sheet,
             { paddingBottom: insets.bottom + 16 },
+            // Lifts the sheet clear of the keyboard — see the keyboardHeight
+            // effect above for why this is done by hand rather than left to
+            // KeyboardAvoidingView. flexShrink on the sheet (and its
+            // ScrollView, below) is what lets it actually give up the space
+            // rather than push its own top off the screen.
+            keyboardHeight > 0 && { marginBottom: keyboardHeight },
             !settled && { transform: [{ translateY: slideY }] },
           ]}>
           <View style={styles.handle} />
@@ -170,14 +319,27 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
             </View>
           )}
 
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {/* THE SHEET CANNOT SHRINK UNLESS THIS DOES TOO, which is why the
+              19.08 fix did not hold on a real phone. `flexShrink` on the
+              sheet lets it give way to the keyboard, but a ScrollView with no
+              style takes its CONTENT height and refuses to shrink — so the
+              content height became a floor, the sheet stayed too tall for
+              what the keyboard left, and being bottom-anchored it overflowed
+              upward and took the name field off the top of the screen with
+              it (owner again, 19.08, on 1.3.1: "the tab keeps missing").
+              Both levels have to be allowed to shrink, not just the outer
+              one; then this scrolls instead of pushing the top away. */}
+          <ScrollView
+            style={{ flexShrink: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled">
             <Text style={styles.label}>Name</Text>
             <View style={[styles.inputWrap, atLimit && styles.inputDisabled]}>
               <CardWash radius={12} />
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Good Vibes"
-                placeholderTextColor={Cruise.textMuted}
+                placeholderTextColor={pal.ink(0.42)}
                 value={name}
                 onChangeText={(t) => { setName(t); setError(''); }}
                 maxLength={32}
@@ -192,7 +354,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Windows down, nothing to worry about"
-                placeholderTextColor={Cruise.textMuted}
+                placeholderTextColor={pal.ink(0.42)}
                 value={tagline}
                 onChangeText={setTagline}
                 maxLength={60}
@@ -209,94 +371,236 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
                   style={[styles.iconBtn, selectedIcon === icon && { borderColor: selectedPalette.color, backgroundColor: selectedPalette.iconBg }]}
                   onPress={() => !atLimit && setSelectedIcon(icon)}>
                   {selectedIcon !== icon && <CardWash radius={12} />}
-                  <MaterialCommunityIcons name={icon as any} size={22} color="#fff" />
+                  {/* The selected tile is filled with the station's own dark
+                      iconBg, so its glyph stays white in both themes; an
+                      unselected tile is the sheet, so it takes the page ink. */}
+                  <MaterialCommunityIcons name={icon as any} size={22} color={selectedIcon === icon ? '#fff' : pal.text} />
                 </Pressable>
               ))}
             </View>
+
+            {/* A photo of their own. Only offered on a build that carries the
+                picker — before that the row would be a dead button, and the
+                colour below is a perfectly good station either way. */}
+            {stationPhotoAvailable() && (
+              <>
+                <Text style={styles.label}>Photo</Text>
+                <View style={styles.photoRow}>
+                  <Pressable
+                    disabled={atLimit || picking}
+                    onPress={async () => {
+                      if (picking) return;
+                      setPicking(true);
+                      const r = await choosePhoto();
+                      setPicking(false);
+                      // Nothing is written yet — the framing sheet decides the
+                      // crop, and only then is anything saved.
+                      if (r.kind === 'chosen') { setFraming(r.photo); setError(''); }
+                      else if (r.kind === 'failed') setError("That photo couldn't be used. Try another one.");
+                    }}
+                    style={[styles.photoBtn, !!photo && styles.photoBtnSet]}>
+                    {photo
+                      ? <ExpoImage source={photo.image} contentFit="cover" style={StyleSheet.absoluteFill} />
+                      : null}
+                    <View style={[styles.photoBtnInner, !!photo && styles.photoBtnScrim]}>
+                      <MaterialCommunityIcons
+                        name={picking ? 'progress-clock' : photo ? 'image-edit-outline' : 'image-plus'}
+                        size={20} color={photo ? '#fff' : pal.text}
+                      />
+                      <Text style={[styles.photoBtnText, !photo && { color: pal.text }]}>
+                        {picking ? 'Opening…' : photo ? 'Change photo' : 'Add a photo'}
+                      </Text>
+                    </View>
+                  </Pressable>
+                  {!!photo && (
+                    <Pressable onPress={() => setPhoto(null)} style={styles.photoClear}>
+                      <Text style={styles.photoClearText}>Remove</Text>
+                    </Pressable>
+                  )}
+                </View>
+                <Text style={styles.photoHint}>
+                  Sits behind every mode when you drive this station.
+                </Text>
+              </>
+            )}
 
             <Text style={styles.label}>Colour</Text>
             <View style={styles.paletteRow}>
               {PALETTES.map((p) => (
                 <Pressable
                   key={p.label}
-                  style={[styles.paletteBtn, { backgroundColor: p.color }, selectedPalette.label === p.label && styles.paletteBtnActive]}
-                  onPress={() => !atLimit && setSelectedPalette(p)}
-                />
+                  style={styles.paletteCell}
+                  hitSlop={4}
+                  onPress={() => !atLimit && setSelectedPalette(p)}>
+                  <View style={[styles.paletteDot, { backgroundColor: p.color }]} />
+                  {selectedPalette.label === p.label && (
+                    <>
+                      {/* The ring sits OUTSIDE the swatch with a gap of sheet
+                          between them, so it neither eats into the colour nor
+                          has to compete with it — which is why it can simply
+                          be white on every swatch, pale ones included. */}
+                      <View style={styles.paletteRing} pointerEvents="none" />
+                      <MaterialCommunityIcons
+                        name="check-bold" size={16} color={ringOn(p.color)}
+                        style={styles.paletteTick} pointerEvents="none" />
+                    </>
+                  )}
+                </Pressable>
               ))}
             </View>
 
-            <View style={[styles.preview, { backgroundColor: selectedPalette.iconBg, borderColor: selectedPalette.color + '55' }]}>
-              <CardWash radius={16} />
-              <View style={[styles.previewIcon, { backgroundColor: selectedPalette.iconBg, borderColor: selectedPalette.color + '88' }]}>
-                <MaterialCommunityIcons name={selectedIcon as any} size={24} color="#fff" />
+            <Text style={styles.label}>Dial number (optional)</Text>
+            <View style={[styles.inputWrap, atLimit && styles.inputDisabled]}>
+              <CardWash radius={12} />
+              <TextInput
+                style={styles.input}
+                placeholder={`Automatic — ${stationAm(previewId)}`}
+                placeholderTextColor={pal.ink(0.42)}
+                value={amNumber}
+                onChangeText={(t) => setAmNumber(t.replace(/[^0-9]/g, '').slice(0, 4))}
+                keyboardType="number-pad"
+                maxLength={4}
+                editable={!atLimit}
+                selectionColor={Cruise.violet}
+              />
+            </View>
+            <Text style={styles.photoHint}>
+              Leave blank for one picked automatically, or set your own so
+              stations you group by colour or mood sit next to each other on
+              the dial (540–1600).
+            </Text>
+
+            {/* Preview = an actual row off the Stations dial, not a card.
+                The page is a printed list now (dial number, name, MINE chip,
+                the station's colour on its icon), so a preview that isn't
+                that shape is showing something the user will never see. The
+                number is real: the id is settled when the sheet opens. */}
+            <Text style={[styles.previewLabel, { fontFamily: Fonts.mono }]}>ON THE DIAL</Text>
+            <View style={styles.previewRow}>
+              <View style={styles.previewNumCol}>
+                <Text style={[styles.previewNum, { fontFamily: dsegFont }]} numberOfLines={1}>{dial.label}</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.previewName} numberOfLines={1}>{name || 'Station name'}</Text>
-                <Text style={styles.previewTagline} numberOfLines={1}>{tagline || 'Your tagline here'}</Text>
+              <Text style={styles.previewName} numberOfLines={1}>{name.trim() || 'Station name'}</Text>
+              <View style={styles.mineChip}><Text style={styles.mineChipText}>MINE</Text></View>
+              <View style={styles.previewTrail}>
+                <View style={styles.previewIconSlot}>
+                  <MaterialCommunityIcons name={selectedIcon as any} size={20} color={selectedPalette.color} />
+                </View>
+                <View style={styles.previewCtrlSlot}>
+                  <Ionicons name="chevron-forward" size={16} color={pal.ink(0.28)} />
+                </View>
               </View>
             </View>
+            <Text style={styles.previewTagline} numberOfLines={1}>
+              {tagline.trim() || 'Your tagline here'}
+            </Text>
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <Pressable
-              style={[styles.saveBtn, { backgroundColor: selectedPalette.color }, (atLimit || saving) && styles.saveBtnDisabled]}
+              style={[styles.saveBtn, (atLimit || saving) && styles.saveBtnDisabled]}
               onPress={atLimit ? undefined : handleSave}
               disabled={atLimit || saving}>
               <Text style={styles.saveBtnText}>{saving ? 'Saving…' : atLimit ? 'Upgrade to Pro' : editing ? 'Save changes' : 'Create station'}</Text>
             </Pressable>
           </ScrollView>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
+
+      {/* Framing. A second Modal over this one is fine — the create sheet is a
+          page-level modal, not one opened from inside a running drive, so the
+          iOS "no third window" rule the modes live under does not apply. */}
+      <PhotoFrameSheet
+        photo={framing}
+        onCancel={() => setFraming(null)}
+        onConfirm={async (crop: CropRect) => {
+          const chosen = framing;
+          setFraming(null);
+          if (!chosen) return;
+          setPicking(true);
+          const r = await saveStationPhoto(previewId, chosen.uri, crop);
+          setPicking(false);
+          if (r.kind === 'photo') { setPhoto(r.photo); setError(''); }
+          else if (r.kind !== 'cancelled') setError("That photo couldn't be used. Try another one.");
+        }}
+      />
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * THE SHEET GOES LIGHT WITH THE PAGES (owner, 18.08: "the create station tab
+ * in light mode should also be switched to light mode"). It was the last
+ * screen still hardcoded — a deep-navy sheet with white type sliding up over
+ * a paper-coloured Stations page.
+ *
+ * Every dark value below is the literal it replaces, so nothing about the app
+ * at night can have moved. Two things could NOT simply be tokenised, because
+ * they were tuned for black and mean the opposite on paper:
+ *
+ *   - the SAVE BUTTON, which is the app's primary pill: a solid fill in the
+ *     opposite of the page. White on paper is not a button, so it inverts.
+ *   - the selected swatch's RING, which is white specifically because it sits
+ *     on the sheet rather than on the colour. On paper the sheet is the pale
+ *     thing, so the ring has to be the ink.
+ */
+const makeStyles = (p: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: p.mode === 'light' ? 'rgba(40,36,28,0.32)' : 'rgba(0,0,0,0.6)',
   },
   sheet: {
-    backgroundColor: Cruise.midnight,
+    // Night: the near-black deep navy of the modes' backdrop, so the glass
+    // cards inside read as clear panels over it. Day: the page's own paper.
+    backgroundColor: p.mode === 'light' ? p.panel : '#060812',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 12,
+    // IT HAS TO BE ABLE TO SHRINK. `maxHeight` is a CAP, not a size: with the
+    // keyboard up, KeyboardAvoidingView pads the backdrop, and a sheet whose
+    // natural height still exceeds what is left simply overflows — upward,
+    // because the backdrop is bottom-aligned. Measured with the window cut to
+    // what an iPhone leaves above the keyboard, the name field sat at top
+    // -142, i.e. off the screen entirely (owner, 19.08: "when I typed the bar
+    // goes missing"). flexShrink lets it give way to the container, and the
+    // ScrollView inside then scrolls instead of pushing the top off.
+    flexShrink: 1,
     maxHeight: SCREEN_H * 0.9,
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: p.ink(0.12),
   },
   handle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: p.ink(0.2),
     alignSelf: 'center',
     marginBottom: 16,
   },
   sheetTitle: {
-    color: Cruise.textPrimary,
+    color: p.text,
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 16,
   },
   limitBanner: {
-    backgroundColor: 'rgba(245,158,11,0.12)',
+    backgroundColor: p.mode === 'light' ? 'rgba(168,94,6,0.10)' : 'rgba(245,158,11,0.12)',
     borderRadius: 10,
     padding: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.3)',
+    borderColor: p.mode === 'light' ? 'rgba(168,94,6,0.32)' : 'rgba(245,158,11,0.3)',
   },
   limitText: {
-    color: Cruise.amber,
+    color: p.amber,
     fontSize: 13,
     lineHeight: 18,
   },
   label: {
-    color: Cruise.textMuted,
+    color: p.ink(0.5),
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.5,
@@ -306,13 +610,13 @@ const styles = StyleSheet.create({
   inputWrap: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(94,199,255,0.25)',
+    borderColor: p.ink(0.14),
     overflow: 'hidden',
   },
   input: {
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: Cruise.textPrimary,
+    color: p.text,
     fontSize: 15,
   },
   inputDisabled: {
@@ -331,69 +635,129 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: 'rgba(94,199,255,0.20)',
+    borderColor: p.ink(0.12),
   },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  photoBtn: {
+    flex: 1, height: 62, borderRadius: 14, overflow: 'hidden',
+    backgroundColor: p.ink(0.06),
+    borderWidth: 1, borderColor: p.ink(0.14),
+    justifyContent: 'center',
+  },
+  photoBtnSet: { borderColor: p.ink(0.30) },
+  photoBtnInner: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+  },
+  // Only once there is a photo underneath. It keeps the label readable
+  // whatever they picked — the same problem the modes solve with a scrim —
+  // but painted over an empty button it is just a dark bar on the sheet.
+  photoBtnScrim: { backgroundColor: 'rgba(6,8,18,0.42)' },
+  photoBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  photoClear: { paddingHorizontal: 14, paddingVertical: 12 },
+  photoClearText: { color: p.ink(0.55), fontSize: 14, fontWeight: '600' },
+  photoHint: { color: p.ink(0.42), fontSize: 12, marginTop: 8, marginBottom: 2 },
   paletteRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
-  paletteBtn: {
+  paletteCell: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paletteDot: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
   },
-  paletteBtnActive: {
-    borderColor: '#fff',
-    transform: [{ scale: 1.15 }],
+  // Inset -4 into the row's 10pt gap, so the ring clears its neighbours by 6.
+  // It sits on the SHEET, not on the swatch, so it is whatever the sheet is
+  // not — ink on paper, white on black.
+  paletteRing: {
+    position: 'absolute',
+    top: -4, left: -4, right: -4, bottom: -4,
+    borderRadius: 20,
+    borderWidth: 2.5,
+    borderColor: p.mode === 'light' ? p.text : '#fff',
   },
-  preview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 20,
-    borderWidth: 1,
-    overflow: 'hidden',
+  paletteTick: {
+    position: 'absolute',
+    // A tick as well as a ring: with 25 swatches on screen, a ring alone still
+    // makes you hunt for which one is lit (owner, 11.08). Its colour flips on
+    // pale swatches — that is what ringOn is for now. It sits ON the swatch,
+    // so it takes no notice of the theme.
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowRadius: 3,
   },
-  previewIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
+  // ── Preview: one row off the Stations dial ───────────────────────────────
+  // Column widths and type sizes are copied from stations.tsx on purpose —
+  // if they drift the preview stops being a preview.
+  previewLabel: {
+    color: p.ink(0.32),
+    fontSize: 9.5, fontWeight: '800', letterSpacing: 2,
+    marginTop: 24, marginBottom: 8,
   },
+  previewRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    paddingVertical: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: p.ink(0.10),
+  },
+  previewNumCol: { width: 64, alignItems: 'flex-end', justifyContent: 'center' },
+  previewNum: { fontSize: 16, color: p.ink(0.42) },
   previewName: {
-    color: Cruise.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 2,
+    flexShrink: 1,
+    color: p.ink(0.94),
+    fontSize: 17, fontWeight: '600', letterSpacing: 0,
   },
+  // Pale blue — a colour tuned for black, and invisible on paper, so the
+  // light side is the same hue deepened rather than a different one.
+  mineChip: {
+    borderWidth: 1,
+    borderColor: p.mode === 'light' ? 'rgba(58,74,138,0.55)' : 'rgba(180,195,255,0.45)',
+    borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  mineChipText: {
+    color: p.mode === 'light' ? '#3a4a8a' : '#cdd8ff',
+    fontSize: 8.5, fontWeight: '800', letterSpacing: 1,
+  },
+  previewTrail: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 10 },
+  previewIconSlot: { width: 28, alignItems: 'center' },
+  previewCtrlSlot: { width: 16, alignItems: 'center' },
+  // The tagline doesn't appear on the dial (it lives on the station's own
+  // page), so it sits under the row as a caption rather than inside it.
   previewTagline: {
-    color: Cruise.textSecondary,
+    color: p.ink(0.6),
     fontSize: 12,
+    marginTop: 8,
+    paddingLeft: 80,
   },
   errorText: {
-    color: '#e05578',
+    color: p.mode === 'light' ? '#B02A4C' : '#e05578',
     fontSize: 13,
     marginTop: 10,
   },
+  // The app's primary button is a solid pill in the OPPOSITE of the page,
+  // with type in the page's own colour. The old version was a slab in
+  // whatever colour the user had just picked, which made the CTA change
+  // identity as you scrolled the swatches.
   saveBtn: {
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 24,
     marginBottom: 8,
+    backgroundColor: p.mode === 'light' ? p.text : '#FFFFFF',
   },
   saveBtnDisabled: {
     opacity: 0.5,
   },
   saveBtnText: {
-    color: '#fff',
+    color: p.mode === 'light' ? p.panel : '#0a0a10',
     fontSize: 16,
     fontWeight: '700',
   },

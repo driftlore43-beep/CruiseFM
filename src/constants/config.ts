@@ -1,7 +1,13 @@
 // ── Dev / owner bypass ────────────────────────────────────────────────────────
 // Set to false before publishing to App Store.
 // When true: all premium locks are bypassed and a DEV badge appears on each card.
-export const OWNER_MODE = true;
+export const OWNER_MODE = false;
+
+// ── Launch-free switch ────────────────────────────────────────────────────────
+// While true, every user gets the full app: no locks, no paywall. This is the
+// public launch state (payments arrive as a fast-follow update). Flip to false
+// only when real store products + platform RevenueCat keys are live.
+export const LAUNCH_FREE = true;
 
 // ── RevenueCat ────────────────────────────────────────────────────────────────
 // Public (publishable) SDK key — safe to ship in the app.

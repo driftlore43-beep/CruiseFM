@@ -1,34 +1,47 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Brightness from 'expo-brightness';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, ImageBackground, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { stationImageSource } from '@/utils/stationImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { useMotion } from '@/context/MotionContext';
 
 import { GlossSheen } from '@/components/GlossSheen';
 
 import { CassetteFullscreen } from '@/components/CassetteMode';
 import { DriveCheckCard } from '@/components/DriveCheckCard';
 import { CircularWaveFullscreen } from '@/components/CircularWaveMode';
+import { DiscoBallFullscreen } from '@/components/DiscoBallMode';
+import { CDFullscreen } from '@/components/CDMode';
 import { EqualizerFullscreen } from '@/components/EqualizerMode';
 import { HorizonFullscreen } from '@/components/HorizonMode';
-import { SoundWaveFullscreen } from '@/components/SoundWaveMode';
+import { MirrorBallGlyph } from '@/components/MirrorBallGlyph';
 import { TunerFullscreen } from '@/components/TunerMode';
 import { VinylFullscreen } from '@/components/VinylMode';
 import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
+import { DriveStub } from '@/components/DriveStub';
+import { getDriveStats } from '@/utils/driveStats';
 import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
-import { useNowPlaying } from '@/context/NowPlayingContext';
-import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+import { useNowPlaying, WAKEABLE_NOTICES } from '@/context/NowPlayingContext';
+import { allowRotation, LANDSCAPE_READY, lockPortrait } from '@/utils/orientation';
+import { isSpotifyConnected, pause as pauseSpotify } from '@/utils/spotify';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 
-const MODE_META: Record<string, { label: string; icon: string }> = {
+// `icon` is a MaterialCommunityIcons glyph; `glyph: true` means the mode has
+// a drawn icon instead (no icon font has a mirror ball).
+const MODE_META: Record<string, { label: string; icon: string; glyph?: boolean }> = {
   cassette:  { label: 'Cassette',    icon: 'cassette' },
   equalizer: { label: 'Equalizer',   icon: 'equalizer' },
   vinyl:     { label: 'Vinyl',       icon: 'album' },
   radio:     { label: 'Tuner',       icon: 'radio-tower' },
   horizon:   { label: 'Horizon',     icon: 'weather-sunset-up' },
-  waves:     { label: 'Sound Waves', icon: 'waveform' },
   orb:       { label: 'Circular EQ', icon: 'chart-donut' },
+  disco:     { label: 'Mirror Ball', icon: 'mirror-variant', glyph: true },
+  cd:        { label: 'CD',          icon: 'disc' },
 };
 
 // ── Spotify-style mini-player — docks above the floating tab bar ──────────────
@@ -36,7 +49,8 @@ function MiniPlayer() {
   const np = useNowPlaying();
   const insets = useSafeAreaInsets();
   const visible = !!np.session && !np.expanded;
-  const spotify = useSpotifyPlayback(visible);
+  // Minimized = less detail on screen → poll Spotify at a relaxed pace.
+  const spotify = useMusicPlayback(visible, { pollMs: 12000 });
 
   if (!visible || !np.session) return null;
 
@@ -47,6 +61,9 @@ function MiniPlayer() {
     TAB_BAR_HEIGHT + 10;
 
   const togglePlay = () => {
+    // Handoff drives have no in-app control — send the user back to Spotify.
+    // But if we actually have live playback (a real track), controls work.
+    if (np.handoff && !spotify.track) { np.returnToSpotify(); return; }
     if (np.playing) spotify.pause(); else spotify.play();
     np.setPlaying(!np.playing);
   };
@@ -54,94 +71,181 @@ function MiniPlayer() {
   return (
     <View style={[mp.wrap, { bottom }]} pointerEvents="box-none">
       <TouchableOpacity activeOpacity={0.92} onPress={np.expand} style={mp.bar}>
-        <LinearGradient
-          colors={station.cardGradient}
-          start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={mp.iconChip}>
-          <MaterialCommunityIcons name={meta.icon as any} size={17} color="#fff" />
+        {/* Dark glass, not a coloured slab (owner, 29.07). The bar used to be
+            the station's cardGradient at full strength, which made it the
+            brightest object anywhere in the app — a saturated violet that
+            appears nowhere else since the pages were quietened. The station is
+            still identifiable, just by its own artwork and a hairline of its
+            colour rather than by drowning the bar in it. */}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(18,18,24,0.96)' }]} />
+        <View style={[mp.accent, { backgroundColor: station.eqColors?.[1] ?? station.glowColor }]} />
+        <View style={mp.artwork}>
+          {stationImageSource(station.image) ? (
+            <ImageBackground
+              source={stationImageSource(station.image)!}
+              style={StyleSheet.absoluteFill}
+              imageStyle={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          ) : (
+            <LinearGradient
+              colors={station.cardGradient}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
         </View>
         <View style={{ flex: 1, gap: 1 }}>
           <Text style={mp.title} numberOfLines={1}>{spotify.track?.title ?? station.name}</Text>
-          <Text style={mp.sub} numberOfLines={1}>{station.name} · {meta.label}</Text>
+          <Text style={mp.sub} numberOfLines={1}>
+            {spotify.track ? `${station.name} · ${meta.label}` : meta.label}
+          </Text>
         </View>
+        {/* Bare glyphs, no filled disc and no dark circle: two buttons inside a
+            56pt bar don't need containers to be found. */}
         <TouchableOpacity
           onPress={togglePlay}
-          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-          style={mp.playBtn}>
-          <Ionicons name={np.playing ? 'pause' : 'play'} size={19} color="#0a0a12" style={np.playing ? undefined : { marginLeft: 2 }} />
+          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}>
+          <Ionicons name={np.playing ? 'pause' : 'play'} size={22} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={np.stop}
-          hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
-          style={mp.stopBtn}>
-          <Ionicons name="close" size={15} color="rgba(255,255,255,0.75)" />
+          hitSlop={{ top: 12, bottom: 12, left: 10, right: 12 }}
+          style={{ marginLeft: 6 }}>
+          <Ionicons name="close" size={17} color="rgba(255,255,255,0.4)" />
         </TouchableOpacity>
       </TouchableOpacity>
     </View>
   );
 }
 
-// How long a free user gets to taste a locked mode before the gate drops.
-const PREVIEW_MS = 25000;
+// How long without a touch before the screen eases down, and how low it goes.
+// 0.35 keeps the visuals clearly readable in daylight while still saving
+// meaningful battery (0.22 proved too dark outside night drives).
+const DIM_AFTER_MS = 30000;
+const DIM_LEVEL = 0.35;
 
 /**
- * Preview gate — after the taste, this slides over the still-moving visuals.
- * Rendered as its own Modal so it stacks above whichever mode is presenting.
+ * Auto-dim — like a car head unit: mid-drive, after ~30s without a touch,
+ * the screen brightness eases down (the visuals keep glowing); the first tap
+ * anywhere wakes it back to full and nothing underneath gets pressed by
+ * accident. The screen is the biggest battery cost of a drive, so this is
+ * the single largest saver in the app. Profile toggle, default ON.
+ *
+ * Brightness is always restored — on touch, on pause, on minimize, when the
+ * app backgrounds, and on unmount — so the phone never gets stuck dim.
  */
-function PreviewGate() {
+function AutoDim() {
   const np = useNowPlaying();
-  const [gateOpen, setGateOpen] = useState(false);
-  const previewActive = !!np.session?.preview;
-  const mode = np.session?.mode;
+  const { autoDim, daylight } = useMotion();
+  const [dimmed, setDimmed] = useState(false);
+  const origRef = useRef<number | null>(null);
 
+  // Daylight turns this off outright: dimming the screen is the exact
+  // opposite of what you want with the sun on it, and a driver who then
+  // reaches for the brightness slider ends up costing MORE battery than
+  // the dim ever saved.
+  // …and so does an open sheet, for a harder reason than politeness. The mode
+  // is already a modal window and the sheet is a second one; this catch layer
+  // would be a third, and iOS silently refuses to present it while still
+  // handing it every touch. That is the freeze the owner hit on 03.08 (the
+  // screen dimmed over the song list, taps went nowhere, and the ones that
+  // leaked through to the disc paused the music). Sheets announce themselves
+  // through useSheetOpen — see the note on sheetCount.
+  //
+  // A PLAYBACK NOTICE IS A WINDOW TOO, and it is deliberately checked directly
+  // rather than through useSheetOpen: the notice decides whether to show by
+  // READING sheetCount, so registering itself would flip its own condition and
+  // oscillate. Testing the notice itself also covers the case where one is
+  // pending behind a sheet, which is the safer side to err on — AutoDim
+  // standing down too often costs nothing, mounting a third window freezes the
+  // app (Ethan's Tuner freeze, 23.08).
+  const eligible = autoDim && !daylight && !!np.session && np.expanded && np.playing
+    && np.sheetCount === 0 && !np.playbackNotice && Platform.OS !== 'web';
+
+  const restore = useCallback(async () => {
+    setDimmed(false);
+    const orig = origRef.current;
+    origRef.current = null;
+    if (orig == null) return;
+    try {
+      if (Platform.OS === 'android') await Brightness.restoreSystemBrightnessAsync();
+      else await Brightness.setBrightnessAsync(orig);
+    } catch { /* never leave the user stuck — but nothing more we can do */ }
+  }, []);
+
+  // The countdown: any playback-control touch (activityTick) restarts it.
+  //
+  // `cancelled` matters more than it looks. The timer fires and then AWAITS
+  // the brightness calls; if the user closes the mode during that gap,
+  // clearTimeout is far too late and the continuation still ran setDimmed(true)
+  // — mounting the invisible full-screen catch layer OVER the app the user had
+  // just returned to. It cleared itself a render later, but for that moment
+  // taps and swipes went nowhere.
   useEffect(() => {
-    if (!previewActive) { setGateOpen(false); return; }
-    const t = setTimeout(() => {
-      np.expand();          // bring the visuals back if they minimized
-      setGateOpen(true);
-    }, PREVIEW_MS);
-    return () => clearTimeout(t);
-    // Restart the clock whenever a new preview session begins.
-  }, [previewActive, mode]);
+    if (!eligible || dimmed) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const orig = await Brightness.getBrightnessAsync();
+        if (cancelled) return;
+        await Brightness.setBrightnessAsync(DIM_LEVEL);
+        if (cancelled) { Brightness.setBrightnessAsync(orig).catch(() => {}); return; }
+        origRef.current = orig;
+        setDimmed(true);
+      } catch { /* no brightness control — skip silently */ }
+    }, DIM_AFTER_MS);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [eligible, dimmed, np.activityTick]);
 
-  if (!gateOpen || !previewActive) return null;
+  // Losing eligibility (pause, minimize, stop, toggle off) wakes the screen.
+  useEffect(() => {
+    if (!eligible && dimmed) restore();
+  }, [eligible, dimmed, restore]);
 
-  const label = MODE_META[mode ?? '']?.label ?? 'This mode';
-  const dismiss = () => { setGateOpen(false); np.stop(); };
-  const goPremium = () => { setGateOpen(false); np.stop(); router.push('/premium'); };
+  // Leaving the app must never leave the phone stuck dim.
+  //
+  // DELIBERATELY `!== 'active'` AND NOT isInFront — do not "fix" this to match
+  // the polls and the animations. Those ask "is our content on screen", and
+  // `inactive` means yes. This asks "is the user looking at OUR content", and
+  // `inactive` means no: they have pulled Notification Centre or Control
+  // Centre over the top, and dimming SYSTEM UI reads as a broken phone rather
+  // than as a driving courtesy. Same AppState, genuinely different questions.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => { if (s !== 'active') restore(); });
+    return () => { sub.remove(); restore(); };
+  }, [restore]);
 
+  if (!dimmed) return null;
+  // Invisible catch layer: the wake tap lands here, not on the controls.
   return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={dismiss}>
-      <View style={pg.scrim}>
-        <View style={pg.card}>
-          <LinearGradient
-            colors={['rgba(245,158,11,0.30)', 'rgba(122,70,10,0.22)', 'rgba(20,14,4,0.35)']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <GlossSheen radius={24} />
-          <Text style={pg.crest}>✦</Text>
-          <Text style={pg.title}>Keep the vibe</Text>
-          <Text style={pg.sub}>
-            {label} is a Premium mode. Try everything free for 7 days — cancel anytime.
-          </Text>
-          <TouchableOpacity onPress={goPremium} activeOpacity={0.9} style={pg.cta}>
-            <LinearGradient
-              colors={['#F7B733', '#F59E0B']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <Text style={pg.ctaText}>Start free trial</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={dismiss} hitSlop={{ top: 10, bottom: 10, left: 20, right: 20 }}>
-            <Text style={pg.later}>Maybe later</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible transparent animationType="none" statusBarTranslucent onRequestClose={restore}>
+      <Pressable style={{ flex: 1 }} onPress={restore} />
     </Modal>
   );
+}
+
+/**
+ * Rotation is a fullscreen-mode privilege (owner, 30.07): the scenes want
+ * widescreen in a car mount, the list pages never do. While a mode is up the
+ * phone may turn; the moment it minimizes or closes, the app snaps upright
+ * again — including physically, if it was closed lying sideways.
+ */
+function OrientationGate() {
+  const np = useNowPlaying();
+  // Only modes with a real landscape composition may turn — see the
+  // LANDSCAPE_READY note. Switching to a not-ready mode mid-drive (the
+  // ModeSheet) re-runs this and snaps the phone upright, which is right.
+  const modeOpen = !!np.session && np.expanded && LANDSCAPE_READY.has(np.session.mode);
+
+  useEffect(() => {
+    if (modeOpen) allowRotation(); else lockPortrait();
+  }, [modeOpen]);
+
+  // Never leave the app rotatable after this unmounts, whatever state it was in.
+  useEffect(() => () => { lockPortrait(); }, []);
+
+  return null;
 }
 
 /**
@@ -152,7 +256,11 @@ function PreviewGate() {
  */
 function PlaybackNotice() {
   const np = useNowPlaying();
-  const notice = np.playbackNotice;
+  // Wait for any open sheet to close before appearing. Not politeness: a third
+  // modal window never presents on iOS and swallows every touch instead, so a
+  // notice that showed up over the song list would freeze the app rather than
+  // inform anyone. The 8s countdown starts once it is genuinely on screen.
+  const notice = np.sheetCount > 0 ? null : np.playbackNotice;
 
   useEffect(() => {
     if (!notice) return;
@@ -163,13 +271,25 @@ function PlaybackNotice() {
   if (!notice) return null;
 
   return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={np.clearPlaybackNotice}>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible transparent animationType="fade" statusBarTranslucent onRequestClose={np.clearPlaybackNotice}>
       <Pressable style={pn.scrim} onPress={np.clearPlaybackNotice}>
         <View style={pn.card}>
           <View style={pn.iconRing}>
             <MaterialCommunityIcons name="spotify" size={22} color="#1DB954" />
           </View>
           <Text style={pn.text}>{notice}</Text>
+          {/* The fix, as a tap. Every one of these notices ends with the same
+              errand — open Spotify, press play, come back — so the card offers
+              it rather than describing it. Stops the drive dead otherwise:
+              you cannot follow written instructions and keep driving. */}
+          {WAKEABLE_NOTICES.includes(notice) && (
+            <Pressable
+              style={pn.action}
+              onPress={() => { np.clearPlaybackNotice(); np.returnToSpotify(); }}>
+              <MaterialCommunityIcons name="spotify" size={17} color="#0b1a10" />
+              <Text style={pn.actionText}>Open Spotify</Text>
+            </Pressable>
+          )}
           <Text style={pn.hint}>Tap anywhere to dismiss</Text>
         </View>
       </Pressable>
@@ -204,44 +324,15 @@ const pn = StyleSheet.create({
     backgroundColor: 'rgba(29,185,84,0.14)',
   },
   text: { color: 'rgba(255,255,255,0.92)', fontSize: 14.5, lineHeight: 21, textAlign: 'center', fontWeight: '600' },
+  action: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#1DB954', borderRadius: 999,
+    paddingHorizontal: 18, paddingVertical: 11, marginTop: 4,
+  },
+  actionText: { color: '#0b1a10', fontSize: 14.5, fontWeight: '800' },
   hint: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '600' },
 });
 
-const pg = StyleSheet.create({
-  scrim: {
-    flex: 1,
-    backgroundColor: 'rgba(2,2,10,0.72)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 28,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: 24,
-    overflow: 'hidden',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 28,
-    gap: 10,
-    backgroundColor: 'rgba(16,12,4,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.4)',
-  },
-  crest: { color: '#F5B014', fontSize: 26 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
-  sub: { color: 'rgba(255,255,255,0.72)', fontSize: 13.5, lineHeight: 20, textAlign: 'center' },
-  cta: {
-    alignSelf: 'stretch',
-    borderRadius: 14,
-    overflow: 'hidden',
-    alignItems: 'center',
-    paddingVertical: 14,
-    marginTop: 8,
-  },
-  ctaText: { color: '#2a1a00', fontSize: 15.5, fontWeight: '800', letterSpacing: 0.2 },
-  later: { color: 'rgba(255,255,255,0.45)', fontSize: 13.5, fontWeight: '600', paddingTop: 6 },
-});
 
 /**
  * Single home for every mode fullscreen + the mini-player.
@@ -263,13 +354,60 @@ export function NowPlayingHost() {
       {mode === 'vinyl' && <VinylFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       {mode === 'radio' && <TunerFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       {mode === 'horizon' && <HorizonFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
-      {mode === 'waves' && <SoundWaveFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       {mode === 'orb' && <CircularWaveFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
+      {mode === 'disco' && <DiscoBallFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
+      {mode === 'cd' && <CDFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       <MiniPlayer />
-      <PreviewGate />
+      <JustFinishedStub />
       <DriveCheckCard />
       <PlaybackNotice />
+      <AutoDim />
+      <OrientationGate />
     </>
+  );
+}
+
+/**
+ * The stub for the drive that just ended.
+ *
+ * Mounted here rather than inside a mode, and that is load-bearing: the ✕ has
+ * already torn the session down, so by the time this renders the mode's own
+ * Modal is gone and there is only one window to present. Stacking it over a
+ * live mode would be the third-modal trap this app has hit twice (PreviewGate
+ * 24.07, AutoDim 03.08) — iOS presents nothing and swallows every touch.
+ *
+ * The stats are read fresh rather than passed in, because "your 12th" has to
+ * count the drive that just finished.
+ */
+function JustFinishedStub() {
+  const np = useNowPlaying();
+  const drive = np.justFinished;
+  const [counts, setCounts] = useState<{ ordinal: number; week: number } | null>(null);
+
+  useEffect(() => {
+    if (!drive) { setCounts(null); return; }
+    let alive = true;
+    getDriveStats().then((st) => {
+      if (!alive) return;
+      const listening = drive.kind === 'listening';
+      setCounts({
+        ordinal: listening ? st.totalListens : st.totalDrives,
+        week: listening ? st.listensThisWeek : st.drivesThisWeek,
+      });
+    }).catch(() => { if (alive) setCounts({ ordinal: 1, week: 1 }); });
+    return () => { alive = false; };
+  }, [drive]);
+
+  // Wait for the counts rather than printing "your 0th" for a frame.
+  if (!drive || !counts) return null;
+  return (
+    <DriveStub
+      drive={drive}
+      visible
+      onClose={np.clearJustFinished}
+      ordinal={counts.ordinal}
+      thisWeek={counts.week}
+    />
   );
 }
 
@@ -284,35 +422,31 @@ const mp = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     width: '100%',
     height: 56,
     borderRadius: 16,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: 'rgba(255,255,255,0.10)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.5,
     shadowRadius: 18,
     elevation: 16,
   },
-  iconChip: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    alignItems: 'center', justifyContent: 'center',
+  // The station's colour, as an edge rather than a wash.
+  accent: {
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
+    width: 3,
   },
-  title: { color: '#fff', fontSize: 13.5, fontWeight: '700' },
-  sub:   { color: 'rgba(255,255,255,0.65)', fontSize: 11, fontWeight: '600' },
-  playBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#fff',
-    alignItems: 'center', justifyContent: 'center',
+  artwork: {
+    width: 38, height: 38, borderRadius: 9,
+    overflow: 'hidden',
+    backgroundColor: '#0d0d14',
   },
-  stopBtn: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.30)',
-    alignItems: 'center', justifyContent: 'center',
-  },
+  title: { color: '#fff', fontSize: 14.5, fontWeight: '600', letterSpacing: 0 },
+  sub:   { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '500' },
 });

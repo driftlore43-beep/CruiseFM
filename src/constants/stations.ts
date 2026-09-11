@@ -15,6 +15,9 @@ export type Station = {
   eqColors?: [string, string, string];
   glowColor: string;
   image: ImageSourcePropType;
+  /** Pre-blurred copy of `image` — rendered instead of a live blurRadius,
+   *  which froze the main thread long enough for iOS to kill the app. */
+  imageBlur?: ImageSourcePropType;
   /** Optional looping motion background (animated WebP). Falls back to `image`. */
   motion?: ImageSourcePropType;
   icon: string;
@@ -24,23 +27,41 @@ export type Station = {
   trackCount: number;
   spotifyUrl: string;
   appleMusicUrl: string;
+  /** A custom station's own AM dial number, chosen by the user rather than
+   *  derived from its name (25.08 — see `stationAm`). Never set on the ten
+   *  built-in stations, which keep their fixed places in `STATION_AM`. */
+  dialAm?: number;
 };
 
 export const STATIONS: Station[] = [
   {
     id: 'night-run',
-    name: 'Night Run FM',
-    tagline: 'Empty expressways. Violet dashboards.',
+    name: 'Night Run AM',
+    tagline: 'Empty expressways. Blue-lit dashboards.',
     tags: ['dark vibes', 'neon nights'],
     premium: false,
-    gradientColors: ['#1a0533', '#4a1a7a', '#000000'],
-    cardGradient: ['#5626bb', '#2d2282', '#181353'],
+    // TEAL, station-wide, TAKEN FROM THE PHOTOGRAPH (owner, 19.08: "have the
+    // accents on night run station a teal colour from the background image").
+    // Not picked by eye — the picture was measured: weighting every pixel by
+    // saturation x brightness, as scripts/marketing/tints.py does, 83% of its
+    // colour sits between hue 180 and 195 and the weighted mean is 182. So
+    // the photograph is teal and the accents were jet blue at hue 218, which
+    // is the same mismatch the 31.07 round fixed one step short of: it moved
+    // magenta -> blue when the picture was never blue either.
+    //
+    // The anchors below are sampled rather than invented — the lit neon in
+    // the shot averages rgb(95,181,200) and its deep tones rgb(22,90,99).
+    // Every colour on the station still moves together (31.07's rule): a teal
+    // mode over a blue card would be worse than either.
+    gradientColors: ['#03151c', '#0d5f70', '#000000'],
+    cardGradient: ['#1f9fb0', '#166f80', '#0d3a45'],
     iconName: 'weather-night',
-    eqColors: ['#5EE7FF', '#5B7BFF', '#C44CFF'],
-    glowColor: '#4a1a7a',
+    eqColors: ['#BDF1F5', '#19C6D4', '#0B6577'],
+    glowColor: '#0d5f70',
     image: require('../../assets/stations/night-run.jpg'),
+    imageBlur: require('../../assets/stations/blur/night-run.jpg'),
     icon: 'weather-night',
-    iconBg: '#2d1060',
+    iconBg: '#0a4a58',
     bestTime: 'Late night',
     duration: '2 hr mix',
     trackCount: 24,
@@ -59,6 +80,7 @@ export const STATIONS: Station[] = [
     eqColors: ['#FFF3B8', '#FFE070', '#F0C24C'],
     glowColor: '#0a3a5c',
     image: require('../../assets/stations/rain-drive.jpg'),
+    imageBlur: require('../../assets/stations/blur/rain-drive.jpg'),
     icon: 'weather-pouring',
     iconBg: '#0c2b45',
     bestTime: 'Rainy days',
@@ -79,6 +101,7 @@ export const STATIONS: Station[] = [
     eqColors: ['#4FE0C0', '#F0B048', '#FF7A3C'],
     glowColor: '#c45a10',
     image: require('../../assets/stations/coastal.jpg'),
+    imageBlur: require('../../assets/stations/blur/coastal.jpg'),
     icon: 'waves',
     iconBg: '#1a4030',
     bestTime: 'Golden hour',
@@ -101,6 +124,7 @@ export const STATIONS: Station[] = [
     eqColors: ['#FFFFFF', '#F2F6FF', '#FFFFFF'],
     glowColor: '#0d4a3a',
     image: require('../../assets/stations/mountain.jpg'),
+    imageBlur: require('../../assets/stations/blur/mountain.jpg'),
     icon: 'image-filter-hdr',
     iconBg: '#0d3a2a',
     bestTime: 'Morning',
@@ -121,6 +145,7 @@ export const STATIONS: Station[] = [
     eqColors: ['#FF4444', '#FF1111', '#FF0000'],
     glowColor: '#0a0f2b',
     image: require('../../assets/stations/after-midnight.jpg'),
+    imageBlur: require('../../assets/stations/blur/after-midnight.jpg'),
     icon: 'star-four-points',
     iconBg: '#16162a',
     bestTime: 'After hours',
@@ -131,16 +156,22 @@ export const STATIONS: Station[] = [
   },
   {
     id: 'sunset',
-    name: 'Sunset FM',
+    name: 'Sunset AM',
     tagline: 'Golden hour. Open roads.',
     tags: ['sunset glow', 'warm vibes'],
     premium: false,
     gradientColors: ['#8a3a05', '#5a1a6a', '#000000'],
     cardGradient: ['#c4461d', '#733061', '#331f47'],
     iconName: 'weather-sunset',
-    eqColors: ['#FF5FB0', '#FF2E96', '#E0187E'],
+    // Golden hour, not neon nightclub. This used to be three hot pinks, which
+    // made it the one station whose accents fought its own artwork and its
+    // burnt-orange gradients — and it turned every warm surface (disco wash,
+    // atmosphere smoke, bloom, EQ bars) magenta. Amber leads now, with pink
+    // kept only as the last stop.
+    eqColors: ['#FFA24B', '#FF6F5A', '#D2467F'],
     glowColor: '#8a3a05',
     image: require('../../assets/stations/sunset.jpg'),
+    imageBlur: require('../../assets/stations/blur/sunset.jpg'),
     // motion: temporarily disabled — new still artwork used everywhere until a
     // fresh motion clip is made for it. Old clip kept at assets/stations/sunset-motion.webp.
     icon: 'weather-sunset',
@@ -163,6 +194,7 @@ export const STATIONS: Station[] = [
     eqColors: ['#FFD9A0', '#F0A050', '#C06A28'],
     glowColor: '#8a5a1a',
     image: require('../../assets/stations/cars-coffee.jpg'),
+    imageBlur: require('../../assets/stations/blur/cars-coffee.jpg'),
     icon: 'coffee',
     iconBg: '#3a2410',
     bestTime: 'Sunday morning',
@@ -183,6 +215,7 @@ export const STATIONS: Station[] = [
     eqColors: ['#FFD24C', '#FF8A2A', '#F03A2E'],
     glowColor: '#2a0a5a',
     image: require('../../assets/stations/tunnel.jpg'),
+    imageBlur: require('../../assets/stations/blur/tunnel.jpg'),
     icon: 'flash',
     iconBg: '#1a1040',
     bestTime: 'Any time',
@@ -203,6 +236,7 @@ export const STATIONS: Station[] = [
     eqColors: ['#6E8CFF', '#9B5CFF', '#E24CFF'],
     glowColor: '#241a58',
     image: require('../../assets/stations/downtown.jpg'),
+    imageBlur: require('../../assets/stations/blur/downtown.jpg'),
     icon: 'city-variant',
     iconBg: '#1a1650',
     bestTime: 'Midnight',
@@ -213,7 +247,7 @@ export const STATIONS: Station[] = [
   },
   {
     id: 'daylight',
-    name: 'Daylight FM',
+    name: 'Daylight AM',
     tagline: 'Top down. Open road.',
     tags: ['summer', 'sunny'],
     premium: false,
@@ -225,6 +259,7 @@ export const STATIONS: Station[] = [
     eqColors: ['#FFD84A', '#FBA518', '#E8720E'],
     glowColor: '#c9922a',
     image: require('../../assets/stations/daylight.jpg'),
+    imageBlur: require('../../assets/stations/blur/daylight.jpg'),
     icon: 'white-balance-sunny',
     iconBg: '#5a3e0a',
     bestTime: 'Daytime',
@@ -236,3 +271,91 @@ export const STATIONS: Station[] = [
 ];
 
 export const RECOMMENDED_IDS = ['night-run', 'daylight', 'sunset'];
+
+/**
+ * Where each station sits on the Tuner's FM dial.
+ *
+ * Lives here rather than inside TunerMode because the share card draws the
+ * same dial and needs the same number — and importing it from the mode would
+ * make a cycle (mode → action row → share card → mode).
+ */
+export const STATION_FREQS: Record<string, number> = {
+  'daylight': 90.5,
+  'night-run': 92.1,
+  'after-midnight': 94.7,
+  'sunset': 96.3,
+  'rain-drive': 98.9,
+  'downtown': 100.1,
+  'coastal': 101.3,
+  'mountain-pass': 103.5,
+  'cars-coffee': 105.1,
+  'tunnel': 107.5,
+};
+
+/** A station's dial frequency. Stations the user made up themselves get a
+ *  stable one derived from their id, so the same station always tunes to the
+ *  same place instead of jumping about between screens. */
+export function stationFrequency(id: string): number {
+  const known = STATION_FREQS[id];
+  if (known !== undefined) return known;
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return Math.round((88.1 + (h % 1000) / 1000 * 20) * 10) / 10;
+}
+
+// ── The two bands ─────────────────────────────────────────────────────────────
+//
+// The Stations page is laid out like a real receiver: AM carries the free
+// stations and the ones you make yourself, FM carries the premium ones. That
+// gives the page a reason to look like a dial instead of a second list of
+// cards, and it makes "what do I get for paying" a thing you can see at a
+// glance rather than a badge repeated seven times.
+
+export type Band = 'AM' | 'FM';
+
+/** Where the free stations sit on the AM scale (kHz). */
+export const STATION_AM: Record<string, number> = {
+  'night-run': 810,
+  'sunset': 1010,
+  'daylight': 1240,
+};
+
+function hashOf(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/** Clamps a chosen AM number onto the real 540–1600 kHz scale, on a round
+ *  10 kHz — the same shape every AM slot on this dial already has, whether
+ *  picked automatically or typed in by the owner of the station. */
+export function clampAm(value: number): number {
+  const rounded = Math.round(value / 10) * 10;
+  return Math.min(1600, Math.max(540, rounded));
+}
+
+/** A made-up station's AM slot: the user's own choice if they set one
+ *  (25.08 — Ethan: colour-matched custom stations kept landing scattered
+ *  across the dial because the number was always hashed from the id), else
+ *  stable and derived from the id so an unset station never jumps about
+ *  between screens. */
+export function stationAm(id: string, override?: number): number {
+  if (override != null) return clampAm(override);
+  return STATION_AM[id] ?? 540 + (hashOf(id) % 107) * 10;
+}
+
+/** What the dial reads for a station, and which band it's on. `amOverride`
+ *  only ever applies on the AM side — a custom station is never premium, so
+ *  it never reaches the FM branch, but the parameter is harmless either way. */
+export function stationDial(
+  id: string,
+  premium: boolean,
+  amOverride?: number,
+): { band: Band; label: string; value: number } {
+  if (premium) {
+    const f = stationFrequency(id);
+    return { band: 'FM', label: f.toFixed(1), value: f };
+  }
+  const a = stationAm(id, amOverride);
+  return { band: 'AM', label: String(a), value: a };
+}

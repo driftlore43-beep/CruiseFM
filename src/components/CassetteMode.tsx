@@ -6,22 +6,47 @@ import {
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Rect as SvgRect, Circle as SvgCircle, Line as SvgLine, Path as SvgPath, Text as SvgText } from 'react-native-svg';
+import Svg, {
+  Rect as SvgRect, Circle as SvgCircle, Line as SvgLine, Path as SvgPath, Text as SvgText,
+  Defs, ClipPath, G, LinearGradient as SvgLinearGradient, Stop,
+} from 'react-native-svg';
 import { Fonts } from '@/constants/theme';
 import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
+import { mmss } from '@/utils/formatTime';
+import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
+import { ModeScrim } from '@/components/ModeScrim';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { PLATFORMS, PlatformId, getSavedPlatform, openMusicPlatform } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
-import { MoodSheet } from '@/components/MoodSheet';
+import { ModeSheet } from '@/components/ModeSheet';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
-import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+// Platform-routed, not Spotify's own — same fault Vinyl had (04.08), found
+// by grepping for the rest rather than waiting for it to be reported.
+import { seekActive, shouldKeepCoasting } from '@/utils/useTrackClock';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { PreviewGate } from '@/components/PreviewGate';
+import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
+import { AmbientGlow } from '@/components/AmbientGlow';
+import { CastShadow } from '@/components/CastShadow';
+import { ModeActionRow } from '@/components/ModeActionRow';
+import { RepeatButton, ShuffleButton } from '@/components/TransportToggle';
+import { ModeCloseButton } from '@/components/ModeCloseButton';
+import { MarqueeText } from '@/components/MarqueeText';
+import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
+import { SeekBar } from '@/components/SeekBar';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
+/** See MAX_COAST_MS in useTrackClock — the deck keeps its own clock, and needs
+ *  the same bound on how far one reading may be extrapolated. */
+const CASSETTE_MAX_COAST_MS = 30000;
 
 // ── Warm palette ──────────────────────────────────────────────────────────────
 const C = {
@@ -62,14 +87,16 @@ function parseTrackMs(duration: string): number {
   return (m * 60 + s) * 1000;
 }
 
-function fmtTapeMs(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-}
+/** Padded: a cassette counter shows leading zeros, so this one does too. */
+const fmtTapeMs = (ms: number) => mmss(ms, { pad: true });
 
 // ── Grain overlay ─────────────────────────────────────────────────────────────
 // Simulated film grain: a grid of tiny dots at random-but-stable positions
 function GrainOverlay() {
+  // Live screen size, not the module-load one: seeded against a portrait
+  // height the grain landed almost entirely below a sideways screen, and
+  // what did show was crammed into the left half.
+  const { width: w, height: h } = useWindowDimensions();
   const dots = useMemo(() => {
     const result: { key: number; left: number; top: number; opacity: number; size: number }[] = [];
     // 400 stable pseudo-random dots seeded by index
@@ -81,14 +108,14 @@ function GrainOverlay() {
       const h4 = Math.sin(i * 19.3)  * 43758.5453;
       result.push({
         key: i,
-        left:    (h1 - Math.floor(h1)) * SCREEN_W,
-        top:     (h2 - Math.floor(h2)) * SCREEN_H,
+        left:    (h1 - Math.floor(h1)) * w,
+        top:     (h2 - Math.floor(h2)) * h,
         opacity: (h3 - Math.floor(h3)) * 0.04 + 0.01,
         size:    (h4 - Math.floor(h4)) * 1.5 + 0.5,
       });
     }
     return result;
-  }, []);
+  }, [w, h]);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -164,7 +191,7 @@ const tl = StyleSheet.create({
   divider:      { borderTopWidth: 1.5, borderTopColor: 'rgba(255,255,255,0.08)' },
   num:   { color: C.amber, fontSize: 16, fontWeight: '700', letterSpacing: 0.5, width: 28 },
   mid:   { flex: 1, gap: 3 },
-  title: { color: '#ffffff', fontSize: 20, fontWeight: '700', letterSpacing: -0.2 },
+  title: { color: '#ffffff', fontSize: 20, fontWeight: '700', letterSpacing: 0 },
   artist:{ color: C.body, fontSize: 14, opacity: 0.7 },
   dur:   { color: C.amber, fontSize: 16, fontWeight: '600', letterSpacing: 0.3 },
 });
@@ -276,47 +303,105 @@ const pb = StyleSheet.create({
 
 // ── Reel component — static disc, rotation applied by parent wrapper ──────────
 // A spinning neon reel hub — cog spokes radiating from a glowing centre.
-function NeonReelHub({ size, color }: { size: number; color: string }) {
-  const c = 50;
-  const teeth = [0, 45, 90, 135, 180, 225, 270, 315];
+// Deterministic scatter for the shell's dust/wear (no Math.random — the
+// speckles must not crawl between renders).
+function ch01(n: number): number {
+  const x = Math.sin(n * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// ── Clear-shell cassette ─────────────────────────────────────────────────────
+// Same lesson as the CD: the shell is NEUTRAL clear polycarbonate and the only
+// colour is the hardware inside it. Everything used to be neon line-art in the
+// station hue, which read as a wireframe; now the station colour lives in the
+// reel hubs and the tape tint, and the shell is glass you can see the road
+// through. Thickness comes from PAIRED strokes — a lit outer edge, a dark line
+// just behind it, then a faint inner highlight.
+const VB_W = 340;
+const VB_H = 210;
+const LX = 118, RX = 224, RY = 118;
+const PACK_BASE = 104;
+
+/**
+ * The reel hub, redrawn off the owner's close-up (02.08: "the inner tape
+ * circles with the teeth look sort of cheap. Realistically they're not shaped
+ * like that").
+ *
+ * They weren't: the old one was spokes RADIATING OUTWARD from a glowing
+ * centre, which reads as an asterisk. A real cassette hub is the opposite —
+ * a white plastic ring with a dark spindle hole punched through it, and six
+ * square teeth projecting INWARD from the ring into that hole, which is what
+ * the deck's spindle grips. The teeth are hub, not gaps.
+ */
+function ReelHub({ size, color }: { size: number; color: string }) {
+  const teeth = [0, 60, 120, 180, 240, 300];
+  const HUB = '#eef2fb';
   return (
-    <Svg width={size} height={size} viewBox="0 0 100 100">
-      <SvgCircle cx={c} cy={c} r={20} fill="none" stroke={color} strokeOpacity={0.3} strokeWidth={7} />
-      <SvgCircle cx={c} cy={c} r={20} fill="none" stroke={color} strokeWidth={2.4} />
-      {teeth.map((a) => {
-        const rad = (a * Math.PI) / 180;
-        return (
-          <SvgLine
-            key={a}
-            x1={c + Math.cos(rad) * 20} y1={c + Math.sin(rad) * 20}
-            x2={c + Math.cos(rad) * 42} y2={c + Math.sin(rad) * 42}
-            stroke={color} strokeWidth={3} strokeLinecap="round"
-          />
-        );
-      })}
-      <SvgCircle cx={c} cy={c} r={6} fill={color} />
+    <Svg width={size} height={size} viewBox="-24 -24 48 48">
+      {/* Clear flange, tinted by the station — the mood colour lives here */}
+      <SvgCircle cx={0} cy={0} r={19} fill={color} fillOpacity={0.34} />
+      <SvgCircle cx={0} cy={0} r={19} fill="none" stroke="#ffffff" strokeOpacity={0.34} strokeWidth={1} />
+      {/* one bright arc so the flange reads as moulded, not printed */}
+      <SvgPath d="M -13 -13 A 19 19 0 0 1 6 -18" fill="none" stroke="#ffffff" strokeOpacity={0.5} strokeWidth={1.8} strokeLinecap="round" />
+
+      {/* White hub, with its moulding ring */}
+      <SvgCircle cx={0} cy={0} r={14.5} fill={HUB} fillOpacity={0.92} />
+      <SvgCircle cx={0} cy={0} r={14.5} fill="none" stroke="#05070e" strokeOpacity={0.20} strokeWidth={0.8} />
+      <SvgCircle cx={0} cy={0} r={11.6} fill="none" stroke="#05070e" strokeOpacity={0.13} strokeWidth={0.7} />
+
+      {/* The spindle hole, then the teeth standing INTO it */}
+      <SvgCircle cx={0} cy={0} r={9.4} fill="#05070e" fillOpacity={0.94} />
+      {teeth.map((deg) => (
+        <SvgRect
+          key={deg}
+          x={-1.85} y={-9.9} width={3.7} height={5.4} rx={0.5}
+          fill={HUB} fillOpacity={0.94}
+          transform={`rotate(${deg})`}
+        />
+      ))}
+      <SvgCircle cx={0} cy={0} r={4.3} fill="#05070e" />
+      <SvgCircle cx={0} cy={0} r={9.4} fill="none" stroke="#ffffff" strokeOpacity={0.22} strokeWidth={0.6} />
     </Svg>
   );
 }
 
-// A small neon "×" screw mark.
-function Cross({ cx, cy, r = 2.8, color }: { cx: number; cy: number; r?: number; color: string }) {
+// A recessed Phillips screw in neutral steel, each seated at its own angle.
+function Screw({ cx, cy, r = 4, angle = 0 }: { cx: number; cy: number; r?: number; angle?: number }) {
+  const s = r * 0.6;
+  const a = (angle * Math.PI) / 180, cos = Math.cos(a), sin = Math.sin(a);
   return (
     <>
-      <SvgLine x1={cx - r} y1={cy - r} x2={cx + r} y2={cy + r} stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-      <SvgLine x1={cx - r} y1={cy + r} x2={cx + r} y2={cy - r} stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <SvgCircle cx={cx} cy={cy} r={r + 1.2} fill="#05070e" fillOpacity={0.40} />
+      <SvgCircle cx={cx} cy={cy} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={1.1} />
+      <SvgCircle cx={cx} cy={cy} r={r * 0.62} fill="#ffffff" fillOpacity={0.10} />
+      <SvgLine x1={cx - s * cos} y1={cy - s * sin} x2={cx + s * cos} y2={cy + s * sin} stroke="#ffffff" strokeOpacity={0.62} strokeWidth={1.2} strokeLinecap="round" />
+      <SvgLine x1={cx + s * sin} y1={cy - s * cos} x2={cx - s * sin} y2={cy + s * cos} stroke="#ffffff" strokeOpacity={0.62} strokeWidth={1.2} strokeLinecap="round" />
     </>
   );
 }
 
-// ── Neon cassette body — a transparent outline that glows to the mood colour ───
-const VB_W = 340;
-const VB_H = 210;
+/**
+ * The sheen on the plastic. NEARLY NEUTRAL on purpose (03.08).
+ *
+ * This was a full rainbow — mint, sky, lilac, pink, peach, yellow — laid out
+ * as six diagonal bands 44 apart at -18°. The two reels sit at the same
+ * height but 106 apart horizontally, which at that angle is 34 units of
+ * vertical shift: almost exactly one band. So each reel sat under a
+ * DIFFERENT colour of the rainbow and the wound tape came out two-tone,
+ * green on one hub and warm on the other. Measured on Daylight before the
+ * fix: R-B of +36 on the left pack against +22 on the right.
+ *
+ * Same rule the mirror ball settled on: the material may not carry a hue.
+ * These are all ~90% white, so the bands still read as light travelling
+ * across plastic but no band can recolour what is underneath it. The mood
+ * comes from the shell's station tint, which is applied evenly.
+ */
+const SHEEN = ['#EAF6FF', '#DEEAFF', '#E9E2FF', '#FFEAF7', '#FFF1E4', '#FFFBE9'];
 
 function CassetteBody({
-  size, leftSpin, rightSpin,
+  size, leftSpin, rightSpin, progress,
   color = '#FF3DF0', accent = '#33E1FF',
-  songName = 'YOUR SONG NAME', artist = 'CRUISE FM', timeText = '00:00',
+  songName = 'YOUR SONG NAME', artist = 'CRUISE FM',
 }: {
   size: number;
   leftSpin: Animated.AnimatedInterpolation<string>;
@@ -325,60 +410,247 @@ function CassetteBody({
   progress?: Animated.Value;
   tapeFlow?: Animated.Value;
   color?: string; accent?: string;
-  songName?: string; artist?: string; timeText?: string;
+  songName?: string; artist?: string;
 }) {
   const scale = size / VB_W;
   const H = size * (VB_H / VB_W);
-  const LX = 118, RX = 224, RY = 122;
-  const leftReelPx = 92 * scale;
-  const rightReelPx = 72 * scale;
+  const hubPx = 48 * scale;
+
+  const fallbackProgress = useRef(new Animated.Value(0.4)).current;
+  const prog = progress ?? fallbackProgress;
+  const packBase = PACK_BASE * scale;
+  const leftPackScale = prog.interpolate({ inputRange: [0, 1], outputRange: [1, 0.56] });
+  const rightPackScale = prog.interpolate({ inputRange: [0, 1], outputRange: [0.56, 0.94] });
+
+  const dust = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+    x: 14 + ch01(i * 2.7) * (VB_W - 28),
+    y: 14 + ch01(i * 5.9 + 3.1) * (VB_H - 28),
+    r: 0.3 + ch01(i * 8.2) * 0.7,
+    o: 0.06 + ch01(i * 4.4) * 0.14,
+  })), []);
+  const winds = useMemo(() => Array.from({ length: 9 }, (_, i) => (PACK_BASE / 2) * (0.42 + 0.065 * i)), []);
+
+  // The wound tape: dark, faintly station-tinted, with fine winding rings.
+  const pack = (cx: number, packScale: Animated.AnimatedInterpolation<number>) => (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        width: packBase, height: packBase,
+        left: cx * scale - packBase / 2, top: RY * scale - packBase / 2,
+        transform: [{ scale: packScale }],
+      }}
+    >
+      <Svg width={packBase} height={packBase} viewBox={`0 0 ${PACK_BASE} ${PACK_BASE}`}>
+        {/* Wound tape is OPAQUE and always dark brown — you cannot see the
+            road through it, and real tape is the same colour whatever is
+            playing. The mood arrives as a tint on top, the way the mirror
+            ball's chrome works. (This alone did NOT fix the two-tone reels:
+            measured before and after, the gap was 13.7 then 14.1. The cause
+            was the rainbow SHEEN above — see the note there. Kept because it
+            is correct, not because it moved the number.) */}
+        {/* Lifted from #17100a, which was near-black and made the two reels the
+            darkest thing on the screen — so the cast shadow had nothing to
+            read against and the whole deck sat heavy (owner, 19.08: "lift the
+            darkness of the cassette mode, it reduces the effects of the
+            shadowing"). Still unmistakably wound tape, just not a hole. The
+            OPACITY is untouched at 0.97: that one is physical, you cannot see
+            the road through wound tape. */}
+        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill="#3a2a18" fillOpacity={0.97} />
+        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill={color} fillOpacity={0.10} />
+        {winds.map((r, i) => (
+          <SvgCircle key={i} cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.075} strokeWidth={0.7} />
+        ))}
+        <SvgCircle cx={PACK_BASE / 2} cy={PACK_BASE / 2} r={PACK_BASE / 2} fill="none" stroke={color} strokeOpacity={0.42} strokeWidth={1} />
+      </Svg>
+    </Animated.View>
+  );
 
   return (
-    <View style={{ width: size, height: H, alignItems: 'center', justifyContent: 'center' }}>
-      <View>
-        <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`}>
-          {/* Body outline — crisp neon line */}
-          <SvgRect x={8} y={8} width={324} height={194} rx={20} fill="none" stroke={color} strokeWidth={2.4} />
+    // overflow visible is LOAD-BEARING: the cast shadow is deliberately
+    // bigger than this box, and a clipped shadow is a rectangle with a
+    // straight edge, which is worse than none.
+    <View style={{ width: size, height: H, alignItems: 'center', justifyContent: 'center', overflow: 'visible' }}>
+      {/* What the shell throws onto the scene behind it. Sized off the SHELL,
+          not the canvas — the body is inset 8 units inside the viewBox, and a
+          halo drawn around the canvas would float clear of the object. See
+          CastShadow. */}
+      <CastShadow
+        x={8 * scale} y={8 * scale}
+        width={324 * scale} height={194 * scale} radius={10 * scale}
+      />
+      {/* ── Behind the tape: shell body, internals, the tape path ── */}
+      <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`} style={StyleSheet.absoluteFill}>
+        <Defs>
+          <SvgLinearGradient id="csShell" x1="0" y1="0" x2="0.8" y2="1">
+            <Stop offset="0%" stopColor="#e8eeff" stopOpacity="0.20" />
+            <Stop offset="45%" stopColor="#9fb0d4" stopOpacity="0.10" />
+            <Stop offset="100%" stopColor="#dbe4ff" stopOpacity="0.17" />
+          </SvgLinearGradient>
+          <ClipPath id="csBody"><SvgRect x={8} y={8} width={324} height={194} rx={10} /></ClipPath>
+        </Defs>
+        <G clipPath="url(#csBody)">
+          <SvgRect x={8} y={8} width={324} height={194} fill="url(#csShell)" />
+          {/* internal chassis */}
+          <SvgRect x={60} y={30} width={220} height={150} rx={6} fill="none" stroke="#ffffff" strokeOpacity={0.13} strokeWidth={1} />
+          <SvgLine x1={171} y1={30} x2={171} y2={180} stroke="#ffffff" strokeOpacity={0.10} strokeWidth={1} />
+          {/* tape path — drawn BEFORE the packs so it emerges from under them
+              instead of crossing over the wound tape */}
+          <SvgPath d={`M ${LX} ${RY} L 74 168 L 268 168 L ${RX} ${RY}`} fill="none" stroke="#0a0c14" strokeOpacity={0.62} strokeWidth={3.4} />
+          <SvgLine x1={74} y1={168} x2={268} y2={168} stroke={color} strokeOpacity={0.34} strokeWidth={1} />
+        </G>
+      </Svg>
 
-          {/* Header label box (accent hue) */}
-          <SvgRect x={30} y={26} width={280} height={42} rx={11} fill="none" stroke={accent} strokeWidth={1.5} />
-          <SvgRect x={42} y={37} width={18} height={18} rx={2} fill="none" stroke={color} strokeWidth={1.6} />
-          <SvgText x={188} y={45} fill={accent} textAnchor="middle" fontSize={11} fontWeight="700" fontFamily={Fonts.mono}>{songName}</SvgText>
-          <SvgText x={300} y={60} fill={accent} textAnchor="end" fontSize={8} fontWeight="700" fontFamily={Fonts.mono} opacity={0.85}>{artist}</SvgText>
+      {/* ── The tape itself, breathing with the song ── */}
+      {pack(LX, leftPackScale)}
+      {pack(RX, rightPackScale)}
 
-          {/* Reel window */}
-          <SvgRect x={66} y={86} width={208} height={72} rx={6} fill="none" stroke={color} strokeWidth={1.4} />
+      {/* ── Reels ── */}
+      <Animated.View pointerEvents="none" style={{ position: 'absolute', width: hubPx, height: hubPx, left: LX * scale - hubPx / 2, top: RY * scale - hubPx / 2, transform: [{ rotate: leftSpin }] }}>
+        <ReelHub size={hubPx} color={color} />
+      </Animated.View>
+      <Animated.View pointerEvents="none" style={{ position: 'absolute', width: hubPx, height: hubPx, left: RX * scale - hubPx / 2, top: RY * scale - hubPx / 2, transform: [{ rotate: rightSpin }] }}>
+        <ReelHub size={hubPx} color={color} />
+      </Animated.View>
 
-          {/* Static reel outer rings */}
-          <SvgCircle cx={LX} cy={RY} r={46} fill="none" stroke={color} strokeOpacity={0.18} strokeWidth={7} />
-          <SvgCircle cx={LX} cy={RY} r={46} fill="none" stroke={color} strokeWidth={2} />
-          <SvgCircle cx={RX} cy={RY} r={36} fill="none" stroke={color} strokeOpacity={0.18} strokeWidth={7} />
-          <SvgCircle cx={RX} cy={RY} r={36} fill="none" stroke={color} strokeWidth={2} />
+      {/* ── In front of the tape: the shell's own glass. Reflections belong to
+             the surface nearest you, so they lie OVER the reels. ── */}
+      <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          {SHEEN.map((hue, i) => (
+            <SvgLinearGradient key={i} id={`csIr${i}`} x1="0" y1="0" x2="1" y2="0">
+              <Stop offset="0%" stopColor={hue} stopOpacity="0" />
+              <Stop offset="35%" stopColor={hue} stopOpacity="0.085" />
+              <Stop offset="65%" stopColor={SHEEN[(i + 3) % SHEEN.length]} stopOpacity="0.070" />
+              <Stop offset="100%" stopColor={SHEEN[(i + 1) % SHEEN.length]} stopOpacity="0" />
+            </SvgLinearGradient>
+          ))}
+          <SvgLinearGradient id="csEdge" x1="0" y1="0" x2="0.9" y2="1">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.92" />
+            <Stop offset="30%" stopColor="#ffffff" stopOpacity="0.24" />
+            <Stop offset="62%" stopColor="#ffffff" stopOpacity="0.62" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.22" />
+          </SvgLinearGradient>
+          <SvgLinearGradient id="csLabel" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.50" />
+            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.32" />
+          </SvgLinearGradient>
+          <ClipPath id="csBody2"><SvgRect x={8} y={8} width={324} height={194} rx={10} /></ClipPath>
+        </Defs>
+        <G clipPath="url(#csBody2)">
+          {/* iridescent sweeps — wide and heavily overlapped so they read as
+              light on plastic rather than stripes */}
+          {SHEEN.map((_, i) => (
+            <SvgRect key={i} x={-60} y={-90 + i * 44} width={460} height={120} fill={`url(#csIr${i})`} transform="rotate(-18 170 105)" />
+          ))}
+          {/* left tape-guide assembly */}
+          <SvgRect x={30} y={120} width={26} height={58} rx={4} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.26} strokeWidth={1} />
+          <SvgCircle cx={43} cy={134} r={4.4} fill="none" stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
+          <SvgCircle cx={43} cy={150} r={3} fill="none" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.9} />
+          <SvgRect x={37} y={160} width={12} height={12} rx={2} fill={color} fillOpacity={0.55} />
+          {/* Guide rollers, on their posts */}
+          {[74, 268].map((gx) => (
+            <G key={`gr${gx}`}>
+              <SvgCircle cx={gx} cy={168} r={5.4} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.2} />
+              <SvgCircle cx={gx} cy={168} r={2.6} fill="none" stroke="#ffffff" strokeOpacity={0.30} strokeWidth={0.8} />
+              <SvgCircle cx={gx} cy={168} r={0.9} fill="#05070e" fillOpacity={0.6} />
+            </G>
+          ))}
 
-          {/* Timer */}
-          <SvgText x={170} y={178} fill={accent} textAnchor="middle" fontSize={13} fontWeight="700" fontFamily={Fonts.mono}>{timeText}</SvgText>
+          {/* ── THE BOTTOM EDGE ──────────────────────────────────────────────
+              The end you actually hold, and the busiest part of a real shell
+              (owner, 02.08). Head window with the felt pressure pad on its
+              leaf spring, two pinch-roller openings with the rollers sitting
+              in them, two capstan holes, locating holes either side, and the
+              moulded lip running the full width. */}
+          <SvgRect x={14} y={195} width={312} height={7} rx={3.5} fill="#ffffff" fillOpacity={0.04} stroke="#ffffff" strokeOpacity={0.20} strokeWidth={0.8} />
+          <SvgPath d="M108 180 L232 180 L222 200 L118 200 Z" fill="#ffffff" fillOpacity={0.04} stroke="#ffffff" strokeOpacity={0.32} strokeWidth={1.2} />
+          {/* the shield behind the tape, and the tape itself crossing it */}
+          <SvgRect x={120} y={183} width={100} height={5} rx={1} fill="#ffffff" fillOpacity={0.07} stroke="#ffffff" strokeOpacity={0.18} strokeWidth={0.6} />
+          {/* pressure pad on its leaf spring */}
+          <SvgPath d="M158 197 L162 190 L178 190 L182 197" fill="none" stroke="#ffffff" strokeOpacity={0.28} strokeWidth={0.8} />
+          <SvgRect x={161} y={186} width={18} height={6} rx={1.4} fill="#05070e" fillOpacity={0.72} stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.7} />
+          {/* pinch-roller openings, with the rollers in them */}
+          {[[143, 1], [193, -1]].map(([px]) => (
+            <G key={`pr${px}`}>
+              <SvgRect x={px - 7.5} y={184} width={15} height={13} rx={3} fill="#05070e" fillOpacity={0.42} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
+              <SvgCircle cx={px} cy={190.5} r={4.4} fill="#ffffff" fillOpacity={0.06} stroke="#ffffff" strokeOpacity={0.34} strokeWidth={0.9} />
+              <SvgCircle cx={px} cy={190.5} r={1.5} fill="#05070e" fillOpacity={0.7} />
+            </G>
+          ))}
+          {/* capstan holes */}
+          {[128, 208].map((cxx) => (
+            <G key={`cp${cxx}`}>
+              <SvgCircle cx={cxx} cy={190} r={4} fill="#05070e" fillOpacity={0.55} stroke="#ffffff" strokeOpacity={0.36} strokeWidth={1} />
+              <SvgCircle cx={cxx} cy={190} r={1.7} fill="none" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.6} />
+            </G>
+          ))}
+          {/* locating holes either side of the window */}
+          <SvgCircle cx={92} cy={191} r={2.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={0.8} />
+          <SvgCircle cx={248} cy={191} r={2.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={0.8} />
+          {/* chamfer catching the light along the very bottom */}
+          <SvgPath d="M20 199.5 L320 199.5" stroke="#ffffff" strokeOpacity={0.16} strokeWidth={0.8} />
+          {/* label — frosted, with the station colour as its spine */}
+          <SvgRect x={30} y={24} width={280} height={40} rx={4} fill="url(#csLabel)" />
+          <SvgRect x={30} y={24} width={280} height={13} rx={4} fill={color} fillOpacity={0.60} />
+          <SvgRect x={30} y={24} width={280} height={40} rx={4} fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={1} />
+          <SvgText x={40} y={34} fill="#0d1020" fontSize={7} fontWeight="800" fontFamily={Fonts.mono} letterSpacing={1.6}>A · STEREO · C90</SvgText>
+          {/* The title itself is NOT drawn here — it is an RN overlay below,
+              so a long one can reel across the inlay instead of being cut at
+              21 characters (owner, 19.08). SVG text has no marquee: it cannot
+              be clipped and panned without animating an SVG prop, which is a
+              JS-thread re-render of the whole shell every frame — the
+              architecture this app has spent weeks removing. */
+          }
+          <SvgText x={300} y={60} fill="#0d1020" fillOpacity={0.66} fontSize={7} fontWeight="700" fontFamily={Fonts.mono} textAnchor="end">{artist}</SvgText>
+          {/* embossed markings + running time */}
+          {/* No counter on the tape. A real cassette hasn't got one — the
+              counter lives on the DECK — so a big digital readout floating on
+              the shell was the one element that read as app-on-object rather
+              than object. It also printed straight over this line, and said
+              exactly what the elapsed time under the seek bar already says
+              (owner, 03.08). */}
+          <SvgText x={300} y={176} fill="#ffffff" fillOpacity={0.20} fontSize={5} fontFamily={Fonts.mono} textAnchor="end">CR-02 · HIGH BIAS · MADE FOR THE ROAD</SvgText>
+          {/* broad glass reflections across the whole face */}
+          <SvgPath d="M 20 8 L 96 8 L 40 202 L 8 202 Z" fill="#ffffff" fillOpacity={0.045} />
+          <SvgPath d="M 250 8 L 282 8 L 214 202 L 190 202 Z" fill="#ffffff" fillOpacity={0.025} />
+          {dust.map((d, i) => <SvgCircle key={i} cx={d.x} cy={d.y} r={d.r} fill="#ffffff" fillOpacity={d.o} />)}
+        </G>
+        {/* moulded edge: lit outer, dark behind, faint inner */}
+        <SvgRect x={8} y={8} width={324} height={194} rx={10} fill="none" stroke="url(#csEdge)" strokeWidth={2.4} />
+        <SvgRect x={11} y={11} width={318} height={188} rx={8} fill="none" stroke="#05070e" strokeOpacity={0.45} strokeWidth={1.2} />
+        <SvgRect x={13.5} y={13.5} width={313} height={183} rx={7} fill="none" stroke="#ffffff" strokeOpacity={0.18} strokeWidth={0.9} />
+        <Screw cx={26} cy={24} angle={12} />
+        <Screw cx={314} cy={24} angle={-31} />
+        <Screw cx={26} cy={186} angle={57} />
+        <Screw cx={314} cy={186} angle={-8} />
+        <Screw cx={170} cy={16} r={2.8} angle={40} />
+      </Svg>
 
-          {/* Corner + edge screws */}
-          <Cross cx={26} cy={24} color={accent} />
-          <Cross cx={314} cy={24} color={accent} />
-          <Cross cx={26} cy={186} color={accent} />
-          <Cross cx={314} cy={186} color={accent} />
-          <Cross cx={170} cy={18} r={2.5} color={accent} />
-
-          {/* Bottom access door + buttons */}
-          <SvgPath d="M112 184 L228 184 L216 200 L124 200 Z" fill="none" stroke={color} strokeWidth={1.5} />
-          <SvgRect x={150} y={188} width={16} height={9} rx={3} fill="none" stroke={color} strokeWidth={1.3} />
-          <SvgRect x={174} y={188} width={16} height={9} rx={3} fill="none" stroke={color} strokeWidth={1.3} />
-        </Svg>
+      {/* The inlay's song title, in real text so it can pan. Positioned in
+          the SVG's own units x scale, so it tracks the shell at any size and
+          in either orientation: the label runs x 30..310, the title's
+          baseline sat at y 52 at font size 11. The window stops short of the
+          artist, which is right-anchored on the line below. */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: 40 * scale,
+          top: 40.8 * scale,
+          width: 260 * scale,
+        }}>
+        <MarqueeText
+          text={songName}
+          style={{
+            color: '#0d1020',
+            fontSize: 11 * scale,
+            lineHeight: 14 * scale,
+            fontWeight: '800',
+            fontFamily: Fonts.mono,
+          }}
+        />
       </View>
-
-      {/* Spinning neon reels overlaid on the wells */}
-      <Animated.View style={{ position: 'absolute', width: leftReelPx, height: leftReelPx, left: LX * scale - leftReelPx / 2, top: RY * scale - leftReelPx / 2, transform: [{ rotate: leftSpin }] }}>
-        <NeonReelHub size={leftReelPx} color={color} />
-      </Animated.View>
-      <Animated.View style={{ position: 'absolute', width: rightReelPx, height: rightReelPx, left: RX * scale - rightReelPx / 2, top: RY * scale - rightReelPx / 2, transform: [{ rotate: rightSpin }] }}>
-        <NeonReelHub size={rightReelPx} color={color} />
-      </Animated.View>
     </View>
   );
 }
@@ -390,7 +662,7 @@ function AmberProgressBar({ progress }: { progress: Animated.Value }) {
   const DOT = 14;
   return (
     <View
-      style={{ flex: 1, height: 36, justifyContent: 'center' }}
+      style={{ width: '100%', height: 36, justifyContent: 'center' }}
       onLayout={(e) => setBarW(e.nativeEvent.layout.width)}
     >
       <View style={{ position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)' }} />
@@ -438,13 +710,24 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const { width: winW, height: winH } = useWindowDimensions();
   const isLandscape = winW > winH;
 
-  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
-  const spotify = useSpotifyPlayback(visible);
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
+  const spotify = useMusicPlayback(visible);
+  // The SCENE waits for the service's own verdict; the transport keeps the
+  // optimistic `playing`, because a button that hesitates reads as broken.
+  // See utils/confirmedPlaying for why, and for the clip that proved it.
+  const live = confirmedPlaying(playing, spotify.track, musicSwitching);
+
+  // Shuffle and repeat are READ STRAIGHT OFF THE PLAYER, not mirrored into
+  // local state. Each mode used to keep its own copy and sync it in an effect
+  // — eight copies of the same two lines, and the copy is what let the button
+  // disagree with the music. The player already flips optimistically and holds
+  // its answer against a stale poll, so there is nothing left for a mirror to
+  // do but drift.
+  const shuffle = spotify.shuffleOn;
+  const repeat = spotify.repeatMode;
   const [activeId,    setActiveId]    = useState(stationId ?? 'night-run');
   const [activeTrack, setActiveTrack] = useState(1);   // A2 default (index 1)
   const [platform,    setPlatform]    = useState<{ id: PlatformId; name: string; color: string } | null>(null);
-  const [shuffle,     setShuffle]     = useState(false);
-  const [repeat,      setRepeat]      = useState(false);
   const [elapsedTxt,  setElapsedTxt]  = useState('00:00');
   const [showMood,    setShowMood]    = useState(false);
   const [showPicker,  setShowPicker]  = useState(false);
@@ -473,11 +756,13 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   const startRolling = () => {
     leftReelAnim.setValue(0);
     rightReelAnim.setValue(0);
+    // Real transport physics: the take-up reel (right) starts near-empty, so
+    // it spins faster than the fat supply reel.
     leftLoopRef.current = Animated.loop(
-      Animated.timing(leftReelAnim, { toValue: 1, duration: 1600, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(leftReelAnim, { toValue: 1, duration: 2200, easing: Easing.linear, useNativeDriver: true })
     );
     rightLoopRef.current = Animated.loop(
-      Animated.timing(rightReelAnim, { toValue: 1, duration: 2200, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(rightReelAnim, { toValue: 1, duration: 1500, easing: Easing.linear, useNativeDriver: true })
     );
     leftLoopRef.current.start();
     rightLoopRef.current.start();
@@ -498,6 +783,12 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
 
   // Ref shadows so startReels/stopReels always read latest values without stale closures
   const progressValue   = useRef(0);
+  /** Is the music really going? Read inside animation callbacks, which are
+   *  built once and would otherwise close over the first render's value. */
+  const playingRef      = useRef(false);
+  /** When the service last told us where the song was — null in demo mode,
+   *  which has no service to lose touch with. */
+  const lastSyncAtRef   = useRef<number | null>(null);
   const activeTrackRef  = useRef(activeTrack);
 
   // ── Real-track layer — same contract as VinylMode: true duration from
@@ -522,7 +813,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
       const s = Math.floor((value * trackMsRef.current) / 1000);
       if (s !== lastSecRef.current) {
         lastSecRef.current = s;
-        setElapsedTxt(`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`);
+        setElapsedTxt(mmss(s * 1000, { pad: true }));
       }
     });
     return () => progress.removeListener(id);
@@ -531,7 +822,46 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   useEffect(() => { activeTrackRef.current = activeTrack; }, [activeTrack]);
 
   const station      = resolveAnyStation(activeId);
-  const currentTrack = SIDE_A_TRACKS[activeTrack];
+
+  /**
+   * Wind the tape forward from a known position.
+   *
+   * THE SAME BOUND THE OTHER TWO CLOCKS CARRY, and the same correction. The
+   * deck used to animate straight to the END of the song, so when readings
+   * stopped arriving — dropped signal, or the music paused somewhere we cannot
+   * see — the counter walked on over silence (the bug the owner filmed on
+   * 14.08). Capping it fixed that and introduced the opposite one: a coast
+   * that STOPS at the cap freezes the readout for the rest of the drive
+   * (18.08). So it re-arms, and only holds after a genuinely long silence.
+   * See MAX_COAST_MS / shouldKeepCoasting in useTrackClock.
+   */
+  const windFrom = (posMs: number, trackMs: number) => {
+    const remaining = trackMs - posMs;
+    if (remaining <= 0) return;
+    const span = Math.min(remaining, CASSETTE_MAX_COAST_MS);
+    const reachesEnd = span >= remaining;
+    progressAnimRef.current = Animated.timing(progress, {
+      toValue: (posMs + span) / trackMs, duration: span, easing: Easing.linear, useNativeDriver: false,
+    });
+    progressAnimRef.current.start(({ finished }) => {
+      if (!finished) return;
+      if (reachesEnd) {
+        // Demo tape advances itself; a real track ends on Spotify's side and
+        // the next poll re-syncs us onto whatever plays next.
+        if (!realTrackRef.current) {
+          setActiveTrack((t) => {
+            const next = Math.min(SIDE_A_TRACKS.length - 1, t + 1);
+            if (next === t) setPlaying(false);
+            return next;
+          });
+        }
+        return;
+      }
+      if (!playingRef.current) return;
+      if (!shouldKeepCoasting(Date.now(), lastSyncAtRef.current)) return;
+      windFrom(posMs + span, trackMs);
+    });
+  };
 
   // ── Start secondary animations (tape flow, glow, progress) ──────────────────
   const startReels = () => {
@@ -541,45 +871,22 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     );
     tapeFlowLoop.current.start();
 
-    pulseLoop.current = Animated.loop(Animated.sequence([
-      Animated.timing(glowPulse, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-      Animated.timing(glowPulse, { toValue: 0, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-    ]));
-    pulseLoop.current.start();
-
-    const remaining = (1 - progressValue.current) * trackMsRef.current;
-    progressAnimRef.current = Animated.timing(progress, {
-      toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false,
-    });
-    progressAnimRef.current.start(({ finished }) => {
-      // Demo tape advances itself; a real track ends on Spotify's side and
-      // the next poll re-syncs us onto whatever plays next.
-      if (finished && !realTrackRef.current) {
-        setActiveTrack((t) => {
-          const next = Math.min(SIDE_A_TRACKS.length - 1, t + 1);
-          if (next === t) setPlaying(false);
-          return next;
-        });
-      }
-    });
+    windFrom(progressValue.current * trackMsRef.current, trackMsRef.current);
   };
 
   const stopReels = () => {
     tapeFlowLoop.current?.stop();
-    pulseLoop.current?.stop();
     progressAnimRef.current?.stop();
-
-    Animated.timing(glowPulse, {
-      toValue: 0, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: false,
-    }).start();
 
     tapeFlow.stopAnimation();
   };
 
+  useEffect(() => { playingRef.current = live; }, [live]);
+
   useEffect(() => {
-    if (playing) { startReels(); } else { stopReels(); }
+    if (live) { startReels(); } else { stopReels(); }
     return () => stopReels();
-  }, [playing]);
+  }, [live]);
 
   // ── Reset progress when track changes (demo tape only) ─────────────────────
   useEffect(() => {
@@ -588,19 +895,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     progress.setValue(0);
     progressValue.current = 0;
     if (playing) {
-      const demoMs = parseTrackMs(SIDE_A_TRACKS[activeTrack].duration);
-      progressAnimRef.current = Animated.timing(progress, {
-        toValue: 1, duration: demoMs, easing: Easing.linear, useNativeDriver: false,
-      });
-      progressAnimRef.current.start(({ finished }) => {
-        if (finished && !realTrackRef.current) {
-          setActiveTrack((t) => {
-            const next = Math.min(SIDE_A_TRACKS.length - 1, t + 1);
-            if (next === t) setPlaying(false);
-            return next;
-          });
-        }
-      });
+      windFrom(0, parseTrackMs(SIDE_A_TRACKS[activeTrack].duration));
     }
   }, [activeTrack]);
 
@@ -609,22 +904,18 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   useEffect(() => {
     const t = spotify.track;
     if (!visible || !t || t.progressMs == null || t.durationMs == null || t.durationMs <= 0) return;
-    const base = Math.min(t.durationMs, t.progressMs + (playing ? Date.now() - t.syncedAt : 0));
+    // Same rule as the vinyl deck and the shared clock: extrapolate only
+    // when the service confirms, or the tape runs on over silence.
+    const running = confirmedPlaying(playing, t, musicSwitching);
+    const base = Math.min(t.durationMs, t.progressMs + (running ? Date.now() - t.syncedAt : 0));
     progressAnimRef.current?.stop();
     const pct = base / t.durationMs;
     progress.setValue(pct);
     progressValue.current = pct;
-    if (playing) {
-      const remaining = t.durationMs - base;
-      if (remaining > 0) {
-        progressAnimRef.current = Animated.timing(progress, {
-          toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false,
-        });
-        progressAnimRef.current.start();
-      }
-    }
+    lastSyncAtRef.current = t.syncedAt;
+    if (running) windFrom(base, t.durationMs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, playing, spotify.track?.progressMs, spotify.track?.syncedAt, spotify.track?.title]);
+  }, [visible, playing, musicSwitching, spotify.track?.isPlaying, spotify.track?.progressMs, spotify.track?.syncedAt, spotify.track?.title]);
 
   useEffect(() => {
     if (!visible) return;
@@ -635,28 +926,70 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
         if (p) setPlatform({ id: id as PlatformId, name: p.name, color: p.color });
       } else { setPlatform(null); }
     });
-    slideY.setValue(SCREEN_H);
+    slideY.setValue(winH);
     // Play state belongs to the session — a Modes-tab browse opens paused.
     progress.setValue(0);
     progressValue.current = 0;
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
+    // Re-opening from the mini-player: the reel loops die while the modal is
+    // hidden, and `playing` hasn't changed so the [playing] effects never
+    // rekick them — restart everything explicitly if music is going.
+    if (playing) {
+      stopRolling(); stopReels();
+      startRolling(); startReels();
+    }
     return () => { stopReels(); };
   }, [visible]);
 
   const handleClose = () => {
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
+    Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
 
   // Swipe down anywhere to drop back to the mini-player — the one exit
   // gesture shared by every mode (the mini-player's X ends the music).
+  /**
+   * The dismiss gesture reaches handleClose through a ref because the
+   * responder below is built once — closing over the first render's copy
+   * would leave it using a stale window height after a rotation.
+   */
+  const dismissCloseRef = useRef(handleClose);
+  dismissCloseRef.current = handleClose;
+
+  /** Where the card ends up when the finger leaves — or is taken away. */
+  const settleDismiss = (g: { dy: number; vy: number }) => {
+    if (g.dy > 120 || g.vy > 0.8) dismissCloseRef.current();
+    else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+  };
+
+  /**
+   * A sheet above the card owns every gesture. Without this, a FAST flick
+   * that the song list declined bubbled down here (the sheet's React tree
+   * lives inside the mode's), the card dismissed UNDER the open sheet, and
+   * tearing down both iOS windows at once froze the whole screen (owner,
+   * 04.08: "the card collapses to the bottom and then whole screen
+   * freezes"). While any sheet is up, the dismiss gesture stands down.
+   */
+  const npSheetCount = useNowPlaying().sheetCount;
+  const sheetUpRef = useRef(false);
+  sheetUpRef.current = npSheetCount > 0;
+
   const dismissPan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, g) => g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.4,
+    onMoveShouldSetPanResponder: (_, g) => !sheetUpRef.current && g.dy > 10 && Math.abs(g.dy) > Math.abs(g.dx) * 1.4,
     onPanResponderMove: (_, g) => { if (g.dy > 0) slideY.setValue(g.dy); },
-    onPanResponderRelease: (_, g) => {
-      if (g.dy > 120 || g.vy > 0.8) handleClose();
-      else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
-    },
+    onPanResponderRelease: (_, g) => settleDismiss(g),
+    /**
+     * iOS CANCELS a touch that leaves the bottom edge of the screen — which
+     * is exactly how you drag a card away. With no terminate handler the
+     * gesture just stopped: `slideY` stayed parked wherever the finger left
+     * it, so the mode was still "open" with its content off-screen and its
+     * modal window still over the app. Taps fell through to the page beneath
+     * (which is why the tab bar kept working) but scrolling did not, and the
+     * only ways out were to swipe again — re-grabbing the stranded card —
+     * or to kill the app. Terminating settles it exactly like a release.
+     */
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderTerminate: (_, g) => settleDismiss(g),
   })).current;
 
 
@@ -670,13 +1003,45 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
     setPlaying(!playing);
   };
 
+  // Drag-to-seek adapter for the cassette's own progress animation — freeze
+  // the tape while scrubbing, seek the real song on release, then let the
+  // timing (and the next poll) carry on from there.
+  const cassetteScrub = {
+    begin: () => progressAnimRef.current?.stop(),
+    move: (pct: number) => { progress.setValue(pct); progressValue.current = pct; },
+    end: (pct: number) => {
+      progressValue.current = pct;
+      if (realTrackRef.current) seekActive(pct * trackMsRef.current);
+      if (playing) windFrom(pct * trackMsRef.current, trackMsRef.current);
+    },
+  };
+
+  // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
+  const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
+    // BOTH orientations now — portrait rests the same way (useRestScene).
+    active: visible, playing, sheetOpen: showMood || showPicker,
+  });
+  const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
+  // The scene re-centres itself once the controls have gone. MEASURED rather
+  // than assumed, so each mode's own deliberate offsets survive — see
+  // restShiftFor in LandscapeChrome.
+  const [contentH, setContentH] = useState(0);
+  const [sceneBox, setSceneBox] = useState({ y: 0, h: 0 });
+  const restScene = useRestScene(chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape);
+
   // Glow: 0.3 → 0.6 range, gentle amber pulse
-  const glowOpacity = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.16, 0.34] });
-  const glowScale   = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] });
 
   const topPad    = Math.max(insets.top, 20);
-  const bottomPad = Math.max(insets.bottom, 24) + 24;
-  const cassetteW = isLandscape ? winH * 0.72 : winW * 0.92;
+  // +16 is THE shared bottom pad — five of the eight modes already use it and
+  // the share capture's crop lines are computed against it. Cassette's old
+  // +24 lifted its whole bottom stack 8pt, so the pill tops and the song
+  // title's crown poked into the shared snapshot (owner, 05.08).
+  const bottomPad = Math.max(insets.bottom, 24) + 16;
+  // Landscape: the shell is the whole show — winH*0.72 was the OLD branch's
+  // side-column size and reads small alone on a full screen.
+  // Landscape had room left over: the deck docks at 0.86 scale beside the
+  // panel, so 1.30/0.60 was leaving a band of empty table on both sides.
+  const cassetteW = isLandscape ? Math.min(winH * 1.46, winW * 0.66) : winW * 0.92;
   const cassetteH = cassetteW * 0.62;
 
 
@@ -685,190 +1050,177 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   // Plain JSX, not an inline component — an inline component remounts the
   // blurred image on every render (background twitching).
   const currentEq = resolveAnyStation(activeId).eqColors;
-  // Neon glow tracks the station's mood: brightest eq stop = body, first stop = accent.
-  const neonColor  = currentEq?.[2] ?? '#FF3DF0';
+  // The shell wears the station's ACCENT stop (eq[1]) — the same slot the
+  // mini-player edge and glow bands use — not the last stop. The last stop
+  // put Sunset's cassette in hot pink when everything else about that
+  // station is orange (owner, 30.07); the middle stop is where each
+  // station's app-wide accent lives.
+  const neonColor  = currentEq?.[1] ?? '#FF3DF0';
   const neonAccent = currentEq?.[0] ?? '#33E1FF';
+  const backdropStation = resolveAnyStation(activeId);
   const background = (
     <>
-      <StationBackdrop station={resolveAnyStation(activeId)} blurRadius={2.5} />
-      <LinearGradient
-        colors={[
-          'rgba(2,2,10,0.55)',
-          'rgba(2,2,10,0.48)',
-          'rgba(2,2,10,0.60)',
-          'rgba(2,2,10,0.72)',
-          'rgba(2,2,10,0.82)',
-        ]}
-        locations={[0, 0.4, 0.65, 0.85, 1]}
-        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+      <StationBackdrop station={backdropStation} blurRadius={2.5} />
+      <ModeScrim station={backdropStation} />
       <LinearGradient
         colors={['transparent', (currentEq?.[1] ?? '#C8860A') + '26', 'transparent']}
         locations={[0, 0.5, 1]}
         start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-        style={{ position: 'absolute', left: 0, right: 0, top: SCREEN_H * 0.40, bottom: 0 }}
+        style={{ position: 'absolute', left: 0, right: 0, top: winH * 0.40, bottom: 0 }}
         pointerEvents="none"
       />
     </>
   );
 
-  // ── Landscape ──────────────────────────────────────────────────────────────
+  // ── Landscape — the owner's L1+L3 grammar (30.07) ──────────────────────────
+  // The cassette alone on the full-bleed scene, the shared chrome along the
+  // bottom, everything fading out mid-drive. This REPLACES the original
+  // early-development landscape (two columns, a FAKE track list, a
+  // Play-on-Spotify button) which predated every shared piece and every
+  // honesty rule — it shipped by accident the day rotation unlocked.
   if (isLandscape) {
-    const leftW = winW * 0.44;
-    const safeL = insets.left  || 0;
-    const safeR = insets.right || 0;
-
     return (
-      <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
-        <View style={[fs.container, { backgroundColor: C.bg }]} {...dismissPan.panHandlers}>
+      <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent>
+        <Animated.View
+          style={[fs.container, { backgroundColor: C.bg, transform: [{ translateY: slideY }] }]}
+          {...dismissPan.panHandlers}
+          onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
           {background}
           <GrainOverlay />
 
-
-          <View style={{ flex: 1, flexDirection: 'row' }}>
-            {/* Left column */}
-            <ScrollView
-              style={{ flex: 0, width: leftW }}
-              contentContainerStyle={[ls.leftCol, { paddingLeft: safeL + 22, paddingBottom: 16 }]}
-              showsVerticalScrollIndicator={false}>
-              <Text style={[ls.nowPlaying, { fontFamily: Fonts.mono }]}>NOW PLAYING</Text>
-              <Text style={ls.lsStation} numberOfLines={1}>{station.name}</Text>
-              <Text style={ls.lsTrack} numberOfLines={1}>
-                {currentTrack.title} — {currentTrack.artist}
-              </Text>
-
-              <View style={{ height: 14 }} />
-
-              {/* Controls */}
-              <View style={ls.ctrlRow}>
-                <TouchableOpacity onPress={() => setActiveTrack((t) => Math.max(0, t - 1))} style={ls.lsSkipBtn} activeOpacity={0.75}>
-                  <Ionicons name="play-skip-back" size={20} color="#fff" />
-                </TouchableOpacity>
-                <Animated.View style={{ transform: [{ scale: playBtnScale }] }}>
-                  <TouchableOpacity
-                    onPress={togglePlay}
-                    onPressIn={() => Animated.spring(playBtnScale, { toValue: 1.05, useNativeDriver: true, speed: 40, bounciness: 4 }).start()}
-                    onPressOut={() => Animated.spring(playBtnScale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 4 }).start()}
-                    style={ls.lsPlayBtn} activeOpacity={0.9}>
-                    <Ionicons name={playing ? 'pause' : 'play'} size={26} color="#0a0a12" style={playing ? undefined : { marginLeft: 3 }} />
-                  </TouchableOpacity>
-                </Animated.View>
-                <TouchableOpacity onPress={() => setActiveTrack((t) => Math.min(SIDE_A_TRACKS.length - 1, t + 1))} style={ls.lsSkipBtn} activeOpacity={0.75}>
-                  <Ionicons name="play-skip-forward" size={20} color="#fff" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={[ls.progressRow, { marginBottom: 14 }]}>
-                <AmberProgressBar progress={progress} />
-              </View>
-
-              {/* Compact track list */}
-              <View style={{ marginBottom: 12 }}>
-                <SectionLabel label="SIDE A" />
-                {SIDE_A_TRACKS.map((track, i) => (
-                  <TouchableOpacity
-                    key={track.id}
-                    onPress={() => setActiveTrack(i)}
-                    style={[ls.miniTrack, i === activeTrack && ls.miniTrackActive]}>
-                    <Text style={[ls.miniNum, { fontFamily: Fonts.mono }, i === activeTrack && { color: C.amber }]}>
-                      {track.id}
-                    </Text>
-                    <Text style={[ls.miniTitle, i === activeTrack && { color: C.amber }]} numberOfLines={1}>
-                      {track.title}
-                    </Text>
-                    <Text style={[ls.miniDur, { fontFamily: Fonts.mono }]}>{track.duration}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {platform && (
-                <PlatformButton platform={platform} onPress={() => openMusicPlatform(station.name)} />
-              )}
-            </ScrollView>
-
-            {/* Right column — cassette */}
-            <View style={[ls.rightCol, { paddingRight: safeR }]}>
-              <Animated.View style={[fs.glowOrb, {
-                backgroundColor: neonColor,
-                width: cassetteW * 0.9, height: cassetteH * 1.4,
-                borderRadius: cassetteW * 0.45,
-                opacity: playing ? glowOpacity : 0.12,
-                transform: [{ scale: glowScale }],
-              }]} />
-              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={currentTrack.title} artist={currentTrack.artist} timeText={elapsedTxt} />
-            </View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <Animated.View style={deckScene}>
+            <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} />
+            </Animated.View>
           </View>
-        </View>
+
+          <LandscapeChrome
+            chrome={chrome}
+            rested={chromeRested}
+            station={station}
+            track={spotify.track}
+            playing={playing}
+            tagline={station.tagline}
+            progress={progress}
+            scrub={cassetteScrub}
+            onPlayPause={togglePlay}
+            onPrev={() => { setActiveTrack((t) => Math.max(0, t - 1)); spotify.prev(); }}
+            onNext={() => { setActiveTrack((t) => Math.min(SIDE_A_TRACKS.length - 1, t + 1)); spotify.next(); }}
+            onClose={handleClose}
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
+          />
+
+          <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
+          <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
+          {handoff && !spotify.track && <HandoffOverlay />}
+          <PreviewGate onSilence={spotify.pause} />
+
+          <ModeSheet visible={showMood} onClose={() => setShowMood(false)} />
+
+          {showPicker && (
+            <PlaylistSheet
+              stationName={station.name}
+              current={linked}
+              onClose={() => setShowPicker(false)}
+              onPick={async (pl) => {
+                await setStationPlaylist(station.id, pl);
+                setLinked(pl);
+                setShowPicker(false);
+                relinkStationPlaylist(station.id);
+              }}
+            />
+          )}
+        </Animated.View>
       </Modal>
     );
   }
 
   // ── Portrait ───────────────────────────────────────────────────────────────
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
-      <Animated.View style={[fs.container, { backgroundColor: C.bg, transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
+    <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent>
+      <Animated.View
+        style={[fs.container, { backgroundColor: C.bg, transform: [{ translateY: slideY }] }]}
+        {...dismissPan.panHandlers}
+        /* Passive touch sniffer — never claims the gesture, just brings the
+           rested chrome back. Must sit on the root so it sees taps on the
+           shell, the buttons and the empty scene alike. */
+        onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
         {background}
         <GrainOverlay />
 
-        {/* Top vignette */}
-        <LinearGradient
-          colors={['rgba(0,0,0,0.5)', 'transparent']}
-          style={[StyleSheet.absoluteFill, { height: SCREEN_H * 0.2, zIndex: 1 }]}
-          pointerEvents="none"
-        />
-
         {/* Floating chrome */}
-        <View style={[fs.floatingTop, { top: topPad + 8, zIndex: 10 }]}>
+        <Animated.View style={[fs.floatingTop, { top: topPad + 8, zIndex: 10, opacity: chrome }]}>
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.22)' }} />
-        </View>
+        </Animated.View>
 
-        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: bottomPad }}>
+        {/* Mode name — top-left corner tag, same treatment as every other mode */}
+        <Animated.View style={{ opacity: chrome, position: 'absolute', top: topPad + 14, left: 20, zIndex: 10 }} pointerEvents="none">
+          <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', letterSpacing: 3, fontFamily: Fonts.mono }}>CASSETTE</Text>
+        </Animated.View>
+
+        <View style={{ flex: 1, paddingTop: topPad + 52, paddingBottom: bottomPad }}
+          onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
 
           {/* Header — small top-center, Spotify style */}
-          <View style={fs.header}>
-            <Text style={fs.headerEyebrow}>PLAYING FROM</Text>
-            <Text style={fs.headerStation}>{station.name}</Text>
-          </View>
+          <Animated.View style={[fs.header, { opacity: chrome }]}>
+            <StationIdentity station={station} />
+          </Animated.View>
 
           {/* Cassette hero — flex:1 so it grows to fill available space */}
-          <View style={[fs.cassetteWrap, { flex: 1 }]}>
-            <Animated.View style={[fs.glowOrb, {
-              backgroundColor: neonColor,
-              width: cassetteW * 0.85, height: cassetteH * 1.3,
-              borderRadius: cassetteW * 0.42,
-              opacity: playing ? glowOpacity : 0.12,
-              transform: [{ scale: glowScale }],
-            }]} />
-            <TouchableOpacity onPress={togglePlay} activeOpacity={0.92}>
-              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} color={neonColor} accent={neonAccent} songName={currentTrack.title} artist={currentTrack.artist} timeText={elapsedTxt} />
+          <Animated.View
+            style={[fs.cassetteWrap, { flex: 1 }, restScene]}
+            onLayout={(e) => setSceneBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
+            {/* Notes BEHIND the shell. Drawn after it they landed on the
+                plastic — between the reels, on the top edge — and on a
+                physical object that reads as dirt rather than atmosphere. */}
+            <FloatingNotes playing={live} color={neonColor} />
+            {/* A tap while the controls are away only brings them back — the
+                root sniffer has already done that. Without the guard, the tap
+                meant to wake the deck would pause the music instead. */}
+            <TouchableOpacity onPress={() => { if (!chromeRested) togglePlay(); }} activeOpacity={0.92}>
+              <CassetteBody size={cassetteW} leftSpin={leftSpin} rightSpin={rightSpin} progress={progress} color={neonColor} accent={neonAccent} songName={spotify.track?.title ?? station.name} artist={spotify.track?.artist ?? 'CRUISE FM'} />
             </TouchableOpacity>
-            <FloatingNotes playing={playing} color={neonColor} />
-          </View>
+          </Animated.View>
 
-          {/* Song title — bottom-left, Spotify style */}
+          {/* EVERYTHING BELOW THE SCENE RESTS TOGETHER. pointerEvents goes
+              off once it is invisible, or the tap meant to bring the controls
+              back would press whatever button it landed on. */}
+          <Animated.View
+            /* THE WRAPPER MUST BE TRANSPARENT TO LAYOUT. This container
+               stretches its children, and the song block relies on that —
+               it is full width with its text pushed to the left edge. Giving
+               the wrapper `alignItems: 'center'` shrank the block to its own
+               content and centred it, so the song titles moved to the middle
+               of the screen (owner, 18.08, on the Equalizer and the
+               cassette). Match the parent's alignment or impose none. */
+            style={{ alignSelf: 'stretch', opacity: chrome }}
+            pointerEvents={chromeRested ? 'none' : 'auto'}>
+          {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
-            <Text style={fs.trackTitle} numberOfLines={1}>{spotify.track?.title ?? currentTrack.title}</Text>
-            <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track?.artist ?? currentTrack.artist}</Text>
+            {spotify.track
+              ? <MarqueeText text={spotify.track.title} style={fs.trackTitle} />
+              : <Text style={[fs.trackTitle, { fontSize: 20 }]} numberOfLines={2}>{station.tagline}</Text>}
+            {spotify.track && <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track.artist}</Text>}
           </View>
 
-          {/* Tape progress — live counter left, true track length right */}
+          {/* Tape progress — only when a real song is playing through */}
+          {spotify.track && (
           <View style={fs.progressWrap}>
-            <View style={fs.progressRow}>
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono }]}>{elapsedTxt}</Text>
-              <AmberProgressBar progress={progress} />
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono, textAlign: 'right' }]}>{fmtTapeMs(trackMs)}</Text>
+            <SeekBar progress={progress} scrub={cassetteScrub} />
+            <View style={fs.timesBelow}>
+              <Text style={fs.timeText}>{elapsedTxt}</Text>
+              <Text style={fs.timeText}>{fmtTapeMs(trackMs)}</Text>
             </View>
           </View>
+          )}
 
           {/* Controls */}
           <View style={fs.controls}>
-            <TouchableOpacity
-              onPress={() => setShuffle((s) => !s)}
-              style={fs.shuffleRepeatBtn}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={26} color={shuffle ? '#C8860A' : '#ffffff'} />
-            </TouchableOpacity>
+            <ShuffleButton accent={currentEq?.[1] ?? '#C8860A'} size={26} on={shuffle}
+              onPress={() => spotify.shuffle(!shuffle)} />
 
             <TouchableOpacity
               onPress={() => { setActiveTrack((t) => Math.max(0, t - 1)); spotify.prev(); }}
@@ -899,36 +1251,31 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
               <MaterialCommunityIcons name="skip-next" size={48} color="#fff" />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setRepeat((r) => !r)}
-              style={fs.shuffleRepeatBtn}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="repeat" size={26} color={repeat ? '#C8860A' : '#ffffff'} />
-            </TouchableOpacity>
+            <RepeatButton accent={currentEq?.[1] ?? '#C8860A'} size={26} mode={repeat}
+              onPress={(next) => spotify.repeat(next)} />
           </View>
 
           {/* Left-aligned action pills — keeps the tape the focus */}
-          <View style={fs.actionRow}>
-            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
-              <Text style={fs.actionPillBold}>Change Mood</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
-              <Text style={fs.actionPillText} numberOfLines={1}>
-                {linked ? linked.name : 'Add Playlist'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <ModeActionRow
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
+            track={spotify.track}
+            station={station}
+          />
+          </Animated.View>
 
         </View>
 
-        <MoodSheet
-          visible={showMood}
-          activeId={activeId}
-          onSelect={(id) => { setActiveId(id); npSetStation(id); setShowMood(false); }}
-          onClose={() => setShowMood(false)}
-        />
+        <ModeCloseButton onPress={handleClose} chrome={chrome} rested={chromeRested} />
+
+        <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} hero={false} color={currentEq?.[1] ?? C.amber} />
+        <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
+        {handoff && !spotify.track && <HandoffOverlay />}
+        <PreviewGate onSilence={spotify.pause} />
+
+        <ModeSheet visible={showMood} onClose={() => setShowMood(false)} />
 
         {showPicker && (
           <PlaylistSheet
@@ -939,6 +1286,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
               await setStationPlaylist(activeId, pl);
               setLinked(pl);
               setShowPicker(false);
+              relinkStationPlaylist(activeId);
             }}
           />
         )}
@@ -948,88 +1296,6 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   );
 }
 
-// ── Card preview ──────────────────────────────────────────────────────────────
-export function CassettePreview() {
-  const leftReelAnim  = useRef(new Animated.Value(0)).current;
-  const rightReelAnim = useRef(new Animated.Value(0)).current;
-  const leftLoopRef   = useRef<any>(null);
-  const rightLoopRef  = useRef<any>(null);
-  const progress = useRef(new Animated.Value(0.22)).current;
-  const tapeFlow = useRef(new Animated.Value(0)).current;
-  const [active, setActive]       = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-
-  const leftSpin  = leftReelAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const rightSpin = rightReelAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-
-  const startRolling = () => {
-    leftReelAnim.setValue(0);
-    rightReelAnim.setValue(0);
-    leftLoopRef.current = Animated.loop(
-      Animated.timing(leftReelAnim, { toValue: 1, duration: 1600, easing: Easing.linear, useNativeDriver: true })
-    );
-    rightLoopRef.current = Animated.loop(
-      Animated.timing(rightReelAnim, { toValue: 1, duration: 2200, easing: Easing.linear, useNativeDriver: true })
-    );
-    leftLoopRef.current.start();
-    rightLoopRef.current.start();
-  };
-  const stopRolling = () => {
-    leftLoopRef.current?.stop();
-    rightLoopRef.current?.stop();
-  };
-
-  // Idle spin always running in preview
-  useEffect(() => {
-    leftLoopRef.current = Animated.loop(
-      Animated.timing(leftReelAnim, { toValue: 1, duration: 5000, easing: Easing.linear, useNativeDriver: true })
-    );
-    rightLoopRef.current = Animated.loop(
-      Animated.timing(rightReelAnim, { toValue: 1, duration: 7000, easing: Easing.linear, useNativeDriver: true })
-    );
-    leftLoopRef.current.start();
-    rightLoopRef.current.start();
-    return () => { leftLoopRef.current?.stop(); rightLoopRef.current?.stop(); };
-  }, []);
-
-  const handleOpen  = () => { stopRolling(); setActive(false); setModalOpen(true); };
-  const handleClose = () => { setModalOpen(false); };
-
-  return (
-    <View style={pv.shell}>
-      <TouchableOpacity onPress={handleOpen} activeOpacity={0.9} style={pv.scene}>
-        <LinearGradient colors={['#0c0c16', '#0a0a12', '#060609']} style={StyleSheet.absoluteFill} />
-        <View style={pv.glow} />
-        <View style={pv.tapHint}>
-          <Ionicons name="play" size={9} color={C.textFaint} />
-          <Text style={[pv.tapHintText, { fontFamily: Fonts.mono }]}>tap to open</Text>
-        </View>
-        <CassetteBody size={275} leftSpin={leftSpin} rightSpin={rightSpin} color="#FF3DF0" accent="#33E1FF" songName="YOUR SONG NAME" artist="CRUISE FM" timeText="00:00" />
-        {OWNER_MODE && (
-          <View style={pv.devBadge} pointerEvents="none">
-            <Text style={pv.devBadgeText}>DEV</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-      <View style={pv.bottomSection}>
-        <View style={pv.footer}>
-          <View style={pv.titleRow}>
-            <Text style={pv.title}>Cassette Mode</Text>
-            <View style={pv.badge}><Text style={pv.badgeText}>PREMIUM</Text></View>
-          </View>
-          <Text style={pv.sub}>Transparent neon. Reels spin. Glows to your mood.</Text>
-        </View>
-        {!OWNER_MODE && (
-          <View style={[pv.unlockBtn, { marginTop: 'auto' }]}>
-            <Ionicons name="lock-closed" size={14} color={C.amber} />
-            <Text style={pv.unlockText}>Unlock Premium</Text>
-          </View>
-        )}
-      </View>
-      <CassetteFullscreen visible={modalOpen} onClose={handleClose} />
-    </View>
-  );
-}
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const fs = StyleSheet.create({
@@ -1050,10 +1316,10 @@ const fs = StyleSheet.create({
   headerEyebrow: { color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
   headerStation: { color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 },
   trackBlock:  { paddingHorizontal: 28, paddingTop: 16, paddingBottom: 4, alignItems: 'flex-start' },
-  trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+  trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: 0 },
   trackArtist: { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 },
 
-  cassetteWrap: { alignItems: 'center', gap: 10 },
+  cassetteWrap: { alignItems: 'center', justifyContent: 'center', gap: 10 },
   glowOrb:     { position: 'absolute', alignSelf: 'center' },
 
   playlistBtn: {
@@ -1063,18 +1329,6 @@ const fs = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9,
   },
   playlistBtnText: { color: C.textDim, fontSize: 10, fontWeight: '700', letterSpacing: 2.5 },
-  actionRow: {
-    flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22,
-  },
-  actionPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
-    maxWidth: '58%',
-  },
-  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
-  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
 
   playlistSheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -1103,8 +1357,8 @@ const fs = StyleSheet.create({
   sheetPlatformText: { flex: 1, fontSize: 13, fontWeight: '600' },
 
   progressWrap: { width: '100%', paddingHorizontal: 28, marginTop: 22, marginBottom: 0 },
-  progressRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2, width: 38 },
+  timesBelow:   { flexDirection: 'row', justifyContent: 'space-between', marginTop: -4 },
+  timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2 },
 
   controls:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 28, marginTop: 10, marginBottom: 8, paddingVertical: 4 },
   shuffleRepeatBtn:{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },

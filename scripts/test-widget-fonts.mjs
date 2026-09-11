@@ -1,0 +1,259 @@
+// A WIDGET'S FONTS FAIL SILENTLY, SO THEY GET PINNED HERE.
+//
+// The first widget build (38, 01.09) drew its dial in a plain system face and
+// every station icon as a missing-glyph box. Two independent causes, and
+// NEITHER threw, logged, or failed a build:
+//
+//   1. `fonts: [...]` in expo-target.config.js was never a supported option.
+//      @bacons/apple-targets reads icon/images/colors/entitlements/frameworks
+//      and silently ignores anything else, so the ttf files were never copied
+//      into the extension and UIAppFonts was never declared. The key sat there
+//      looking correct from 21.08 to 01.09.
+//   2. Swift asked for `.custom("MaterialCommunityIcons")` — the FILENAME. The
+//      font's PostScript name, which is what SwiftUI wants, is
+//      "MaterialDesignIcons". iOS quietly substitutes the system font, where a
+//      private-use codepoint has no glyph.
+//
+// An icon that does not render is invisible to every other check in this repo,
+// which is exactly why it survived a build. This file makes both mechanical.
+import fs from 'node:fs';
+
+const ROOT = '/home/user/CruiseFM';
+const DIR = `${ROOT}/targets/widgets`;
+let fails = 0;
+const check = (n, ok, extra = '') => {
+  if (ok) { console.log('  ok  ', n); return; }
+  fails++; console.log('  FAIL', n, extra);
+};
+
+/** Every codepoint a ttf actually covers, from its own cmap (format 4 and 12). */
+function coverage(file) {
+  const d = fs.readFileSync(file);
+  const covered = new Set();
+  const numTables = d.readUInt16BE(4);
+  let cmapOff = null;
+  for (let i = 0; i < numTables; i++) {
+    const rec = 12 + i * 16;
+    if (d.toString('latin1', rec, rec + 4) === 'cmap') { cmapOff = d.readUInt32BE(rec + 8); break; }
+  }
+  if (cmapOff == null) return covered;
+  const n = d.readUInt16BE(cmapOff + 2);
+  for (let i = 0; i < n; i++) {
+    const sub = cmapOff + d.readUInt32BE(cmapOff + 4 + i * 8 + 4);
+    const fmt = d.readUInt16BE(sub);
+    if (fmt === 4) {
+      const segX2 = d.readUInt16BE(sub + 6);
+      for (let s = 0; s < segX2 / 2; s++) {
+        const end = d.readUInt16BE(sub + 14 + s * 2);
+        const start = d.readUInt16BE(sub + 16 + segX2 + s * 2);
+        for (let c = start; c <= end && c !== 0xffff; c++) covered.add(c);
+      }
+    } else if (fmt === 12) {
+      const groups = d.readUInt32BE(sub + 12);
+      for (let g = 0; g < groups; g++) {
+        const o = sub + 16 + g * 12;
+        for (let c = d.readUInt32BE(o); c <= d.readUInt32BE(o + 4); c++) covered.add(c);
+      }
+    }
+  }
+  return covered;
+}
+
+/** The PostScript name (nameID 6), read from the ttf's own name table — the
+ *  only authority on what `.custom()` will match. */
+function postScriptName(file) {
+  const d = fs.readFileSync(file);
+  const numTables = d.readUInt16BE(4);
+  let off = null;
+  for (let i = 0; i < numTables; i++) {
+    const rec = 12 + i * 16;
+    if (d.toString('latin1', rec, rec + 4) === 'name') { off = d.readUInt32BE(rec + 8); break; }
+  }
+  if (off == null) return null;
+  const count = d.readUInt16BE(off + 2), strOff = d.readUInt16BE(off + 4);
+  for (let i = 0; i < count; i++) {
+    const r = off + 6 + i * 12;
+    const platformId = d.readUInt16BE(r), nameId = d.readUInt16BE(r + 6);
+    const len = d.readUInt16BE(r + 8), so = d.readUInt16BE(r + 10);
+    if (nameId !== 6) continue;
+    const raw = d.subarray(off + strOff + so, off + strOff + so + len);
+    return platformId === 3 ? raw.swap16().toString('utf16le') : raw.toString('latin1');
+  }
+  return null;
+}
+
+console.log('\n  the fonts are in the folder the target syncs:');
+const plist = fs.readFileSync(`${DIR}/Info.plist`, 'utf8');
+const declared = [...plist.matchAll(/<string>([^<]+\.ttf)<\/string>/g)].map((m) => m[1]);
+check('Info.plist declares UIAppFonts', /UIAppFonts/.test(plist));
+check('...and names at least one font', declared.length > 0, JSON.stringify(declared));
+for (const f of declared) {
+  check(`${f} exists beside it`, fs.existsSync(`${DIR}/${f}`));
+}
+
+console.log('\n  Info.plist still registers the widget at all:');
+// Losing this while hand-authoring the file would unregister the extension —
+// the widgets would simply never appear in the gallery, with no error.
+check('NSExtensionPointIdentifier is widgetkit-extension',
+  /com\.apple\.widgetkit-extension/.test(plist));
+
+console.log('\n  every font Swift asks for is one we actually ship:');
+const swift = fs.readFileSync(`${DIR}/Snapshot.swift`, 'utf8');
+const asked = [...swift.matchAll(/\.custom\("([^"]+)"/g)].map((m) => m[1]);
+check('Swift asks for at least one custom font', asked.length > 0,
+  'if this is 0 the regex matched nothing and every case below is vacuous');
+const shipped = declared.map((f) => postScriptName(`${DIR}/${f}`));
+console.log(`       shipped PostScript names: ${JSON.stringify(shipped)}`);
+for (const name of asked) {
+  check(`"${name}" matches a shipped font's PostScript name`, shipped.includes(name),
+    `asked for "${name}" — the ttf files call themselves ${JSON.stringify(shipped)}`);
+}
+
+console.log('\n  the subset still covers every icon a station can use:');
+{
+  const glyphs = JSON.parse(fs.readFileSync(
+    `${ROOT}/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json`, 'utf8'));
+  const names = new Set();
+  for (const m of fs.readFileSync(`${ROOT}/src/constants/stations.ts`, 'utf8').matchAll(/iconName:\s*'([^']+)'/g)) names.add(m[1]);
+  for (const m of fs.readFileSync(`${ROOT}/src/utils/customStations.ts`, 'utf8').matchAll(/iconName:.*?'([a-z][a-z0-9-]+)'/g)) names.add(m[1]);
+  const cs = fs.readFileSync(`${ROOT}/src/components/CreateStationModal.tsx`, 'utf8');
+  for (const blk of cs.matchAll(/ICONS\s*=\s*\[([^\]]+)\]/g)) {
+    for (const m of blk[1].matchAll(/'([a-z][a-z0-9-]+)'/g)) names.add(m[1]);
+  }
+  check('found the icon names to check', names.size >= 10, `${names.size} — a regex matching nothing passes vacuously`);
+
+  const sub = declared.find((f) => /Material/i.test(f));
+  const covered = coverage(`${DIR}/${sub}`);
+  const missing = [...names].filter((nm) => glyphs[nm] && !covered.has(glyphs[nm]));
+  check('every station icon is in the subset', missing.length === 0,
+    `missing: ${JSON.stringify(missing)} — re-run the subset after adding an icon`);
+  const unknown = [...names].filter((nm) => !glyphs[nm]);
+  check('every icon name is a real glyph', unknown.length === 0, JSON.stringify(unknown));
+
+  // THE CAR ON THE START DRIVE TILE IS THE SEEK BAR'S OWN CAR, and it is the
+  // one icon in this target asked for by CODEPOINT rather than by name — the
+  // extension has no glyph-name table, since every other icon arrives in the
+  // snapshot as a character the app already resolved. So three things have to
+  // stay in step, and a hollow box is what it looks like when they do not:
+  // the app still draws `car-convertible`, that name still means this
+  // codepoint, and the subset still carries it.
+  const seek = fs.readFileSync(`${ROOT}/src/components/SeekBar.tsx`, 'utf8');
+  const drew = seek.match(/name="([a-z][a-z0-9-]+)"/);
+  check('the seek bar still draws a named car', !!drew && /car/.test(drew[1]),
+    `SeekBar's icon is ${JSON.stringify(drew && drew[1])}`);
+
+  const swift = fs.readFileSync(`${ROOT}/targets/widgets/StartDriveWidget.swift`, 'utf8');
+  const pinned = swift.match(/let CAR_GLYPH = "\\u\{([0-9A-Fa-f]+)\}"/);
+  check('the widget pins the car as a codepoint', !!pinned,
+    'CAR_GLYPH is not written as \\u{...} — the check cannot read it');
+  if (pinned && drew) {
+    const want = glyphs[drew[1]];
+    const got = parseInt(pinned[1], 16);
+    check('the widget and the seek bar draw the SAME car',
+      want === got,
+      `SeekBar draws ${drew[1]} = U+${want && want.toString(16).toUpperCase()}, ` +
+      `the widget pins U+${got.toString(16).toUpperCase()}`);
+    check('and that car is in the subset', covered.has(got),
+      `U+${got.toString(16).toUpperCase()} is not in ${sub} — it would draw a hollow box`);
+  }
+}
+
+// ── THE BAND LETTERS ──────────────────────────────────────────────────────
+//
+// The snapshot carries the dial as ONE string — "810 AM" — and every widget
+// set the whole thing in DSEG7Classic-Bold. That font DOES have A, M and F
+// (checked: distinct outlines, not substitutions), but seven bars have no
+// diagonal and no vertical centre, so its M is a calculator's best attempt
+// and reads as N. The app hit exactly that on 31.07 with "94.7 FM" coming out
+// "94.7 FN" and moved the band to the fourteen-segment face; the widgets
+// shipped without the fix because nothing here could see it.
+//
+// The rule this pins is ours, not the font's: a dial is never handed whole to
+// the number font. That is checkable; "does an M read as an N" is not.
+{
+  console.log('\n  the band letters go in a font that can draw them:');
+  const glyphless = 'DSEG7Classic-Bold';
+  let offenders = [];
+  for (const f of fs.readdirSync(DIR).filter((n) => n.endsWith('.swift'))) {
+    const src = fs.readFileSync(`${DIR}/${f}`, 'utf8');
+    // Text(<anything>.dial<anything>) followed by .font(dialFont(...)) — the
+    // whole string in the numbers-only face. Deliberately loose about what
+    // sits around `.dial` — a nested call must be caught too — so the ONE
+    // legitimate shape is excused by name below rather than by the pattern.
+    const re = /Text\(([^)]*\.dial[^)]*)\)[\s\S]{0,120}?\.font\(dialFont\(/g;
+    for (const m of src.matchAll(re)) {
+      // `Text(splitDial(x).number)` IS the split — digits only, with the band
+      // drawn elsewhere or deliberately absent. It trips the pattern only
+      // because the capture truncates at splitDial's own closing bracket.
+      if (/^Text\(\s*splitDial\([^()]*\)\.number\s*\)/.test(src.slice(m.index))) continue;
+      offenders.push(`${f}: Text(${m[1].trim()})`);
+    }
+  }
+  check('no widget sets a whole dial string in ' + glyphless, offenders.length === 0,
+    offenders.join('; ') + ' — split it with splitDial/DialText so the band gets bandFont');
+
+  const snap = fs.readFileSync(`${DIR}/Snapshot.swift`, 'utf8');
+  check('a band font exists and names the 14-segment face',
+    /func bandFont\([\s\S]{0,120}DSEG14Classic-Bold/.test(snap));
+  check('the 14-segment font is declared in Info.plist',
+    fs.readFileSync(`${DIR}/Info.plist`, 'utf8').includes('DSEG14Classic-Bold.ttf'));
+  // The whole reason the split is needed: prove the numbers font really is
+  // missing the letters, rather than trusting that it is.
+  // The fourteen-segment face must actually carry the letters it is being
+  // used for, or this whole split buys nothing.
+  const fourteen = coverage(`${DIR}/DSEG14Classic-Bold.ttf`);
+  const gaps = [...'AMF'].filter((c) => !fourteen.has(c.charCodeAt(0)));
+  check('the 14-segment font covers the band letters', gaps.length === 0, JSON.stringify(gaps));
+
+  // ── EVERY CUSTOM FACE IS ASKED FOR AT A FIXED SIZE ───────────────────────
+  // `Font.custom(_:size:)` scales with the reader's text-size setting;
+  // `Font.custom(_:fixedSize:)` does not. A widget is a fixed rectangle drawn
+  // to a hand-measured layout with no scroll view to absorb the extra, and
+  // `.system(size:)` does not scale — so these helpers were the only text in
+  // the target that grew, which is what made the layouts come apart unevenly
+  // rather than uniformly.
+  //
+  // MEASURED OFF THE OWNER'S OWN SCREENSHOTS 08.09: the ticket's seven-segment
+  // digits ran ~38% wider relative to the widget than the prototype's. At that
+  // scale "Artist:" (38.5pt of glyph at 11pt) overflowed its column and iOS
+  // truncated the LABEL — the "Arti···" she photographed.
+  console.log('\n  a widget never lets the reader resize its layout:');
+  const scaled = [];
+  for (const m of snap.matchAll(/func (\w*Font)\(([\s\S]{0,160}?)\}/g)) {
+    if (/\.custom\([^)]*,\s*size:/.test(m[2])) scaled.push(m[1]);
+  }
+  check('every custom-font helper asks for a fixed size', scaled.length === 0,
+    scaled.join(', ') + ' — use .custom(_:fixedSize:), or Dynamic Type resizes the widget\'s text');
+  // And it has to find them at all: a regex that quietly matches nothing
+  // would pass this vacuously, which is the trap this repo keeps re-learning.
+  const helpers = [...snap.matchAll(/func \w*Font\(/g)].length;
+  check('and it actually read the helpers', helpers >= 4, `found ${helpers}`);
+}
+
+// ── THE TEN STATIONS' PHOTOGRAPHS ARE WHERE THE FONTS ARE ────────────────
+//
+// The extension cannot read the app's bundle, so the built-ins' blurred
+// backdrops are carried as its OWN resources, named by station id. They sat in
+// a `stations/` subfolder from 01.09 to 09.09 and never rendered: the On Air
+// tile on build 44 drew After Hours FM as its flat gradient (hue 235) where
+// the photograph is a teal road (hue 197), while the same recording showed a
+// CUSTOM station's photo — which arrives through the App Group container —
+// perfectly. A ttf at the folder's ROOT demonstrably reaches the bundle, so
+// that is where these go too: the same arrangement as the thing known to work,
+// rather than a bet on how Xcode copies a subfolder.
+console.log('\n  every built-in station carries its photograph into the extension:');
+{
+  const ids = [...fs.readFileSync(`${ROOT}/src/constants/stations.ts`, 'utf8')
+    .matchAll(/^\s{4}id: '([a-z0-9-]+)',/gm)].map((m) => m[1]);
+  check('and it actually read the stations', ids.length >= 10, `found ${ids.length}`);
+  const missing = ids.filter((id) => !fs.existsSync(`${DIR}/${id}.jpg`));
+  check('each one has a .jpg beside the fonts', missing.length === 0,
+    missing.join(', ') + ' — a subfolder is not proven to reach the bundle');
+  const stray = fs.existsSync(`${DIR}/stations`);
+  check('and none are hidden in a subfolder', !stray,
+    'targets/widgets/stations still exists — move them to the folder root');
+}
+
+console.log(fails ? `\n  ${fails} failure(s)\n`
+  : '\n  the widgets ship the fonts they draw with, under the names they ask for\n');
+process.exit(fails ? 1 : 0);

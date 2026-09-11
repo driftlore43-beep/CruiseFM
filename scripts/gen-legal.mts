@@ -30,6 +30,18 @@ ${doc.sections.map((s) => `<h2>${esc(s.heading)}</h2><p>${esc(s.body)}</p>`).joi
 `;
 }
 
-writeFileSync('docs/legal/privacy.html', render(PRIVACY_POLICY));
-writeFileSync('docs/legal/terms.html', render(TERMS_OF_SERVICE));
-console.log('wrote docs/legal/privacy.html and terms.html');
+/**
+ * BOTH copies are written from here. The website's pages are the ones Apple
+ * and real users actually read, and they had been hand-edited at some point —
+ * by 04.08 the live policy was missing a section the in-app one carried and
+ * carried a different "last updated" date. Two copies of one document with no
+ * single source is how that happens; there is one now.
+ */
+const targets: [string, typeof PRIVACY_POLICY][] = [
+  ['docs/legal/privacy.html', PRIVACY_POLICY],
+  ['docs/legal/terms.html', TERMS_OF_SERVICE],
+  ['website/privacy/index.html', PRIVACY_POLICY],
+  ['website/terms/index.html', TERMS_OF_SERVICE],
+];
+for (const [path, doc] of targets) writeFileSync(path, render(doc));
+console.log('wrote:\n  ' + targets.map(([p]) => p).join('\n  '));

@@ -1,6 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { GlossSheen } from '@/components/GlossSheen';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -20,14 +19,48 @@ import {
   getSavedPlatform,
   savePlatform,
 } from '@/utils/musicPlatform';
-import { Cruise } from '@/constants/theme';
+import { usePalette, useStyles } from '@/context/AppearanceContext';
+import { readableOn, type Palette } from '@/utils/appearance';
 
 const NONE_ENTRY = { id: 'none' as PlatformId, name: 'None / Other', color: '#666666' };
 
+/**
+ * SPOTIFY IS NOT OFFERED (owner, 01.09: "remove the option to have Spotify as
+ * it's not available").
+ *
+ * It is not a code limit and no amount of work here changes it: Spotify caps a
+ * development-tier app at FIVE authorised accounts, and extension requests have
+ * been organisations-only since May 2025, needing an established business with
+ * 250k+ monthly users. So for essentially everyone who picks it, "Full in-app
+ * control" was a promise the app could not keep — they would sign in, be
+ * refused, and land in the visual companion mode they could have had without
+ * the detour.
+ *
+ * `PLATFORMS.spotify` is deliberately LEFT IN PLACE. Anyone already running on
+ * Spotify — the owner and the handful of allowlisted testers — keeps working
+ * exactly as before, because the playback switchboard reads their saved choice
+ * and never consults this list. This removes the offer, not the feature.
+ */
 const PLATFORM_ENTRIES = [
-  ...Object.entries(PLATFORMS).map(([id, p]) => ({ id: id as PlatformId, ...p })),
+  ...Object.entries(PLATFORMS)
+    .filter(([id]) => id !== 'spotify')
+    .map(([id, p]) => ({ id: id as PlatformId, ...p })),
   NONE_ENTRY,
 ];
+
+// Honest tier line under each name. Apple Music is the full ride; everything
+// else runs as the visual companion beside the user's own music app, which
+// genuinely works today — never call it "upcoming". The `spotify` entry is
+// kept only so an existing Spotify listener's saved choice still resolves to a
+// caption; it is no longer offered (see PLATFORM_ENTRIES).
+const TIER_CAPTIONS: Record<string, string> = {
+  spotify:      'Full in-app control',
+  appleMusic:   'Full in-app control',
+  youtubeMusic: 'Visuals + your app',
+  amazonMusic:  'Visuals + your app',
+  tidal:        'Visuals + your app',
+  none:         'Just the visuals',
+};
 
 type Props = {
   visible: boolean;
@@ -35,6 +68,8 @@ type Props = {
 };
 
 export function PlatformSelector({ visible, onDismiss }: Props) {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
   const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState<PlatformId | null>(null);
 
@@ -49,6 +84,15 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
 
   useEffect(() => {
     if (visible) {
+      // THE "KEEPS UNSELECTING" BUG (Ethan, 25.08). `selected` started at
+      // `null` on every open, so the sheet always showed nothing chosen even
+      // though the saved platform hadn't moved — it just never asked what it
+      // was. `getSavedPlatform` can return 'none' (Skip for now was pressed
+      // once) — that has no card of its own to light up, so it's left
+      // unselected rather than mapped onto a platform nobody chose.
+      getSavedPlatform().then((id) => {
+        if (id && id !== 'none') setSelected(id);
+      }).catch(() => {});
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1, duration: 400, useNativeDriver: true,
@@ -141,26 +185,29 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
               onPress={handleClose}
               style={styles.closeBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="close" size={16} color="rgba(255,255,255,0.6)" />
+              <Ionicons name="close" size={16} color={pal.ink(0.6)} />
             </TouchableOpacity>
           </View>
 
           <Text style={styles.title}>Connect Your Music</Text>
           <Text style={styles.subtitle}>
-            Choose your favourite platform and we'll take you straight to the vibe.
+            Apple Music plays inside Cruise FM, with the controls on the card. Anywhere else, the visuals run alongside your own music app.
           </Text>
 
           {/* ── Platform grid ────────────────────────────────────────────── */}
           <View style={styles.grid}>
-            {PLATFORM_ENTRIES.map((platform) => {
+            {PLATFORM_ENTRIES.map((entry) => {
+              // Tidal's mark is a near-white grey, correct on a dark sheet and
+              // invisible on paper. Deepened only where it has to be.
+              const platform = { ...entry, color: readableOn(entry.color, pal.mode) };
               const isSelected = selected === platform.id;
               const isNone = platform.id === 'none';
               return (
                 <Pressable
-                  key={platform.id}
+                  key={entry.id}
                   style={({ pressed }) => [
                     styles.platformBtn,
-                    { borderColor: isSelected ? platform.color : `${platform.color}55` },
+                    { borderColor: isSelected ? platform.color : pal.ink(0.12) },
                     isSelected && { borderWidth: 2 },
                     pressed && { opacity: 0.82 },
                   ]}
@@ -170,32 +217,44 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
                   <LinearGradient
                     colors={
                       isSelected
-                        ? [`${platform.color}66`, `${platform.color}2e`]
-                        : ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.05)']
+                        ? [`${platform.color}2e`, `${platform.color}12`]
+                        : [pal.ink(0.09), pal.ink(0.03)]
                     }
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={StyleSheet.absoluteFill}
                   />
 
-                  {/* Brand mark — bold white icon on a tinted chip */}
+                  {/* Brand mark on a chip tinted with its own colour. On black
+                      the glyph is white, which is the strongest thing that can
+                      sit on a dark tint. On paper that chip is a PALE wash, so
+                      a white glyph disappears into it — the mark takes the
+                      brand's own colour instead, which is both legible and
+                      more like the real logo. */}
                   <View style={[
                     styles.emojiWrap,
-                    { backgroundColor: `${platform.color}22`, borderColor: `${platform.color}44` },
+                    pal.mode === 'light'
+                      ? { backgroundColor: `${platform.color}1f`, borderColor: `${platform.color}59` }
+                      : { backgroundColor: `${platform.color}22`, borderColor: `${platform.color}44` },
                   ]}>
-                    <PlatformIcon id={platform.id} />
+                    <PlatformIcon id={platform.id} color={pal.mode === 'light' ? platform.color : '#fff'} />
                   </View>
 
-                  <Text
-                    style={[
-                      styles.platformName,
-                      isSelected
-                        ? { color: isNone ? '#aaa' : platform.color, fontWeight: '700' }
-                        : { color: Cruise.textPrimary },
-                    ]}
-                    numberOfLines={1}>
-                    {platform.name}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.platformName,
+                        isSelected
+                          ? { color: isNone ? pal.ink(0.62) : platform.color, fontWeight: '700' }
+                          : { color: pal.text },
+                      ]}
+                      numberOfLines={1}>
+                      {platform.name}
+                    </Text>
+                    <Text style={styles.platformTier} numberOfLines={1}>
+                      {TIER_CAPTIONS[platform.id] ?? ''}
+                    </Text>
+                  </View>
 
                   {/* Checkmark on selection */}
                   {isSelected && (
@@ -219,18 +278,17 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
             disabled={!isReady}>
             {isReady ? (
               <View style={styles.confirmGradient}>
-                {/* Glassy translucent gradient — the sheet glows through */}
-                <LinearGradient
-                  colors={['rgba(160,98,255,0.55)', 'rgba(123,56,224,0.42)', 'rgba(96,40,190,0.38)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <GlossSheen radius={16} />
-                <Text style={styles.confirmText}>Let's Drive</Text>
+                {/* The app's primary button: a solid pill in the OPPOSITE of the
+                    page, so it reads as the one thing to press. On black that
+                    is white with dark type; on paper it has to invert, or a
+                    white pill on a near-white sheet disappears entirely. */}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: pal.mode === 'light' ? pal.text : '#ffffff' }]} />
+                <Text style={[styles.confirmText, { color: pal.mode === 'light' ? pal.bg : '#0a0a10' }]}>
+                  Let&apos;s Drive
+                </Text>
               </View>
             ) : (
-              <Text style={[styles.confirmText, { color: 'rgba(255,255,255,0.3)' }]}>
+              <Text style={[styles.confirmText, { color: pal.ink(0.32) }]}>
                 Select a platform
               </Text>
             )}
@@ -253,24 +311,53 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
 // ── Hook — show on first launch, re-show when triggered ──────────────────────
 export function usePlatformSelector() {
   const [visible, setVisible] = useState(false);
+  /**
+   * Whether the saved-platform lookup has come back yet.
+   *
+   * `visible` alone cannot answer "is the platform question settled?" — it is
+   * false both BEFORE the async read finishes and AFTER the sheet is
+   * dismissed, and those are opposite situations. Anything that must wait its
+   * turn behind this sheet (the WhatIsThis explainer does) needs to tell them
+   * apart, or it appears for a frame underneath the sheet that is about to
+   * cover it.
+   */
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    getSavedPlatform().then((saved) => {
-      if (!saved) setVisible(true);
-    });
+    getSavedPlatform()
+      .then((saved) => {
+        if (!saved) setVisible(true);
+      })
+      .catch(() => {})
+      .finally(() => setChecked(true));
   }, []);
 
   return {
     visible,
+    checked,
     show:    () => setVisible(true),
     dismiss: () => setVisible(false),
   };
 }
 
-const styles = StyleSheet.create({
+/**
+ * THEMED (owner, 14.08: "the connect your music is still black in the daytime
+ * mode"). This is the first screen a new listener ever sees, so it sets the
+ * expectation for everything behind it — and on paper it was still a slab of
+ * black, which is exactly the mistake it was restyled away from on 03.08, only
+ * in the other direction.
+ *
+ * The BRAND COLOURS are untouched. Spotify's green and Apple's red are the
+ * whole point of these cards, they read on either ground, and they are the one
+ * thing on the sheet that must not follow the theme.
+ */
+const makeStyles = (p: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(6,6,18,0.94)',
+    // The ground the sheet is lifted off. On paper it must still be a dimming
+    // layer rather than a lighter one, or the sheet has nothing to sit against
+    // — but far softer than the near-opaque black used on dark.
+    backgroundColor: p.mode === 'light' ? 'rgba(28,26,22,0.34)' : 'rgba(4,4,10,0.92)',
     justifyContent: 'flex-end',
   },
   glowOrb: {
@@ -280,10 +367,12 @@ const styles = StyleSheet.create({
     width: 380,
     height: 380,
     borderRadius: 190,
-    backgroundColor: 'rgba(123,56,224,0.22)',
+    // A soft light behind the sheet. Light ON light is invisible, so on paper
+    // it goes the other way and reads as a shadow pooling under the sheet.
+    backgroundColor: p.mode === 'light' ? 'rgba(58,52,42,0.07)' : 'rgba(255,255,255,0.05)',
   },
   sheet: {
-    backgroundColor: '#0F0F22',
+    backgroundColor: p.mode === 'light' ? p.panel : '#0a0a10',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingHorizontal: 22,
@@ -291,7 +380,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: 'rgba(123,56,224,0.35)',
+    borderColor: p.ink(0.12),
     overflow: 'hidden',
   },
 
@@ -305,19 +394,19 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: p.ink(0.08),
+    borderWidth: 1, borderColor: p.ink(0.12),
     alignItems: 'center', justifyContent: 'center',
   },
-  closeBtnText: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '600' },
+  closeBtnText: { color: p.ink(0.6), fontSize: 14, fontWeight: '600' },
   logoText: {
-    color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 3.5,
+    color: p.text, fontSize: 12, fontWeight: '800', letterSpacing: 3.5,
   },
   title: {
-    color: '#fff', fontSize: 26, fontWeight: '700', marginBottom: 6, letterSpacing: -0.3,
+    color: p.text, fontSize: 26, fontWeight: '700', marginBottom: 6, letterSpacing: 0,
   },
   subtitle: {
-    color: Cruise.textSecondary, fontSize: 13.5, lineHeight: 20, marginBottom: 24,
+    color: p.ink(0.68), fontSize: 13.5, lineHeight: 20, marginBottom: 24,
   },
 
   // ── Grid ─────────────────────────────────────────────────────────────────────
@@ -335,10 +424,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    borderWidth: 1.5,
+    borderWidth: 1,
     overflow: 'hidden',
-    // base background (gradient overlays this)
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: p.ink(0.05),
   },
   emojiWrap: {
     width: 32, height: 32, borderRadius: 9,
@@ -347,7 +435,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   platformName: {
-    flex: 1, fontSize: 13, fontWeight: '600',
+    fontSize: 13, fontWeight: '600',
+  },
+  platformTier: {
+    fontSize: 9.5, fontWeight: '600', color: p.ink(0.52), marginTop: 1,
   },
   checkCircle: {
     width: 19, height: 19, borderRadius: 10,
@@ -366,17 +457,17 @@ const styles = StyleSheet.create({
   },
   confirmBtnActive: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    shadowColor: Cruise.violet,
+    borderColor: p.ink(0.28),
+    shadowColor: p.shadow,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
+    shadowOpacity: p.mode === 'light' ? 0.28 : 0.5,
     shadowRadius: 18,
     elevation: 12,
   },
   confirmBtnDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: p.ink(0.06),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: p.ink(0.1),
   },
   confirmGradient: {
     width: '100%',
@@ -386,7 +477,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
-  confirmText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
+  confirmText: { color: p.text, fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
   skipRow: { alignItems: 'center', paddingTop: 16 },
-  skipText: { color: 'rgba(255,255,255,0.28)', fontSize: 13, fontWeight: '500' },
+  // Deliberately quiet — but 0.28 of the ink is genuinely hard to read on
+  // paper, where there is no glow to carry a faint colour. 0.4 is still
+  // plainly the secondary option and is still legible outdoors.
+  skipText: { color: p.ink(p.mode === 'light' ? 0.4 : 0.28), fontSize: 13, fontWeight: '500' },
 });

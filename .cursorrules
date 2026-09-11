@@ -1,0 +1,13 @@
+This file exists only as a fallback for older Cursor versions.
+
+THE REAL RULES ARE IN `.cursor/rules/cruise-fm.mdc` — read that file now,
+in full, before changing anything.
+
+Then read `docs/CLAUDE_HANDOVER.md`, which is the project handover and points
+at four further documents: PROJECT_ARCHITECTURE.md, CURRENT_STATE.md,
+KNOWN_ISSUES.md and TODO.md.
+
+Deliberately a pointer and not a copy: two files carrying the same rules drift
+apart, and this project has been bitten by duplicated sources of truth more
+than once (four copies of the mode scrim, eleven copies of the clock, two
+copies of the shuffle state). One place to change, one place to read.

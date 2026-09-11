@@ -1,27 +1,49 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import Svg, { Circle as SvgCircle, Path } from 'react-native-svg';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import Svg, { Circle as SvgCircle, Defs, Ellipse as SvgEllipse, G, LinearGradient as SvgLinearGradient, Path, RadialGradient, Rect as SvgRect, Stop } from 'react-native-svg';
 import {
-  Animated, Dimensions, Easing, Modal, PanResponder, ScrollView, StyleSheet,
+  Animated, Dimensions, Easing, Image, Modal, PanResponder, ScrollView, StyleSheet,
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OWNER_MODE } from '@/constants/config';
 import { Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
+import { mmss } from '@/utils/formatTime';
+import { createScrubHaptics } from '@/utils/scrubHaptics';
+import { useScrubFocus } from '@/utils/useScrubFocus';
+import { confirmedPlaying } from '@/utils/confirmedPlaying';
+import { useMotion } from '@/context/MotionContext';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
+import { ModeScrim } from '@/components/ModeScrim';
+import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
+import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
 import { PlatformIcon } from '@/components/icons/PlatformIcon';
-import { seekTo } from '@/utils/spotify';
-import { useSpotifyPlayback } from '@/utils/useSpotifyPlayback';
+// NOT spotify's seekTo. Vinyl predates the shared clock and kept its own
+// scrub plumbing, so it went on seeking Spotify while Apple Music played —
+// the record turned, the bar moved, and the song snapped back (owner, 04.08).
+// CD works because it goes through useTrackClock. Same router for both now.
+import { seekActive, shouldKeepCoasting } from '@/utils/useTrackClock';
+import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useNowPlaying } from '@/context/NowPlayingContext';
+import { HandoffOverlay } from '@/components/HandoffOverlay';
+import { PreviewGate } from '@/components/PreviewGate';
+import { WakeSpotifyHint } from '@/components/WakeSpotifyHint';
+import { AmbientGlow } from '@/components/AmbientGlow';
+import { CastShadow } from '@/components/CastShadow';
+import { ModeActionRow } from '@/components/ModeActionRow';
+import { RepeatButton, ShuffleButton } from '@/components/TransportToggle';
+import { SeekCar } from '@/components/SeekBar';
+import { ModeCloseButton } from '@/components/ModeCloseButton';
+import { MarqueeText } from '@/components/MarqueeText';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { MoodSheet } from '@/components/MoodSheet';
+import { ModeSheet } from '@/components/ModeSheet';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
+import { useAppActive } from '@/utils/useAppActive';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -30,6 +52,11 @@ const V = {
   bg:            '#0d0d0d',
   record:        '#0a0a0a',
   platter:       '#181818',
+  /** Classic Vinyl's material: an opaque black pressing with grey grooves,
+   *  rather than the clear accent-tinted disc the glow look uses. */
+  pressing:      '#0a0a0c',
+  groove:        '#6e6e78',
+  grooveBand:    '#3a3a40',
   platBorder:    '#2e2e2e',
   label:         '#8B0000',
   labelBorder:   '#6B0000',
@@ -59,14 +86,34 @@ const VINYL_TRACKS = [
 // Explicit vinyl accent per station — the disc rim, grooves and tonearm take
 // this colour. Stations not listed fall back to their mid eq stop.
 const VINYL_ACCENTS: Record<string, string> = {
-  'sunset':         '#D84C8A', // dusk pink
+  // NO sunset entry (owner, 04.08): the amber override read as mustard on
+  // device — the ring now falls through to eqColors[1], the same peachy
+  // accent slot every other mode wears for Sunset.
+  // NO night-run entry either (owner, 19.08): the station went teal, and a
+  // hardcoded deep blue here is the same mistake Sunset's amber was — the
+  // accent slot already holds the colour every other mode wears.
   'mountain-pass':  '#FFFFFF', // crisp white
   'cars-coffee':    '#8B5A2B', // coffee brown
-  'night-run':      '#2B4CFF', // deep blue
-  'coastal':        '#7CD4FF', // light sky blue
+  'coastal':        '#FF7A3C', // golden-hour orange (matches the warm moods)
 };
 
+/**
+ * Where Classic's grooves sit, from just outside the label to just inside the
+ * rim. 26 of them at ~2.6px apart on a phone-sized disc: dense enough to read
+ * as a cut surface, and deliberately NOT denser — below about 2px apart
+ * neighbouring rings start to moiré against the pixel grid, which is its own
+ * kind of drawn-looking artefact.
+ */
+const CLASSIC_GROOVES = Array.from({ length: 26 }, (_, i) => 0.505 + (i / 25) * 0.44);
+
 /** '#RRGGBB' → 'rgba(r,g,b,a)' — for animated colour interpolation. */
+/** See MAX_COAST_MS in useTrackClock — the deck keeps its own clock, and
+ *  needs the same bound on how far one reading may be extrapolated. It also
+ *  needs the same correction: a coast that STOPS at the cap froze the deck's
+ *  readout for the rest of the drive the moment the signal dipped, so it
+ *  re-arms instead and only holds after a long silence (shouldKeepCoasting). */
+const VINYL_MAX_COAST_MS = 30000;
+
 function withAlpha(hex: string, a: number): string {
   const h = hex.replace('#', '');
   return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`;
@@ -76,12 +123,9 @@ function parseTrackMs(d: string): number {
   const [m, s] = d.split(':').map(Number);
   return (m * 60 + s) * 1000;
 }
-function formatMs(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-}
+/** Padded: this deck's readout is hardware, and a real one shows leading zeros. */
+const formatMs = (ms: number) => mmss(ms, { pad: true });
 
-// Preview geometry — computed dynamically from container width inside VinylModePreview
 
 // ── Disco sparkle field ───────────────────────────────────────────────────────
 function SparkleField({ size }: { size: number }) {
@@ -108,8 +152,13 @@ function SparkleField({ size }: { size: number }) {
 }
 
 // ── Vinyl disc — clean bold design ───────────────────────────────────────────
-function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: number; spin: Animated.AnimatedInterpolation<string>; accent?: string; showLabel?: boolean }) {
-  const cSize = Math.min(80, size * 0.30);
+function VinylDisc({ size, spin, accent = V.gold, showLabel = false, classic = false }: { size: number; spin: Animated.AnimatedInterpolation<string>; accent?: string; showLabel?: boolean; classic?: boolean }) {
+  // Gradient ids must be unique per instance: duplicate ids across separate
+  // <Svg> roots make one of them render blank, which this repo has been bitten
+  // by three times (the share card, the mirror ball's glints, GlassPane).
+  const uid = useId().replace(/:/g, '');
+  // A touch over true-to-life (real label ≈ 33%) — matches the fullscreen deck.
+  const cSize = Math.min(135, size * 0.40);
   const cR    = cSize / 2;
 
   const cx = size / 2;
@@ -138,22 +187,58 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
         {/* Clear pressing — glassy tint, sunlit accent rim, pressed grooves */}
         <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
           {/* Glass body — barely-there so the scene glows through */}
-          <SvgCircle cx={cx} cy={cx} r={r - 1} fill="rgba(255,255,255,0.08)" />
+          <SvgCircle cx={cx} cy={cx} r={r - 1} fill={classic ? V.pressing : 'rgba(255,255,255,0.08)'} />
           {/* Sunlit rim — bright accent edge with a soft inner falloff */}
           <SvgCircle cx={cx} cy={cx} r={r - 2} fill="none" stroke={accent} strokeWidth={2.6} />
           <SvgCircle cx={cx} cy={cx} r={r - 5.5} fill="none" stroke={accent} strokeOpacity={0.35} strokeWidth={5} />
           {/* Outer groove band catching the light */}
-          <SvgCircle cx={cx} cy={cx} r={r * 0.82} fill="none" stroke={accent} strokeOpacity={0.10} strokeWidth={r * 0.22} />
-          {/* Fine pressed grooves */}
-          {[0.56, 0.62, 0.68, 0.73, 0.78, 0.86, 0.90].map((f, i) => (
-            <SvgCircle key={i} cx={cx} cy={cx} r={r * f} fill="none" stroke={accent} strokeOpacity={i % 2 ? 0.24 : 0.14} strokeWidth={0.8} />
-          ))}
-          {/* Faint pressing marks — the surface itself, so the spin still
-              reads as the disc turns beneath the stationary light */}
-          <Path d={`M ${pt(37, r * 0.55)} L ${pt(37, r * 0.94)}`} stroke="rgba(255,255,255,0.10)" strokeWidth={1} strokeLinecap="round" />
-          <Path d={`M ${pt(203, r * 0.60)} L ${pt(203, r * 0.88)}`} stroke="rgba(255,255,255,0.07)" strokeWidth={0.8} strokeLinecap="round" />
-          <SvgCircle cx={cx + r * 0.42} cy={cx - r * 0.31} r={1.4} fill="rgba(255,255,255,0.22)" />
-          <SvgCircle cx={cx - r * 0.58} cy={cx + r * 0.22} r={1.1} fill="rgba(255,255,255,0.16)" />
+          <SvgCircle cx={cx} cy={cx} r={r * 0.82} fill="none" stroke={classic ? V.grooveBand : accent} strokeOpacity={0.10} strokeWidth={r * 0.22} />
+          {/* Fine pressed grooves.
+              CLASSIC CUTS THEM, IT DOES NOT DRAW THEM (owner, 25.08: "smooth
+              out the circle white lines, it makes it look 2D — either remove
+              it or change it to black, like as if there were real vinyl
+              indents not just white lines"). Seven bright rings read as seven
+              rings; a record has hundreds, and at this size they are a
+              TEXTURE rather than lines you can count. So: many more, much
+              fainter, and DARK — each groove is a recess, so it is a dark cut
+              with a hairline of light on the wall just outside it, which is
+              what makes it read as pressed into the surface rather than
+              painted onto it. The glow look keeps its seven accent rings —
+              that disc is glass, and they belong to it. */}
+          {classic
+            ? CLASSIC_GROOVES.map((f, i) => (
+                <G key={i}>
+                  <SvgCircle cx={cx} cy={cx} r={r * f} fill="none" stroke="#000"
+                    strokeOpacity={i % 3 === 0 ? 0.40 : 0.30} strokeWidth={0.75} />
+                  <SvgCircle cx={cx} cy={cx} r={r * f + 0.8} fill="none" stroke="#fff"
+                    strokeOpacity={i % 3 === 0 ? 0.055 : 0.038} strokeWidth={0.5} />
+                </G>
+              ))
+            : [0.56, 0.62, 0.68, 0.73, 0.78, 0.86, 0.90].map((f, i) => (
+                <SvgCircle key={i} cx={cx} cy={cx} r={r * f} fill="none" stroke={accent} strokeOpacity={i % 2 ? 0.24 : 0.14} strokeWidth={0.8} />
+              ))}
+          {/* Pressing marks — asymmetric surface texture, brighter than the
+              grooves, so the spin reads at a glance instead of only the
+              label appearing to turn.
+              NOT IN CLASSIC (owner, 25.08: "remove the white lines that run
+              from the centre to the outside"). They were drawn for the CLEAR
+              pressing on 24.07, where the surface was otherwise pure
+              concentric circles and the label looked like it was turning
+              alone. A real record has no such spokes. The scattered flecks
+              below stay and are what carries the spin now — they are dust and
+              wear, which a record genuinely has. */}
+          {!classic && (<>
+          <Path d={`M ${pt(37, r * 0.50)} L ${pt(37, r * 0.95)}`} stroke="rgba(255,255,255,0.20)" strokeWidth={1.3} strokeLinecap="round" />
+          <Path d={`M ${pt(203, r * 0.58)} L ${pt(203, r * 0.90)}`} stroke="rgba(255,255,255,0.14)" strokeWidth={1} strokeLinecap="round" />
+          <Path d={`M ${pt(130, r * 0.44)} L ${pt(130, r * 0.70)}`} stroke="rgba(255,255,255,0.12)" strokeWidth={0.8} strokeLinecap="round" />
+          <Path d={`M ${pt(305, r * 0.62)} L ${pt(305, r * 0.85)}`} stroke="rgba(255,255,255,0.10)" strokeWidth={0.8} strokeLinecap="round" />
+          </>)}
+          <SvgCircle cx={cx + r * 0.42} cy={cx - r * 0.31} r={1.6} fill="rgba(255,255,255,0.32)" />
+          <SvgCircle cx={cx - r * 0.58} cy={cx + r * 0.22} r={1.3} fill="rgba(255,255,255,0.24)" />
+          <SvgCircle cx={cx - r * 0.20} cy={cx - r * 0.66} r={1} fill="rgba(255,255,255,0.20)" />
+          <SvgCircle cx={cx + r * 0.66} cy={cx + r * 0.14} r={0.9} fill="rgba(255,255,255,0.18)" />
+          <SvgCircle cx={cx + r * 0.10} cy={cx + r * 0.72} r={1.1} fill="rgba(0,0,0,0.18)" />
+          <SvgCircle cx={cx - r * 0.48} cy={cx - r * 0.48} r={0.9} fill="rgba(0,0,0,0.14)" />
         </Svg>
         {/* Center label — rendered inside disc when showLabel=true (preview card) */}
         {showLabel && (
@@ -164,7 +249,7 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
           top: size / 2 - cR, left: size / 2 - cR,
           overflow: 'hidden',
         }}>
-          <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 0.8 }}>COLUMBIA</Text>
+          <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 0.8 }}>STROFI</Text>
           <Text style={{ position: 'absolute', top: cR * 0.50, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: Math.max(7, cSize * 0.145), fontWeight: '800', letterSpacing: 0.4 }}>CRUISE FM</Text>
           <Text style={{ position: 'absolute', top: cR * 1.22, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: Math.max(4, cSize * 0.065), letterSpacing: 0.3 }}>NIGHT RUN FM</Text>
           <View style={{ position: 'absolute', width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff', top: cR - 2.5, left: cR - 2.5 }} />
@@ -175,53 +260,205 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false }: { size: n
       {/* ── Fixed lighting — reflections belong to the light source, not the
           disc, so they hold their position while the record turns ── */}
       <Svg width={size} height={size} style={StyleSheet.absoluteFill} pointerEvents="none">
-        {/* Broad sheen — top-right, with a hot streak inside it */}
-        <Path d={wedge(-85, -20, r)} fill="rgba(255,255,255,0.12)" />
-        <Path d={wedge(-68, -52, r)} fill="rgba(255,255,255,0.16)" />
-        {/* Opposite sheen — dimmer, with its own faint streak */}
-        <Path d={wedge(95, 160, r)} fill="rgba(255,255,255,0.07)" />
-        <Path d={wedge(112, 126, r)} fill="rgba(255,255,255,0.10)" />
-        {/* Specular rim glints — bright glass edge catching the light */}
-        <Path d={rimArc(-150, -95, r - 3)} stroke="rgba(255,255,255,0.65)" strokeWidth={2} strokeLinecap="round" fill="none" />
-        <Path d={rimArc(25, 60, r - 3)} stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} strokeLinecap="round" fill="none" />
-        {/* Inner glass ring highlight */}
-        <SvgCircle cx={cx} cy={cx} r={r * 0.50} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth={1} />
+        {/*
+          LIGHT IS DISPERSED, NEVER CUT (owner, 25.08: "make it smooth out as if
+          light is dispersed rather than, like, a cut line distinguishing
+          between what's not reflected and what is reflected").
+
+          This used to be four PIE WEDGES — literal triangles from the centre —
+          so every sheen had two straight radial edges running out to the rim,
+          and on a black pressing those edges are the first thing you see. It is
+          the rule this app keeps relearning on the mirror ball: any light drawn
+          as a hard-edged or stroked shape eventually gets reported as an
+          artefact, so light layers must be pure gradient falloff.
+
+          Two off-centre blooms instead — a key light from the upper right and a
+          weaker fill opposite. They are drawn BIGGER THAN THE DISC on purpose:
+          the wrapping View already has overflow:'hidden' and a full
+          borderRadius, so the bloom is cut cleanly at the rim and has no
+          boundary of its own anywhere inside the record. Do not clip them by
+          hand, and do not shrink them to fit — a bloom that ends before the rim
+          puts the cut line straight back.
+        */}
+        <Defs>
+          <RadialGradient id={`vdKey${uid}`} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#fff" stopOpacity={classic ? 0.115 : 0.20} />
+            <Stop offset="0.42" stopColor="#fff" stopOpacity={classic ? 0.055 : 0.10} />
+            <Stop offset="0.78" stopColor="#fff" stopOpacity={classic ? 0.016 : 0.030} />
+            <Stop offset="1" stopColor="#fff" stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id={`vdFill${uid}`} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#fff" stopOpacity={classic ? 0.055 : 0.10} />
+            <Stop offset="0.5" stopColor="#fff" stopOpacity={classic ? 0.022 : 0.042} />
+            <Stop offset="1" stopColor="#fff" stopOpacity={0} />
+          </RadialGradient>
+          {/* Rim glints fade in and out ALONG the rim rather than starting and
+              stopping — a specular highlight has no ends. userSpaceOnUse so the
+              ramp runs across the disc rather than each stroke's own box. */}
+          <SvgLinearGradient id={`vdGlintA${uid}`} gradientUnits="userSpaceOnUse" x1={cx - r} y1={cx - r * 0.5} x2={cx + r * 0.1} y2={cx - r}>
+            <Stop offset="0" stopColor="#fff" stopOpacity={0} />
+            <Stop offset="0.5" stopColor="#fff" stopOpacity={classic ? 0.55 : 0.65} />
+            <Stop offset="1" stopColor="#fff" stopOpacity={0} />
+          </SvgLinearGradient>
+          <SvgLinearGradient id={`vdGlintB${uid}`} gradientUnits="userSpaceOnUse" x1={cx + r * 0.9} y1={cx + r * 0.35} x2={cx + r * 0.3} y2={cx + r * 0.95}>
+            <Stop offset="0" stopColor="#fff" stopOpacity={0} />
+            <Stop offset="0.5" stopColor="#fff" stopOpacity={classic ? 0.28 : 0.35} />
+            <Stop offset="1" stopColor="#fff" stopOpacity={0} />
+          </SvgLinearGradient>
+        </Defs>
+        {/* Key light, upper right — centred off the disc so the brightest part
+            sits near the rim and falls away across the face. */}
+        <SvgEllipse cx={cx + r * 0.46} cy={cx - r * 0.52} rx={r * 1.16} ry={r * 0.98} fill={`url(#vdKey${uid})`} />
+        {/* Weaker fill from the opposite side, so the disc is never flat. */}
+        <SvgEllipse cx={cx - r * 0.52} cy={cx + r * 0.44} rx={r * 0.96} ry={r * 0.82} fill={`url(#vdFill${uid})`} />
+        {/* Specular rim glints — the bright edge catching the light */}
+        <Path d={rimArc(-150, -95, r - 3)} stroke={`url(#vdGlintA${uid})`} strokeWidth={2} strokeLinecap="round" fill="none" />
+        <Path d={rimArc(25, 60, r - 3)} stroke={`url(#vdGlintB${uid})`} strokeWidth={1.5} strokeLinecap="round" fill="none" />
+        {/* Inner ring highlight */}
+        {/* Inner ring highlight — a GLASS cue, so Classic does without it:
+            it is one more drawn circle on a surface that should read as cut. */}
+        {!classic && <SvgCircle cx={cx} cy={cx} r={r * 0.50} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth={1} />}
       </Svg>
     </View>
   );
 }
 
 // ── Tonearm (shared between preview and fullscreen) ───────────────────────────
+//
+// THE SPINE, in fractions of armLen measured from the pivot. `a` is the tube's
+// lean off the arm's own axis in degrees, POSITIVE = away from the spindle.
+//
+// A real S-arm leaves the bearing leaning slightly OUTWARD, bows back across
+// the middle and straightens into the headshell. Two cubics joined with
+// MATCHING tangents put that inflection exactly where it belongs; a single
+// cubic bends wherever its control points happen to fall, which is how the old
+// arm ended up a straight stick with one kink at the bottom.
+// A SOLID STRAIGHT LINE, owner's final call 04.08 after two curved rounds
+// ("Just make it a solid straight line"). Every point sits on the one line
+// from the bearing to the stylus (−9.4° off vertical), every tangent IS that
+// line, and the headshell shares the same axis — so both cubics degenerate
+// to rules and the arm is a single straight rod, pivot to needle. Do not
+// reintroduce an S here without her asking. THE STYLUS DID NOT MOVE: still
+// lands at (−0.158, 1.025)·armLen exactly — change anything here and
+// re-solve (scratchpad/arm/shape.mjs prints where the needle lands).
+const ARM_A = { x:  0.000, y: 0.075, a: -9.4 };  // leaves the bearing
+const ARM_J = { x: -0.079, y: 0.550, a: -9.4 };  // on the same line
+const ARM_B = { x: -0.128, y: 0.842, a: -9.4 };  // collar, where the shell bolts on
+/** Headshell axis — the same line as the tube: a straight arm. */
+const ARM_HEAD_A = -9.4;
+/** Collar → stylus, so the needle lands at ~1.03 armLen from the pivot and
+ *  ~0.158 of it toward the spindle. Change these and it walks off the record. */
+const ARM_HEAD_L = 0.1855;
+
+/** Unit vector for a lean angle. +y runs down the arm, +x away from the spindle.
+ *  NOTE: SVG `rotate(a)` turns a downward vector toward −x, so a group that
+ *  should point along armDir(θ) is rotated by −θ. */
+function armDir(deg: number) {
+  const r = (deg * Math.PI) / 180;
+  return { x: Math.sin(r), y: Math.cos(r) };
+}
+
+/**
+ * The arm, rebuilt from a reference photograph of a real one (owner, 02.08:
+ * "it has the funky shape... let's start from scratch"). Three things carry it
+ * and all three are structural, not decoration:
+ *
+ *  1. THE SPINE IS AN S (see the constants above), sized in fractions of the
+ *     arm's own length so the same geometry serves the fullscreen deck and the
+ *     little preview card.
+ *  2. THE TUBE IS ROUND — stroked four times on the SAME path: outline, body,
+ *     inner light, hot hairline offset to the lit side. One flat stroke is the
+ *     whole difference between a tube and a drawn line.
+ *  3. THE HARDWARE IS REAL — bearing housing with vents and a centre screw, a
+ *     counterweight on a stub directly behind the pivot, a collar, an angular
+ *     headshell with slots, screws and a finger lift, and the cartridge and
+ *     stylus at the far tip.
+ *
+ * Silver and graphite whatever the station's mood: this is hi-fi kit, and the
+ * colour on this deck belongs to the record.
+ */
 function Tonearm({
-  armLen, armW, headW, headH, pivotX, pivotY, rotation, color = '#222222',
+  armLen, armW, headW, pivotX, pivotY, rotation,
 }: {
-  armLen: number; armW: number; headW: number; headH: number;
+  armLen: number; armW: number; headW: number;
   pivotX: number; pivotY: number;
   rotation: Animated.AnimatedInterpolation<string>;
-  /** Solid mood colour for the arm + headshell. */
-  color?: string;
 }) {
-  const cwW = Math.max(16, armW * 2.2);
-  const cwH = Math.max(10, armW * 1.4);
+  const L  = armLen;
+  const A  = { x: ARM_A.x * L, y: ARM_A.y * L };
+  const J  = { x: ARM_J.x * L, y: ARM_J.y * L };
+  const B  = { x: ARM_B.x * L, y: ARM_B.y * L };
+  const tA = armDir(ARM_A.a), tJ = armDir(ARM_J.a), tB = armDir(ARM_B.a);
+  const hd = armDir(ARM_HEAD_A);
+  const headLen = ARM_HEAD_L * L;
+  const S = { x: B.x + hd.x * headLen, y: B.y + hd.y * headLen };
+
+  // Counterweight — a stub straight back from the pivot with a machined
+  // cylinder on it. Sized off the tube so it stays in proportion at both
+  // scales, with a floor off armLen so it doesn't vanish on the preview card.
+  // Keep the stub SHORT: set further back the weight reads as a lollipop.
+  const stubLen = L * 0.10;
+  const cwW = Math.max(armW * 3.4, L * 0.09);
+  const cwH = Math.max(armW * 2.1, L * 0.058);
+  const cwMid = stubLen + cwH * 0.5;
+
+  // Canvas — room for the bow, the headshell and the counterweight.
+  const minX = Math.min(S.x - headW * 0.8, -cwMid * 0.25 - cwW * 0.62) - armW;
+  const maxX = Math.max(J.x + armW, cwW * 0.62) + armW;
+  const minY = -(cwMid + cwH * 0.62 + armW);
+  const maxY = S.y + armW * 1.8;
+  const PX = -minX, PY = -minY;
+  const svgW = maxX - minX, svgH = maxY - minY;
+
+  const p = (q: { x: number; y: number }) => `${(PX + q.x).toFixed(2)} ${(PY + q.y).toFixed(2)}`;
+  const d1 = 0.40 * Math.hypot(J.x - A.x, J.y - A.y);
+  const d2 = 0.40 * Math.hypot(B.x - J.x, B.y - J.y);
+  const tube =
+    `M ${p(A)} ` +
+    `C ${p({ x: A.x + tA.x * d1, y: A.y + tA.y * d1 })} ${p({ x: J.x - tJ.x * d1, y: J.y - tJ.y * d1 })} ${p(J)} ` +
+    `C ${p({ x: J.x + tJ.x * d2, y: J.y + tJ.y * d2 })} ${p({ x: B.x - tB.x * d2, y: B.y - tB.y * d2 })} ${p(B)}`;
+
+  // Headshell — drawn straight down from the collar, then swung onto its axis.
+  // It is a WEDGE: narrow where it bolts to the tube, widening to the
+  // cartridge face. A shell barely wider than the tube reads as a blob.
+  const bx = PX + B.x, by = PY + B.y;
+  const headRot = `rotate(${-ARM_HEAD_A} ${bx.toFixed(2)} ${by.toFixed(2)})`;
+  const shellTop = by + armW * 0.50;
+  const shellBot = by + headLen * 0.71;
+  const wTop = armW * 1.15, wBot = headW;
+  /** Half-width of the shell a fraction f down its length. */
+  const edge = (f: number) => (wTop + (wBot - wTop) * f) / 2;
+  const yAt  = (f: number) => shellTop + (shellBot - shellTop) * f;
+  const shellPath =
+    `M ${bx - wTop / 2} ${shellTop} L ${bx + wTop / 2} ${shellTop} ` +
+    `L ${bx + wBot / 2} ${shellBot} L ${bx - wBot / 2} ${shellBot} Z`;
+  const cartTop = shellBot;
+  const cartBot = by + headLen * 0.90;
+  const cartW   = wBot * 0.52;
+  // The cartridge tapers to a nose with the stylus at its point. A separate
+  // cantilever line plus a dot just reads as a little "T" hung off the end.
+  const cartPath =
+    `M ${bx - cartW / 2} ${cartTop} L ${bx + cartW / 2} ${cartTop} ` +
+    `L ${bx + cartW * 0.32} ${cartBot} L ${bx - cartW * 0.32} ${cartBot} Z`;
+  const styPath =
+    `M ${bx - cartW * 0.13} ${cartBot} L ${bx + cartW * 0.13} ${cartBot} ` +
+    `L ${bx} ${by + headLen} Z`;
+  // Finger lift — anchored ALONG the shell's real edge, not floating beside it,
+  // and TAPERED (the outer edge spans less than the attachment) so it reads as
+  // a lift rather than a grey rectangle stuck on the side.
+  const lfDX = wBot * 0.36, lfDY = armW * 0.34;
+  const liftPath =
+    `M ${bx + edge(0.54)} ${yAt(0.54)} L ${bx + edge(0.62) + lfDX} ${yAt(0.62) - lfDY} ` +
+    `L ${bx + edge(0.80) + lfDX} ${yAt(0.80) - lfDY} L ${bx + edge(0.88)} ${yAt(0.88)} Z`;
+  const screwR  = Math.max(1, headW * 0.075);
+  const slotH   = Math.max(1, armW * 0.20);
+
+  // Counterweight swings with the arm, so it lives in the same rotating Svg.
+  const cwRot = `rotate(${-ARM_A.a} ${PX.toFixed(2)} ${PY.toFixed(2)})`;
+
   return (
     <View pointerEvents="none" style={{ position: 'absolute', top: pivotY, left: pivotX - armW / 2 }}>
-      {/* Drop shadow — slightly offset clone of arm behind the real arm */}
-      <Animated.View style={{
-        position: 'absolute',
-        width: armW, height: armLen,
-        top: 5, left: 3,
-        opacity: 0.45,
-        transform: [
-          { translateY: -(armLen / 2) },
-          { rotate: rotation },
-          { translateY: armLen / 2 },
-        ],
-      }}>
-        <View style={{ position: 'absolute', top: 0, left: 0, width: armW, height: armLen - headH + 4, backgroundColor: '#000', borderRadius: 3 }} />
-        <View style={{ position: 'absolute', bottom: -4, left: -(headW / 2 - armW / 2), width: headW + 2, height: headH + 2, backgroundColor: '#000', borderRadius: 3 }} />
-      </Animated.View>
-
-      {/* Main arm */}
+      {/* Whole arm (shadow + tube + headshell + counterweight) rotates about the pivot */}
       <Animated.View style={{
         width: armW, height: armLen,
         transform: [
@@ -230,50 +467,122 @@ function Tonearm({
           { translateY: armLen / 2 },
         ],
       }}>
-        {/* Counterweight — at back end of arm */}
-        <View style={{
-          position: 'absolute',
-          top: -cwH / 2 - 2,
-          left: -(cwW / 2 - armW / 2),
-          width: cwW, height: cwH,
-          backgroundColor: '#1e1e1e',
-          borderRadius: 4,
-          borderWidth: 1, borderColor: '#3a3a3a',
-        }} />
-        {/* Arm body — solid mood colour */}
-        <View style={{ position: 'absolute', top: 0, left: 0, width: armW, height: armLen - headH, backgroundColor: color, borderRadius: 3 }} />
-        {/* Highlight stripe */}
-        <View style={{ position: 'absolute', top: 8, left: 1.5, width: 1.5, height: armLen - headH - 16, backgroundColor: 'rgba(255,255,255,0.28)', borderRadius: 1 }} />
-        {/* Headshell — wide flat block, mood colour */}
-        <View style={{
-          position: 'absolute', bottom: 0,
-          left: -(headW / 2 - armW / 2),
-          width: headW, height: headH,
-          backgroundColor: color,
-          borderRadius: 3,
-          borderWidth: 1, borderColor: 'rgba(0,0,0,0.35)',
-        }}>
-          <View style={{ position: 'absolute', top: 3, left: 3, right: 3, height: headH - 10, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 2 }} />
-          {/* Stylus shank */}
-          <View style={{ position: 'absolute', bottom: -6, left: headW / 2 - 1.5, width: 3, height: 7, backgroundColor: '#CCC', borderRadius: 1 }} />
-          {/* Needle bright tip */}
-          <View style={{ position: 'absolute', bottom: -11, left: headW / 2 - 1, width: 2, height: 5, backgroundColor: '#FFF', borderRadius: 1 }} />
-        </View>
+        <Svg
+          width={svgW} height={svgH}
+          style={{ position: 'absolute', top: -PY, left: armW / 2 - PX }}
+        >
+          {/* Drop shadow — the tube and the shell, offset and darkened */}
+          <G transform={`translate(${(armW * 0.34).toFixed(2)},${(armW * 0.56).toFixed(2)})`} opacity={0.42}>
+            <Path d={tube} stroke="#000" strokeWidth={armW * 1.05} fill="none" strokeLinecap="round" />
+            <G transform={headRot}>
+              <Path d={shellPath} fill="#000" />
+              <Path d={cartPath} fill="#000" />
+            </G>
+          </G>
+
+          {/* Counterweight — stub, adjustment collar, machined cylinder */}
+          <G transform={cwRot}>
+            <SvgRect x={PX - armW * 0.33} y={PY - stubLen} width={armW * 0.66} height={stubLen + armW * 0.4} rx={armW * 0.3} fill="#5b5e69" />
+            <SvgRect x={PX - armW * 0.24} y={PY - stubLen + armW * 0.1} width={armW * 0.17} height={stubLen - armW * 0.2} rx={armW * 0.08} fill="rgba(255,255,255,0.5)" />
+            <SvgRect x={PX - armW * 0.66} y={PY - stubLen * 0.46} width={armW * 1.32} height={armW * 0.46} rx={armW * 0.16} fill="#3a3c45" />
+            {/* Cylinder */}
+            <SvgRect x={PX - cwW / 2} y={PY - cwMid - cwH / 2} width={cwW} height={cwH} rx={cwH * 0.34} fill="#25262d" stroke="#4a4d58" strokeWidth={1} />
+            <SvgRect x={PX - cwW / 2} y={PY - cwMid - cwH / 2} width={cwW} height={cwH * 0.19} rx={cwH * 0.16} fill="#34363f" />
+            <SvgRect x={PX - cwW / 2} y={PY - cwMid - cwH * 0.07} width={cwW} height={cwH * 0.13} fill="#7d818d" />
+            {[-0.30, -0.20, 0.22, 0.32].map((f, i) => (
+              <SvgRect key={i} x={PX - cwW / 2} y={PY - cwMid + cwH * f} width={cwW} height={Math.max(0.7, cwH * 0.045)} fill="rgba(0,0,0,0.42)" />
+            ))}
+            <SvgRect x={PX - cwW * 0.37} y={PY - cwMid - cwH * 0.34} width={cwW * 0.12} height={cwH * 0.68} rx={cwW * 0.06} fill="rgba(255,255,255,0.16)" />
+          </G>
+
+          {/* Tube — a round chrome pipe: outline, body, inner light, hot hairline */}
+          <Path d={tube} stroke="#3c3e47" strokeWidth={armW + Math.max(1.2, armW * 0.18)} fill="none" strokeLinecap="round" />
+          <Path d={tube} stroke="#8a8d99" strokeWidth={armW} fill="none" strokeLinecap="round" />
+          <Path d={tube} stroke="#c9ccd6" strokeWidth={armW * 0.5} fill="none" strokeLinecap="round" transform={`translate(${(-armW * 0.13).toFixed(2)},0)`} />
+          <Path d={tube} stroke="rgba(255,255,255,0.9)" strokeWidth={Math.max(0.9, armW * 0.15)} fill="none" strokeLinecap="round" transform={`translate(${(-armW * 0.27).toFixed(2)},0)`} />
+
+          {/* Headshell — collar, graphite shell, slots, screws, finger lift, cartridge */}
+          <G transform={headRot}>
+            {/* Collar / bayonet coupling */}
+            <SvgRect x={bx - armW * 0.86} y={by - armW * 0.6} width={armW * 1.72} height={armW * 1.2} rx={armW * 0.34} fill="#9aa0ad" stroke="#4a4d57" strokeWidth={0.8} />
+            <SvgRect x={bx - armW * 0.86} y={by - armW * 0.06} width={armW * 1.72} height={armW * 0.22} fill="rgba(0,0,0,0.38)" />
+            {/* Finger lift — under the shell so it reads as bolted on */}
+            <Path d={liftPath} fill="#7f8592" stroke="#3d404a" strokeWidth={0.7} />
+            {/* Shell body */}
+            <Path d={shellPath} fill="#23252c" stroke="#0c0d11" strokeWidth={1} />
+            <Path
+              d={`M ${bx - wTop / 2} ${shellTop} L ${bx - wTop * 0.10} ${shellTop} L ${bx - wBot * 0.12} ${shellBot} L ${bx - wBot / 2} ${shellBot} Z`}
+              fill="rgba(255,255,255,0.10)"
+            />
+            {/* Mount band under the collar */}
+            <SvgRect x={bx - wTop * 0.72} y={shellTop - armW * 0.06} width={wTop * 1.44} height={armW * 0.42} rx={armW * 0.14} fill="#a7adba" />
+            {/* Vent slots */}
+            {[0.38, 0.58].map((f, i) => {
+              const w = wBot * 0.40;
+              return <SvgRect key={i} x={bx - w / 2} y={yAt(f)} width={w} height={slotH} rx={slotH / 2} fill="#0d0e12" />;
+            })}
+            {/* Cartridge mounting screws */}
+            <SvgCircle cx={bx - wBot * 0.30} cy={shellBot - armW * 0.5} r={screwR} fill="#8d93a0" />
+            <SvgCircle cx={bx + wBot * 0.30} cy={shellBot - armW * 0.5} r={screwR} fill="#8d93a0" />
+            {/* The shell's front FACE, then the cartridge nose below it. Without
+                the bright face the shell and the cartridge merge into one long
+                dark wedge and only the needle reads. */}
+            <Path d={cartPath} fill="#191b21" stroke="#0a0b0e" strokeWidth={0.8} />
+            <SvgRect x={bx - wBot * 0.5} y={shellBot - Math.max(1, armW * 0.3)} width={wBot} height={Math.max(1, armW * 0.3)} fill="#aeb4c1" />
+            <SvgRect x={bx - cartW * 0.34} y={cartTop + armW * 0.26} width={cartW * 0.2} height={(cartBot - cartTop) * 0.46} rx={armW * 0.07} fill="rgba(255,255,255,0.18)" />
+            <Path d={styPath} fill="#e9edf5" />
+          </G>
+        </Svg>
       </Animated.View>
 
-      {/* Pivot base — flat illustration style: grey circle with lighter center */}
-      <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: '#2a2a2a', borderWidth: 1, borderColor: '#444', top: -11, left: armW / 2 - 11, zIndex: 10,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.8, shadowRadius: 4, elevation: 6,
-      }} />
-      <View style={{ position: 'absolute', width: 12, height: 12, borderRadius: 6, backgroundColor: '#3e3e3e', top: -6, left: armW / 2 - 6, zIndex: 11 }} />
-      <View style={{ position: 'absolute', width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#585858', top: -2.5, left: armW / 2 - 2.5, zIndex: 12 }} />
+      {/* Pivot base — fixed round plate with vents, screws, bearing and
+          anti-skate dial (does not swing with the arm) */}
+      {(() => {
+        const R = Math.max(11, armW * 1.7);
+        const dialR = Math.max(3.5, R * 0.32);
+        const bw = R * 2 + dialR * 2 + 8;
+        const bcx = R;
+        return (
+          <Svg
+            width={bw} height={R * 2 + 4}
+            style={{ position: 'absolute', top: -R, left: armW / 2 - R, zIndex: 10 }}
+            pointerEvents="none"
+          >
+            <SvgCircle cx={bcx} cy={R} r={R} fill="#212228" stroke="#3f414a" strokeWidth={1.5} />
+            <SvgCircle cx={bcx} cy={R} r={R * 0.84} fill="none" stroke="#585b66" strokeWidth={Math.max(0.9, R * 0.07)} />
+            {/* Radial vents around the bearing */}
+            {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
+              const t = (deg * Math.PI) / 180;
+              const c = Math.cos(t), s = Math.sin(t);
+              return (
+                <Path
+                  key={deg}
+                  d={`M ${bcx + c * R * 0.56} ${R + s * R * 0.56} L ${bcx + c * R * 0.74} ${R + s * R * 0.74}`}
+                  stroke="rgba(0,0,0,0.5)" strokeWidth={Math.max(0.8, R * 0.09)} strokeLinecap="round"
+                />
+              );
+            })}
+            {[[-0.52, -0.42], [0.52, -0.42], [-0.52, 0.42], [0.52, 0.42]].map(([fx, fy], i) => (
+              <SvgCircle key={i} cx={bcx + R * fx} cy={R + R * fy} r={Math.max(1.2, R * 0.1)} fill="#6E6E78" />
+            ))}
+            {/* Anti-skate dial off the plate's shoulder */}
+            <SvgCircle cx={bcx + R + dialR + 2} cy={R + R * 0.24} r={dialR} fill="#33333a" stroke="#55555e" strokeWidth={1.2} />
+            <Path d={`M ${bcx + R + dialR + 2} ${R + R * 0.24 - dialR + 1.5} V ${R + R * 0.24}`} stroke="#9C9CA6" strokeWidth={1.3} />
+            {/* Bearing housing + centre screw with a glint */}
+            <SvgCircle cx={bcx} cy={R} r={R * 0.46} fill="#2c2e35" stroke="#4d505b" strokeWidth={1} />
+            <SvgCircle cx={bcx} cy={R} r={R * 0.22} fill="#5c5f6a" />
+            <Path d={`M ${bcx - R * 0.16} ${R} H ${bcx + R * 0.16}`} stroke="#26272d" strokeWidth={Math.max(0.8, R * 0.06)} />
+            <SvgCircle cx={bcx - R * 0.30} cy={R - R * 0.30} r={Math.max(1, R * 0.09)} fill="#9AA0AC" />
+          </Svg>
+        );
+      })()}
     </View>
   );
 }
 
 // ── Fullscreen turntable hero ─────────────────────────────────────────────────
 function TurntableHero({
-  platSize, spin, tonearmAnim, glowOpacity, ringShimmer, raysSpin, labelRotate, playing, panHandlers, scrubbing, scrubDir, accent = V.gold, labelText = 'NIGHT RUN FM',
+  platSize, spin, tonearmAnim, glowOpacity, ringShimmer, raysSpin, labelRotate, playing, panHandlers, scrubbing, scrubDir, accent = V.gold, labelText = 'NIGHT RUN FM', albumArt = null, progressAnim, classic = false,
 }: {
   platSize: number;
   spin: Animated.AnimatedInterpolation<string>;
@@ -281,38 +590,77 @@ function TurntableHero({
   glowOpacity: Animated.AnimatedInterpolation<number>;
   ringShimmer: Animated.Value;
   raysSpin: Animated.AnimatedInterpolation<string>;
+  /** Classic Vinyl: the turntable without its neon layer — no ring, no rays,
+   *  no specks. See getVinylClassic. The record, arm, grooves and album art
+   *  are untouched, and the station's colour still reaches the rim and the
+   *  arm, so the deck still reads as the mood it belongs to. */
+  classic?: boolean;
   labelRotate: Animated.AnimatedInterpolation<string>;
   playing: boolean;
   panHandlers: any;
   scrubbing: boolean;
   scrubDir: 'fwd' | 'bwd' | null;
-  /** Station mood colour — rim, ring, rays, notes and tonearm all take it. */
+  /** Station mood colour — rim, ring, rays and notes all take it. */
   accent?: string;
+  /** Album cover URL — fills the centre label like a picture disc. */
+  albumArt?: string | null;
+  /** Track progress 0..1 — the arm creeps toward the label as the song plays. */
+  progressAnim?: Animated.Value;
   /** Station name printed on the red centre label. */
   labelText?: string;
 }) {
   const recSize  = platSize * 0.865;
   const armLen   = platSize * 0.70;
-  const armW     = 9;
-  const headW    = 18;
-  const headH    = 24;
+  const armW     = 10;
+  const headW    = 26;
   const pivotX   = platSize * 0.935;
   const pivotY   = platSize * 0.048;
   // 0 = parked clear of the record (negative swings right, off the platter),
   // 1 = stylus resting on the outer groove (small positive).
-  const armRot   = tonearmAnim.interpolate({ inputRange: [0, 1], outputRange: ['-16deg', '4deg'] });
+  // Parked at -16°; the stylus drops onto the outer grooves (6°, clearly
+  // inside the rim — needles never sit on the edge), then creeps toward the
+  // label as the song progresses, exactly like a real pressing. The creep is
+  // gated by tonearmAnim so a parked arm never wanders.
+  const armAngle = Animated.add(
+    tonearmAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 6] }),
+    progressAnim
+      ? Animated.multiply(tonearmAnim, Animated.multiply(progressAnim, 5))
+      : new Animated.Value(0),
+  );
+  const armRot = armAngle.interpolate({ inputRange: [-16, 11], outputRange: ['-16deg', '11deg'] });
   const platOff  = (platSize - recSize) / 2;
   const rayLen   = recSize / 2;
   const rayPivot = recSize / 2 - rayLen / 2;
 
   return (
-    <View style={{ width: platSize, height: platSize }}>
-      <SparkleField size={platSize} />
+    // overflow visible is LOAD-BEARING: the cast shadow is deliberately
+    // bigger than this box, and a clipped shadow is a rectangle with a
+    // straight edge, which is worse than none.
+    <View style={{ width: platSize, height: platSize, overflow: 'visible' }}>
+      {/* What the record throws onto the scene behind it. First child, so it
+          sits under everything; oversized canvas, because a shadow falls
+          beside the thing casting it. See CastShadow.
+
+          SIZED TO THE RECORD, NOT THE PLATTER BOX, and that distinction is
+          the whole of what looked wrong (owner, 23.08: "the shadow looks too
+          awkward south… make sure it lies behind/beneath the disc"). The box
+          is `platSize`; the disc actually drawn in it is `recSize`, i.e.
+          86.5% of that. Casting at the box's size made the shadow a disc
+          ~13% WIDER than the record — so its edge stood outside the record
+          all the way round, reading as a second dark disc behind rather than
+          as shade under this one, and worst at the foot where the pool is.
+          It is inset by half the difference so the two are concentric. */}
+      <CastShadow
+        width={recSize} height={recSize} radius={recSize / 2}
+        x={(platSize - recSize) / 2} y={(platSize - recSize) / 2}
+      />
+      {!classic && <SparkleField size={platSize} />}
       {/* Platter disc — pan responder applied here for record scrub */}
       <View {...panHandlers} style={[th.platter, { width: platSize, height: platSize, borderRadius: platSize / 2, position: 'absolute', top: 0, left: 0 }]}>
-        <VinylDisc size={recSize} spin={spin} accent={accent} />
+        <VinylDisc size={recSize} spin={spin} accent={accent} classic={classic} />
       </View>
       {/* Disco light rays — rotate at half record speed */}
+      {!classic && (
       <Animated.View style={{
         position: 'absolute',
         width: recSize, height: recSize,
@@ -333,8 +681,12 @@ function TurntableHero({
           }} />
         ))}
       </Animated.View>
-      {/* Single thick pulsing mood ring — color interpolated, not opacity */}
-      <Animated.View style={{
+      )}
+      {/* Single thick pulsing mood ring — color interpolated, not opacity.
+          pointerEvents none is LOAD-BEARING: this view covers the whole
+          record, and without it every tap/scrub on the vinyl died here. */}
+      {!classic && (
+      <Animated.View pointerEvents="none" style={{
         position: 'absolute',
         width: recSize + 20, height: recSize + 20, borderRadius: (recSize + 20) / 2,
         borderWidth: 10,
@@ -344,30 +696,41 @@ function TurntableHero({
         }),
         top: (platSize - recSize - 20) / 2, left: (platSize - recSize - 20) / 2,
       }} />
+      )}
       {/* Center label — independent spin, sits above the record */}
       {(() => {
-        const cSize = Math.min(80, recSize * 0.27);
+        // Well over true-to-life (real label ≈ 33%) — the album art is the
+        // star, give it the room (owner calls, 23–24.07).
+        const cSize = Math.min(170, recSize * 0.45);
         const cR    = cSize / 2;
         return (
           <Animated.View pointerEvents="none" style={{
             position: 'absolute',
             width: cSize, height: cSize, borderRadius: cR,
-            backgroundColor: '#8B0000', borderWidth: 1, borderColor: '#6B0000',
+            backgroundColor: '#8B0000', borderWidth: 1, borderColor: albumArt ? 'rgba(0,0,0,0.55)' : '#6B0000',
             alignItems: 'center', justifyContent: 'center',
             top: platSize / 2 - cR, left: platSize / 2 - cR,
             transform: [{ rotate: labelRotate }],
             overflow: 'hidden',
           }}>
-            <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 1.2 }}>COLUMBIA</Text>
-            <Text style={{ position: 'absolute', top: cR * 0.50, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: Math.max(8, cSize * 0.145), fontWeight: '800', letterSpacing: 0.4 }}>CRUISE FM</Text>
-            <Text style={{ position: 'absolute', top: cR * 1.22, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: Math.max(4, cSize * 0.075), letterSpacing: 0.4 }} numberOfLines={1}>{labelText}</Text>
-            <View style={{ position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', top: cR - 3, left: cR - 3 }} />
+            {albumArt ? (
+              // Album cover fills the label — picture-disc style, MD-free.
+              <Image source={{ uri: albumArt }} style={{ position: 'absolute', width: cSize, height: cSize }} resizeMode="cover" />
+            ) : (
+              <>
+                <Text style={{ position: 'absolute', top: cR * 0.18, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: Math.max(5, cSize * 0.075), fontWeight: '700', letterSpacing: 1.2 }}>STROFI</Text>
+                <Text style={{ position: 'absolute', top: cR * 0.50, left: 0, right: 0, textAlign: 'center', color: '#fff', fontSize: Math.max(8, cSize * 0.145), fontWeight: '800', letterSpacing: 0.4 }}>CRUISE FM</Text>
+                <Text style={{ position: 'absolute', top: cR * 1.22, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: Math.max(4, cSize * 0.075), letterSpacing: 0.4 }} numberOfLines={1}>{labelText}</Text>
+              </>
+            )}
+            {/* Spindle hole stays on top of art and label alike */}
+            <View style={{ position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', top: cR - 3, left: cR - 3, borderWidth: 1, borderColor: 'rgba(0,0,0,0.4)' }} />
           </Animated.View>
         );
       })()}
       {/* Floating music notes */}
       <FloatingNotes playing={playing} emitter="ring" ringRadius={recSize / 2} scrubbing={scrubbing} scrubDir={scrubDir} color={accent} />
-      <Tonearm armLen={armLen} armW={armW} headW={headW} headH={headH} pivotX={pivotX} pivotY={pivotY} rotation={armRot} color={accent} />
+      <Tonearm armLen={armLen} armW={armW} headW={headW} pivotX={pivotX} pivotY={pivotY} rotation={armRot} />
     </View>
   );
 }
@@ -386,15 +749,18 @@ function ScrubProgressBar({ progress, isScrubbing, onLayout, panHandlers }: {
   onLayout: (e: any) => void; panHandlers: any;
 }) {
   const [barWidth, setBarWidth] = useState(300);
-  const fillW      = progress.interpolate({ inputRange: [0, 1], outputRange: [0, barWidth] });
   const trackH     = isScrubbing ? 8 : 6;
-  const DOT        = 14;
-  const trackHalf  = trackH / 2;
-  const dotOff     = DOT / 2;
+  // Scaled, not resized — see SeekBar, which carries the full reasoning. width
+  // is a layout property and so cannot leave the JS thread; scaleX can, and
+  // the paired translateX pins the left edge because RN scales about the
+  // centre. The dot rides outside the scaled view or it would be squashed.
+  const fillScale  = progress.interpolate({ inputRange: [0, 1], outputRange: [0.0001, 1], extrapolate: 'clamp' });
+  const fillShift  = progress.interpolate({ inputRange: [0, 1], outputRange: [-barWidth / 2, 0], extrapolate: 'clamp' });
+  const dotShift   = progress.interpolate({ inputRange: [0, 1], outputRange: [0, barWidth], extrapolate: 'clamp' });
 
   return (
     <View
-      style={{ flex: 1, height: 36, justifyContent: 'center' }}
+      style={{ width: '100%', height: 36, justifyContent: 'center' }}
       onLayout={(e) => { setBarWidth(e.nativeEvent.layout.width); onLayout(e); }}
       {...panHandlers}
     >
@@ -404,25 +770,16 @@ function ScrubProgressBar({ progress, isScrubbing, onLayout, panHandlers }: {
         height: trackH, borderRadius: trackH / 2,
         backgroundColor: 'rgba(255,255,255,0.22)',
       }} />
-      {/* White fill + dot at right edge */}
+      {/* White fill */}
       <Animated.View style={{
-        position: 'absolute', left: 0,
+        position: 'absolute', left: 0, width: barWidth,
         height: trackH, borderRadius: trackH / 2,
-        width: fillW, backgroundColor: '#ffffff',
-      }}>
-        {/* Dot sits at the fill end */}
-        <View style={{
-          position: 'absolute',
-          right: -dotOff, top: trackHalf - dotOff,
-          width: DOT, height: DOT, borderRadius: dotOff,
-          backgroundColor: '#ffffff',
-          shadowColor: '#000',
-          shadowOpacity: isScrubbing ? 0.6 : 0.4,
-          shadowRadius: isScrubbing ? 8 : 5,
-          shadowOffset: { width: 0, height: 2 },
-          elevation: isScrubbing ? 8 : 4,
-        }} />
-      </Animated.View>
+        backgroundColor: '#ffffff',
+        transform: [{ translateX: fillShift }, { scaleX: fillScale }],
+      }} />
+      {/* The car rides the fill's end, unscaled — shared with SeekBar so the
+          deck cannot end up the one mode without one. */}
+      <SeekCar shift={dotShift} trackH={trackH} />
     </View>
   );
 }
@@ -463,17 +820,31 @@ function TrackList({ activeIdx, onSelect }: { activeIdx: number; onSelect: (i: n
 export function VinylFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
+  const isLandscape = winW > winH;
 
-  const { playing, setPlaying, setStationId: npSetStation } = useNowPlaying();
-  const spotify = useSpotifyPlayback(visible);
+  const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
+  // Classic Vinyl: the deck without its neon layer. See getVinylClassic.
+  const { vinylClassic } = useMotion();
+  const spotify = useMusicPlayback(visible);
+  // The SCENE waits for the service's own verdict; the transport keeps the
+  // optimistic `playing`, because a button that hesitates reads as broken.
+  // See utils/confirmedPlaying for why, and for the clip that proved it.
+  const live = confirmedPlaying(playing, spotify.track, musicSwitching);
+
+  // Shuffle and repeat are READ STRAIGHT OFF THE PLAYER, not mirrored into
+  // local state. Each mode used to keep its own copy and sync it in an effect
+  // — eight copies of the same two lines, and the copy is what let the button
+  // disagree with the music. The player already flips optimistically and holds
+  // its answer against a stale poll, so there is nothing left for a mirror to
+  // do but drift.
+  const shuffle = spotify.shuffleOn;
+  const repeat = spotify.repeatMode;
   const [activeId,      setActiveId]      = useState(stationId ?? 'night-run');
   const [activeTrack,   setActiveTrack]   = useState(0);
   const [platform,      setPlatform]      = useState<{ id: PlatformId; name: string; color: string } | null>(null);
   const [isScrubbing,   setIsScrubbing]   = useState(false);
   const [scrubDir,      setScrubDir]      = useState<'fwd' | 'bwd' | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
-  const [shuffle,       setShuffle]       = useState(false);
-  const [repeat,        setRepeat]        = useState(false);
   const [showTracks,    setShowTracks]    = useState(false);
   const [linked,        setLinked]        = useState<LinkedPlaylist | null>(null);
   const [showPicker,    setShowPicker]    = useState(false);
@@ -482,6 +853,22 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   useEffect(() => {
     if (visible) getStationPlaylist(activeId).then(setLinked);
   }, [visible, activeId]);
+
+  // Landscape rest-and-wake (L3) — the shared machinery from LandscapeChrome.
+  const { chrome, rested: chromeRested, wake: wakeChrome } = useChromeFade({
+    // BOTH orientations now — portrait rests the same way (useRestScene).
+    active: visible, playing, sheetOpen: showMood || showPicker,
+    // Winding the deck holds the countdown without waking anything —
+    // the scene must not slide while a finger is on it.
+    hold: isScrubbing,
+  });
+  const deckScene = useDeckScene(chrome, winW, 0.86, isLandscape);
+  // The scene re-centres itself once the controls have gone. MEASURED rather
+  // than assumed, so each mode's own deliberate offsets survive — see
+  // restShiftFor in LandscapeChrome.
+  const [contentH, setContentH] = useState(0);
+  const [sceneBox, setSceneBox] = useState({ y: 0, h: 0 });
+  const restScene = useRestScene(chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape);
 
   // ── Real-track layer ────────────────────────────────────────────────────────
   // With Spotify connected the deck runs on the REAL song: true duration,
@@ -519,7 +906,65 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const activeTrackRef    = useRef(activeTrack);
   const playingRef        = useRef(false);
   const scrubStartPosRef  = useRef(0);
-  const lastHapticAccumRef = useRef(0);
+  /** When the music service last told us where the song was. Null in demo
+   *  mode, which has no service to lose touch with. */
+  const lastSyncAtRef     = useRef<number | null>(null);
+  // Grain under the thumb, shared with the CD so the two can't drift apart.
+  const scrubHaptics = useRef(createScrubHaptics()).current;
+  const scrubFocus = useScrubFocus();
+  /** Read inside the record's responder, which is built once. */
+  const restedRef = useRef(false);
+  restedRef.current = chromeRested;
+  /**
+   * WAKE ON THE NEXT TICK, so a touch that turns out to be a scrub can take
+   * it back.
+   *
+   * Owner, 18.08: "could we have the vinyl and CD not have the controls come
+   * back in when I try to scrub. It tends to move back up and then it acts
+   * like the page wants to move down." Both halves are one cause. The root's
+   * touch sniffer woke the chrome on ANY touch, and waking slides the scene
+   * back to its awake position — under the finger, mid-gesture. The object
+   * then moves relative to the thumb, which the drag classifier reads as
+   * downward travel, so the card starts to dismiss.
+   *
+   * The sniffer sits on the ROOT and capture runs top-down, so it always
+   * fires before the object's own responder is granted — there is no way to
+   * ask "did this land on the record?" at that moment. Deferring by a tick
+   * puts the decision after the negotiation: the responder's grant cancels
+   * it, and a gesture that turns out to be a plain TAP wakes on release
+   * instead. So a tap on the deck still brings the controls back; a DRAG on
+   * it winds the song and leaves them alone, which is what was asked for.
+   */
+  const wakePendingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestWake = () => {
+    if (wakePendingRef.current) clearTimeout(wakePendingRef.current);
+    wakePendingRef.current = setTimeout(() => { wakePendingRef.current = null; wakeChrome(); }, 0);
+  };
+  const cancelWake = () => {
+    if (wakePendingRef.current) { clearTimeout(wakePendingRef.current); wakePendingRef.current = null; }
+  };
+
+  /**
+   * The deck comes forward while it is being wound, and goes back when it is
+   * let go. Driven from the SCRUB STATE rather than from each branch of the
+   * gesture: the responder has three ways out (release, terminate, and a drag
+   * that turns out to be a dismiss) and hooking each one is how the three
+   * quietly drift apart. Every one of them already sets this flag.
+   */
+  const wasScrubbingRef = useRef(false);
+  useEffect(() => {
+    if (isScrubbing) {
+      scrubFocus.begin();
+      scrubHaptics.grab();
+      wasScrubbingRef.current = true;
+      return;
+    }
+    scrubFocus.end();
+    // Only on the way DOWN from a real scrub — otherwise the mode taps out a
+    // haptic simply for mounting.
+    if (wasScrubbingRef.current) { scrubHaptics.release(); wasScrubbingRef.current = false; }
+  }, [isScrubbing]);
+
   const progressBarWidthRef = useRef(300);
   const spinCurrentRef    = useRef(0);
   const pbHandlerRef      = useRef({ onGrant: (_x: number) => {}, onMove: (_x: number) => {}, onRelease: () => {} });
@@ -530,6 +975,28 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const recordCenterY     = useRef(0);
   const lastAngle         = useRef<number | null>(null);
   const accumulatedRotation = useRef(0);
+  // Tap detection: a still, quick touch on the record toggles play/pause
+  // (like tapping the cassette body) instead of registering as a zero scrub.
+  const tapStartRef       = useRef(0);
+  const movedDegRef       = useRef(0);
+  const togglePlayRef     = useRef(() => {});
+  const closeRef          = useRef(() => {});
+
+  /**
+   * What a drag that started on the record turned out to be — see the same
+   * refs in CDMode for the full reasoning. In short (owner, 03.08): the
+   * record claims touches on start and refuses to give them up, so a
+   * pull-down on it could never reach the mode's dismiss, and a short one
+   * fell under the tap threshold and PAUSED the music instead.
+   *
+   * A drag within ~35 degrees of straight DOWN is a pull-down; everything
+   * else winds the record. See the fuller note in CDMode for why the
+   * physically-derived test was measured and then rejected, and for what this
+   * knowingly trades away.
+   */
+  const dragRef  = useRef<null | 'scrub' | 'dismiss'>(null);
+  const DECIDE_PX = 16;
+  const DOWN_BIAS = 1.4;
 
   const _getAngleFromCenter = (touchX: number, touchY: number) =>
     Math.atan2(touchY - recordCenterY.current, touchX - recordCenterX.current) * (180 / Math.PI);
@@ -549,27 +1016,60 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       onMoveShouldSetPanResponderCapture:  () => true,
       onPanResponderTerminationRequest:    () => false,
       onPanResponderGrant: (evt) => {
-        (evt.target as any).measure((_x: number, _y: number, w: number, h: number, pX: number, pY: number) => {
+        const { pageX, pageY } = evt.nativeEvent;
+        // `measure?.` — optional because a detached node has none, and a
+        // throw in here kills the whole gesture.
+        (evt.target as any).measure?.((_x: number, _y: number, w: number, h: number, pX: number, pY: number) => {
           recordCenterX.current = pX + w / 2;
           recordCenterY.current = pY + h / 2;
+          // measure answers a frame late, so the angle this gesture started
+          // from has to be recomputed against the FRESH centre. Without
+          // this, the first move is measured from the old one and the record
+          // jumps — which happens any time the centre has moved since the
+          // last touch: after turning the phone, or mid deck-glide.
+          if (lastAngle.current !== null) lastAngle.current = _getAngleFromCenter(pageX, pageY);
         });
+        tapStartRef.current = Date.now();
+        movedDegRef.current = 0;
+        dragRef.current = null;
         scrubStartPosRef.current = progressValue.current * trackMsRef.current;
         progressAnimRef.current?.stop();
         stopSpin();
         accumulatedRotation.current = spinCurrentRef.current * 360;
         lastAngle.current = _getAngleFromCenter(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
-        lastHapticAccumRef.current = 0;
-        scrubbingRef.current = true;
-        setIsScrubbing(true);
-        if (scrubFadeTimerRef.current) clearTimeout(scrubFadeTimerRef.current);
-        scrubIndicatorAnim.setValue(1);
+        scrubHaptics.reset();
+        // This touch belongs to the deck now — see requestWake. A tap gives
+        // the wake back on release; a wind keeps the controls away.
+        cancelWake();
+        // The scrub does NOT begin here — until the drag is judged this might
+        // be a tap or a pull-down, and neither should wind the record.
       },
-      onPanResponderMove: (evt) => {
+      onPanResponderMove: (evt, g) => {
         if (lastAngle.current === null) return;
         const angle = _getAngleFromCenter(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
         const diff  = _angleDiff(angle, lastAngle.current);
         lastAngle.current = angle;
+
+        if (dragRef.current === null) {
+          if (Math.hypot(g.dx, g.dy) < DECIDE_PX) return; // still a maybe-tap
+          if (g.dy > 0 && Math.abs(g.dy) > Math.abs(g.dx) * DOWN_BIAS) {
+            dragRef.current = 'dismiss';
+          } else {
+            dragRef.current = 'scrub';
+            scrubbingRef.current = true;
+            setIsScrubbing(true);
+            if (scrubFadeTimerRef.current) clearTimeout(scrubFadeTimerRef.current);
+            scrubIndicatorAnim.setValue(1);
+          }
+        }
+
+        if (dragRef.current === 'dismiss') {
+          if (g.dy > 0) slideY.setValue(g.dy);
+          return;
+        }
+
         accumulatedRotation.current += diff;
+        movedDegRef.current += Math.abs(diff);
 
         // 360° = 5 seconds of track
         const trackMs = trackMsRef.current;
@@ -582,23 +1082,49 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
         spinValue.setValue(((accumulatedRotation.current % 360) + 360) % 360 / 360);
 
-        lastHapticAccumRef.current += Math.abs(deltaMs);
-        if (lastHapticAccumRef.current >= 5000) {
-          lastHapticAccumRef.current = 0;
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
+        scrubHaptics.turn(diff);
       },
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (_evt, g) => {
         lastAngle.current = null;
+        const kind = dragRef.current;
+        dragRef.current = null;
+
+        if (kind === 'dismiss') {
+          // Same thresholds as the mode's own dismiss, so a pull-down feels
+          // identical whether it starts on the record or beside it.
+          if (g.dy > 120 || g.vy > 0.8) closeRef.current();
+          else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+          return;
+        }
+
         scrubbingRef.current = false;
         setIsScrubbing(false);
         setScrubDir(null);
         if (scrubFadeTimerRef.current) clearTimeout(scrubFadeTimerRef.current);
+        // Never judged = never travelled DECIDE_PX, i.e. a TAP: the record
+        // doubles as a play/pause button, matching the cassette body. Judged
+        // by FINGER TRAVEL in pixels (not rotation degrees — near the
+        // record's centre a tiny wobble reads as many degrees and taps kept
+        // registering as scrubs).
+        if (kind === null) {
+          scrubIndicatorAnim.setValue(0);
+          // A tap while the controls are away only brings them back — the root
+          // sniffer has already done that by now. Without this, the tap meant
+          // to wake the deck would pause the music instead.
+          // A TAP is not a wind: it hands the wake back. While the controls
+          // are away that is all it does — the tap that brings them back must
+          // not also pause the music.
+          if (Date.now() - tapStartRef.current < 450) {
+            if (restedRef.current) wakeChrome();
+            else togglePlayRef.current();
+          }
+          return;
+        }
         scrubFadeTimerRef.current = setTimeout(() => {
           Animated.timing(scrubIndicatorAnim, { toValue: 0, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
         }, 1000);
         // Real track: the spin you gave the record seeks the actual song.
-        if (realTrackRef.current) seekTo(progressValue.current * trackMsRef.current).catch(() => {});
+        if (realTrackRef.current) seekActive(progressValue.current * trackMsRef.current);
         if (playingRef.current) {
           startSpin();
           _restartProgressFrom(progressValue.current * trackMsRef.current, trackMsRef.current);
@@ -606,12 +1132,21 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       },
       onPanResponderTerminate: () => {
         lastAngle.current = null;
+        const kind = dragRef.current;
+        dragRef.current = null;
+        if (kind === 'dismiss') {
+          Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+          return;
+        }
         scrubbingRef.current = false;
         setIsScrubbing(false);
         setScrubDir(null);
       },
     })
   ).current;
+
+  // Re-bound every render so the tap always sees fresh play state.
+  togglePlayRef.current = () => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); };
 
   const progressPanRef = useRef(
     PanResponder.create({
@@ -642,16 +1177,29 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   ).current;
 
   useEffect(() => { activeTrackRef.current = activeTrack; }, [activeTrack]);
-  useEffect(() => { playingRef.current = playing; }, [playing]);
+  // The spin loop and its safety net read this every cycle, so it carries the
+  // CONFIRMED state: a record that keeps turning over a sleeping Spotify is
+  // the exact thing the owner filmed.
+  useEffect(() => { playingRef.current = live; }, [live]);
   // Track spinValue position so we can manually setValue during rotational scrub
   useEffect(() => {
     const id = spinValue.addListener(({ value }) => { spinCurrentRef.current = value; });
     return () => spinValue.removeListener(id);
   }, []);
   useEffect(() => {
+    // COMMIT STATE ONLY WHEN THE DISPLAYED SECOND CHANGES. Without that guard
+    // this ran setState on EVERY animation frame — so the whole deck (record,
+    // grooves, tonearm, fireflies, backdrop) re-rendered ~60 times a second for
+    // the entire song, to move a readout that changes once a second.
+    //
+    // Every other clock in the app already had the guard: the shared
+    // useTrackClock carries it with a comment saying exactly this, and Cassette
+    // has its own copy. Vinyl predates the shared clock (it still has its own
+    // progress value and its own listeners) and simply never got it.
     const id = progress.addListener(({ value }) => {
       progressValue.current = value;
-      setCurrentTimeMs(Math.round(value * trackMsRef.current));
+      const ms = Math.round(value * trackMsRef.current);
+      setCurrentTimeMs((prev) => (Math.floor(ms / 1000) === Math.floor(prev / 1000) ? prev : ms));
     });
     return () => progress.removeListener(id);
   }, []);
@@ -731,42 +1279,54 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const stopLabelSpin = () => { labelSpinRef.current?.stop(); };
 
   useEffect(() => {
-    if (playing) {
+    if (live) {
       spinUp();
+      // NOT STARTED IN CLASSIC, and that is a real saving rather than tidiness:
+      // this animates borderColor, which cannot take the native driver, so it
+      // is JS-thread work every frame for the whole drive — and in Classic the
+      // ring it drives is not on screen at all.
+      if (!vinylClassic) {
       shimmerLoopRef.current = Animated.loop(Animated.sequence([
         Animated.timing(ringShimmer, { toValue: 1.0, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
         Animated.timing(ringShimmer, { toValue: 0.6, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
       ]));
       shimmerLoopRef.current.start();
+      }
     } else {
       coastToStop();
       shimmerLoopRef.current?.stop();
       ringShimmer.setValue(0.6);
     }
     return () => { stopSpin(); shimmerLoopRef.current?.stop(); };
-  }, [playing]);
+  }, [live, vinylClassic]);
 
-  // Safety net — restart spin if it stopped unexpectedly
+  // Safety net — restart spin if it stopped unexpectedly. Stops dead when the
+  // app is backgrounded: a repeating timer is one of the things iOS kills a
+  // background app for, and there is nothing to keep spinning off-screen.
+  const appActive = useAppActive();
   useEffect(() => {
+    if (!appActive) return;
     const interval = setInterval(() => {
       if (playingRef.current && !isSpinning.current) startSpin();
     }, 3000);
     return () => clearInterval(interval);
-  }, [playing]);
+  }, [live, appActive]);
 
   // Tonearm
   useEffect(() => {
     Animated.timing(tonearmVal, {
-      toValue: playing ? 1 : 0,
-      duration: playing ? 1200 : 900,
-      easing: playing ? Easing.out(Easing.cubic) : Easing.inOut(Easing.ease),
-      useNativeDriver: true,
+      toValue: live ? 1 : 0,
+      duration: live ? 1200 : 900,
+      easing: live ? Easing.out(Easing.cubic) : Easing.inOut(Easing.ease),
+      // JS driver: the arm angle is combined with the (JS-driven) track
+      // progress for the inward creep — Animated can't mix drivers.
+      useNativeDriver: false,
     }).start();
-  }, [playing]);
+  }, [live]);
 
   // Glow + progress
   useEffect(() => {
-    if (playing) {
+    if (live) {
       pulseLoopRef.current = Animated.loop(Animated.sequence([
         Animated.timing(glowPulse, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
         Animated.timing(glowPulse, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
@@ -779,7 +1339,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       Animated.timing(glowPulse, { toValue: 0, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
     }
     return () => { pulseLoopRef.current?.stop(); progressAnimRef.current?.stop(); };
-  }, [playing]);
+  }, [live]);
 
   // Track change (demo deck only — real tracks change on Spotify's side)
   useEffect(() => {
@@ -797,7 +1357,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       if (id && id !== 'none') { const p = PLATFORMS[id as Exclude<PlatformId, 'none'>]; if (p) setPlatform({ id: id as PlatformId, name: p.name, color: p.color }); } else setPlatform(null);
     });
     // Play state belongs to the session — a Modes-tab browse opens paused.
-    slideY.setValue(SCREEN_H); setActiveTrack(0);
+    slideY.setValue(winH); setActiveTrack(0);
     progress.setValue(0); progressValue.current = 0; setCurrentTimeMs(0);
     setShowTracks(false); showTracksAnim.setValue(0);
     Animated.spring(slideY, { toValue: 0, tension: 50, friction: 12, useNativeDriver: true }).start();
@@ -807,36 +1367,101 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   }, [visible]);
 
   const handleClose = () => {
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
+    Animated.timing(slideY, { toValue: winH, duration: 320, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start(onClose);
   };
+  // The record's responder is built once, so it reaches this through a ref.
+  closeRef.current = handleClose;
 
   const station      = resolveAnyStation(activeId);
   const currentTrack = VINYL_TRACKS[activeTrack];
-  const platSize     = Math.min(winW * 0.9, winH * 0.46);
+  // Landscape sizes off HEIGHT alone — the portrait formula shrinks a
+  // sideways platter to a saucer (the "squish", owner 30.07).
+  const platSize     = isLandscape ? Math.min(winH * 0.86, 350) : Math.min(winW * 0.9, winH * 0.46);
 
   // Swipe-down to dismiss
+  /**
+   * The dismiss gesture reaches handleClose through a ref because the
+   * responder below is built once — closing over the first render's copy
+   * would leave it using a stale window height after a rotation.
+   */
+  const dismissCloseRef = useRef(handleClose);
+  dismissCloseRef.current = handleClose;
+
+  /** Where the card ends up when the finger leaves — or is taken away. */
+  const settleDismiss = (g: { dy: number; vy: number }) => {
+    if (g.dy > 120 || g.vy > 0.8) dismissCloseRef.current();
+    else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+  };
+
+  /**
+   * A sheet above the card owns every gesture. Without this, a FAST flick
+   * that the song list declined bubbled down here (the sheet's React tree
+   * lives inside the mode's), the card dismissed UNDER the open sheet, and
+   * tearing down both iOS windows at once froze the whole screen (owner,
+   * 04.08: "the card collapses to the bottom and then whole screen
+   * freezes"). While any sheet is up, the dismiss gesture stands down.
+   */
+  const npSheetCount = useNowPlaying().sheetCount;
+  const sheetUpRef = useRef(false);
+  sheetUpRef.current = npSheetCount > 0;
+
   const dismissPan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder:  (_, g) => g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+    onMoveShouldSetPanResponder:  (_, g) => !sheetUpRef.current && g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
     onPanResponderMove:  (_, g) => { if (g.dy > 0) slideY.setValue(g.dy); },
-    onPanResponderRelease: (_, g) => {
-      if (g.dy > 120 || g.vy > 0.8) handleClose();
-      else Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
-    },
+    onPanResponderRelease: (_, g) => settleDismiss(g),
+    /**
+     * iOS CANCELS a touch that leaves the bottom edge of the screen — which
+     * is exactly how you drag a card away. With no terminate handler the
+     * gesture just stopped: `slideY` stayed parked wherever the finger left
+     * it, so the mode was still "open" with its content off-screen and its
+     * modal window still over the app. Taps fell through to the page beneath
+     * (which is why the tab bar kept working) but scrolling did not, and the
+     * only ways out were to swipe again — re-grabbing the stranded card —
+     * or to kill the app. Terminating settles it exactly like a release.
+     */
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderTerminate: (_, g) => settleDismiss(g),
   })).current;
 
   const topPad       = Math.max(insets.top, 20);
+  // +16 is THE shared bottom pad across the modes — the share capture's crop
+  // lines assume it (see grabModeSnapshot). The old +24 left a 2pt sliver of
+  // the pills inside the snapshot.
+  const bottomPad    = Math.max(insets.bottom, 24) + 16;
 
+  // The imprint line on the record's label says STROFI, not COLUMBIA. It read
+  // COLUMBIA for realism, which is a live Sony Music trademark printed on a
+  // simulated label inside a music app — harmless-looking until it goes on an
+  // App Store listing, which is where it was spotted (14.08) while reshooting
+  // the screenshots. The app's own company name reads exactly like a real
+  // imprint and is ours. Do not put a real label back.
   const _restartProgressFrom = (posMs: number, trackMs: number) => {
     const remaining = trackMs - posMs;
     if (remaining <= 0) return;
-    progressAnimRef.current = Animated.timing(progress, { toValue: 1, duration: remaining, easing: Easing.linear, useNativeDriver: false });
+    // The deck coasts only as far as one reading justifies. Animating to the
+    // END of the song means that when polls stop arriving — dropped signal, or
+    // the music paused somewhere we cannot see — the bar keeps travelling
+    // while the song sits still. The owner watched exactly that mid-drive.
+    // A poll lands every five seconds, so the cap is never reached in normal
+    // use; when it is, the bar HOLDS instead of inventing a position.
+    const span = Math.min(remaining, VINYL_MAX_COAST_MS);
+    const reachesEnd = span >= remaining;
+    progressAnimRef.current = Animated.timing(progress, { toValue: (posMs + span) / trackMs, duration: span, easing: Easing.linear, useNativeDriver: false });
     progressAnimRef.current.start(({ finished }) => {
-      // Demo deck advances itself; a real track ends on Spotify's side and
-      // the next poll re-syncs us onto whatever plays next.
-      if (finished && !realTrackRef.current) {
-        setActiveTrack((t) => { const n = Math.min(VINYL_TRACKS.length - 1, t + 1); if (n === t) setPlaying(false); return n; });
+      if (!finished) return;
+      if (reachesEnd) {
+        // The song genuinely ran out — only then does the demo deck advance.
+        if (!realTrackRef.current) {
+          setActiveTrack((t) => { const n = Math.min(VINYL_TRACKS.length - 1, t + 1); if (n === t) setPlaying(false); return n; });
+        }
+        return;
       }
+      // Only the cap. Carry on from here while the music is still going and
+      // the last reading is recent enough to believe.
+      if (!playingRef.current) return;
+      if (!shouldKeepCoasting(Date.now(), lastSyncAtRef.current)) return;
+      _restartProgressFrom(posMs + span, trackMs);
     });
   };
 
@@ -846,15 +1471,21 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     const t = spotify.track;
     if (!visible || !t || t.progressMs == null || t.durationMs == null || t.durationMs <= 0) return;
     if (scrubbingRef.current) return;
-    const base = Math.min(t.durationMs, t.progressMs + (playing ? Date.now() - t.syncedAt : 0));
+    // Only extrapolate forward if the music is REALLY running. `playing` is
+    // our optimistic flag, so against a sleeping Spotify this term grew
+    // without bound — the owner's clip measured the deck reading 01:49 while
+    // the true position sat at 00:16 and never moved. See confirmedPlaying.
+    const running = confirmedPlaying(playing, t, musicSwitching);
+    const base = Math.min(t.durationMs, t.progressMs + (running ? Date.now() - t.syncedAt : 0));
     progressAnimRef.current?.stop();
     const pct = base / t.durationMs;
     progress.setValue(pct);
     progressValue.current = pct;
     setCurrentTimeMs(Math.round(base));
-    if (playing) _restartProgressFrom(base, t.durationMs);
+    lastSyncAtRef.current = t.syncedAt;
+    if (running) _restartProgressFrom(base, t.durationMs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, playing, spotify.track?.progressMs, spotify.track?.syncedAt, spotify.track?.title]);
+  }, [visible, playing, musicSwitching, spotify.track?.isPlaying, spotify.track?.progressMs, spotify.track?.syncedAt, spotify.track?.title]);
 
   pbHandlerRef.current.onGrant = (x: number) => {
     progressAnimRef.current?.stop();
@@ -874,7 +1505,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   pbHandlerRef.current.onRelease = () => {
     scrubbingRef.current = false;
     setIsScrubbing(false);
-    if (realTrackRef.current) seekTo(progressValue.current * trackMsRef.current).catch(() => {});
+    if (realTrackRef.current) seekActive(progressValue.current * trackMsRef.current);
     if (playingRef.current) {
       _restartProgressFrom(progressValue.current * trackMsRef.current, trackMsRef.current);
     }
@@ -886,26 +1517,28 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const labelRotate = labelSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
-      <Animated.View style={[fs.container, { transform: [{ translateY: slideY }] }]} {...dismissPan.panHandlers}>
-        <StationBackdrop station={station} blurRadius={2.5} />
-        <LinearGradient
-          colors={[
-            'rgba(2,2,12,0.20)',
-            'rgba(2,2,12,0.15)',
-            'rgba(2,2,12,0.30)',
-            'rgba(2,2,12,0.46)',
-            'rgba(2,2,12,0.58)',
-          ]}
-          locations={[0, 0.4, 0.65, 0.85, 1]}
-          start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
+    <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent>
+      <Animated.View
+        style={[fs.container, { transform: [{ translateY: slideY }] }]}
+        {...dismissPan.panHandlers}
+        onStartShouldSetResponderCapture={() => { requestWake(); return false; }}>
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ scale: scrubFocus.backdropScale }] }]}>
+          <StationBackdrop station={station} blurRadius={2.5} />
+        </Animated.View>
+        <ModeScrim station={station} />
+        {/* The background falls away while the deck is being wound — see
+            useScrubFocus for why this is a veil and a small push rather than
+            the blur that was asked for. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: '#04040a', opacity: scrubFocus.veilOpacity }]}
         />
+
         <LinearGradient
           colors={['transparent', (station.eqColors?.[1] ?? V.gold) + '26', 'transparent']}
           locations={[0, 0.5, 1]}
           start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-          style={{ position: 'absolute', left: 0, right: 0, top: SCREEN_H * 0.40, bottom: 0 }}
+          style={{ position: 'absolute', left: 0, right: 0, top: winH * 0.40, bottom: 0 }}
           pointerEvents="none"
         />
 
@@ -924,51 +1557,90 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         </Animated.View>
 
         {/* Floating header */}
-        <View style={[fs.floatingTop, { top: topPad + 4, zIndex: 10 }]}>
+        {!isLandscape && (
+        <Animated.View style={[fs.floatingTop, { top: topPad + 4, zIndex: 10, opacity: chrome }]} pointerEvents="none">
           <View style={fs.dragPill} />
-        </View>
+        </Animated.View>
+        )}
 
-        <View style={{ flex: 1, paddingTop: topPad + 52, alignItems: 'center' }}>
+        {/* Mode name — top-left corner tag, same treatment as every other mode */}
+        {!isLandscape && (
+        <Animated.View style={{ opacity: chrome, position: 'absolute', top: topPad + 14, left: 20, zIndex: 10 }} pointerEvents="none">
+          <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700', letterSpacing: 3, fontFamily: Fonts.mono }}>VINYL</Text>
+        </Animated.View>
+        )}
 
-          {/* ── Header — small top-center, Spotify style ── */}
-          <View style={fs.header}>
-            <Text style={fs.headerEyebrow}>PLAYING FROM</Text>
-            <Text style={fs.headerStation}>{station.name}</Text>
-          </View>
+        <View style={{ flex: 1, paddingTop: isLandscape ? 8 : topPad + 52, paddingBottom: isLandscape ? 8 : bottomPad, alignItems: 'center' }}
+          onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
 
-          <View style={fs.turntableWrap}>
+          {!isLandscape && (
+          <Animated.View style={[fs.header, { opacity: chrome }]}>
+            <StationIdentity station={station} />
+          </Animated.View>
+          )}
+
+          {/* restScene is a SEPARATE view from deckScene: two style objects
+              each carrying `transform` do not merge, the later one replaces
+              the earlier, so the landscape glide and the portrait re-centring
+              cannot share one. */}
+          <Animated.View
+            style={[fs.turntableWrap, restScene]}
+            onLayout={(e) => setSceneBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
+          <Animated.View style={[{ width: '100%', alignItems: 'center' }, isLandscape && { flex: 1, justifyContent: 'center' }, deckScene]}>
+            {/* A SECOND wrapper, not another entry in deckScene's transform
+                array: two style objects each carrying `transform` do not
+                merge, the later one replaces the earlier, so the deck's
+                landscape glide and this scale have to live on separate
+                views. Scaling about the object's own centre also leaves the
+                gesture maths alone — `measure` reports the untransformed
+                box, and a centred scale does not move the centre. */}
+            <Animated.View style={{ transform: [{ scale: scrubFocus.objectScale }] }}>
             <TurntableHero
               platSize={platSize} spin={spin} tonearmAnim={tonearmVal} glowOpacity={glowOpacity}
-              ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={spin} playing={playing}
+              ringShimmer={ringShimmer} raysSpin={raysSpin} labelRotate={spin} playing={live} classic={vinylClassic}
               panHandlers={recordPanRef.panHandlers} scrubbing={isScrubbing} scrubDir={scrubDir}
               accent={VINYL_ACCENTS[station.id] ?? station.eqColors?.[1] ?? V.gold}
               labelText={station.name.toUpperCase()}
+              albumArt={spotify.track?.albumArt ?? null}
+              progressAnim={progress}
             />
-          </View>
+            </Animated.View>
+          </Animated.View>
+          </Animated.View>
 
-          {/* Song title — bottom-left, Spotify style */}
+          {!isLandscape && (
+          /* EVERYTHING BELOW THE SCENE RESTS TOGETHER. pointerEvents goes
+             off once it is invisible, or the tap meant to bring the controls
+             back would press whatever button it landed on. */
+          <Animated.View
+            style={{ alignSelf: 'stretch', alignItems: 'center', opacity: chrome }}
+            pointerEvents={chromeRested ? 'none' : 'auto'}>
+          {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>
-            <Text style={fs.trackTitle} numberOfLines={1}>{spotify.track?.title ?? currentTrack.title}</Text>
-            <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track?.artist ?? currentTrack.artist}</Text>
+            {spotify.track
+              ? <MarqueeText text={spotify.track.title} style={fs.trackTitle} />
+              : <Text style={[fs.trackTitle, { fontSize: 20 }]} numberOfLines={2}>{station.tagline}</Text>}
+            {spotify.track && <Text style={fs.trackArtist} numberOfLines={1}>{spotify.track.artist}</Text>}
           </View>
 
+          {spotify.track && (
           <View style={fs.progressWrap}>
-            <View style={fs.progressRow}>
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono }]}>{formatMs(currentTimeMs)}</Text>
-              <ScrubProgressBar
-                progress={progress} isScrubbing={isScrubbing}
-                onLayout={(e) => { progressBarWidthRef.current = e.nativeEvent.layout.width; }}
-                panHandlers={progressPanRef.panHandlers}
-              />
-              <Text style={[fs.timeText, { fontFamily: Fonts.mono, textAlign: 'right' }]}>{formatMs(trackMs)}</Text>
+            <ScrubProgressBar
+              progress={progress} isScrubbing={isScrubbing}
+              onLayout={(e) => { progressBarWidthRef.current = e.nativeEvent.layout.width; }}
+              panHandlers={progressPanRef.panHandlers}
+            />
+            <View style={fs.timesBelow}>
+              <Text style={fs.timeText}>{formatMs(currentTimeMs)}</Text>
+              <Text style={fs.timeText}>{formatMs(trackMs)}</Text>
             </View>
           </View>
+          )}
 
           {/* Controls */}
           <View style={fs.controls}>
-            <TouchableOpacity onPress={() => setShuffle((s) => !s)} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="shuffle" size={26} color={shuffle ? V.gold : '#ffffff'} />
-            </TouchableOpacity>
+            <ShuffleButton accent={station.eqColors?.[1] ?? V.gold} size={26} on={shuffle}
+              onPress={() => spotify.shuffle(!shuffle)} />
             <TouchableOpacity onPress={() => { setActiveTrack((t) => Math.max(0, t - 1)); spotify.prev(); }} style={fs.skipBtn} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-previous" size={48} color="#fff" />
             </TouchableOpacity>
@@ -991,33 +1663,58 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
             <TouchableOpacity onPress={() => { setActiveTrack((t) => Math.min(VINYL_TRACKS.length - 1, t + 1)); spotify.next(); }} style={fs.skipBtn} activeOpacity={0.75}>
               <MaterialCommunityIcons name="skip-next" size={48} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setRepeat((r) => !r)} style={fs.shuffleRepeatBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="repeat" size={26} color={repeat ? V.gold : '#ffffff'} />
-            </TouchableOpacity>
+            <RepeatButton accent={station.eqColors?.[1] ?? V.gold} size={26} mode={repeat}
+              onPress={(next) => spotify.repeat(next)} />
           </View>
 
           {/* Left-aligned action pills — keep the record the focus */}
-          <View style={fs.actionRow}>
-            <TouchableOpacity onPress={() => setShowMood(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="tune-variant" size={15} color="#fff" />
-              <Text style={fs.actionPillBold}>Change Mood</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowPicker(true)} style={fs.actionPill} activeOpacity={0.85}>
-              <Ionicons name="musical-notes-outline" size={14} color="rgba(255,255,255,0.7)" />
-              <Text style={fs.actionPillText} numberOfLines={1}>
-                {linked ? linked.name : 'Add Playlist'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <ModeActionRow
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
+            track={spotify.track}
+            station={station}
+          />
 
+          </Animated.View>
+          )}
         </View>
 
-        <MoodSheet
-          visible={showMood}
-          activeId={activeId}
-          onSelect={(id) => { setActiveId(id); npSetStation(id); setShowMood(false); }}
-          onClose={() => setShowMood(false)}
-        />
+        {isLandscape && (
+          <LandscapeChrome
+            chrome={chrome}
+            rested={chromeRested}
+            station={station}
+            track={spotify.track}
+            playing={live}
+            tagline={station.tagline}
+            seekBar={spotify.track ? (
+              <ScrubProgressBar
+                progress={progress} isScrubbing={isScrubbing}
+                onLayout={(e) => { progressBarWidthRef.current = e.nativeEvent.layout.width; }}
+                panHandlers={progressPanRef.panHandlers}
+              />
+            ) : null}
+            onPlayPause={() => { if (playing) spotify.pause(); else spotify.play(); setPlaying(!playing); }}
+            onPrev={() => { setActiveTrack((t) => Math.max(0, t - 1)); spotify.prev(); }}
+            onNext={() => { setActiveTrack((t) => Math.min(VINYL_TRACKS.length - 1, t + 1)); spotify.next(); }}
+            onClose={handleClose}
+            onChangeMood={() => setShowMood(true)}
+            onPickPlaylist={() => setShowPicker(true)}
+            playlistLabel={spotify.contextName ?? (linked ? linked.name : 'Add Playlist')}
+            contextUri={spotify.contextUri}
+          />
+        )}
+
+        {!isLandscape && <ModeCloseButton onPress={handleClose} chrome={chrome} rested={chromeRested} />}
+
+        <AmbientGlow active={visible && live} beat={visible && live} trackKey={spotify.track?.title ?? null} color={station.eqColors?.[1] ?? V.gold} />
+        <WakeSpotifyHint show={playing && !spotify.track && !handoff} connected={spotify.connected} />
+        {handoff && !spotify.track && <HandoffOverlay />}
+        <PreviewGate onSilence={spotify.pause} />
+
+        <ModeSheet visible={showMood} onClose={() => setShowMood(false)} />
 
         {showPicker && (
           <PlaylistSheet
@@ -1028,6 +1725,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
               await setStationPlaylist(activeId, pl);
               setLinked(pl);
               setShowPicker(false);
+              relinkStationPlaylist(activeId);
             }}
           />
         )}
@@ -1047,12 +1745,12 @@ const fs = StyleSheet.create({
   headerEyebrow: { color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
   headerStation: { color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '700', letterSpacing: 0.2 },
   trackBlock:  { alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 16, paddingBottom: 4, alignItems: 'flex-start' },
-  trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+  trackTitle:  { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: 0 },
   trackArtist: { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '500', marginTop: 2 },
-  turntableWrap:{ alignItems: 'center', width: '100%' },
+  turntableWrap:{ flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%' },
   progressWrap: { width: '100%', paddingHorizontal: 28, marginTop: 22, marginBottom: 0 },
-  progressRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2, width: 38 },
+  timesBelow:   { flexDirection: 'row', justifyContent: 'space-between', marginTop: -4 },
+  timeText:     { color: '#ffffff', fontSize: 11, fontWeight: '600', letterSpacing: 0.2 },
   controls:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 28, marginTop: 10, marginBottom: 8, paddingVertical: 4 },
   shuffleRepeatBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   skipBtn:      { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
@@ -1061,16 +1759,6 @@ const fs = StyleSheet.create({
 
   tracksBtn:     { marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: V.surfaceBorder, flexDirection: 'row', alignItems: 'center', gap: 8 },
   tracksBtnText: { color: V.textDim, fontSize: 9, fontWeight: '700', letterSpacing: 3 },
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 18, paddingHorizontal: 22, alignSelf: 'stretch' },
-  actionPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
-    maxWidth: '58%',
-  },
-  actionPillBold: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
-  actionPillText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '600' },
   stationPill: {
     flexDirection: 'row', alignItems: 'center', gap: 7,
     paddingHorizontal: 14, height: 42,
@@ -1093,96 +1781,3 @@ const fs = StyleSheet.create({
   scrubIndicatorText: { color: V.gold, fontSize: 11, fontWeight: '700', letterSpacing: 2.5 },
 });
 
-// Preview geometry — fixed so record fits fully inside the 260px preview container
-const PV_PLATTER = 232;
-const PV_RECORD  = 216;  // PV_PLATTER - 16 (8px visual gap each side inside gold ring)
-const PV_ARM_LEN = 138;
-const PV_PIVOT_X = 224;  // PV_PLATTER - 8 (near top-right of platter)
-const PV_PIVOT_Y = 8;
-
-// ── Preview card ──────────────────────────────────────────────────────────────
-export function VinylModePreview() {
-  const idleSpin     = useRef(new Animated.Value(0)).current;
-  const tonearmAngle = useRef(new Animated.Value(0)).current;
-  const [modalOpen,  setModalOpen] = useState(false);
-  const idleRef      = useRef<any>(null);
-
-  // Zero-rotation passed to VinylDisc so the disc is static relative to the
-  // platter — the outer Animated.View provides the actual idle spin,
-  // keeping the entire record (grooves + label) spinning as one unit.
-  const idleRotate   = idleSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const staticRotate = idleSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '0deg'] });
-  const armRot       = tonearmAngle.interpolate({ inputRange: [0, 1], outputRange: ['-18deg', '4deg'] });
-
-  const startIdleSpin = () => {
-    idleRef.current = Animated.loop(
-      Animated.timing(idleSpin, { toValue: 1, duration: 8000, easing: Easing.linear, useNativeDriver: true })
-    );
-    idleRef.current.start();
-  };
-
-  useEffect(() => {
-    startIdleSpin();
-    return () => idleRef.current?.stop();
-  }, []);
-
-  const handlePress = () => {
-    idleRef.current?.stop();
-    setModalOpen(true);
-  };
-
-  const handleModalClose = () => {
-    setModalOpen(false);
-    startIdleSpin();
-  };
-
-  return (
-    <TouchableOpacity onPress={handlePress} activeOpacity={0.9} style={pv.scene}>
-      <View style={pv.glowOrb} />
-      <View style={pv.tapHint}>
-        <Ionicons name="play" size={9} color="rgba(255,255,255,0.4)" />
-        <Text style={pv.tapHintText}>tap to open</Text>
-      </View>
-
-      {/* Shared positioning container — tonearm sits here, static, while platter spins */}
-      <View style={{ width: PV_PLATTER, height: PV_PLATTER }}>
-        {/* Spinning platter — entire record (gold ring + disc + label) rotates as one */}
-        <Animated.View style={[pv.platter, {
-          width: PV_PLATTER, height: PV_PLATTER, borderRadius: PV_PLATTER / 2,
-          transform: [{ rotate: idleRotate }],
-        }]}>
-          <VinylDisc size={PV_RECORD} spin={staticRotate} showLabel />
-        </Animated.View>
-        {/* Tonearm — positioned in same container but outside spinning view */}
-        <Tonearm armLen={PV_ARM_LEN} armW={2} headW={9} headH={13} pivotX={PV_PIVOT_X} pivotY={PV_PIVOT_Y} rotation={armRot} />
-      </View>
-
-      <VinylFullscreen visible={modalOpen} onClose={handleModalClose} />
-    </TouchableOpacity>
-  );
-}
-
-const pv = StyleSheet.create({
-  scene: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#0a0a0a',
-  },
-  glowOrb: {
-    position: 'absolute',
-    width: PV_PLATTER + 80, height: PV_PLATTER + 80,
-    borderRadius: (PV_PLATTER + 80) / 2,
-    backgroundColor: 'rgba(200,134,10,0.09)',
-  },
-  tapHint: {
-    position: 'absolute', top: 10, right: 10,
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
-  },
-  tapHintText: { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '600' },
-  platter: {
-    backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 4, borderColor: '#C8960A',
-    shadowColor: '#C8960A', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.35, shadowRadius: 14, elevation: 10,
-  },
-});

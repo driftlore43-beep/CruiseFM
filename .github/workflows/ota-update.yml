@@ -1,17 +1,50 @@
 # Ship an over-the-air update from anywhere — including a phone.
 #
-# This is a BUTTON, not an automation: it only runs when you press "Run
-# workflow" in GitHub (Actions tab, or the GitHub mobile app). Nothing ships
-# on a plain push, so what goes out is still your call.
+# TWO WAYS IN.
 #
-# GitHub → Actions → "Ship OTA update" → Run workflow → pick a channel → Run.
+#   1. AUTOMATIC, preview only. Every push to the development branch publishes
+#      to the `preview` channel, which is the owner's own phone and the
+#      TestFlight testers. Added 13.08 after a day's work sat in the repo
+#      unpublished: pushing is not shipping, and "it's OTA" is only true of
+#      what the code COULD do until something actually sends it. Preview is
+#      the right channel to automate because it reaches people who have opted
+#      into unfinished work.
 #
-# Note this file is NOT a fingerprint source (unlike app.json, eas.json and
-# package.json), so adding it does not disturb OTA for installed builds.
+#   2. THE BUTTON, for everything else — a different channel, a build, a
+#      submission, or a diagnose. PRODUCTION IS NEVER AUTOMATIC: that channel
+#      is the public App Store app, and pushing a commit must never change what
+#      a stranger is running, or what Apple is reviewing.
+#
+# github.com → Actions → "Ship OTA update" → Run workflow → set "Use workflow
+# from" to this branch → pick a channel → Run.
+#
+# USE A BROWSER, NOT THE GITHUB MOBILE APP. The app has no "Run workflow"
+# button and cannot reach repo Settings, so it can neither trigger this nor
+# set the EXPO_TOKEN secret it needs. Mobile Safari on github.com is fine.
+#
+# EXPO_TOKEN is a repo secret (Settings → Secrets and variables → Actions),
+# made at expo.dev/settings/access-tokens. Without a valid one the run dies
+# early with "The bearer token is invalid" — which is exactly how the first
+# attempt at this failed.
+#
+# Note this file is NOT a runtime-version source (unlike app.json, eas.json
+# and package.json), so editing it never disturbs OTA for installed builds.
 
 name: Ship OTA update
 
 on:
+  # Automatic preview publishes. Confined to the development branch, and to
+  # changes that can actually reach a phone over the air: an update carries JS
+  # and assets only, so a docs or workflow edit publishing a new bundle is pure
+  # noise. Native changes need a build and are handled by the button.
+  push:
+    branches: [claude/cruise-fm-v4wk5f]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'app.json'
+      - 'package.json'
+      - 'package-lock.json'
   workflow_dispatch:
     inputs:
       channel:
@@ -25,11 +58,42 @@ on:
         description: 'Short note for the update log'
         type: string
         default: 'Update from GitHub'
+      mode:
+        description: 'publish an update, ask Expo what state things are in, or cut a new build'
+        type: choice
+        default: publish
+        options:
+          - publish
+          - diagnose
+          - build
+          - submit
+      build_profile:
+        description: 'build mode only — testflight goes to your phone, production goes to the store'
+        type: choice
+        default: testflight
+        options:
+          - testflight
+          - production
+
+# Everything below runs on Expo's servers via eas-cli, including `build` mode
+# (added 08.08) — which starts a real EAS build and returns immediately with a
+# link to watch. It takes 20+ minutes and costs a build slot, so it is behind
+# its own mode rather than being the default, but it means a build no longer
+# needs a Mac: the phone can start one.
 
 jobs:
   update:
-    name: eas update --branch ${{ inputs.channel }}
+    name: eas update --branch ${{ inputs.channel || 'preview' }}
     runs-on: ubuntu-latest
+    # A push carries no inputs, so the defaults ARE the automatic behaviour:
+    # publish, to preview. Everything below reads these rather than `inputs`,
+    # so a push and a button press follow exactly the same path — including
+    # every guard.
+    env:
+      CHANNEL: ${{ inputs.channel || 'preview' }}
+      MODE: ${{ inputs.mode || 'publish' }}
+      BUILD_PROFILE: ${{ inputs.build_profile || 'testflight' }}
+      NOTE: ${{ inputs.message || format('Push {0}', github.sha) }}
     steps:
       # "Use workflow from" decides which code gets bundled, and main is a long
       # way behind the branch the app is actually built from — publishing from
@@ -44,16 +108,30 @@ jobs:
           exit 1
 
       - name: Refuse production without a good reason
-        if: inputs.channel == 'production'
+        if: env.MODE == 'publish' && env.CHANNEL == 'production'
         run: |
           echo "::warning::Publishing to PRODUCTION. Never do this while the app"
           echo "::warning::is sitting in App Review — it changes the build Apple is looking at."
 
+      # Full history: preflight compares native module versions against the
+      # last build that was seen to LAUNCH, and reads that commit's lockfile.
+      # A default shallow clone has no such commit and every check downstream
+      # of it reports a false failure.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22, NOT 20, and the reason is external to this repo: eas-cli is
+          # installed at `latest`, and 22.4.0 pulled in a dependency requiring
+          # Node >= 22. On 25.08 that broke the job before a single check of
+          # ours ran — "The engine node is incompatible with this module" —
+          # which reads like a repo failure and is not one. React Native and
+          # metro both accept ^22.13.0 (they publish
+          # ^20.19.4 || ^22.13.0 || ^24.3.0 || >= 25.0.0), so this stays inside
+          # what the project itself supports.
+          node-version: 22
           cache: npm
 
       - uses: expo/expo-github-action@v8
@@ -64,25 +142,424 @@ jobs:
       - run: npm ci
 
       # The Spotify keys live in EAS, not in the repo (.env is gitignored). If
-      # they aren't set for this environment the update would publish with
-      # empty credentials and quietly break signing in — so stop first.
-      - name: Check the Spotify keys are present
+      # they aren't READABLE for this environment the update publishes with
+      # empty credentials and quietly breaks signing in — so stop first.
+      #
+      # Presence is not enough, which is why this asks for the values rather
+      # than grepping the names. A variable stored with `secret` visibility
+      # still appears in `env:list` by name, but eas-cli cannot read it back
+      # (only EAS Build can), so it would be inlined as empty while a
+      # name-only check reported green. `--include-sensitive` returns the real
+      # values for plaintext and sensitive vars; anything still masked as
+      # `*****` here is a secret and must have its visibility changed.
+      # ── Diagnose ────────────────────────────────────────────────────────
+      # Read-only. Lives in this workflow rather than its own file because
+      # GitHub only registers workflow_dispatch workflows that exist on the
+      # DEFAULT branch, and main is deliberately far behind — a new file on a
+      # feature branch is invisible to the Run workflow button and the API.
+      #
+      # Every command prints its own output including stderr and then
+      # continues, so one unsupported flag can't mask the rest.
+      - name: Ask Expo what state things are in
+        if: env.MODE == 'diagnose'
         run: |
-          set -e
-          vars=$(eas env:list --environment ${{ inputs.channel }} --non-interactive || true)
-          echo "$vars"
+          CH="${{ env.CHANNEL }}"
+          echo "════════ $CH channel → branch ════════"
+          eas channel:view "$CH" --non-interactive 2>&1 | head -30 || true
+          echo "════════ newest updates on the $CH branch ════════"
+          eas update:list --branch "$CH" --limit 4 --non-interactive 2>&1 | head -60 || true
+          echo "════════ the iOS builds people actually have ════════"
+          eas build:list --platform ios --limit 6 --non-interactive 2>&1 \
+            | grep -E "Build number|Runtime Version|Channel|Profile|Commit|Status|Version" || true
+          # A build that ERRORED is invisible in TestFlight and looks exactly
+          # like one that was never started, so always print WHY — the status
+          # word alone sent us hunting for a missing submit step (08.08).
+          echo "════════ how the newest iOS build ended, and why ════════"
+          # One-line python on purpose: a multi-line -c string starting at
+          # column 0 breaks this step's YAML block scalar.
+          eas build:list --platform ios --limit 1 --json --non-interactive 2>/dev/null \
+            | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; print("build", b.get("appBuildVersion"), b.get("status"), "| profile", b.get("buildProfile"), "| channel", b.get("channel")); print("url  ", b.get("buildUrl") or b.get("id")); print("error", json.dumps(b.get("error"), indent=2)); print("submitted to App Store Connect: THIS LINE CANNOT ANSWER THAT — see note")' || true
+          # THAT LINE HAS NEVER WORKED, AND IT TOOK UNTIL 08.09 TO NOTICE.
+          # It used to read `b["submissions"]` and print "no submission
+          # recorded against this build" — but `eas build:list` sends
+          # BuildFragment, and `submissions` lives only on
+          # BuildWithSubmissionsFragment, which NO cli command exposes as json
+          # (grep withSubmissionsByIdAsync: its one caller is runBuildAndSubmit).
+          # So the key was always absent and the line always printed the same
+          # words whatever the truth — which is exactly why the 29.08 entry
+          # records it saying "no submission recorded" about build 32 the day
+          # after build 32 was demonstrably submitted.
+          #
+          # A check that can only ever give one answer is worse than none,
+          # because it gets read as evidence. Deleting the claim rather than
+          # dressing it up: run `submit` mode, which now passes --verbose and
+          # prints the real reason from eas-cli's own submission logs.
+          echo "════════ what Xcode actually said, with file and line ════════"
+          # WHY THIS EXISTS: EAS's `error.message` is a SUMMARY — it names the
+          # compiler complaint and never the file or the line. Builds 40 and 41
+          # both died on "instance member 'padding' cannot be used on type
+          # 'View'", and two rounds were spent reasoning about which of eleven
+          # Swift files could produce it. Swift cannot be compiled in this
+          # environment, so the build IS the compiler, and a compiler that will
+          # not tell you where is barely a compiler at all.
+          #
+          # The full Xcode log is an artifact EAS keeps a signed URL for. Print
+          # the real `error:` lines instead of guessing at mechanisms — which is
+          # this project's own most-repeated lesson.
+          # NESTED UNDER `artifacts`, not top level — read out of eas-cli's own
+          # GraphQL fragment (graphql/types/Build.js) rather than guessed, which
+          # is the same shape trap the runtime guard hit on 01.09: a field whose
+          # name implies a string and is actually an object.
+          LOGS=$(eas build:list --platform ios --limit 1 --json --non-interactive 2>/dev/null \
+            | python3 -c 'import sys,json; b=json.load(sys.stdin)[0]; a=b.get("artifacts") or {}; print(a.get("xcodeBuildLogsUrl") or "")' || true)
+          if [ -n "$LOGS" ]; then
+            echo "log: $LOGS"
+            # curl, never Node fetch — this environment's proxy is picked up by
+            # one and not the other (04.09).
+            # --compressed matters: GCS serves this content-encoded, and
+            # without it curl hands back the encoded bytes, which look exactly
+            # like a corrupt file.
+            curl -sSL --compressed --max-time 120 "$LOGS" -o /tmp/xcode.log 2>/dev/null || true
+            if [ -s /tmp/xcode.log ]; then
+              echo "size: $(wc -c < /tmp/xcode.log) bytes"
+              echo "magic: $(head -c 8 /tmp/xcode.log | od -An -tx1 | tr -d ' \n')"
+              # DESPITE THE .txt NAME the file has arrived compressed more than
+              # once, so try each decompressor rather than trusting the
+              # extension — and say which one worked, because "no errors found"
+              # and "could not read the file" look identical otherwise.
+              rm -f /tmp/xcode.txt
+              if gzip -t /tmp/xcode.log 2>/dev/null; then
+                gunzip -c /tmp/xcode.log > /tmp/xcode.txt && echo "(gzip)"
+              elif command -v zstd >/dev/null && zstd -t /tmp/xcode.log 2>/dev/null; then
+                zstd -dc /tmp/xcode.log > /tmp/xcode.txt && echo "(zstd)"
+              elif command -v brotli >/dev/null && brotli -dc /tmp/xcode.log > /tmp/xcode.txt 2>/dev/null; then
+                echo "(brotli)"
+              elif command -v xz >/dev/null && xz -dc /tmp/xcode.log > /tmp/xcode.txt 2>/dev/null; then
+                echo "(xz)"
+              fi
+              if [ ! -s /tmp/xcode.txt ]; then
+                cp /tmp/xcode.log /tmp/xcode.txt
+                echo "(no decompressor matched — reading raw)"
+              fi
+              echo "--- compiler errors ---"
+              node scripts/xcode-errors.mjs /tmp/xcode.txt || true
+              echo "--- end ---"
+            else
+              echo "(log fetch returned nothing — open the url by hand)"
+            fi
+          else
+            echo "(no xcodeBuildLogsUrl on this build — nothing to fetch)"
+          fi
+          echo "════════ runtime version this code publishes as ════════"
+          npx expo config --type public --json 2>/dev/null \
+            | python3 -c "import sys,json; print(json.load(sys.stdin).get('runtimeVersion'))" || true
+          # The BUILD reads its environment from eas.json's `environment` key,
+          # not from the channel — the production profile builds against the
+          # `production` environment. If the Spotify keys are missing there,
+          # the store build ships with empty credentials and sign-in is broken
+          # for everyone who downloads it, which costs another whole build to
+          # fix. Read-only, and reports rather than failing: this mode exists
+          # to answer questions, not to gate anything.
+          echo "════════ Spotify keys in the '$CH' environment ════════"
+          if vars=$(eas env:list --environment "$CH" --include-sensitive --format short 2>&1); then
+            for key in EXPO_PUBLIC_SPOTIFY_CLIENT_ID EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET; do
+              line=$(echo "$vars" | grep -E "^${key}=" || true)
+              value=${line#*=}
+              if [ -z "$line" ]; then
+                echo "  $key: MISSING — a build here would have no Spotify credentials"
+              elif [ -z "$value" ] || case "$value" in '*****'*) true ;; *) false ;; esac; then
+                echo "  $key: present but NOT READABLE (stored as 'secret')"
+              else
+                echo "  $key: present and readable (${#value} chars)"
+              fi
+            done
+          else
+            echo "  could not read them; eas said:"
+            echo "$vars" | head -20
+          fi
+
+      # ── Build ───────────────────────────────────────────────────────────
+      # Starts an EAS build and returns as soon as it is queued, so the run
+      # finishes in a minute or two and the build carries on at Expo. Watch it
+      # at expo.dev, or in the emails EAS sends.
+      #
+      # PROFILE MATTERS AND IS EASY TO GET WRONG. `testflight` builds on the
+      # PREVIEW channel — that is the owner's phone and the TestFlight
+      # testers. `production` builds on the PRODUCTION channel, for the store.
+      # A production-profile build must never be installed on the test phone
+      # from TestFlight: it silently moves that phone off the preview channel
+      # and it stops receiving over-the-air updates (02.08, cost a day).
+      #
+      # A FINISHED BUILD IS NOT A TESTFLIGHT BUILD. EAS builds the binary and
+      # stops; App Store Connect never hears about it until something submits
+      # it, and TestFlight only lists what App Store Connect has. That gap is
+      # what made the 1.2.0 build look like it had never happened (08.08).
+      # `--auto-submit` closes it: EAS submits the moment the build finishes,
+      # server-side, so this run can still return in a minute. Apple then
+      # takes another 5-15 minutes to process before TestFlight shows it.
+      # THE GATE. Runs before anything is spent — a build costs 25 minutes and
+      # a slot, and a bad one costs a day. It checks the app's RESOLVED native
+      # configuration and the native module versions against the last build
+      # that was seen to launch; see scripts/preflight.mjs for what each check
+      # is protecting against and which build taught it.
+      - name: Preflight
+        if: env.MODE == 'build' || env.MODE == 'publish'
+        run: node scripts/preflight.mjs
+
+      # A BUILD READS ITS KEYS FROM THE PROFILE'S `environment`, NOT THE
+      # CHANNEL — the production profile builds against the `production`
+      # environment. If the Spotify keys are missing or unreadable there, the
+      # store binary ships with empty credentials, nobody can sign in, and it
+      # costs a whole review cycle to fix. The publish-path check below looks
+      # at the channel, which is the wrong question for a build.
+      - name: Check the Spotify keys for the environment this build will use
+        if: env.MODE == 'build'
+        run: |
+          set -euo pipefail
+          ENV=$([ "${{ env.BUILD_PROFILE }}" = "production" ] && echo production || echo preview)
+          echo "The ${{ env.BUILD_PROFILE }} profile builds against the '$ENV' environment."
+          if ! vars=$(eas env:list --environment "$ENV" --include-sensitive --format short 2>&1); then
+            echo "::error::Could not read EAS environment '$ENV'. eas said:"; echo "$vars"; exit 1
+          fi
           for key in EXPO_PUBLIC_SPOTIFY_CLIENT_ID EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET; do
-            echo "$vars" | grep -q "$key" || {
-              echo "::error::$key is not set for the '${{ inputs.channel }}' environment in EAS."
-              echo "::error::Add it at expo.dev → your project → Environment variables, then run this again."
-              exit 1
-            }
+            line=$(echo "$vars" | grep -E "^${key}=" || true)
+            value=${line#*=}
+            if [ -z "$line" ]; then
+              echo "::error::$key is not set in the '$ENV' environment — this build would ship with no Spotify credentials."; exit 1
+            fi
+            case "$value" in ''|'*****'*)
+              echo "::error::$key exists in '$ENV' but is stored as a secret, so the build inlines it empty. Change its visibility to Sensitive."; exit 1 ;;
+            esac
+            echo "  $key: present and readable (${#value} chars)"
           done
 
+      - name: Start an EAS build
+        if: env.MODE == 'build'
+        run: |
+          set -euo pipefail
+          echo "Starting a ${{ env.BUILD_PROFILE }} build for iOS from $(git rev-parse --short HEAD)."
+          # WHY THE OUTPUT IS CAPTURED: when the account's build quota is spent,
+          # eas-cli prints the explanation and THEN fails with a bare
+          # "Error: build command failed." — so the useful line is the one
+          # above the error and is easy to scroll past. On 19.08 a fully green
+          # sweep died here on "This account has used its iOS builds from the
+          # Free plan this month". Say so plainly instead of leaving the next
+          # person to diagnose the code.
+          set +e
+          eas build --platform ios --profile ${{ env.BUILD_PROFILE }} \
+            --auto-submit-with-profile ${{ env.BUILD_PROFILE }} \
+            --non-interactive --no-wait 2>&1 | tee /tmp/easbuild.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" -ne 0 ]; then
+            if grep -qi 'from the Free plan this month\|build quota\|used its .* builds' /tmp/easbuild.log; then
+              echo "::error::THE BUILD QUOTA IS SPENT, the code is fine. This account's iOS builds"
+              echo "::error::for the month are used up. Either wait for the reset date printed above,"
+              echo "::error::or lift it with a paid Expo plan at"
+              echo "::error::https://expo.dev/accounts/driftlore/settings/billing"
+              echo "::error::Note a failed attempt still increments the remote build number."
+            fi
+            exit "$code"
+          fi
+          echo "::notice::Build queued. Watch it at https://expo.dev/accounts/driftlore/projects/CruiseFM/builds"
+          # DO NOT TRUST --auto-submit TO HAVE WORKED. On 19.08 build 30 was
+          # started with the flag above, finished cleanly, and 38 minutes later
+          # diagnose still reported "no submission recorded against this build";
+          # running `submit` mode by hand uploaded it in 15 seconds. The likely
+          # reason is `--no-wait` on the line above: the CLI exits the moment
+          # the build is queued, so nothing is left attached to start the
+          # submission when it finishes. Unproven, and not worth guessing at —
+          # the reliable move is to check.
+          echo "::notice::WHEN IT FINISHES: run this workflow again in 'diagnose' mode and read the"
+          echo "::notice::'submitted to App Store Connect' line. If it says no submission is recorded,"
+          echo "::notice::run it once more in 'submit' mode — that takes the newest finished build."
+
+      # ── Submit ──────────────────────────────────────────────────────────
+      # For a build that already finished without being submitted — which is
+      # every build cut before --auto-submit was added above. Takes the newest
+      # finished iOS build on that profile and sends it to App Store Connect.
+      - name: Submit the newest build to App Store Connect
+        if: env.MODE == 'submit'
+        run: |
+          set -euo pipefail
+          echo "Submitting the newest ${{ env.BUILD_PROFILE }} iOS build."
+          # --verbose forces eas-cli's own downloadAndPrintSubmissionLogsAsync
+          # (submit/utils/logs.js) to run whatever the error code. Without it a
+          # failure prints "Something went wrong when submitting your app" and
+          # nothing else, which is unactionable — the same summary-with-no-file
+          # problem the Xcode log block below exists to solve.
+          eas submit --platform ios --profile ${{ env.BUILD_PROFILE }} --verbose \
+            --latest --non-interactive
+          echo "::notice::Submitted. Apple takes 5-15 minutes to process before TestFlight lists it."
+
+      - name: Check the Spotify keys are present AND readable
+        if: env.MODE == 'publish'
+        run: |
+          set -euo pipefail
+          # DO NOT add --non-interactive here. It is not one of env:list's
+          # flags — checked against eas-cli 21.4.0's own source, where the
+          # command declares exactly: include-sensitive, include-file-content,
+          # environment, format, scope. oclif rejects unknown flags outright,
+          # so passing it made this step die with "env:list command failed"
+          # and then report both keys as missing, which sent us hunting in
+          # expo.dev for variables that were there all along.
+          #
+          # The output is captured WITH stderr and printed on failure for the
+          # same reason: the original version swallowed it with `|| true`, so
+          # the one line that said what actually went wrong never appeared.
+          if ! vars=$(eas env:list --environment ${{ env.CHANNEL }} --include-sensitive --format short 2>&1); then
+            echo "::error::Could not read environment variables from EAS for '${{ env.CHANNEL }}'."
+            echo "::error::eas said:"
+            echo "$vars"
+            exit 1
+          fi
+          for key in EXPO_PUBLIC_SPOTIFY_CLIENT_ID EXPO_PUBLIC_SPOTIFY_CLIENT_SECRET; do
+            # Anchored to "KEY=" so a similarly-named variable can't satisfy it.
+            line=$(echo "$vars" | grep -E "^${key}=" || true)
+            if [ -z "$line" ]; then
+              echo "::error::$key is not set for the '${{ env.CHANNEL }}' environment in EAS."
+              echo "::error::Add it at expo.dev → your project → Environment variables, then run this again."
+              exit 1
+            fi
+            value=${line#*=}
+            case "$value" in
+              ''|'*****'*)
+                echo "::error::$key exists but its value cannot be read — it is stored with 'secret' visibility."
+                echo "::error::An update would ship it BLANK and break Spotify sign-in for everyone on this channel."
+                echo "::error::Change it to 'sensitive' at expo.dev → your project → Environment variables."
+                exit 1 ;;
+            esac
+            echo "$key: present and readable"
+          done
+
+      # THE GUARD THIS WORKFLOW WAS MISSING, and the reason a whole day went
+      # into "the update published fine but never arrived" (30.07).
+      #
+      # An update only ever reaches a build whose runtime version matches it
+      # EXACTLY. Nothing in eas-cli warns when nothing matches: the publish
+      # succeeds, the dashboard looks healthy, and the phone silently ignores
+      # it forever. So ask, before publishing, whether any real iOS build on
+      # this channel is actually listening on the number we're about to stamp.
+      - name: Check a real build is listening on this runtime version
+        if: env.MODE == 'publish'
+        run: |
+          set -euo pipefail
+          mine=$(npx expo config --type public --json \
+            | python3 -c "import sys,json; print(json.load(sys.stdin).get('runtimeVersion') or '')")
+          if [ -z "$mine" ]; then
+            echo "::error::app.json has no runtimeVersion. It must be a literal string, e.g. \"1.0.0\"."
+            exit 1
+          fi
+          echo "this update would publish as runtime: $mine"
+
+          # NOTE the 2>/dev/null: a failure here used to become '[]', which the
+          # check below then treated as "nothing to compare against" and let
+          # through. It now fails closed, so a broken list stops the publish
+          # rather than silently blessing it.
+          builds=$(eas build:list --platform ios --limit 12 --json --non-interactive 2>/dev/null || echo '[]')
+          # The build list goes in through the ENVIRONMENT, not a pipe: the
+          # heredoc below is already using stdin to carry the script, so a
+          # piped `echo "$builds"` would have python reading its own source.
+          CFM_BUILDS="$builds" CFM_MINE="$mine" CFM_CHANNEL="${{ env.CHANNEL }}" python3 <<'PY'
+          import json, os, sys
+          mine, channel = os.environ["CFM_MINE"], os.environ["CFM_CHANNEL"]
+
+          # THIS CHECK FAILED OPEN AND NOBODY NOTICED, 01.09. It published an
+          # update at runtime 1.4.0 to a channel whose newest build is 1.3.0 —
+          # i.e. to nobody — and reported success. Cause: it read the channel
+          # as b["channel"], and in `build:list --json` that key is not there
+          # (diagnose gets the channel right only because it greps the HUMAN
+          # output instead). So `on_channel` was empty every time, and empty
+          # took the "nothing to compare against, carry on" branch.
+          #
+          # A guard that cannot fail is worse than no guard, because it is
+          # read as evidence. Two changes: look for the channel in more than
+          # one place, and treat "could not check" as a FAILURE rather than a
+          # pass — the whole point of this step is to stop a publish that
+          # reaches no one, and a publish is always safe to retry.
+          # BOTH FIELDS THIS CHECK NEEDS ARE NESTED OBJECTS, not the strings
+          # their names suggest. Read from eas-cli's own GraphQL fragment
+          # (graphql/types/Build.js) rather than guessed at:
+          #
+          #     updateChannel { id name }      <- NOT `channel`
+          #     runtime       { id version }   <- NOT `runtimeVersion`
+          #
+          # That is the whole story of this guard's history. It compared
+          # b["channel"] (absent) to a channel name and b["runtimeVersion"]
+          # (absent) to a version, so both were None on every build, the
+          # candidate list came out empty, and empty took a branch that
+          # exited 0 — a guard printing reassurance while checking nothing.
+          def pick(b, keys, sub):
+              for key in keys:
+                  v = b.get(key)
+                  if isinstance(v, dict):
+                      v = v.get(sub)
+                  if isinstance(v, str) and v:
+                      return v
+              return None
+
+          def channel_of(b):
+              return pick(b, ("updateChannel", "channel", "buildChannel"), "name")
+
+          def runtime_of(b):
+              return pick(b, ("runtime", "runtimeVersion"), "version")
+
+          try:
+              builds = json.loads(os.environ.get("CFM_BUILDS") or "[]")
+          except Exception:
+              print("::error::Could not read the build list, so this update cannot be checked.")
+              print("::error::Refusing to publish blind. Re-run once `eas build:list` works.")
+              sys.exit(1)
+
+          finished = [b for b in builds if b.get("status") == "FINISHED"]
+          if not finished:
+              print("::error::No finished iOS builds at all — nothing to check this runtime against.")
+              sys.exit(1)
+
+          on_channel = [b for b in finished if channel_of(b) == channel]
+          # If NO build in the list exposes a channel, the field has moved
+          # again. Fall back to checking every finished build rather than
+          # silently checking none, and say plainly that is what happened.
+          scope = f"the '{channel}' channel"
+          if not on_channel and not any(channel_of(b) for b in finished):
+              print(f"::warning::No build in the list reports a channel — the field has moved.")
+              print("::warning::Falling back to checking ALL finished builds, which is weaker.")
+              on_channel, scope = finished, "any finished build"
+          elif not on_channel:
+              print(f"::error::No finished iOS build is on the '{channel}' channel.")
+              sys.exit(1)
+
+          seen = {runtime_of(b) for b in on_channel}
+          for b in on_channel[:6]:
+              label = b.get("appBuildVersion") or b.get("appVersion") or b.get("id", "?")[:8]
+              print(f"  build {label}  runtime {runtime_of(b)}  channel {channel_of(b)}")
+          if mine in seen:
+              print(f"OK — {scope} is listening on {mine}.")
+              sys.exit(0)
+          print(f"::error::Nothing on {scope} is listening on runtime {mine}.")
+          print(f"::error::Builds there are on: {', '.join(sorted(x or '?' for x in seen))}")
+          print("::error::This update would publish successfully and never reach a single phone.")
+          print("::error::Either a new build is still finishing, or app.json's runtimeVersion")
+          print("::error::was changed without cutting a build to match it.")
+          sys.exit(1)
+          PY
+
+      # --environment is LOAD-BEARING and nothing here will catch its absence.
+      # eas-cli's own "you forgot --environment" guard for SDK 55+ skips
+      # itself whenever CI or EAS_BUILD is set, and GitHub Actions always sets
+      # CI=true — so removing this flag produces no error, no prompt and no
+      # warning, just an update with empty Spotify credentials. Never drop it.
       - name: Publish
+        if: env.MODE == 'publish'
         run: >-
           eas update
-          --branch ${{ inputs.channel }}
-          --environment ${{ inputs.channel }}
-          --message "${{ inputs.message }}"
+          --branch ${{ env.CHANNEL }}
+          --environment ${{ env.CHANNEL }}
+          --message "${{ env.NOTE }}"
           --non-interactive
+
+  # (A second job on a macOS runner used to live here, to prove whether the
+  # operating system was why EAS's builds and our updates disagreed on the
+  # runtime version. It wasn't — macOS computed the same number Linux did.
+  # The runtime version is now a literal string in app.json, so there is no
+  # number to compute and nothing left for that job to answer.)

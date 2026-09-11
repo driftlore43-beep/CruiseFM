@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 
@@ -22,7 +22,7 @@ import { StationDetailModal } from '@/components/StationDetailModal';
 import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
-import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET, pageColumn } from '@/constants/theme';
+import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET, isWide, pageColumn } from '@/constants/theme';
 import { useStyles } from '@/context/AppearanceContext';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { needsOffAirAsk } from '@/constants/schedule';
@@ -76,6 +76,13 @@ function greetingFor(hour: number, returning: boolean): string {
 export default function CruiseScreen() {
   const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { width: winW } = useWindowDimensions();
+  // THE IPAD HAS NO "HEADING ANYWHERE?" TO ANSWER — sessionKind.ts already
+  // forces 'listening' there unconditionally, so both the ask and the switch
+  // would just be dead furniture: the ask can literally never fire (its
+  // trigger is "have I ever been asked", which is never true), and the switch
+  // would offer "Driving" as an option this device has no such mode for.
+  const tablet = isWide(winW);
   const router = useRouter();
   const np = useNowPlaying();
   // The focus callback is memoised, so anything it calls must be read through
@@ -242,7 +249,7 @@ export default function CruiseScreen() {
           contextName={spotify.contextName}
           onAsk={(mode) => setAdopt({ mode, station: null })}
         />
-        <HeadingAnywhereCard onAnswered={setKind} />
+        {!tablet && <HeadingAnywhereCard onAnswered={setKind} />}
 
         <HeroCard
           onStartDrive={handleStartDrive}
@@ -253,10 +260,12 @@ export default function CruiseScreen() {
           resuming={!!lastCruise}
         />
 
-        <SessionKindSwitch
-          kind={kind}
-          onChange={(k) => { setKind(k); void setSessionKind(k); }}
-        />
+        {!tablet && (
+          <SessionKindSwitch
+            kind={kind}
+            onChange={(k) => { setKind(k); void setSessionKind(k); }}
+          />
+        )}
 
         <View style={styles.connects}>
           <ConnectSpotifyCard />

@@ -3,7 +3,7 @@ import * as Brightness from 'expo-brightness';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, ImageBackground, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, ImageBackground, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { stationImageSource } from '@/utils/stationImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,7 +25,7 @@ import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { DriveStub } from '@/components/DriveStub';
 import { getDriveStats } from '@/utils/driveStats';
-import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
+import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT, isWide } from '@/constants/theme';
 import { useNowPlaying, WAKEABLE_NOTICES } from '@/context/NowPlayingContext';
 import { allowRotation, LANDSCAPE_READY, lockPortrait } from '@/utils/orientation';
 import { isSpotifyConnected, pause as pauseSpotify } from '@/utils/spotify';
@@ -138,6 +138,7 @@ const DIM_LEVEL = 0.35;
 function AutoDim() {
   const np = useNowPlaying();
   const { autoDim, daylight } = useMotion();
+  const { width: winW } = useWindowDimensions();
   const [dimmed, setDimmed] = useState(false);
   const origRef = useRef<number | null>(null);
 
@@ -145,6 +146,21 @@ function AutoDim() {
   // opposite of what you want with the sun on it, and a driver who then
   // reaches for the brightness slider ends up costing MORE battery than
   // the dim ever saved.
+  //
+  // AN IPAD TURNS IT OFF FOR THE SAME REASON, PERMANENTLY (owner, 12.09):
+  // this is the literal hardware-brightness dim — the head-unit courtesy of
+  // easing the screen down mid-drive so it doesn't blind you at night. An
+  // iPad propped up as an ambient visualiser is meant to be LOOKED at, not
+  // driven past, so dimming it after 30s idle is exactly backwards: the
+  // toggle is hidden on Profile there (see profile.tsx), but the setting's
+  // own stored default is still `true`, so the actual dimming has to be
+  // gated here too, not just the switch that offers it.
+  //
+  // NOTE this is deliberately NOT the same thing as a mode's own chrome-fade
+  // rest state (the controls disappearing after a few idle seconds while the
+  // scene keeps running) — that is a separate, per-mode mechanism and IS the
+  // ambient visualiser look this device wants. Only the screen's actual
+  // hardware brightness is switched off here.
   // …and so does an open sheet, for a harder reason than politeness. The mode
   // is already a modal window and the sheet is a second one; this catch layer
   // would be a third, and iOS silently refuses to present it while still
@@ -160,7 +176,7 @@ function AutoDim() {
   // pending behind a sheet, which is the safer side to err on — AutoDim
   // standing down too often costs nothing, mounting a third window freezes the
   // app (Ethan's Tuner freeze, 23.08).
-  const eligible = autoDim && !daylight && !!np.session && np.expanded && np.playing
+  const eligible = autoDim && !daylight && !isWide(winW) && !!np.session && np.expanded && np.playing
     && np.sheetCount === 0 && !np.playbackNotice && Platform.OS !== 'web';
 
   const restore = useCallback(async () => {

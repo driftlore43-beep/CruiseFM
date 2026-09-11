@@ -1,5 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
+import { Dimensions } from 'react-native';
+
+import { WIDE_MIN } from '@/constants/theme';
 
 /**
  * Driving, or just listening.
@@ -28,8 +31,42 @@ const KEY = 'cruisefm_session_kind';
 /** Sync mirror, so a render can read it without waiting. Primed on load. */
 let cached: SessionKind | null = null;
 
-/** The remembered answer, or null if they have never been asked. */
+/**
+ * THE IPAD HAS NO DRIVING MODE AT ALL (owner, 12.09): "I'll be removing the
+ * driving features from the iPad… make a music visualiser experience only."
+ * It is never in a car, never mounted on a dash — it is a stationary screen,
+ * so the honest answer is always 'listening' and there is no question to ask.
+ *
+ * SAME SIGNAL theme.ts ALREADY TRUSTS for "is this a tablet, not a phone":
+ * the widest iPhone this app runs on is 430pt and the smallest iPad clears
+ * 700pt, so a width check can never mistake one for the other in either
+ * orientation — no separate definition of "iPad" to keep in step.
+ *
+ * WHY THE OVERRIDE LIVES HERE rather than as a prop threaded down from a
+ * component: `cachedSessionKind()` is read from a dozen places with no
+ * window to hand it — widgets, notifications, the drive stats strip — so the
+ * one place they all already funnel through is the one place this has to be
+ * decided. `Dimensions.get`, not `useWindowDimensions`, because this file has
+ * no component to hook from; it never needs to react to rotation since an
+ * iPad's shorter edge never dips below the threshold either way.
+ */
+function isIPadWindow(): boolean {
+  try {
+    return Dimensions.get('window').width >= WIDE_MIN;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The remembered answer, or null if they have never been asked.
+ *
+ * On an iPad this is always 'listening' and NEVER null — that is what stops
+ * HeadingAnywhereCard ever asking (its whole trigger is `k === null`), with
+ * no change needed in that file at all.
+ */
 export async function loadSessionKind(): Promise<SessionKind | null> {
+  if (isIPadWindow()) { cached = 'listening'; return cached; }
   try {
     const raw = await AsyncStorage.getItem(KEY);
     cached = raw === 'driving' || raw === 'listening' ? raw : null;
@@ -39,8 +76,17 @@ export async function loadSessionKind(): Promise<SessionKind | null> {
   }
 }
 
-/** What the last load found, for callers that must not wait. */
+/**
+ * What the last load found, for callers that must not wait.
+ *
+ * The iPad override is unconditional here too, not just a default — it wins
+ * over whatever happens to be cached (there is nothing to cache anything
+ * OTHER than 'listening' from on this device, but this is the one function
+ * `DriveCheckCard` reads synchronously, so it is the one that must never be
+ * wrong even for a single frame before a load has run).
+ */
 export function cachedSessionKind(): SessionKind {
+  if (isIPadWindow()) return 'listening';
   return cached ?? 'driving';
 }
 

@@ -219,28 +219,27 @@ struct ModeView: View {
       // React Native SVG side of this app, which has none — so this is
       // genuine falloff rather than a stack of stepped rings.
       Circle().fill(s.accentColor.opacity(0.32))
-        .frame(width: 138, height: 138)
+        .frame(width: 146, height: 146)
         .blur(radius: 20)
         .offset(x: 6)
       // THE DISC ALL BUT FILLS THE CASE (owner, 10.09: "the CD is still quite
-      // small, I wanted the CD to fit like the 3rd image where the edges are
-      // close to the case"). 114 -> 124, and the ten points came from the two
-      // things standing in its way rather than from wishful thinking:
+      // small... the edges are close to the case"), grown again with case
+      // option D's slimmer frame (owner, 11.09 "D"). 124 -> 132:
       //
       //   THE HORIZONTAL IS THE BINDING AXIS, because the hinge eats one side.
-      //   On a ~158pt tile the case now runs x 8..150, the spine takes 12 off
-      //   the left, so the INTERIOR is x 20..150 — 130 wide, centred at 85,
-      //   i.e. 6pt right of the tile's own centre, which is where the offset
-      //   below comes from. A 124 disc there leaves ~3pt clear of the hinge
-      //   and ~3pt clear of the far wall.
+      //   With the frame at inset 5 the case now runs x 5..153 on a ~158pt
+      //   tile, the spine takes 12 off the left, so the INTERIOR is x 17..153
+      //   — 136 wide, still centred at 85 (the near and far walls both moved
+      //   out 3pt, so the centre held), i.e. 6pt right of the tile's centre,
+      //   which is where the offset below comes from. A 132 disc leaves ~2pt
+      //   clear of the hinge and ~2pt of the far wall.
       //
-      //   Vertically there is more room than that (~9pt top and bottom), and
-      //   it is deliberately not spent: a disc squeezed to the case's top and
-      //   bottom edges would foul the corner posts, which sit 7pt in.
+      //   Vertically there is room to spare and it is deliberately not spent:
+      //   a disc squeezed to the edges would foul the corner clips, at 6pt in.
       //
       // Centred on the case's INTERIOR rather than on the tile — dead centre
       // would leave the disc visibly closer to the hinge than to the far wall.
-      CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 124)
+      CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 132)
         .offset(x: 6)
     }
     .widgetURL(s.url(mode: "cd"))
@@ -572,45 +571,65 @@ struct MirrorBall: View {
 private struct JewelCase: View {
   var body: some View {
     ZStack {
+      // ── the glass body ──
       RoundedRectangle(cornerRadius: caseRadius)
         .fill(LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.02), .white.opacity(0.10)],
                              startPoint: .topLeading, endPoint: .bottomTrailing))
-        // THE OUTER STROKE, LIGHTENED (owner, 10.09: "reduce the heavy outer
-        // frame/borders"). 2pt at 0.30 is a genuinely bold line at this
-        // scale; the plastic is already carried by the fill and the diagonal
-        // sweep below, so the stroke only needs to mark the edge, not draw
-        // it. Halved on both counts.
-        .overlay(RoundedRectangle(cornerRadius: caseRadius).stroke(.white.opacity(0.16), lineWidth: 1))
+        // The outer stroke marks the edge, not draws it (owner, 10.09:
+        // "reduce the heavy outer frame/borders"); the plastic is carried by
+        // the fill, the bevel and the sweeps below.
+        .overlay(RoundedRectangle(cornerRadius: caseRadius).stroke(.white.opacity(0.14), lineWidth: 1))
 
-      // hinge spine — the tabs down it are the "side buttons" (owner, 10.09:
-      // "make the side buttons more subtle"), quieted the same way as the
-      // frame: less fill, less stroke.
+      // ── INNER BEVEL (case option D, owner 11.09 "D"): a dark line on the
+      // wall and a highlight just inside it, so the plastic reads with real
+      // depth rather than as a flat panel. ──
+      RoundedRectangle(cornerRadius: caseRadius - 1).inset(by: 1)
+        .stroke(Color(hex: "#05070e").opacity(0.26), lineWidth: 1)
+      RoundedRectangle(cornerRadius: caseRadius - 3).inset(by: 3)
+        .stroke(.white.opacity(0.12), lineWidth: 1)
+
+      // ── BARREL HINGE down the spine (case option D): a rod with two
+      // knuckles and their pins, plus a frosted CRUISE FM spine, in place of
+      // the old three flat tabs. ──
       HStack(spacing: 0) {
         LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.04)],
                        startPoint: .leading, endPoint: .trailing)
           .frame(width: 12)
           .overlay(HStack { Spacer(); Rectangle().fill(.white.opacity(0.20)).frame(width: 1) })
           .overlay(
-            VStack(spacing: 14) {
-              ForEach(0..<3, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: 2)
-                  .fill(.white.opacity(0.09))
-                  .overlay(RoundedRectangle(cornerRadius: 2).stroke(.white.opacity(0.14), lineWidth: 1))
-                  .frame(width: 8, height: 19)
+            Text("CRUISE FM")
+              .font(.system(size: 4.5, weight: .semibold, design: .monospaced))
+              .tracking(1.5)
+              .foregroundColor(.white.opacity(0.28))
+              .fixedSize()
+              .rotationEffect(.degrees(-90)))
+          .overlay(Rectangle().fill(.white.opacity(0.26)).frame(width: 1).padding(.vertical, 18))
+          .overlay(
+            VStack(spacing: 20) {
+              ForEach(0..<2, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: 4.5)
+                  .fill(.white.opacity(0.14))
+                  .overlay(RoundedRectangle(cornerRadius: 4.5).stroke(.white.opacity(0.26), lineWidth: 1))
+                  .frame(width: 9, height: 24)
+                  .overlay(
+                    Circle().fill(Color(hex: "#0a0c12").opacity(0.55))
+                      .frame(width: 4.4, height: 4.4)
+                      .overlay(Circle().stroke(.white.opacity(0.34), lineWidth: 0.7)))
               }
             })
         Spacer(minLength: 0)
       }
 
-      // corner posts, also quieted with the rest of the frame
+      // ── moulded corner clips (case option D): quieter glossy brackets ──
       VStack {
-        HStack { post(.topLeading); Spacer(); post(.topTrailing) }
+        HStack { clip(.topLeading); Spacer(); clip(.topTrailing) }
         Spacer()
-        HStack { post(.bottomLeading); Spacer(); post(.bottomTrailing) }
+        HStack { clip(.bottomLeading); Spacer(); clip(.bottomTrailing) }
       }
-      .padding(7)
+      .padding(6)
 
-      // one diagonal sweep of light on the plastic
+      // ── DUAL sweep of light on the plastic + a crisp top-edge glass
+      // highlight (case option D) ──
       RoundedRectangle(cornerRadius: caseRadius)
         .fill(LinearGradient(stops: [
           .init(color: .white.opacity(0.20), location: 0.04),
@@ -618,34 +637,38 @@ private struct JewelCase: View {
           .init(color: .clear, location: 0.74),
           .init(color: .white.opacity(0.10), location: 0.96),
         ], startPoint: .topLeading, endPoint: .bottomTrailing))
+      RoundedRectangle(cornerRadius: caseRadius)
+        .fill(LinearGradient(stops: [
+          .init(color: .white.opacity(0.10), location: 0.0),
+          .init(color: .clear, location: 0.34),
+        ], startPoint: .topTrailing, endPoint: .bottomLeading))
     }
     .padding(caseInset)
     .allowsHitTesting(false)
   }
 
-  /// A CORNER SURVIVES WHEN ITS INSET PLUS ITS RADIUS REACH THE TILE'S.
-  /// A widget clips to a rounded rectangle of roughly 22pt, so the old
-  /// 4pt-radius case sitting 11pt in had its four corners sliced off by the
-  /// tile — the owner's "ensure the CD case is not cut off from the widget
-  /// shape". 10 + 14 = 24 clears it, and a real slimline case has generous
-  /// corners anyway (the app's own CD deck settled that on 03.08).
-  ///
-  /// TIGHTENED AGAIN 10.09 to make room for a bigger disc (owner: "the CD is
-  /// still quite small, I wanted the CD to fit like the 3rd image where the
-  /// edges are close to the case"). 8 + 16 = 24 still clears the tile, and
-  /// the two points the case gives up go straight to the disc.
-  private var caseInset: CGFloat { 8 }
-  private var caseRadius: CGFloat { 16 }
+  /// SLIMMER FRAME (case option D, owner 11.09 "D"): 5 + 13 = 18. The old rule
+  /// of thumb — inset + radius should reach the tile's ~22pt clip so the
+  /// corners are not sliced — is SUFFICIENT, not necessary: a 13pt-radius
+  /// corner sitting 5pt in still falls entirely inside the tile's 22pt-radius
+  /// clip (its nearest point to the tile corner is ~18.7pt from the clip's
+  /// corner centre, inside 22), so no corner is lost and the three points off
+  /// the frame go straight to a bigger disc.
+  private var caseInset: CGFloat { 5 }
+  private var caseRadius: CGFloat { 13 }
 
-  private func post(_ corner: Alignment) -> some View {
+  /// A glossy moulded corner clip — two rounded ribs meeting at the corner,
+  /// thicker and brighter than the old hairline L so it reads as a reinforced
+  /// plastic corner (case option D).
+  private func clip(_ corner: Alignment) -> some View {
     let top = corner == .topLeading || corner == .topTrailing
     let leading = corner == .topLeading || corner == .bottomLeading
     return ZStack {
-      VStack { if !top { Spacer() }; Rectangle().frame(height: 1.8); if top { Spacer() } }
-      HStack { if !leading { Spacer() }; Rectangle().frame(width: 1.8); if leading { Spacer() } }
+      VStack { if !top { Spacer() }; RoundedRectangle(cornerRadius: 1.6).frame(height: 3.2); if top { Spacer() } }
+      HStack { if !leading { Spacer() }; RoundedRectangle(cornerRadius: 1.6).frame(width: 3.2); if leading { Spacer() } }
     }
-    .foregroundColor(.white.opacity(0.22))
-    .frame(width: 15, height: 15)
+    .foregroundColor(.white.opacity(0.44))
+    .frame(width: 17, height: 17)
   }
 }
 

@@ -2,7 +2,7 @@
 #
 # TWO WAYS IN.
 #
-#   1. AUTOMATIC, preview only. Every push to the development branch publishes
+#   1. AUTOMATIC, preview only. Every push to `main` publishes
 #      to the `preview` channel, which is the owner's own phone and the
 #      TestFlight testers. Added 13.08 after a day's work sat in the repo
 #      unpublished: pushing is not shipping, and "it's OTA" is only true of
@@ -16,7 +16,7 @@
 #      a stranger is running, or what Apple is reviewing.
 #
 # github.com → Actions → "Ship OTA update" → Run workflow → set "Use workflow
-# from" to this branch → pick a channel → Run.
+# from" to main → pick a channel → Run.
 #
 # USE A BROWSER, NOT THE GITHUB MOBILE APP. The app has no "Run workflow"
 # button and cannot reach repo Settings, so it can neither trigger this nor
@@ -33,12 +33,12 @@
 name: Ship OTA update
 
 on:
-  # Automatic preview publishes. Confined to the development branch, and to
+  # Automatic preview publishes. Confined to `main`, and to
   # changes that can actually reach a phone over the air: an update carries JS
   # and assets only, so a docs or workflow edit publishing a new bundle is pure
   # noise. Native changes need a build and are handled by the button.
   push:
-    branches: [claude/cruise-fm-v4wk5f]
+    branches: [main]
     paths:
       - 'src/**'
       - 'assets/**'
@@ -95,18 +95,6 @@ jobs:
       BUILD_PROFILE: ${{ inputs.build_profile || 'testflight' }}
       NOTE: ${{ inputs.message || format('Push {0}', github.sha) }}
     steps:
-      # "Use workflow from" decides which code gets bundled, and main is a long
-      # way behind the branch the app is actually built from — publishing from
-      # it would push a stale bundle to the owner's phone AND every TestFlight
-      # tester. Hard stop. Remove this once main catches up.
-      - name: Refuse to publish stale code from main
-        if: github.ref_name == 'main'
-        run: |
-          echo "::error::'Use workflow from' was set to main, which is far behind the branch the app is built from."
-          echo "::error::Publishing this would send an old version of Cruise FM to your phone and to TestFlight."
-          echo "::error::Press Run workflow again and choose claude/cruise-fm-v4wk5f instead."
-          exit 1
-
       - name: Refuse production without a good reason
         if: env.MODE == 'publish' && env.CHANNEL == 'production'
         run: |

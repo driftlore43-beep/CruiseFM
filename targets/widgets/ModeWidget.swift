@@ -672,36 +672,60 @@ private struct DiffractionFan: View {
   let spread: Double
   let strength: Double
 
+  // The station's own reference disc, sampled 11.09: its vivid bands are
+  // PINK/MAGENTA (~310-325deg), VIOLET (~262-278), BLUE and TURQUOISE/TEAL
+  // (~186-210). The yellow-gold a raw photo shows is the silver metal itself,
+  // not the diffraction — so the spectrum drops the generic green/yellow/
+  // orange the old wheel carried and runs pink -> violet -> blue -> turquoise.
+  private static let spectrumStops: [Gradient.Stop] = [
+    .init(color: .clear, location: 0.00),
+    .init(color: Color(hex: "#ff5ec8").opacity(0.5), location: 0.12),
+    .init(color: Color(hex: "#b57cff"), location: 0.30),
+    .init(color: Color(hex: "#5a9cff"), location: 0.50),
+    .init(color: Color(hex: "#2fd6dc"), location: 0.68),
+    .init(color: Color(hex: "#9bede0").opacity(0.6), location: 0.86),
+    .init(color: .clear, location: 1.00),
+  ]
+
   var body: some View {
-    Circle()
-      .fill(RadialGradient(stops: [
-        .init(color: .clear, location: 0.00),
-        .init(color: Color(hex: "#5b3bff").opacity(0.45), location: 0.12),
-        .init(color: Color(hex: "#2bc0ff"), location: 0.28),
-        .init(color: Color(hex: "#48ffc0"), location: 0.43),
-        .init(color: Color(hex: "#ffe86b"), location: 0.58),
-        .init(color: Color(hex: "#ff8a3c"), location: 0.72),
-        .init(color: Color(hex: "#ff4d8f").opacity(0.55), location: 0.87),
-        .init(color: .clear, location: 1.00),
-      ], center: .center, startRadius: size * 0.13, endRadius: size * 0.52))
-      // The trailing-closure `mask(alignment:content:)`, not the older
-      // `mask(_:)` that takes a view — that one has been deprecated since
-      // iOS 15, and a deprecation warning in a build log is one more line
-      // to read past when something real goes wrong.
-      .mask {
-        // The wedge is built with its peak at location 0.5 and the whole
-        // gradient then TURNED so that 0.5 lands on the bearing — an
-        // AngularGradient's location 0 sits at its own `angle`, so half a
-        // turn back is what puts the peak where it was asked for. Writing
-        // the wedge across the 0/1 seam instead would need two stop runs and
-        // is the kind of thing that is invisibly wrong without a compiler to
-        // argue with.
-        Circle().fill(
-          AngularGradient(stops: wedgeStops(), center: .center,
-                          angle: .degrees(bearing - 180)))
-      }
-      .blendMode(.screen)
-      .opacity(strength)
+    ZStack {
+      Circle()
+        .fill(RadialGradient(stops: Self.spectrumStops, center: .center,
+                             startRadius: size * 0.13, endRadius: size * 0.52))
+      // THE TRACKS CATCH THE FAN'S LIGHT (owner, 11.09: "make them more
+      // visible near the reflected area on the rainbow"). The SAME pitch and
+      // phase as the disc's base tracks (pressedRingStops), so this reads as
+      // those tracks lit rather than a second set beating against them.
+      // Screened over the spectrum inside this group, so the colour is broken
+      // into the fine concentric lines a real pressing shows most where it
+      // throws a rainbow. The hub graphic covers the inner turns.
+      Circle()
+        .fill(RadialGradient(stops: pressedRingStops(0.60), center: .center,
+                             startRadius: 0, endRadius: size / 2))
+        .blendMode(.screen)
+    }
+    // Flatten the spectrum + tracks before the wedge mask and the outer
+    // screen apply, so the inner `.screen` composites against the spectrum
+    // rather than against the disc behind the whole fan.
+    .compositingGroup()
+    // The trailing-closure `mask(alignment:content:)`, not the older
+    // `mask(_:)` that takes a view — that one has been deprecated since
+    // iOS 15, and a deprecation warning in a build log is one more line
+    // to read past when something real goes wrong.
+    .mask {
+      // The wedge is built with its peak at location 0.5 and the whole
+      // gradient then TURNED so that 0.5 lands on the bearing — an
+      // AngularGradient's location 0 sits at its own `angle`, so half a
+      // turn back is what puts the peak where it was asked for. Writing
+      // the wedge across the 0/1 seam instead would need two stop runs and
+      // is the kind of thing that is invisibly wrong without a compiler to
+      // argue with.
+      Circle().fill(
+        AngularGradient(stops: wedgeStops(), center: .center,
+                        angle: .degrees(bearing - 180)))
+    }
+    .blendMode(.screen)
+    .opacity(strength)
   }
 
   private func wedgeStops() -> [Gradient.Stop] {
@@ -718,6 +742,33 @@ private struct DiffractionFan: View {
   }
 }
 
+/// The pressed CD's fine concentric tracks, as gradient stops. A real disc's
+/// data pitch is a few hundred nanometres — far below anything a screen can
+/// resolve — so what a photo shows is a soft shimmer, not rings you could
+/// count. THINNED 11.09 (owner: "the grooves are too thick, thin them out a
+/// little"): the white band is 0.26 of the pitch rather than half.
+///
+/// Shared by two callers at the SAME pitch and phase so they align instead of
+/// beating: the disc's faint base layer everywhere (low opacity), and each
+/// DiffractionFan's brighter tracks inside its own wedge (owner: "make them
+/// more visible near the reflected area on the rainbow") — a real pressing
+/// shows its tracks most where the rainbow lands.
+///
+/// A free function rather than inline so the locations are unambiguously
+/// CGFloat — an implicit Double bridge is the kind of thing that compiles
+/// locally and costs a build cycle when it does not, and Swift cannot be
+/// compiled in the environment this is written in.
+fileprivate func pressedRingStops(_ opacity: Double) -> [Gradient.Stop] {
+  var out: [Gradient.Stop] = []
+  var t: CGFloat = 0
+  while t < 1 {
+    out.append(Gradient.Stop(color: .white.opacity(opacity), location: t))
+    out.append(Gradient.Stop(color: .clear, location: min(1, t + 0.022)))
+    t += 0.085
+  }
+  return out
+}
+
 /// A disc with the last cover printed on it, under the diffraction the plastic
 /// throws. The rainbow sits OVER the art rather than under it, because a CD's
 /// sheen is on its surface — the app's own CD deck settled this on 03.08.
@@ -725,32 +776,6 @@ struct CompactDisc: View {
   let cover: Image?
   let accent: Color
 
-  /// The pressed rings, EASED (owner, 10.09: "ease on the CD's crevices' CDs
-  /// are that textured" — she means the opposite of "are", the grooves read
-  /// as a target printed on the disc rather than the near-invisible sheen a
-  /// real pressing has). A real CD's data pitch is a few hundred nanometres —
-  /// thousands of grooves per millimetre, far below anything a screen can
-  /// resolve, so what a photo of one actually shows is a soft, barely-there
-  /// shimmer, not rings you could count. EASED AGAIN 11.09 (owner: "ease on
-  /// the CD grooves, they're not meant to be that significant") — opacity
-  /// 0.04 -> 0.02 and pitch 0.07 -> 0.085 of the radius, halving them once
-  /// more so they read as the barely-there shimmer a pressing shows rather
-  /// than a faint target.
-  ///
-  /// Built here rather than inline so the locations are unambiguously
-  /// CGFloat — an implicit Double bridge is the kind of thing that compiles
-  /// locally and costs a build cycle when it does not, and Swift cannot be
-  /// compiled in the environment this is written in.
-  private func ringStops() -> [Gradient.Stop] {
-    var out: [Gradient.Stop] = []
-    var t: CGFloat = 0
-    while t < 1 {
-      out.append(Gradient.Stop(color: .white.opacity(0.02), location: t))
-      out.append(Gradient.Stop(color: .clear, location: min(1, t + 0.0425)))
-      t += 0.085
-    }
-    return out
-  }
   let size: CGFloat
 
   var body: some View {
@@ -851,12 +876,12 @@ struct CompactDisc: View {
         .blendMode(.screen)
         .opacity(0.42)
 
-      // The pressed rings. Fine enough to read as texture rather than as
-      // drawn circles — the same pitch rule the app's Classic vinyl settled
-      // on (25.08): below about 1.2pt apart they moiré, above ~4 they read
-      // as a target printed on a disc.
+      // The base pressed tracks, faint everywhere on the silver (opacity
+      // 0.015, thinned). The DiffractionFans lift these SAME tracks where the
+      // rainbow lands, so what reads as "grooves in the rainbow" is the base
+      // shimmer lit rather than a second set of lines.
       Circle().fill(
-        RadialGradient(stops: ringStops(), center: .center,
+        RadialGradient(stops: pressedRingStops(0.015), center: .center,
                        startRadius: 0, endRadius: size / 2))
       // THE SPECULAR SWEEP, TIGHTENED for a crisper gloss rather than a broad
       // soft wash — a narrower, brighter streak is what a genuine reflective

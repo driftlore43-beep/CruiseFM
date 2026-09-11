@@ -64,14 +64,18 @@ def screen(dst, src, a):
     return dst * (1 - a[..., None]) + s * a[..., None]
 
 # ── the disc ─────────────────────────────────────────────────────────────
+# The station's own reference disc, sampled 11.09 (docs/design + /tmp/cd_ref):
+# the vivid bands are PINK/MAGENTA (~310-325deg), VIOLET (~262-278), BLUE and
+# TURQUOISE/TEAL (~186-210). The yellow-gold in a raw photo is the silver metal
+# itself, not the diffraction — so the spectrum drops the generic green/yellow/
+# orange the old wheel carried and runs pink -> violet -> blue -> turquoise.
 SPECTRUM = [
     (0.00, (0, 0, 0), 0.0),
-    (0.12, hexc('#5b3bff'), 0.45),
-    (0.28, hexc('#2bc0ff'), 1.0),
-    (0.43, hexc('#48ffc0'), 1.0),
-    (0.58, hexc('#ffe86b'), 1.0),
-    (0.72, hexc('#ff8a3c'), 1.0),
-    (0.87, hexc('#ff4d8f'), 0.55),
+    (0.12, hexc('#ff5ec8'), 0.5),
+    (0.30, hexc('#b57cff'), 1.0),
+    (0.50, hexc('#5a9cff'), 1.0),
+    (0.68, hexc('#2fd6dc'), 1.0),
+    (0.86, hexc('#9bede0'), 0.6),
     (1.00, (0, 0, 0), 0.0),
 ]
 METAL = [(0.00, (1, 1, 1), 0.20), (0.17, (1, 1, 1), 0.02), (0.34, (1, 1, 1), 0.26),
@@ -146,6 +150,11 @@ def disc(option, size=DISC):
         r0, r1 = 0.13 * n, 0.52 * n
         t = np.clip((d - r0) / (r1 - r0), 0, 1)
         spec, sa = stops_at(SPECTRUM, t)
+        # Fine concentric tracks, THINNED (owner 11.09: "the grooves are too
+        # thick, thin them out a little") and made to CATCH THE LIGHT in the
+        # fans ("make them more visible near the reflected area on the
+        # rainbow"). Same pitch as the base rings below so the two align.
+        track = np.where(((d / R) % 0.085) / 0.085 < 0.26, 1.0, 0.0)
         for bearing, spread, strength in fans:
             # DiffractionFan turns the wedge back half a revolution so its
             # peak (location 0.5) lands on the bearing.
@@ -153,6 +162,9 @@ def disc(option, size=DISC):
             loc = ((ang - gangle) % 360) / 360.0
             _, wa = stops_at(wedge_stops(spread), loc)
             img = screen(img, spec, wa * sa * strength)
+            # the tracks brighten where this fan's rainbow lands — gated by
+            # the same wedge and the spectrum's own radial falloff.
+            img = screen(img, np.ones_like(img), wa * sa * strength * track * 0.65)
         mloc = ((ang - (-30 - 90)) % 360) / 360.0
         _, ma = stops_at(METAL, mloc)
         img = screen(img, np.ones_like(img), ma * 0.55)
@@ -165,15 +177,14 @@ def disc(option, size=DISC):
         # into the flat colour-wheel of option A.
         img = screen(img, np.full_like(img, 0.62), np.full(ang.shape, 0.42))
 
-    # pressed rings, EASED AGAIN 11.09 — opacity 0.04 -> 0.02, pitch
-    # 0.07 -> 0.085 of the radius (owner: "ease on the CD grooves, they're
-    # not meant to be that significant"). A real CD's groove pitch is
-    # nanometres, far below anything a photo resolves; halving the opacity
-    # and widening the pitch again turns them from a faint target into the
-    # barely-there shimmer a pressing actually shows.
+    # The base tracks everywhere on the silver — THINNED (owner 11.09: "too
+    # thick, thin them out a little"): the white band is now 0.26 of the
+    # pitch rather than half, at opacity 0.015. On plain metal they are a
+    # barely-there shimmer; the fan loop above lifts the SAME tracks where
+    # the rainbow lands, which is where a real disc shows them most.
     ring_t = d / R
     phase = (ring_t % 0.085) / 0.085
-    ring_a = np.where(phase < 0.5, 0.02, 0.0)
+    ring_a = np.where(phase < 0.26, 0.015, 0.0)
     img = over(img, np.ones_like(img), ring_a)
 
     # specular sweep, topLeading -> bottomTrailing

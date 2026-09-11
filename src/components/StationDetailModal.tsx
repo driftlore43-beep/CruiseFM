@@ -23,7 +23,7 @@ import { useDsegFonts } from '@/components/StationIdentity';
 import { isCustomStation, type CustomStation } from '@/utils/customStations';
 import { backOnLabel, isOnAir, needsOffAirAsk } from '@/constants/schedule';
 import { OffAirAsk } from '@/components/OffAirAsk';
-import { Cruise } from '@/constants/theme';
+import { Cruise, PAGE_MAX_W } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { useTheme } from '@/context/ThemeContext';
@@ -47,6 +47,8 @@ import {
 } from '@/utils/stationPlaylists';
 
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get('window');
+/** The width the page's content actually gets, once capped to the column. */
+const COL_W = Math.min(SCREEN_W, PAGE_MAX_W);
 const APPLE_MUSIC_RED = '#FA243C';
 const SPOTIFY_GREEN = '#1DB954';
 
@@ -580,7 +582,11 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#02020c' },
   dragPill: { position: 'absolute', alignSelf: 'center', zIndex: 10, alignItems: 'center' },
   pillBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.4)' },
-  content: { paddingHorizontal: 24 },
+  // Same reading column as every page behind this one (PAGE_MAX_W). Left
+  // full-bleed, an iPad gave each mode chip ~480 points and spread Start
+  // Drive across a metre of glass — a phone sheet blown up rather than a
+  // page. Never binds on a phone; see PAGE_MAX_W.
+  content: { paddingHorizontal: 24, width: '100%', maxWidth: PAGE_MAX_W, alignSelf: 'center' },
 
   // ── Custom-station chrome ──
   customHero: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 14, zIndex: 5 },
@@ -680,7 +686,9 @@ const styles = StyleSheet.create({
   },
   modeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 28 },
   modeBtn: {
-    width: (SCREEN_W - 48 - 10) / 2,
+    // Two to a row, measured off the COLUMN rather than the screen — the
+    // column is what the chips actually sit in once it is capped.
+    width: (COL_W - 48 - 10) / 2,
     backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 14,
     paddingVertical: 16, paddingHorizontal: 14,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)',

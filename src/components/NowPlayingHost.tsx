@@ -25,7 +25,7 @@ import { STATIONS } from '@/constants/stations';
 import { resolveAnyStation } from '@/utils/customStations';
 import { DriveStub } from '@/components/DriveStub';
 import { getDriveStats } from '@/utils/driveStats';
-import { TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
+import { PAGE_GUTTER, PAGE_MAX_W, TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
 import { useNowPlaying, WAKEABLE_NOTICES } from '@/context/NowPlayingContext';
 import { allowRotation, LANDSCAPE_READY, lockPortrait } from '@/utils/orientation';
 import { isSpotifyConnected, pause as pauseSpotify } from '@/utils/spotify';
@@ -424,6 +424,12 @@ const mp = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     width: '100%',
+    // THE PLAYER LINES UP WITH THE TAB BAR BENEATH IT. Same cap, same reason
+    // as _layout's bar (31.07): left to run the full width of an iPad it
+    // overshot both the tab bar and the column of cards above, and read as a
+    // strip borrowed from another screen. `wrap` already centres us.
+    // Never binds on a phone — see PAGE_MAX_W.
+    maxWidth: PAGE_MAX_W - PAGE_GUTTER * 2,
     height: 56,
     borderRadius: 16,
     paddingHorizontal: 12,

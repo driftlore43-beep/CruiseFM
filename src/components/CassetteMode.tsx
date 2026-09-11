@@ -1062,7 +1062,12 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   // side-column size and reads small alone on a full screen.
   // Landscape had room left over: the deck docks at 0.86 scale beside the
   // panel, so 1.30/0.60 was leaving a band of empty table on both sides.
-  const cassetteW = isLandscape ? Math.min(winH * 1.46, winW * 0.66) : winW * 0.92;
+  // The 560 cap is the tablet guard: on a phone winW*0.92 always wins, but on
+  // an iPad an uncapped deck would sprawl the full width while the round modes
+  // (CD 430, orb 460) stay a tidy hero. 560 matches the radio deck — the widest
+  // capped object — so the cassette reads as the same class of thing on a big
+  // screen instead of a poster.
+  const cassetteW = isLandscape ? Math.min(winH * 1.46, winW * 0.66) : Math.min(winW * 0.92, 560);
   const cassetteH = cassetteW * 0.638;   // 217/340 — the taller option-D body
 
 

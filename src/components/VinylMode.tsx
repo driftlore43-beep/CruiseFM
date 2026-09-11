@@ -1376,7 +1376,10 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   const currentTrack = VINYL_TRACKS[activeTrack];
   // Landscape sizes off HEIGHT alone — the portrait formula shrinks a
   // sideways platter to a saucer (the "squish", owner 30.07).
-  const platSize     = isLandscape ? Math.min(winH * 0.86, 350) : Math.min(winW * 0.9, winH * 0.46);
+  // The 430 cap is the tablet guard (matches the CD disc): without it, an iPad's
+  // tall window drives winH*0.46 past 500pt and the platter dwarfs the capped
+  // modes. On a phone winW*0.9 / winH*0.46 always win, so phones are untouched.
+  const platSize     = isLandscape ? Math.min(winH * 0.86, 350) : Math.min(winW * 0.9, winH * 0.46, 430);
 
   // Swipe-down to dismiss
   /**

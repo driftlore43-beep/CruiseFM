@@ -17,12 +17,13 @@ import { HeadingAnywhereCard, SessionKindSwitch } from '@/components/HeadingAnyw
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
 import { HeroCard } from '@/components/HeroCard';
+import { IPadHero } from '@/components/IPadHero';
 import { NewStationCard, ShelfCard, SHELF_CARD_W } from '@/components/ShelfCard';
 import { StationDetailModal } from '@/components/StationDetailModal';
 import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
-import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET, isWide, pageColumn } from '@/constants/theme';
+import { Cruise, PAGE_GUTTER, PAGE_MAX_W, TAB_SAFE_INSET, isWide, pageColumn } from '@/constants/theme';
 import { useStyles } from '@/context/AppearanceContext';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { needsOffAirAsk } from '@/constants/schedule';
@@ -251,14 +252,37 @@ export default function CruiseScreen() {
         />
         {!tablet && <HeadingAnywhereCard onAnswered={setKind} />}
 
-        <HeroCard
-          onStartDrive={handleStartDrive}
-          cueLabel={heroCue}
-          station={heroStation}
-          buttonLabel={lastCruise ? words(kind).resume : words(kind).start}
-          heroLine={words(kind).heroLine}
-          resuming={!!lastCruise}
-        />
+        {/* THE IPAD HERO IS A DIFFERENT COMPONENT, NOT A BIGGER HeroCard
+            (owner, 12.09, off the turntable mockup — "that's the idea I
+            mean"). HeroCard's own recipe is a flat photo strip that reads
+            fine at 250pt tall and reads as a letterbox banner stretched
+            across 676pt of iPad — the exact "stretched phone" fault the
+            10.09 reading-column fix was built to avoid everywhere else on
+            this page, just arrived here by a different route. IPadHero
+            draws the mode's own real object (the record and its tonearm,
+            the CD, the mirror ball — ShareModeArt.tsx's ModeHero, the same
+            production art the share cards use) over the station's real
+            photo, at a genuinely large size. */}
+        {tablet ? (
+          <IPadHero
+            station={heroStation}
+            mode={heroCruise.mode}
+            eyebrow={lastCruise ? 'PICK UP WHERE YOU LEFT OFF' : 'TONIGHT’S PICK'}
+            headline={words(kind).heroLine}
+            buttonLabel={lastCruise ? words(kind).resume : words(kind).start}
+            onPress={handleStartDrive}
+            width={Math.min(winW, PAGE_MAX_W) - 44}
+          />
+        ) : (
+          <HeroCard
+            onStartDrive={handleStartDrive}
+            cueLabel={heroCue}
+            station={heroStation}
+            buttonLabel={lastCruise ? words(kind).resume : words(kind).start}
+            heroLine={words(kind).heroLine}
+            resuming={!!lastCruise}
+          />
+        )}
 
         {!tablet && (
           <SessionKindSwitch

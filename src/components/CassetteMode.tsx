@@ -318,9 +318,17 @@ function ch01(n: number): number {
 // through. Thickness comes from PAIRED strokes — a lit outer edge, a dark line
 // just behind it, then a faint inner highlight.
 const VB_W = 340;
-const VB_H = 210;
-const LX = 118, RX = 224, RY = 118;
-const PACK_BASE = 104;
+// Option D (owner, 11.09 "D"): a truer compact-cassette ratio and fuller
+// reels. The body grows 7 units taller (210 -> 217, ~1.57:1), the reels move
+// down to stay centred between the label and the mechanism, spread wider and
+// wind onto fatter packs. MECH_DY is how far everything below the reels — the
+// tape path, the guide rollers, the whole bottom edge — drops to sit against
+// the new bottom, so those elements keep the numbers they were tuned with and
+// only ride down together.
+const VB_H = 217;
+const MECH_DY = 7;
+const LX = 111, RX = 229, RY = 121;
+const PACK_BASE = 116;
 
 /**
  * The reel hub, redrawn off the owner's close-up (02.08: "the inner tape
@@ -341,8 +349,13 @@ function ReelHub({ size, color }: { size: number; color: string }) {
       {/* Clear flange, tinted by the station — the mood colour lives here */}
       <SvgCircle cx={0} cy={0} r={19} fill={color} fillOpacity={0.34} />
       <SvgCircle cx={0} cy={0} r={19} fill="none" stroke="#ffffff" strokeOpacity={0.34} strokeWidth={1} />
-      {/* one bright arc so the flange reads as moulded, not printed */}
-      <SvgPath d="M -13 -13 A 19 19 0 0 1 6 -18" fill="none" stroke="#ffffff" strokeOpacity={0.5} strokeWidth={1.8} strokeLinecap="round" />
+      {/* Two moulding arcs + a specular pip so the flange reads crisper glass
+          (option D refined graphics, owner 11.09) — a bright top-left sweep
+          and a fainter lower-right one, the way a round moulding catches a
+          lamp twice. */}
+      <SvgPath d="M -13 -13 A 19 19 0 0 1 6 -18" fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={1.9} strokeLinecap="round" />
+      <SvgPath d="M 13 8 A 19 19 0 0 1 -2 18" fill="none" stroke="#ffffff" strokeOpacity={0.22} strokeWidth={1.2} strokeLinecap="round" />
+      <SvgCircle cx={-8.5} cy={-8.5} r={1.5} fill="#ffffff" fillOpacity={0.5} />
 
       {/* White hub, with its moulding ring */}
       <SvgCircle cx={0} cy={0} r={14.5} fill={HUB} fillOpacity={0.92} />
@@ -371,11 +384,13 @@ function Screw({ cx, cy, r = 4, angle = 0 }: { cx: number; cy: number; r?: numbe
   const a = (angle * Math.PI) / 180, cos = Math.cos(a), sin = Math.sin(a);
   return (
     <>
-      <SvgCircle cx={cx} cy={cy} r={r + 1.2} fill="#05070e" fillOpacity={0.40} />
-      <SvgCircle cx={cx} cy={cy} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={1.1} />
-      <SvgCircle cx={cx} cy={cy} r={r * 0.62} fill="#ffffff" fillOpacity={0.10} />
-      <SvgLine x1={cx - s * cos} y1={cy - s * sin} x2={cx + s * cos} y2={cy + s * sin} stroke="#ffffff" strokeOpacity={0.62} strokeWidth={1.2} strokeLinecap="round" />
-      <SvgLine x1={cx + s * sin} y1={cy - s * cos} x2={cx - s * sin} y2={cy + s * cos} stroke="#ffffff" strokeOpacity={0.62} strokeWidth={1.2} strokeLinecap="round" />
+      {/* Subtler than before — option D refined graphics (owner 11.09): the
+          screws should read as seated hardware, not punctuation. */}
+      <SvgCircle cx={cx} cy={cy} r={r + 1.2} fill="#05070e" fillOpacity={0.32} />
+      <SvgCircle cx={cx} cy={cy} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.0} />
+      <SvgCircle cx={cx} cy={cy} r={r * 0.62} fill="#ffffff" fillOpacity={0.08} />
+      <SvgLine x1={cx - s * cos} y1={cy - s * sin} x2={cx + s * cos} y2={cy + s * sin} stroke="#ffffff" strokeOpacity={0.5} strokeWidth={1.1} strokeLinecap="round" />
+      <SvgLine x1={cx + s * sin} y1={cy - s * cos} x2={cx - s * sin} y2={cy + s * cos} stroke="#ffffff" strokeOpacity={0.5} strokeWidth={1.1} strokeLinecap="round" />
     </>
   );
 }
@@ -414,7 +429,7 @@ function CassetteBody({
 }) {
   const scale = size / VB_W;
   const H = size * (VB_H / VB_W);
-  const hubPx = 48 * scale;
+  const hubPx = 53 * scale;   // hub grows with the fatter pack (option D)
 
   const fallbackProgress = useRef(new Animated.Value(0.4)).current;
   const prog = progress ?? fallbackProgress;
@@ -477,7 +492,7 @@ function CassetteBody({
           CastShadow. */}
       <CastShadow
         x={8 * scale} y={8 * scale}
-        width={324 * scale} height={194 * scale} radius={10 * scale}
+        width={324 * scale} height={201 * scale} radius={10 * scale}
       />
       {/* ── Behind the tape: shell body, internals, the tape path ── */}
       <Svg width={size} height={H} viewBox={`0 0 ${VB_W} ${VB_H}`} style={StyleSheet.absoluteFill}>
@@ -487,17 +502,18 @@ function CassetteBody({
             <Stop offset="45%" stopColor="#9fb0d4" stopOpacity="0.10" />
             <Stop offset="100%" stopColor="#dbe4ff" stopOpacity="0.17" />
           </SvgLinearGradient>
-          <ClipPath id="csBody"><SvgRect x={8} y={8} width={324} height={194} rx={10} /></ClipPath>
+          <ClipPath id="csBody"><SvgRect x={8} y={8} width={324} height={201} rx={10} /></ClipPath>
         </Defs>
         <G clipPath="url(#csBody)">
-          <SvgRect x={8} y={8} width={324} height={194} fill="url(#csShell)" />
-          {/* internal chassis */}
-          <SvgRect x={60} y={30} width={220} height={150} rx={6} fill="none" stroke="#ffffff" strokeOpacity={0.13} strokeWidth={1} />
-          <SvgLine x1={171} y1={30} x2={171} y2={180} stroke="#ffffff" strokeOpacity={0.10} strokeWidth={1} />
+          <SvgRect x={8} y={8} width={324} height={201} fill="url(#csShell)" />
+          {/* internal chassis — grows with the taller body, its base meeting
+              the dropped tape path (option D). */}
+          <SvgRect x={60} y={30} width={220} height={156} rx={6} fill="none" stroke="#ffffff" strokeOpacity={0.13} strokeWidth={1} />
+          <SvgLine x1={171} y1={30} x2={171} y2={175} stroke="#ffffff" strokeOpacity={0.10} strokeWidth={1} />
           {/* tape path — drawn BEFORE the packs so it emerges from under them
               instead of crossing over the wound tape */}
-          <SvgPath d={`M ${LX} ${RY} L 74 168 L 268 168 L ${RX} ${RY}`} fill="none" stroke="#0a0c14" strokeOpacity={0.62} strokeWidth={3.4} />
-          <SvgLine x1={74} y1={168} x2={268} y2={168} stroke={color} strokeOpacity={0.34} strokeWidth={1} />
+          <SvgPath d={`M ${LX} ${RY} L 74 175 L 268 175 L ${RX} ${RY}`} fill="none" stroke="#0a0c14" strokeOpacity={0.62} strokeWidth={3.4} />
+          <SvgLine x1={74} y1={175} x2={268} y2={175} stroke={color} strokeOpacity={0.34} strokeWidth={1} />
         </G>
       </Svg>
 
@@ -531,29 +547,25 @@ function CassetteBody({
             <Stop offset="62%" stopColor="#ffffff" stopOpacity="0.62" />
             <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.22" />
           </SvgLinearGradient>
-          <SvgLinearGradient id="csLabel" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.50" />
-            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.32" />
-          </SvgLinearGradient>
-          <ClipPath id="csBody2"><SvgRect x={8} y={8} width={324} height={194} rx={10} /></ClipPath>
+          <ClipPath id="csBody2"><SvgRect x={8} y={8} width={324} height={201} rx={10} /></ClipPath>
         </Defs>
         <G clipPath="url(#csBody2)">
           {/* iridescent sweeps — wide and heavily overlapped so they read as
               light on plastic rather than stripes */}
           {SHEEN.map((_, i) => (
-            <SvgRect key={i} x={-60} y={-90 + i * 44} width={460} height={120} fill={`url(#csIr${i})`} transform="rotate(-18 170 105)" />
+            <SvgRect key={i} x={-60} y={-90 + i * 44} width={460} height={120} fill={`url(#csIr${i})`} transform="rotate(-18 170 108)" />
           ))}
-          {/* left tape-guide assembly */}
-          <SvgRect x={30} y={120} width={26} height={58} rx={4} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.26} strokeWidth={1} />
-          <SvgCircle cx={43} cy={134} r={4.4} fill="none" stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
-          <SvgCircle cx={43} cy={150} r={3} fill="none" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.9} />
-          <SvgRect x={37} y={160} width={12} height={12} rx={2} fill={color} fillOpacity={0.55} />
-          {/* Guide rollers, on their posts */}
+          {/* left tape-guide assembly — sits MECH_DY lower on the taller D body */}
+          <SvgRect x={30} y={120 + MECH_DY} width={26} height={58} rx={4} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.26} strokeWidth={1} />
+          <SvgCircle cx={43} cy={134 + MECH_DY} r={4.4} fill="none" stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
+          <SvgCircle cx={43} cy={150 + MECH_DY} r={3} fill="none" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.9} />
+          <SvgRect x={37} y={160 + MECH_DY} width={12} height={12} rx={2} fill={color} fillOpacity={0.55} />
+          {/* Guide rollers, on their posts, riding the dropped tape line */}
           {[74, 268].map((gx) => (
             <G key={`gr${gx}`}>
-              <SvgCircle cx={gx} cy={168} r={5.4} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.2} />
-              <SvgCircle cx={gx} cy={168} r={2.6} fill="none" stroke="#ffffff" strokeOpacity={0.30} strokeWidth={0.8} />
-              <SvgCircle cx={gx} cy={168} r={0.9} fill="#05070e" fillOpacity={0.6} />
+              <SvgCircle cx={gx} cy={175} r={5.4} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.42} strokeWidth={1.2} />
+              <SvgCircle cx={gx} cy={175} r={2.6} fill="none" stroke="#ffffff" strokeOpacity={0.30} strokeWidth={0.8} />
+              <SvgCircle cx={gx} cy={175} r={0.9} fill="#05070e" fillOpacity={0.6} />
             </G>
           ))}
 
@@ -563,38 +575,47 @@ function CassetteBody({
               leaf spring, two pinch-roller openings with the rollers sitting
               in them, two capstan holes, locating holes either side, and the
               moulded lip running the full width. */}
-          <SvgRect x={14} y={195} width={312} height={7} rx={3.5} fill="#ffffff" fillOpacity={0.04} stroke="#ffffff" strokeOpacity={0.20} strokeWidth={0.8} />
-          <SvgPath d="M108 180 L232 180 L222 200 L118 200 Z" fill="#ffffff" fillOpacity={0.04} stroke="#ffffff" strokeOpacity={0.32} strokeWidth={1.2} />
+          <SvgRect x={14} y={195 + MECH_DY} width={312} height={7} rx={3.5} fill="#ffffff" fillOpacity={0.04} stroke="#ffffff" strokeOpacity={0.20} strokeWidth={0.8} />
+          {/* head window — enlarged ~12% (option D refined graphics): the deck
+              reads the tape here, so it earns a little more room. */}
+          <SvgPath d={`M100.6 ${180 + MECH_DY} L239.4 ${180 + MECH_DY} L228.2 ${200 + MECH_DY} L111.8 ${200 + MECH_DY} Z`} fill="#ffffff" fillOpacity={0.05} stroke="#ffffff" strokeOpacity={0.36} strokeWidth={1.2} />
           {/* the shield behind the tape, and the tape itself crossing it */}
-          <SvgRect x={120} y={183} width={100} height={5} rx={1} fill="#ffffff" fillOpacity={0.07} stroke="#ffffff" strokeOpacity={0.18} strokeWidth={0.6} />
+          <SvgRect x={120} y={183 + MECH_DY} width={100} height={5} rx={1} fill="#ffffff" fillOpacity={0.07} stroke="#ffffff" strokeOpacity={0.18} strokeWidth={0.6} />
           {/* pressure pad on its leaf spring */}
-          <SvgPath d="M158 197 L162 190 L178 190 L182 197" fill="none" stroke="#ffffff" strokeOpacity={0.28} strokeWidth={0.8} />
-          <SvgRect x={161} y={186} width={18} height={6} rx={1.4} fill="#05070e" fillOpacity={0.72} stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.7} />
+          <SvgPath d={`M158 ${197 + MECH_DY} L162 ${190 + MECH_DY} L178 ${190 + MECH_DY} L182 ${197 + MECH_DY}`} fill="none" stroke="#ffffff" strokeOpacity={0.28} strokeWidth={0.8} />
+          <SvgRect x={161} y={186 + MECH_DY} width={18} height={6} rx={1.4} fill="#05070e" fillOpacity={0.72} stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.7} />
           {/* pinch-roller openings, with the rollers in them */}
           {[[143, 1], [193, -1]].map(([px]) => (
             <G key={`pr${px}`}>
-              <SvgRect x={px - 7.5} y={184} width={15} height={13} rx={3} fill="#05070e" fillOpacity={0.42} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
-              <SvgCircle cx={px} cy={190.5} r={4.4} fill="#ffffff" fillOpacity={0.06} stroke="#ffffff" strokeOpacity={0.34} strokeWidth={0.9} />
-              <SvgCircle cx={px} cy={190.5} r={1.5} fill="#05070e" fillOpacity={0.7} />
+              <SvgRect x={px - 7.5} y={184 + MECH_DY} width={15} height={13} rx={3} fill="#05070e" fillOpacity={0.42} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={1} />
+              <SvgCircle cx={px} cy={190.5 + MECH_DY} r={4.4} fill="#ffffff" fillOpacity={0.06} stroke="#ffffff" strokeOpacity={0.34} strokeWidth={0.9} />
+              <SvgCircle cx={px} cy={190.5 + MECH_DY} r={1.5} fill="#05070e" fillOpacity={0.7} />
             </G>
           ))}
           {/* capstan holes */}
           {[128, 208].map((cxx) => (
             <G key={`cp${cxx}`}>
-              <SvgCircle cx={cxx} cy={190} r={4} fill="#05070e" fillOpacity={0.55} stroke="#ffffff" strokeOpacity={0.36} strokeWidth={1} />
-              <SvgCircle cx={cxx} cy={190} r={1.7} fill="none" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.6} />
+              <SvgCircle cx={cxx} cy={190 + MECH_DY} r={4} fill="#05070e" fillOpacity={0.55} stroke="#ffffff" strokeOpacity={0.36} strokeWidth={1} />
+              <SvgCircle cx={cxx} cy={190 + MECH_DY} r={1.7} fill="none" stroke="#ffffff" strokeOpacity={0.24} strokeWidth={0.6} />
             </G>
           ))}
           {/* locating holes either side of the window */}
-          <SvgCircle cx={92} cy={191} r={2.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={0.8} />
-          <SvgCircle cx={248} cy={191} r={2.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={0.8} />
+          <SvgCircle cx={92} cy={191 + MECH_DY} r={2.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={0.8} />
+          <SvgCircle cx={248} cy={191 + MECH_DY} r={2.6} fill="#05070e" fillOpacity={0.5} stroke="#ffffff" strokeOpacity={0.30} strokeWidth={0.8} />
           {/* chamfer catching the light along the very bottom */}
-          <SvgPath d="M20 199.5 L320 199.5" stroke="#ffffff" strokeOpacity={0.16} strokeWidth={0.8} />
-          {/* label — frosted, with the station colour as its spine */}
-          <SvgRect x={30} y={24} width={280} height={40} rx={4} fill="url(#csLabel)" />
-          <SvgRect x={30} y={24} width={280} height={13} rx={4} fill={color} fillOpacity={0.60} />
+          <SvgPath d={`M20 ${199.5 + MECH_DY} L320 ${199.5 + MECH_DY}`} stroke="#ffffff" strokeOpacity={0.16} strokeWidth={0.8} />
+          {/* label — frosted, with the station colour as its spine. Option D
+              refines it: a more opaque frosted body so the print always reads,
+              faint index ticks and a title baseline rule like a real inlay. */}
+          <SvgRect x={30} y={24} width={280} height={40} rx={4} fill="#f4f6ff" fillOpacity={0.88} />
+          <SvgRect x={30} y={24} width={280} height={20} rx={4} fill="#ffffff" fillOpacity={0.10} />
+          <SvgRect x={30} y={24} width={280} height={13} rx={4} fill={color} fillOpacity={0.62} />
+          {[52, 78, 104, 130, 156, 182, 208, 234, 260, 286].map((tx) => (
+            <SvgLine key={`lt${tx}`} x1={tx} y1={40} x2={tx} y2={62} stroke="#0d1020" strokeOpacity={0.06} strokeWidth={0.6} />
+          ))}
+          <SvgLine x1={40} y1={49} x2={300} y2={49} stroke="#0d1020" strokeOpacity={0.10} strokeWidth={0.5} />
           <SvgRect x={30} y={24} width={280} height={40} rx={4} fill="none" stroke="#ffffff" strokeOpacity={0.55} strokeWidth={1} />
-          <SvgText x={40} y={34} fill="#0d1020" fontSize={7} fontWeight="800" fontFamily={Fonts.mono} letterSpacing={1.6}>A · STEREO · C90</SvgText>
+          <SvgText x={40} y={34} fill="#0d1020" fontSize={6.5} fontWeight="800" fontFamily={Fonts.mono} letterSpacing={2.2}>A · STEREO · C90</SvgText>
           {/* The title itself is NOT drawn here — it is an RN overlay below,
               so a long one can reel across the inlay instead of being cut at
               21 characters (owner, 19.08). SVG text has no marquee: it cannot
@@ -602,7 +623,7 @@ function CassetteBody({
               JS-thread re-render of the whole shell every frame — the
               architecture this app has spent weeks removing. */
           }
-          <SvgText x={300} y={60} fill="#0d1020" fillOpacity={0.66} fontSize={7} fontWeight="700" fontFamily={Fonts.mono} textAnchor="end">{artist}</SvgText>
+          <SvgText x={300} y={61} fill="#0d1020" fillOpacity={0.72} fontSize={7} fontWeight="700" fontFamily={Fonts.mono} textAnchor="end">{artist}</SvgText>
           {/* embossed markings + running time */}
           {/* No counter on the tape. A real cassette hasn't got one — the
               counter lives on the DECK — so a big digital readout floating on
@@ -610,20 +631,20 @@ function CassetteBody({
               than object. It also printed straight over this line, and said
               exactly what the elapsed time under the seek bar already says
               (owner, 03.08). */}
-          <SvgText x={300} y={176} fill="#ffffff" fillOpacity={0.20} fontSize={5} fontFamily={Fonts.mono} textAnchor="end">CR-02 · HIGH BIAS · MADE FOR THE ROAD</SvgText>
+          <SvgText x={300} y={183} fill="#ffffff" fillOpacity={0.20} fontSize={5} fontFamily={Fonts.mono} textAnchor="end">CR-02 · HIGH BIAS · MADE FOR THE ROAD</SvgText>
           {/* broad glass reflections across the whole face */}
-          <SvgPath d="M 20 8 L 96 8 L 40 202 L 8 202 Z" fill="#ffffff" fillOpacity={0.045} />
-          <SvgPath d="M 250 8 L 282 8 L 214 202 L 190 202 Z" fill="#ffffff" fillOpacity={0.025} />
+          <SvgPath d="M 20 8 L 96 8 L 40 209 L 8 209 Z" fill="#ffffff" fillOpacity={0.045} />
+          <SvgPath d="M 250 8 L 282 8 L 214 209 L 190 209 Z" fill="#ffffff" fillOpacity={0.025} />
           {dust.map((d, i) => <SvgCircle key={i} cx={d.x} cy={d.y} r={d.r} fill="#ffffff" fillOpacity={d.o} />)}
         </G>
         {/* moulded edge: lit outer, dark behind, faint inner */}
-        <SvgRect x={8} y={8} width={324} height={194} rx={10} fill="none" stroke="url(#csEdge)" strokeWidth={2.4} />
-        <SvgRect x={11} y={11} width={318} height={188} rx={8} fill="none" stroke="#05070e" strokeOpacity={0.45} strokeWidth={1.2} />
-        <SvgRect x={13.5} y={13.5} width={313} height={183} rx={7} fill="none" stroke="#ffffff" strokeOpacity={0.18} strokeWidth={0.9} />
+        <SvgRect x={8} y={8} width={324} height={201} rx={10} fill="none" stroke="url(#csEdge)" strokeWidth={2.4} />
+        <SvgRect x={11} y={11} width={318} height={195} rx={8} fill="none" stroke="#05070e" strokeOpacity={0.45} strokeWidth={1.2} />
+        <SvgRect x={13.5} y={13.5} width={313} height={190} rx={7} fill="none" stroke="#ffffff" strokeOpacity={0.18} strokeWidth={0.9} />
         <Screw cx={26} cy={24} angle={12} />
         <Screw cx={314} cy={24} angle={-31} />
-        <Screw cx={26} cy={186} angle={57} />
-        <Screw cx={314} cy={186} angle={-8} />
+        <Screw cx={26} cy={193} angle={57} />
+        <Screw cx={314} cy={193} angle={-8} />
         <Screw cx={170} cy={16} r={2.8} angle={40} />
       </Svg>
 
@@ -1042,7 +1063,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   // Landscape had room left over: the deck docks at 0.86 scale beside the
   // panel, so 1.30/0.60 was leaving a band of empty table on both sides.
   const cassetteW = isLandscape ? Math.min(winH * 1.46, winW * 0.66) : winW * 0.92;
-  const cassetteH = cassetteW * 0.62;
+  const cassetteH = cassetteW * 0.638;   // 217/340 — the taller option-D body
 
 
   const stationImg = resolveAnyStation(activeId).image;

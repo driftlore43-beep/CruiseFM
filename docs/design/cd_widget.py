@@ -98,7 +98,7 @@ SPECTRUM = [
 SPECTRA = {
     'warm': [
         (0.00, (0, 0, 0), 0.0),
-        (0.10, hexc('#ffc39a'), 0.30),  # FAINT orange
+        (0.11, hexc('#ffb886'), 0.42),  # faint orange, nudged up a bit (owner 11.09)
         (0.30, hexc('#ff9fd4'), 0.72),  # light pink
         (0.55, hexc('#ff88cc'), 0.80),  # pink
         (0.80, hexc('#c3a8ff'), 0.76),  # lavender

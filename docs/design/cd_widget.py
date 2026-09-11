@@ -83,6 +83,63 @@ SPECTRUM = [
     (0.93, hexc('#2fd6dc'), 0.6),   # turquoise, thin outer rim
     (1.00, (0, 0, 0), 0.0),
 ]
+
+# ── PER-BEAM SPECTRA, LIGHT ──────────────────────────────────────────────
+# Owner 11.09: "keep A [the smooth gradient] — but add in a faint of orange,
+# make sure the colours aren't exactly the same on the disc... one side has
+# orange, the other side doesn't but has turquoise. Keeping shades of pink and
+# purple the main colours. Keep the colours light, not heavily saturated."
+#
+# So the two beams no longer share one spectrum: pink and purple carry both,
+# but the WARM beam adds a FAINT orange at its inner edge and the COOL beam
+# adds a soft turquoise at its outer edge — the disc is no longer symmetric.
+# Every colour is a pastel at reduced alpha so the face stays light rather
+# than a saturated rainbow. `_p` variants nudge one accent up for the dials.
+SPECTRA = {
+    'warm': [
+        (0.00, (0, 0, 0), 0.0),
+        (0.10, hexc('#ffc39a'), 0.30),  # FAINT orange
+        (0.30, hexc('#ff9fd4'), 0.72),  # light pink
+        (0.55, hexc('#ff88cc'), 0.80),  # pink
+        (0.80, hexc('#c3a8ff'), 0.76),  # lavender
+        (0.94, hexc('#d6c6ff'), 0.42),  # pale lavender
+        (1.00, (0, 0, 0), 0.0),
+    ],
+    'warm_p': [
+        (0.00, (0, 0, 0), 0.0),
+        (0.12, hexc('#ffbc8a'), 0.48),  # a touch more orange
+        (0.34, hexc('#ff9fd4'), 0.76),
+        (0.58, hexc('#ff88cc'), 0.82),
+        (0.82, hexc('#c3a8ff'), 0.76),
+        (0.95, hexc('#d6c6ff'), 0.42),
+        (1.00, (0, 0, 0), 0.0),
+    ],
+    'cool': [
+        (0.00, (0, 0, 0), 0.0),
+        (0.12, hexc('#ff9fd4'), 0.70),  # light pink
+        (0.34, hexc('#ff88cc'), 0.80),  # pink
+        (0.58, hexc('#c3a8ff'), 0.76),  # lavender
+        (0.80, hexc('#a3e6dc'), 0.58),  # soft turquoise
+        (0.94, hexc('#c6efe8'), 0.32),  # pale turquoise
+        (1.00, (0, 0, 0), 0.0),
+    ],
+    'cool_p': [
+        (0.00, (0, 0, 0), 0.0),
+        (0.12, hexc('#ff9fd4'), 0.66),
+        (0.32, hexc('#ff88cc'), 0.78),
+        (0.54, hexc('#c3a8ff'), 0.74),
+        (0.76, hexc('#8fe0d6'), 0.68),  # more turquoise
+        (0.92, hexc('#bff0e8'), 0.42),
+        (1.00, (0, 0, 0), 0.0),
+    ],
+    'pink': [  # the faint middle beam — pink/purple only, no accent
+        (0.00, (0, 0, 0), 0.0),
+        (0.15, hexc('#ff9fd4'), 0.66),
+        (0.50, hexc('#ff88cc'), 0.76),
+        (0.82, hexc('#c3a8ff'), 0.64),
+        (1.00, (0, 0, 0), 0.0),
+    ],
+}
 METAL = [(0.00, (1, 1, 1), 0.20), (0.17, (1, 1, 1), 0.02), (0.34, (1, 1, 1), 0.26),
          (0.55, (1, 1, 1), 0.04), (0.74, (1, 1, 1), 0.22), (0.88, (1, 1, 1), 0.03),
          (1.00, (1, 1, 1), 0.20)]
@@ -97,14 +154,25 @@ def wedge_stops(spread):
             (min(1.0, 0.5 + half), (1, 1, 1), 0.0),
             (1.0, (1, 1, 1), 0.0)]
 
-# The four directions on the sheet. `fans` is (bearing, spread, strength);
-# bearing is degrees clockwise from straight up, matching DiffractionFan.
+# `fans` is (bearing, spread, strength) and optionally a 4th entry naming the
+# beam's own spectrum in SPECTRA (else the global SPECTRUM). bearing is degrees
+# clockwise from straight up, matching DiffractionFan.
 OPTIONS = {
     'A_build45': None,                                    # the old colour wheel
     'B_build47': [(34, 84, 0.95), (214, 72, 0.78), (128, 44, 0.34)],
     'C_four':    [(30, 62, 0.92), (150, 62, 0.72), (210, 62, 0.88), (330, 62, 0.66)],
     'D_two_wide':[(38, 118, 1.00), (218, 104, 0.86)],
+    # LIGHT, ASYMMETRIC gradient (owner 11.09): warm beam carries the faint
+    # orange, cool beam the turquoise, both pink/purple-led, plus a faint
+    # pink middle. G_light is the same, dimmer; the _p dials push one accent.
+    'G_A':      [(34, 84, 0.88, 'warm'),  (214, 72, 0.74, 'cool'),  (128, 44, 0.28, 'pink')],
+    'G_orange': [(34, 84, 0.90, 'warm_p'),(214, 72, 0.74, 'cool'),  (128, 44, 0.28, 'pink')],
+    'G_light':  [(34, 84, 0.88, 'warm'),  (214, 72, 0.74, 'cool'),  (128, 44, 0.28, 'pink')],
+    'G_turq':   [(34, 84, 0.88, 'warm'),  (214, 72, 0.80, 'cool_p'),(128, 44, 0.28, 'pink')],
 }
+# option-level colour intensity multiplier (default 1.0); G_light rides lower
+# to read even softer.
+INTENSITY = {'G_light': 0.80}
 
 WHEEL = ['#6ad0ff', '#b98cff', '#ff9ad0', '#ffd68a', '#a8ffcf', '#6ad0ff']
 
@@ -212,7 +280,7 @@ def disc(option, size=DISC):
     else:
         r0, r1 = 0.13 * n, 0.52 * n
         t = np.clip((d - r0) / (r1 - r0), 0, 1)
-        spec, sa = stops_at(SPECTRUM, t)
+        intensity = INTENSITY.get(option, 1.0)
         # Fine concentric tracks, now HAIRLINES (owner 11.09: "reduce the
         # groove thickness significantly — make them hairline thickness"): the
         # pitch is tighter (0.06 of the radius) and the lit band is only 0.10
@@ -220,16 +288,20 @@ def disc(option, size=DISC):
         # to CATCH THE LIGHT in the fans ("more visible near the reflected
         # area"). Same pitch as the base rings below so the two align.
         track = np.where(((d / R) % 0.06) / 0.06 < 0.10, 1.0, 0.0)
-        for bearing, spread, strength in fans:
+        for beam in fans:
+            bearing, spread, strength = beam[0], beam[1], beam[2]
+            # each beam may name its own spectrum (warm/cool/pink) so the two
+            # sides of the disc are NOT identical (owner 11.09).
+            spec, sa = stops_at(SPECTRA[beam[3]] if len(beam) > 3 else SPECTRUM, t)
             # DiffractionFan turns the wedge back half a revolution so its
             # peak (location 0.5) lands on the bearing.
             gangle = (bearing - 90) - 180
             loc = ((ang - gangle) % 360) / 360.0
             _, wa = stops_at(wedge_stops(spread), loc)
-            img = screen(img, spec, wa * sa * strength)
+            img = screen(img, spec, wa * sa * strength * intensity)
             # the tracks brighten where this fan's rainbow lands — gated by
             # the same wedge and the spectrum's own radial falloff.
-            img = screen(img, np.ones_like(img), wa * sa * strength * track * 0.65)
+            img = screen(img, np.ones_like(img), wa * sa * strength * intensity * track * 0.65)
         mloc = ((ang - (-30 - 90)) % 360) / 360.0
         _, ma = stops_at(METAL, mloc)
         img = screen(img, np.ones_like(img), ma * 0.55)
@@ -370,10 +442,10 @@ def tile(option):
     return base.resize((158 * 3, 158 * 3), Image.LANCZOS)
 
 if __name__ == '__main__':
-    names = [('B_build47', 'A  current — one smooth gradient per beam'),
-             ('S_streaks', 'B  streaks — pink/orange/turquoise/purple, overlapping'),
-             ('S_dense',   'C  streaks — denser, softer overlap'),
-             ('S_wide',    'D  streaks — two wide beams')]
+    names = [('G_A',      'A  faint orange one side, turquoise the other — pink/purple main, light'),
+             ('G_orange', 'B  a touch more orange'),
+             ('G_light',  'C  lighter overall'),
+             ('G_turq',   'D  a touch more turquoise')]
     W = 158 * 3
     sheet = Image.new('RGB', (W * 4 + 100, W + 130), (14, 14, 17))
     dd = ImageDraw.Draw(sheet)

@@ -671,31 +671,48 @@ private struct DiffractionFan: View {
   let bearing: Double
   let spread: Double
   let strength: Double
+  // Each beam carries its OWN spectrum so the two sides of the disc are not
+  // identical (owner 11.09, below). Defaults to the pink/purple `warm` set.
+  var spectrum: [Gradient.Stop] = DiffractionFan.warmStops
 
-  // The station's own reference disc, sampled 11.09: its vivid bands are
-  // PINK/MAGENTA (~310-325deg), VIOLET (~262-278), BLUE and TURQUOISE/TEAL
-  // (~186-210). The yellow-gold a raw photo shows is the silver metal itself,
-  // not the diffraction — so the spectrum drops the generic green/yellow/
-  // orange the old wheel carried and runs pink -> violet -> blue -> turquoise.
-  // WEIGHTED TOWARD PINK/PURPLE 11.09 (owner: "add more pink and purple to
-  // the rainbow"): pink enters early and holds two stops, violet holds two
-  // more, so pink+purple owns the inner ~0.6 of the fan and blue/turquoise
-  // are a thin outer rim rather than half the sweep.
-  private static let spectrumStops: [Gradient.Stop] = [
+  // LIGHT, ASYMMETRIC SPECTRA 11.09 (owner: "keep [the smooth gradient] — but
+  // add in a faint of orange, make sure the colours aren't exactly the same on
+  // the disc... one side has orange, the other side doesn't but has turquoise.
+  // Keeping shades of pink and purple the main colours. Keep the colours light,
+  // not heavily saturated.") Pink and purple lead every beam; the WARM beam
+  // adds a faint orange at its inner edge, the COOL beam a soft turquoise at
+  // its outer edge, the faint middle beam neither. Every stop is a pastel at
+  // reduced opacity so the face stays light rather than a saturated rainbow.
+  static let warmStops: [Gradient.Stop] = [
     .init(color: .clear, location: 0.00),
-    .init(color: Color(hex: "#ff4fbf").opacity(0.65), location: 0.09),
-    .init(color: Color(hex: "#ff6ad6"), location: 0.26),
-    .init(color: Color(hex: "#cf6dff"), location: 0.44),
-    .init(color: Color(hex: "#9b7cff"), location: 0.60),
-    .init(color: Color(hex: "#5a9cff"), location: 0.80),
-    .init(color: Color(hex: "#2fd6dc").opacity(0.6), location: 0.93),
+    .init(color: Color(hex: "#ffc39a").opacity(0.30), location: 0.10),  // faint orange
+    .init(color: Color(hex: "#ff9fd4").opacity(0.72), location: 0.30),  // light pink
+    .init(color: Color(hex: "#ff88cc").opacity(0.80), location: 0.55),  // pink
+    .init(color: Color(hex: "#c3a8ff").opacity(0.76), location: 0.80),  // lavender
+    .init(color: Color(hex: "#d6c6ff").opacity(0.42), location: 0.94),  // pale lavender
+    .init(color: .clear, location: 1.00),
+  ]
+  static let coolStops: [Gradient.Stop] = [
+    .init(color: .clear, location: 0.00),
+    .init(color: Color(hex: "#ff9fd4").opacity(0.70), location: 0.12),  // light pink
+    .init(color: Color(hex: "#ff88cc").opacity(0.80), location: 0.34),  // pink
+    .init(color: Color(hex: "#c3a8ff").opacity(0.76), location: 0.58),  // lavender
+    .init(color: Color(hex: "#a3e6dc").opacity(0.58), location: 0.80),  // soft turquoise
+    .init(color: Color(hex: "#c6efe8").opacity(0.32), location: 0.94),  // pale turquoise
+    .init(color: .clear, location: 1.00),
+  ]
+  static let pinkStops: [Gradient.Stop] = [   // faint middle beam, no accent
+    .init(color: .clear, location: 0.00),
+    .init(color: Color(hex: "#ff9fd4").opacity(0.66), location: 0.15),
+    .init(color: Color(hex: "#ff88cc").opacity(0.76), location: 0.50),
+    .init(color: Color(hex: "#c3a8ff").opacity(0.64), location: 0.82),
     .init(color: .clear, location: 1.00),
   ]
 
   var body: some View {
     ZStack {
       Circle()
-        .fill(RadialGradient(stops: Self.spectrumStops, center: .center,
+        .fill(RadialGradient(stops: spectrum, center: .center,
                              startRadius: size * 0.13, endRadius: size * 0.52))
       // THE TRACKS CATCH THE FAN'S LIGHT (owner, 11.09: "make them more
       // visible near the reflected area on the rainbow"). The SAME pitch and
@@ -840,12 +857,18 @@ struct CompactDisc: View {
       // So the RADIAL gradient carries the spectrum and an ANGULAR gradient is
       // used as a MASK to confine it to a fan, which is the exact inversion of
       // what was here before.
-      DiffractionFan(size: size, bearing: 34, spread: 84, strength: 0.95)
-      DiffractionFan(size: size, bearing: 214, spread: 72, strength: 0.78)
+      // The two main beams are NO LONGER IDENTICAL (owner 11.09): the warm
+      // beam carries the faint orange, the cool beam the turquoise, both
+      // pink/purple-led and lighter than before so the face stays soft.
+      DiffractionFan(size: size, bearing: 34, spread: 84, strength: 0.88,
+                     spectrum: DiffractionFan.warmStops)
+      DiffractionFan(size: size, bearing: 214, spread: 72, strength: 0.74,
+                     spectrum: DiffractionFan.coolStops)
       // A third, much fainter fan — a real disc catches a weaker second source
       // (a window, a wall) as well as the main one, and one lone fan reads as
-      // a mistake rather than as light.
-      DiffractionFan(size: size, bearing: 128, spread: 44, strength: 0.34)
+      // a mistake rather than as light. Pink/purple only, no accent.
+      DiffractionFan(size: size, bearing: 128, spread: 44, strength: 0.28,
+                     spectrum: DiffractionFan.pinkStops)
 
       // AND THE FACE BETWEEN THE FANS HAS TO READ AS METAL, or the fans are
       // simply sitting on a photograph. Neutral on purpose — no hue anywhere

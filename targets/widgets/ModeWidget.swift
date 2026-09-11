@@ -685,7 +685,7 @@ private struct DiffractionFan: View {
   // reduced opacity so the face stays light rather than a saturated rainbow.
   static let warmStops: [Gradient.Stop] = [
     .init(color: .clear, location: 0.00),
-    .init(color: Color(hex: "#ffb886").opacity(0.42), location: 0.11),  // faint orange, nudged up
+    .init(color: Color(hex: "#ffbc8a").opacity(0.48), location: 0.12),  // faint orange, locked to B
     .init(color: Color(hex: "#ff9fd4").opacity(0.72), location: 0.30),  // light pink
     .init(color: Color(hex: "#ff88cc").opacity(0.80), location: 0.55),  // pink
     .init(color: Color(hex: "#c3a8ff").opacity(0.76), location: 0.80),  // lavender

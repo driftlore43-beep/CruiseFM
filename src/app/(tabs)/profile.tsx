@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 
-import { Cruise, TAB_SAFE_INSET, pageColumn } from '@/constants/theme';
+import { Cruise, TAB_SAFE_INSET, isWide, pageColumn } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { useTheme } from '@/context/ThemeContext';
 import { useMotion } from '@/context/MotionContext';
@@ -237,6 +237,11 @@ export default function ProfileScreen() {
   const styles = useStyles(makeStyles);
   const pal = usePalette();
   const insets = useSafeAreaInsets();
+  const { width: winW } = useWindowDimensions();
+  // Auto-dim is a driving courtesy (screen eases down mid-drive so it doesn't
+  // blind you at night) and iPad has no driving mode at all — the toggle
+  // would offer a setting that can never do anything there.
+  const tablet = isWide(winW);
   const { theme } = useTheme();
   const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere, daylight, setDaylight, vinylClassic, setVinylClassic } = useMotion();
   const { devFreePreview, setDevFreePreview, isPro } = useEntitlements();
@@ -454,9 +459,10 @@ export default function ProfileScreen() {
           </View>
 
           {/* Auto-dim toggle — head-unit style screen dimming mid-drive.
-              Hidden while Daylight is on: it cannot fire then, and a toggle
-              that does nothing is worse than no toggle. */}
-          {!daylight && (
+              Hidden while Daylight is on (it cannot fire then) and hidden
+              outright on iPad, which has no driving mode to dim for — a
+              toggle that does nothing is worse than no toggle either way. */}
+          {!daylight && !tablet && (
           <View style={[styles.settingsRow, styles.settingsBorder]}>
             <View style={styles.platformRowLeft}>
               <IconChip icon="brightness-6" size={34} />

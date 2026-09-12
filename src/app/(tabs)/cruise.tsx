@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 
@@ -17,12 +17,13 @@ import { HeadingAnywhereCard, SessionKindSwitch } from '@/components/HeadingAnyw
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
 import { HeroCard } from '@/components/HeroCard';
+import { IPadHero } from '@/components/IPadHero';
 import { NewStationCard, ShelfCard, SHELF_CARD_W } from '@/components/ShelfCard';
 import { StationDetailModal } from '@/components/StationDetailModal';
 import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
-import { Cruise, PAGE_GUTTER, TAB_SAFE_INSET, pageColumn } from '@/constants/theme';
+import { Cruise, PAGE_GUTTER, PAGE_MAX_W, TAB_SAFE_INSET, isWide, pageColumn } from '@/constants/theme';
 import { useStyles } from '@/context/AppearanceContext';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { needsOffAirAsk } from '@/constants/schedule';
@@ -76,6 +77,13 @@ function greetingFor(hour: number, returning: boolean): string {
 export default function CruiseScreen() {
   const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { width: winW } = useWindowDimensions();
+  // THE IPAD HAS NO "HEADING ANYWHERE?" TO ANSWER — sessionKind.ts already
+  // forces 'listening' there unconditionally, so both the ask and the switch
+  // would just be dead furniture: the ask can literally never fire (its
+  // trigger is "have I ever been asked", which is never true), and the switch
+  // would offer "Driving" as an option this device has no such mode for.
+  const tablet = isWide(winW);
   const router = useRouter();
   const np = useNowPlaying();
   // The focus callback is memoised, so anything it calls must be read through
@@ -242,21 +250,46 @@ export default function CruiseScreen() {
           contextName={spotify.contextName}
           onAsk={(mode) => setAdopt({ mode, station: null })}
         />
-        <HeadingAnywhereCard onAnswered={setKind} />
+        {!tablet && <HeadingAnywhereCard onAnswered={setKind} />}
 
-        <HeroCard
-          onStartDrive={handleStartDrive}
-          cueLabel={heroCue}
-          station={heroStation}
-          buttonLabel={lastCruise ? words(kind).resume : words(kind).start}
-          heroLine={words(kind).heroLine}
-          resuming={!!lastCruise}
-        />
+        {/* THE IPAD HERO IS A DIFFERENT COMPONENT, NOT A BIGGER HeroCard
+            (owner, 12.09, off the turntable mockup — "that's the idea I
+            mean"). HeroCard's own recipe is a flat photo strip that reads
+            fine at 250pt tall and reads as a letterbox banner stretched
+            across 676pt of iPad — the exact "stretched phone" fault the
+            10.09 reading-column fix was built to avoid everywhere else on
+            this page, just arrived here by a different route. IPadHero
+            draws the mode's own real object (the record and its tonearm,
+            the CD, the mirror ball — ShareModeArt.tsx's ModeHero, the same
+            production art the share cards use) over the station's real
+            photo, at a genuinely large size. */}
+        {tablet ? (
+          <IPadHero
+            station={heroStation}
+            mode={heroCruise.mode}
+            eyebrow={lastCruise ? 'PICK UP WHERE YOU LEFT OFF' : 'TONIGHT’S PICK'}
+            headline={words(kind).heroLine}
+            buttonLabel={lastCruise ? words(kind).resume : words(kind).start}
+            onPress={handleStartDrive}
+            width={Math.min(winW, PAGE_MAX_W) - 44}
+          />
+        ) : (
+          <HeroCard
+            onStartDrive={handleStartDrive}
+            cueLabel={heroCue}
+            station={heroStation}
+            buttonLabel={lastCruise ? words(kind).resume : words(kind).start}
+            heroLine={words(kind).heroLine}
+            resuming={!!lastCruise}
+          />
+        )}
 
-        <SessionKindSwitch
-          kind={kind}
-          onChange={(k) => { setKind(k); void setSessionKind(k); }}
-        />
+        {!tablet && (
+          <SessionKindSwitch
+            kind={kind}
+            onChange={(k) => { setKind(k); void setSessionKind(k); }}
+          />
+        )}
 
         <View style={styles.connects}>
           <ConnectSpotifyCard />

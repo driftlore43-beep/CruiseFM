@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,7 +14,7 @@ import { resolveAnyStation } from '@/utils/customStations';
 import { applyModeOrder, getModeOrder, moveModeWithinGroup, saveModeOrder } from '@/utils/modeOrder';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { useEntitlements } from '@/context/EntitlementsContext';
-import { PAGE_GUTTER, TAB_SAFE_INSET, pageColumn } from '@/constants/theme';
+import { PAGE_GUTTER, PAGE_MAX_W, TAB_SAFE_INSET, isWide, pageColumn } from '@/constants/theme';
 import { usePalette, useStyles } from '@/context/AppearanceContext';
 import type { Palette } from '@/utils/appearance';
 
@@ -152,6 +152,72 @@ function ModeRow({ mode, locked, last, onPress, editing, onMoveUp, onMoveDown, c
   return editing ? row : <Pressy onPress={onPress}>{row}</Pressy>;
 }
 
+/**
+ * THE GRID — iPad only. Owner, 12.09, off the reading-column render of this
+ * page: "I want the music modes presented in a different way because it's
+ * not enlarged." She's right, and it is a direct consequence of the page's
+ * own rule above ("show the mode, don't describe it") only being paid for
+ * ONE mode: the hero gets a real 202pt picture and everything else is a
+ * 62pt thumbnail in a list — on a phone that's the honest trade for space,
+ * on a 720pt-wide reading column it's seven tiny icons in a lot of empty
+ * margin.
+ *
+ * iPad has the room to give EVERY mode the hero's own treatment, so it does:
+ * two columns of the same picture-plus-scrim card, just smaller. The hero
+ * itself is untouched and still leads — one mode getting first billing is a
+ * different thing from the other seven being starved of a picture at all,
+ * and it's also the one part of this page that already reads as designed
+ * rather than assembled. Only the below-the-hero LIST becomes a grid.
+ */
+const GRID_COLS = 2;
+const GRID_GAP = 16;
+const GRID_CARD_W = (PAGE_MAX_W - PAGE_GUTTER * 2 - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
+const GRID_CARD_H = 300;
+const GRID_ART = 250;
+
+function ModeGridCard({ mode, locked, onPress, editing, onMoveUp, onMoveDown, canMoveUp, canMoveDown }: {
+  mode: ModeDef; locked: boolean; onPress: () => void;
+  editing?: boolean; onMoveUp?: () => void; onMoveDown?: () => void;
+  canMoveUp?: boolean; canMoveDown?: boolean;
+}) {
+  const styles = useStyles(makeStyles);
+  const card = (
+    <View style={styles.gridCard}>
+      <ModeThumb mode={mode.id} size={GRID_ART} colors={mode.colors} uid={`grid${mode.id}`} />
+      <LinearGradient
+        colors={['rgba(0,0,0,0.10)', 'rgba(0,0,0,0.26)', 'rgba(0,0,0,0.86)']}
+        locations={[0, 0.5, 1]}
+        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
+        style={styles.gridScrim}
+        pointerEvents="none"
+      />
+      <View style={styles.gridFoot}>
+        <Text style={styles.gridTitle} numberOfLines={1}>{mode.title}</Text>
+        <Text style={styles.gridDesc} numberOfLines={2}>{mode.desc}</Text>
+      </View>
+      {locked && !editing && (
+        <View style={styles.gridLock}>
+          <Ionicons name="lock-closed" size={12} color="rgba(255,255,255,0.85)" />
+          <Text style={styles.gridLockText}>PREMIUM</Text>
+        </View>
+      )}
+      {editing && (
+        <View style={styles.gridOrderBtns}>
+          <Pressable onPress={onMoveUp} disabled={!canMoveUp} hitSlop={8} style={styles.gridOrderBtn}>
+            <Ionicons name="chevron-up" size={16} color={canMoveUp ? '#fff' : 'rgba(255,255,255,0.28)'} />
+          </Pressable>
+          <Pressable onPress={onMoveDown} disabled={!canMoveDown} hitSlop={8} style={styles.gridOrderBtn}>
+            <Ionicons name="chevron-down" size={16} color={canMoveDown ? '#fff' : 'rgba(255,255,255,0.28)'} />
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+  // Same rule as ModeRow: mid-reorder the tile is a still picture, or tapping
+  // it to move it would also launch a drive out from under you.
+  return editing ? card : <Pressy onPress={onPress} style={styles.gridWrap}>{card}</Pressy>;
+}
+
 const THUMB = 62;
 const HERO_H = 250;
 // The art sits above the type rather than behind it — a hero whose subject
@@ -161,6 +227,8 @@ const HERO_ART = 202;
 export default function ModesScreen() {
   const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { width: winW } = useWindowDimensions();
+  const tablet = isWide(winW);
   const np = useNowPlaying();
   const { isPro } = useEntitlements();
 
@@ -259,7 +327,17 @@ export default function ModesScreen() {
         )}
 
         <Text style={styles.section}>INCLUDED</Text>
-        {free.map((m, i) => (
+        {tablet ? (
+          <View style={styles.grid}>
+            {free.map((m, i) => (
+              <ModeGridCard key={m.id} mode={m} locked={false}
+                onPress={() => open(m.id, false)}
+                editing={editingOrder}
+                onMoveUp={() => move(m.id, -1)} onMoveDown={() => move(m.id, 1)}
+                canMoveUp={i > 0} canMoveDown={i < free.length - 1} />
+            ))}
+          </View>
+        ) : free.map((m, i) => (
           <ModeRow key={m.id} mode={m} locked={false} last={i === free.length - 1}
             onPress={() => open(m.id, false)}
             editing={editingOrder}
@@ -268,7 +346,17 @@ export default function ModesScreen() {
         ))}
 
         <Text style={styles.section}>PREMIUM</Text>
-        {pro.map((m, i) => (
+        {tablet ? (
+          <View style={styles.grid}>
+            {pro.map((m, i) => (
+              <ModeGridCard key={m.id} mode={m} locked={!isPro}
+                onPress={() => open(m.id, !isPro)}
+                editing={editingOrder}
+                onMoveUp={() => move(m.id, -1)} onMoveDown={() => move(m.id, 1)}
+                canMoveUp={i > 0} canMoveDown={i < pro.length - 1} />
+            ))}
+          </View>
+        ) : pro.map((m, i) => (
           <ModeRow key={m.id} mode={m} locked={!isPro} last={i === pro.length - 1}
             onPress={() => open(m.id, !isPro)}
             editing={editingOrder}
@@ -445,4 +533,83 @@ const makeStyles = (p: Palette) => StyleSheet.create({
   },
   orderBtns: { gap: 2 },
   orderBtn: { padding: 4 },
+
+  // ── iPad grid ───────────────────────────────────────────────────────────
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: PAGE_GUTTER,
+    gap: GRID_GAP,
+  },
+  gridWrap: {
+    width: GRID_CARD_W,
+    borderRadius: 22,
+    shadowColor: p.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.42 * p.shadowOpacity,
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  gridCard: {
+    width: GRID_CARD_W,
+    height: GRID_CARD_H,
+    borderRadius: 22,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#07070c',
+  },
+  gridScrim: {
+    position: 'absolute',
+    left: 0, right: 0, top: 0, bottom: 0,
+  },
+  gridFoot: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
+  },
+  gridTitle: {
+    color: '#fff',
+    fontSize: 19,
+    fontWeight: '800',
+    letterSpacing: 0,
+  },
+  gridDesc: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12.5,
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  gridLock: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  gridLockText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  gridOrderBtns: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    flexDirection: 'row',
+    gap: 2,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 12,
+    padding: 2,
+  },
+  gridOrderBtn: { padding: 6 },
 });

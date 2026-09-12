@@ -1,6 +1,8 @@
 # Widget designs H and I — the exact task, ready to execute
 
 **Written 2026-09-08 at commit `0572efa`, branch `claude/cruise-fm-v4wk5f`.**
+**CORRECTED 2026-09-12: that branch was merged into `main`, which is now the
+branch everything happens on.**
 
 This is the one piece of work that was **mid-flight** when the previous agent
 handed over. `docs/TODO.md` §0 describes it; this file is the executable

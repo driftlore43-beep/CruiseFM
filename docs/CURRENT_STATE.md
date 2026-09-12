@@ -4,6 +4,11 @@
 `claude/cruise-fm-v4wk5f`. Verified against the codebase, the workflow run
 history and `scripts/preflight.mjs`, not from memory.
 
+**CORRECTED 2026-09-12: `main` is the branch now, not `claude/cruise-fm-v4wk5f`.**
+The two were merged together and the standing decision since is to ship
+straight to `main` — every reference to the feature branch below (as "where
+work happens" or what auto-publishes) is stale.
+
 ---
 
 ## 1. The one-paragraph summary
@@ -27,7 +32,7 @@ widget designs, still at the mockup stage.
 | Live on the App Store | **1.3.1, build 32** | Submitted + released 19 Aug 2026 |
 | Newest build attempted | **39** | testflight profile, FINISHED, **never submitted** |
 | `provenCommit` | **`057c023`** | build 28 (1.3.0) — last build opened on a real phone |
-| Branch | `claude/cruise-fm-v4wk5f` | All work happens here |
+| Branch | `main` | All work happens here (merged 12.09, see note above) |
 
 ### Why `runtimeVersion` is held at 1.3.0
 

@@ -157,8 +157,11 @@ at all), `measure()`, haptics, and gesture termination. See
 
 ## Shipping — and one thing that will bite
 
-- A push to `claude/cruise-fm-v4wk5f` **auto-publishes to the `preview`
-  channel** (the owner's phone + TestFlight). **Production is never automatic.**
+- **`main` is the working branch** (merged with the old `claude/cruise-fm-v4wk5f`
+  on 12.09 — that branch name may still appear elsewhere in the docs as
+  history, but `main` is where everything happens now). A push to `main`
+  **auto-publishes to the `preview` channel** (the owner's phone + TestFlight).
+  **Production is never automatic.**
 - `node scripts/production-lag.mjs` answers "is the public app behind?"
 - **A finished EAS build is not a submitted build**, and a submitted build is
   not a released one.
@@ -185,9 +188,9 @@ Full reasoning in `docs/KNOWN_ISSUES.md` Part 2.
 ## Coordination
 
 **One agent per branch at a time.** Claude Code also works in this repository
-and pushes to the same branch. Two agents editing the same files without
-coordination produces merge conflicts at best and silent undone work at worst.
-Pull before starting; push when done.
+and pushes to `main`, the same branch this file has you on. Two agents editing
+the same files without coordination produces merge conflicts at best and
+silent undone work at worst. Pull before starting; push when done.
 
 ## Comments are the reasoning
 

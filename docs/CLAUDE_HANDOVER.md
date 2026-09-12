@@ -1,6 +1,9 @@
 # Cruise FM — Handover
 
 **Written 2026-09-05 at commit `84e3cab`, branch `claude/cruise-fm-v4wk5f`.**
+**CORRECTED 2026-09-12: that branch was merged into `main` and `main` is now
+the branch everything happens on — every reference below to
+`claude/cruise-fm-v4wk5f` means `main`.**
 
 This is the entry document. Read it, then the four beside it:
 
@@ -314,9 +317,8 @@ wastes both agents.
 
 > **One agent per branch at a time.**
 
-Both push to `claude/cruise-fm-v4wk5f`, and **a push to that branch
-auto-publishes to the `preview` channel** — the owner's phone and every
-TestFlight tester. Two agents editing the same files without coordinating gives
+Both push to `main`, and **a push to that branch auto-publishes to the
+`preview` channel** — the owner's phone and every TestFlight tester. Two agents editing the same files without coordinating gives
 merge conflicts at best and silently undone work at worst, and the result goes
 out to real people either way.
 

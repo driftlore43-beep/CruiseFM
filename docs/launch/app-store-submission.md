@@ -42,7 +42,7 @@ only *builds*. Nothing reaches TestFlight until you submit it.
 
 ```
 cd ~/CruiseFM
-git pull origin claude/cruise-fm-v4wk5f
+git pull origin main
 npx eas-cli build  -p ios --profile testflight        # 20-40 min
 npx eas-cli submit -p ios --profile testflight --latest
 ```
@@ -69,8 +69,8 @@ already the fixed version.
 
 ```
 cd ~/CruiseFM                                  # wherever you cloned it
-git checkout claude/cruise-fm-v4wk5f           # NOT main — main is behind
-git pull origin claude/cruise-fm-v4wk5f
+git checkout main                              # main is the real branch now (merged 12.09)
+git pull origin main
 npx eas-cli build -p ios --profile production
 ```
 

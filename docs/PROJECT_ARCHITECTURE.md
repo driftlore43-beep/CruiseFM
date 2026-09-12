@@ -697,15 +697,15 @@ builds.**
 
 Two ways in:
 
-1. **Automatic** — every push to `claude/cruise-fm-v4wk5f` publishes to
-   **preview**, filtered to paths an update can actually carry (`src/**`,
-   `assets/**`, `app.json`, `package.json`, `package-lock.json`).
+1. **Automatic** — every push to `main` (the real branch since 12.09, when it
+   was merged with the old `claude/cruise-fm-v4wk5f`) publishes to **preview**,
+   filtered to paths an update can actually carry (`src/**`, `assets/**`,
+   `app.json`, `package.json`, `package-lock.json`).
 2. **The button** (`workflow_dispatch`) — for everything else. Modes:
    `publish`, `diagnose`, `build`, `submit`. **Production is never automatic.**
 
-Guards that run on every path: refuse to publish stale code from `main`;
-`preflight`; readable-Spotify-keys check; "is a real build listening on this
-runtime version" check.
+Guards that run on every path: `preflight`; readable-Spotify-keys check; "is a
+real build listening on this runtime version" check.
 
 ### Versioning — `version` vs `runtimeVersion`
 

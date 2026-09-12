@@ -13,7 +13,7 @@ the Apple ID **cruisefmservice@gmail.com**.
 
 ### 1. Get the latest project + build the TestFlight version
 ```
-git pull origin claude/cruise-fm-v4wk5f
+git pull origin main
 eas build -p ios --profile testflight
 ```
 - This builds a "store-style" copy in the cloud (~15–20 min).
@@ -55,7 +55,7 @@ the visuals over the top.
 
 You do **not** rebuild. Just push the day's work:
 ```
-git pull origin claude/cruise-fm-v4wk5f
+git pull origin main
 eas update --branch preview -m "what changed"
 ```
 Because the TestFlight build listens on the **preview** channel, this one

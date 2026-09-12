@@ -13,9 +13,11 @@ update can reach a phone. The builds currently on phones don't have it yet.
 
 1. Pull the latest code:
    ```
-   git checkout claude/cruise-fm-v4wk5f
-   git pull origin claude/cruise-fm-v4wk5f
+   git checkout main
+   git pull origin main
    ```
+   (Older versions of this doc said to check out `claude/cruise-fm-v4wk5f` —
+   that branch was merged into `main` on 12.09, which is the real branch now.)
 
 2. Make sure the new package is installed:
    ```
@@ -40,7 +42,7 @@ Whenever there are new visual / text / logic changes to ship (no new native
 features), just publish an update:
 
 ```
-git pull origin claude/cruise-fm-v4wk5f
+git pull origin main
 eas update --branch preview --environment preview -m "short note about what changed"
 ```
 

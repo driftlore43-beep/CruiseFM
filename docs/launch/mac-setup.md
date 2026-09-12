@@ -58,18 +58,19 @@ node -p "process.arch"
 cd ~/Documents
 git clone https://github.com/driftlore43-beep/CruiseFM.git
 cd CruiseFM
-git checkout claude/cruise-fm-v4wk5f
 npm ci
 ```
 
 `npm ci` takes a few minutes and prints a lot of text. That's normal.
 
-**The `git checkout` line is not optional.** A fresh copy lands on `main`,
-which is well over a hundred commits behind the branch the app is actually
-built from — everything since 21 July, including the crash fix that stops the
-app being killed when you leave and come back to it. Publishing from `main`
-would push all of that *backwards* onto your phone and every TestFlight
-tester, and it would do it without any error at all.
+**`main` is the real branch now (12.09).** For a long stretch, the app was
+actually built from `claude/cruise-fm-v4wk5f` while `main` sat behind it —
+that's why an older version of this file had you check out that branch by
+hand. The two were merged back together on 12.09 and the standing decision
+since then is to ship straight to `main`: a fresh `git clone` above lands
+exactly where it should, with nothing extra to type. If you ever see an old
+note (here or anywhere else) telling you to check out the feature branch,
+it's stale — ignore it.
 
 ### 5. Sign in to Expo
 
@@ -92,7 +93,8 @@ permanently. The first run asks "Ok to proceed?" — say yes.
 From inside the CruiseFM folder:
 
 ```
-git pull origin claude/cruise-fm-v4wk5f
+git checkout main
+git pull origin main
 npx eas-cli update --branch preview --environment preview -m "short note about what changed"
 ```
 

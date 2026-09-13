@@ -122,3 +122,16 @@ export const pageColumn: ViewStyle = {
 export const TAB_BAR_HEIGHT  = 84;
 export const TAB_BAR_BOTTOM  = 22;   // gap from screen edge
 export const TAB_SAFE_INSET  = TAB_BAR_HEIGHT + TAB_BAR_BOTTOM + 16;
+
+/**
+ * THE IPAD "RACK" — a persistent left sidebar, only above `WIDE_MIN`.
+ *
+ * On a tablet the four tabs stop being a floating pill at the foot and become a
+ * hi-fi/receiver sidebar down the left, with each page rendered in the stage to
+ * its right. The vendored bottom-tab view already does the two-pane split when
+ * `tabBarPosition: 'left'` is set (it lays the bar and the scenes out in a row),
+ * so this width is all the geometry the shell needs — the navigator insets the
+ * stage by it automatically. Never used on a phone, which keeps the floating
+ * pill exactly as it shipped (see WIDE_MIN).
+ */
+export const SIDEBAR_W = 300;

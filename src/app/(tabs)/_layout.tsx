@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NowPlayingHost } from '@/components/NowPlayingHost';
+import { SideRack } from '@/components/SideRack';
 import { useStyles, usePalette } from '@/context/AppearanceContext';
 import type { Palette } from '@/utils/appearance';
-import { PAGE_GUTTER, PAGE_MAX_W, TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/constants/theme';
+import { PAGE_GUTTER, PAGE_MAX_W, TAB_BAR_BOTTOM, TAB_BAR_HEIGHT, isWide } from '@/constants/theme';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -113,11 +114,29 @@ function FloatingTabBar({
 }
 
 export default function TabLayout() {
+  const { width } = useWindowDimensions();
+  const wide = isWide(width);
+
+  // On a tablet the bar becomes the left "rack" and the pages render in the
+  // stage beside it; `tabBarPosition: 'left'` is what makes the vendored
+  // bottom-tab view lay the two out in a row and inset the scene for us. On a
+  // phone this is never reached, so the floating pill is exactly as it shipped.
+  // `tabBarPosition` is a real bottom-tabs screen option but is not in
+  // expo-router's Tabs typings, hence the cast.
+  const screenOptions = {
+    headerShown: false,
+    ...(wide ? { tabBarPosition: 'left' } : null),
+  } as React.ComponentProps<typeof Tabs>['screenOptions'];
+
   return (
     <>
       <Tabs
-        tabBar={(props) => <FloatingTabBar state={props.state} navigation={props.navigation} />}
-        screenOptions={{ headerShown: false }}>
+        tabBar={(props) =>
+          wide
+            ? <SideRack state={props.state} navigation={props.navigation} />
+            : <FloatingTabBar state={props.state} navigation={props.navigation} />
+        }
+        screenOptions={screenOptions}>
         <Tabs.Screen name="cruise"  options={{ title: 'Cruise' }} />
         <Tabs.Screen name="stations" options={{ title: 'Stations' }} />
         <Tabs.Screen name="modes"   options={{ title: 'Modes' }} />

@@ -19,7 +19,7 @@ import { ModeScrim } from '@/components/ModeScrim';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { mixHex } from '@/components/GlassPane';
 import { FloatingNotes } from '@/components/FloatingNotes';
-import { Fonts } from '@/constants/theme';
+import { deckColumn, Fonts } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
@@ -667,7 +667,7 @@ export function HorizonFullscreen({ visible, onClose, stationId }: { visible: bo
               off once it is invisible, or the tap meant to bring the controls
               back would press whatever button it landed on. */}
           <Animated.View
-            style={{ alignSelf: 'stretch', opacity: chrome }}
+            style={[deckColumn, { opacity: chrome }]}
             pointerEvents={chromeRested ? 'none' : 'auto'}>
           {/* Song title / mood line */}
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>

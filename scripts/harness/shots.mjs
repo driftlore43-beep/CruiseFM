@@ -39,6 +39,25 @@ try {
 }
 const BASE = (process.env.BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
 const OUT = process.env.OUT_DIR || 'screenshots-appstore';
+
+// THE SAME SET AT A SECOND SIZE, because Apple requires an iPad set the
+// moment `supportsTablet` ships and there has never been one. A separate
+// harness would have been a second copy of every trap above — the wake tap,
+// the off-air ask, the hint that retires itself — and copies drift, so the
+// size is an input instead.
+//
+//   DEVICE=ipad OUT_DIR=screenshots-appstore-ipad node scripts/harness/shots.mjs
+//
+// 1032 x 1376 at scale 2 = 2064 x 2752, Apple's 13-inch iPad slot, measured
+// off their own spec page rather than remembered. The phone numbers are
+// unchanged, so a run with no DEVICE set produces byte-identical framing to
+// every set before this.
+const DEVICES = {
+  phone: { width: 428, height: 926, scale: 3 },
+  ipad:  { width: 1032, height: 1376, scale: 2 },
+};
+const DEV = DEVICES[process.env.DEVICE || 'phone'];
+if (!DEV) { console.error(`unknown DEVICE — pick one of ${Object.keys(DEVICES).join(', ')}`); process.exit(2); }
 fs.mkdirSync(OUT, { recursive: true });
 
 // Mode paired with the station whose colours suit it. Same pairings as the
@@ -58,11 +77,22 @@ const SHOTS = [
 const ONLY = (process.env.ONLY || '').split(',').map((x) => x.trim()).filter(Boolean);
 const wanted = (file) => ONLY.length === 0 || ONLY.some((o) => file.includes(o));
 
-const b = await chromium.launch({ args: ['--no-sandbox'] });
+// PLAYWRIGHT_CHROMIUM names the browser binary when the installed
+// playwright-core's own pinned version does not match what is on the machine
+// — which is the normal case here, since playwright-core is installed into a
+// scratchpad rather than into this project's lockfile. Left unset it resolves
+// the usual way, so nothing changes for anyone who has a matching install.
+const b = await chromium.launch({
+  args: ['--no-sandbox'],
+  ...(process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {}),
+});
 const problems = [];
 
 async function page() {
-  const ctx = await b.newContext({ viewport: { width: 428, height: 926 }, deviceScaleFactor: 3 });
+  const ctx = await b.newContext({
+    viewport: { width: DEV.width, height: DEV.height },
+    deviceScaleFactor: DEV.scale,
+  });
   await ctx.addInitScript(() => {
     // 'none' is the companion listener: no service, so no track, so every mode
     // shows the station's tagline instead of a song.

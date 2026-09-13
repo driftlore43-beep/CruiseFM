@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OWNER_MODE } from '@/constants/config';
-import { Fonts, heroCeil } from '@/constants/theme';
+import { deckColumn, Fonts, heroCeil } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { mmss } from '@/utils/formatTime';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
@@ -1618,7 +1618,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
              off once it is invisible, or the tap meant to bring the controls
              back would press whatever button it landed on. */
           <Animated.View
-            style={{ alignSelf: 'stretch', alignItems: 'center', opacity: chrome }}
+            style={[deckColumn, { alignItems: 'center', opacity: chrome }]}
             pointerEvents={chromeRested ? 'none' : 'auto'}>
           {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>

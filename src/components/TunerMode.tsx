@@ -20,7 +20,7 @@ import { resolveAnyStation } from '@/utils/customStations';
 import { ModeScrim } from '@/components/ModeScrim';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
-import { Fonts, heroCeil } from '@/constants/theme';
+import { deckColumn, Fonts, heroCeil } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
@@ -1125,7 +1125,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
               off once it is invisible, or the tap meant to bring the controls
               back would press whatever button it landed on. */}
           <Animated.View
-            style={{ alignSelf: 'stretch', opacity: chrome }}
+            style={[deckColumn, { opacity: chrome }]}
             pointerEvents={chromeRested ? 'none' : 'auto'}>
 
           {/* With a song on the display there's nothing to repeat here — the

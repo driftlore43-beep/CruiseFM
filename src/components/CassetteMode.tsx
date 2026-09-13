@@ -10,7 +10,7 @@ import Svg, {
   Rect as SvgRect, Circle as SvgCircle, Line as SvgLine, Path as SvgPath, Text as SvgText,
   Defs, ClipPath, G, LinearGradient as SvgLinearGradient, Stop,
 } from 'react-native-svg';
-import { Fonts, heroCeil } from '@/constants/theme';
+import { deckColumn, Fonts, heroCeil } from '@/constants/theme';
 import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
 import { mmss } from '@/utils/formatTime';
@@ -1232,7 +1232,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
                content and centred it, so the song titles moved to the middle
                of the screen (owner, 18.08, on the Equalizer and the
                cassette). Match the parent's alignment or impose none. */
-            style={{ alignSelf: 'stretch', opacity: chrome }}
+            style={[deckColumn, { opacity: chrome }]}
             pointerEvents={chromeRested ? 'none' : 'auto'}>
           {/* Song title when connected, else the mood's own line — never a fake track */}
           <View style={fs.trackBlock}>

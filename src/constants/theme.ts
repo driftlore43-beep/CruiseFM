@@ -148,6 +148,32 @@ export const pageColumn: ViewStyle = {
   alignSelf: 'center',
 };
 
+/**
+ * THE SAME COLUMN, FOR THE CONTROLS UNDER A FULLSCREEN MODE.
+ *
+ * A deck's picture is full-bleed and should stay that way — the photograph and
+ * the object are the point of the screen. Its CONTROLS are not: the song
+ * title, the seek bar, the transport row and the pills were all laid out
+ * against a phone's width, and stretched across 1032 points the shuffle and
+ * repeat buttons end up at opposite corners of an iPad with the play button
+ * marooned between them. That is the same "phone stretched" fault the reading
+ * column fixed on the list pages, one layer in.
+ *
+ * DELIBERATELY THE SAME NUMBER as `pageColumn` rather than a second one: a
+ * deck and a page are read at the same distance by the same person, and two
+ * nearly-equal caps is how they drift apart.
+ *
+ * IT MUST NOT IMPOSE ALIGNMENT. `alignItems` here would shrink each mode's
+ * song block to its own content and centre it, which is exactly the regression
+ * of 18.08 — so this sets width and self-alignment only, and a mode that
+ * genuinely centres its own children keeps saying so itself.
+ */
+export const deckColumn: ViewStyle = {
+  width: '100%',
+  maxWidth: PAGE_MAX_W,
+  alignSelf: 'center',
+};
+
 export const TAB_BAR_HEIGHT  = 84;
 export const TAB_BAR_BOTTOM  = 22;   // gap from screen edge
 export const TAB_SAFE_INSET  = TAB_BAR_HEIGHT + TAB_BAR_BOTTOM + 16;

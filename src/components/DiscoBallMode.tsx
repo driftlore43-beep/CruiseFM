@@ -18,7 +18,7 @@ import { mmss } from '@/utils/formatTime';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
-import { Fonts, heroCeil } from '@/constants/theme';
+import { deckColumn, Fonts, heroCeil } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
@@ -1796,7 +1796,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
               once it's invisible so the first tap only wakes it — you can't
               hit a skip button you can't see. */}
           {!isLandscape && (
-          <Animated.View style={{ opacity: chrome }} pointerEvents={chromeRested ? 'none' : 'auto'}>
+          <Animated.View style={[deckColumn, { opacity: chrome }]} pointerEvents={chromeRested ? 'none' : 'auto'}>
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
             {hasTrack
               ? <MarqueeText text={title} style={{ color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: 0 }} />

@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Cruise, Fonts } from '@/constants/theme';
+import { Cruise, deckColumn, Fonts } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { mmss } from '@/utils/formatTime';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
@@ -651,7 +651,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
                content and centred it, so the song titles moved to the middle
                of the screen (owner, 18.08, on the Equalizer and the
                cassette). Match the parent's alignment or impose none. */
-            style={{ alignSelf: 'stretch', opacity: chrome }}
+            style={[deckColumn, { opacity: chrome }]}
             pointerEvents={chromeRested ? 'none' : 'auto'}>
 
           {/* Song title when connected, else the mood's own line — never a fake track */}

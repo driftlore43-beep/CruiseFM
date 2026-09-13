@@ -22,7 +22,7 @@ import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { ModeScrim } from '@/components/ModeScrim';
-import { Fonts, heroCeil } from '@/constants/theme';
+import { deckColumn, Fonts, heroCeil } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
@@ -887,7 +887,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
              off once it is invisible, or the tap meant to bring the controls
              back would press whatever button it landed on. */
           <Animated.View
-            style={{ alignSelf: 'stretch', opacity: chrome }}
+            style={[deckColumn, { opacity: chrome }]}
             pointerEvents={chromeRested ? 'none' : 'auto'}>
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 }}>
             {hasTrack

@@ -304,7 +304,13 @@ export default function ModesScreen() {
   }
 
   const hero = MODES.find((m) => m.id === HERO_ID)!;
-  const ordered = applyModeOrder(MODES, order);
+  // The hero already gets its own big picture above — listing it again below
+  // (owner, 13.09: "I'd rather not repeat it") is a promotion doubling as a
+  // row, which reads as a mistake once the row is the same size as the hero
+  // (the iPad grid). Excluded from BOTH lists rather than just the tablet
+  // one: a mode named twice in a row of small text is the same redundancy,
+  // just quieter — there's no reason to keep it on phone.
+  const ordered = applyModeOrder(MODES, order).filter((m) => m.id !== HERO_ID);
   const free = ordered.filter((m) => !m.pro);
   const pro = ordered.filter((m) => m.pro);
 

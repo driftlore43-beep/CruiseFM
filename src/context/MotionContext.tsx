@@ -29,7 +29,7 @@ const Ctx = createContext<MotionCtx>({
   atmosphere: true, setAtmosphere: () => {},
   softAtmosphere: true, setSoftAtmosphere: () => {},
   daylight: false, setDaylight: () => {},
-  vinylClassic: false, setVinylClassic: () => {},
+  vinylClassic: true, setVinylClassic: () => {},
 });
 
 export function MotionProvider({ children }: { children: ReactNode }) {
@@ -38,7 +38,10 @@ export function MotionProvider({ children }: { children: ReactNode }) {
   const [atmosphere, setAT] = useState(true);
   const [softAtmosphere, setSA] = useState(true);
   const [daylight, setDL] = useState(false);
-  const [vinylClassic, setVC] = useState(false);
+  // TRUE, matching getVinylClassic's default. The first render happens before
+  // storage answers, so starting false would show one frame of the neon record
+  // to everyone opening the Vinyl deck and then swap it.
+  const [vinylClassic, setVC] = useState(true);
 
   useEffect(() => {
     getDataSaver().then(setDS);

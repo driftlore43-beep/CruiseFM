@@ -135,16 +135,30 @@ const VINYL_CLASSIC_KEY = 'cruise_vinyl_classic';
  * nearly disappears on a pale station (Mountain Pass over a daylit mountain),
  * while a black one is unmistakably a record on every station.
  *
- * Default OFF, so nobody's deck changes unless they choose it. THE RIM AND THE
- * TONEARM KEEP THE STATION'S COLOUR — that is what stops a black record
- * becoming a generic one, and it is the whole reason this reads as a look
+ * DEFAULT ON SINCE 13.09 (owner: "yes make the realistic vinyl the default").
+ * It shipped off so nobody's deck changed under them, and a round of polish
+ * against MD Vinyl settled which of the two is the one to show a stranger —
+ * bigger record, grooves that hold their pitch at any size, and a pool of warm
+ * light for it to sit in. The neon layer is still a tap away for anyone who
+ * wants it; it is simply no longer what the app opens with.
+ *
+ * AN UNSET VALUE AND AN EXPLICIT "no" ARE NOT THE SAME THING, and reading this
+ * as `=== 'true'` made them identical. Someone who deliberately turned Classic
+ * OFF has said something, and flipping the default must not overrule them —
+ * so the test is now "anything but an explicit false". Never seen the toggle:
+ * Classic. Turned it on: Classic. Turned it off: the neon look, still.
+ *
+ * THE RIM AND THE TONEARM KEEP THE STATION'S COLOUR — that is what stops a
+ * black record becoming a generic one, and it is the whole reason this reads
+ * as a look
  * rather than a loss.
  */
 export async function getVinylClassic(): Promise<boolean> {
   try {
-    return (await AsyncStorage.getItem(VINYL_CLASSIC_KEY)) === 'true';
+    return (await AsyncStorage.getItem(VINYL_CLASSIC_KEY)) !== 'false';
   } catch {
-    return false;
+    // Storage unreadable: the default, not the opposite of it.
+    return true;
   }
 }
 

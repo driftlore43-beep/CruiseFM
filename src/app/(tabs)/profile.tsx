@@ -551,16 +551,18 @@ export default function ProfileScreen() {
           )}
 
           {/* Classic Vinyl — the turntable without its neon layer. A listener
-              asked for the plain thing (Ethan, 23.08); default OFF, so nobody's
-              deck changes unless they choose it. Deliberately does NOT touch
-              the haze or the fireflies — those are the room, and the two
-              Atmosphere rows above already own them. */}
+              asked for the plain thing (Ethan, 23.08) and it is the DEFAULT
+              since 13.09, so this row is now read the other way round: the
+              question it answers is "how do I get the glow back". The sub-line
+              says so rather than describing a state you are already in.
+              Deliberately does NOT touch the haze or the fireflies — those are
+              the room, and the two Atmosphere rows above already own them. */}
           <View style={[styles.settingsRow, styles.settingsBorder]}>
             <View style={styles.platformRowLeft}>
               <IconChip icon="record-player" size={34} />
               <View style={styles.settingsTextBlock}>
                 <Text style={styles.settingsLabel}>Classic Vinyl</Text>
-                <Text style={styles.dataSaverSub}>Plain black vinyl · no glow or sparkles</Text>
+                <Text style={styles.dataSaverSub}>A real black pressing · turn off for the glowing ring and sparkles</Text>
               </View>
             </View>
             <Switch

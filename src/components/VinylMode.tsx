@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OWNER_MODE } from '@/constants/config';
-import { deckColumn, Fonts, heroCeil } from '@/constants/theme';
+import { deckColumn, Fonts, heroCeil, isWide } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { mmss } from '@/utils/formatTime';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
@@ -99,12 +99,30 @@ const VINYL_ACCENTS: Record<string, string> = {
 
 /**
  * Where Classic's grooves sit, from just outside the label to just inside the
- * rim. 26 of them at ~2.6px apart on a phone-sized disc: dense enough to read
- * as a cut surface, and deliberately NOT denser — below about 2px apart
- * neighbouring rings start to moiré against the pixel grid, which is its own
- * kind of drawn-looking artefact.
+ * rim.
+ *
+ * THE SPACING IS THE CONSTANT, NOT THE COUNT, and that is the fix (owner,
+ * 13.09, against MD Vinyl: "it has that realistic, premium effect"). It used
+ * to be a flat 26 rings, chosen because at ~2.6px apart on a PHONE-sized disc
+ * they read as a cut surface — and kept deliberately no denser, since below
+ * about 2px neighbouring rings moiré against the pixel grid, which is its own
+ * drawn-looking artefact. But a fixed count means a bigger disc gets the same
+ * 26 rings spread further apart: on an iPad they land ~4.8px apart, which is
+ * exactly where a texture stops being a texture and becomes rings you can
+ * count. Holding the PITCH instead keeps the surface reading the same at any
+ * size, which is most of what separates a pressed record from a drawn one.
+ *
+ * 26 is now the floor rather than the number, so no phone layout moves.
  */
-const CLASSIC_GROOVES = Array.from({ length: 26 }, (_, i) => 0.505 + (i / 25) * 0.44);
+const GROOVE_PITCH_PX = 2.7;
+const GROOVE_INNER    = 0.505;
+const GROOVE_OUTER    = 0.945;
+
+function classicGrooves(radius: number): number[] {
+  const span = (GROOVE_OUTER - GROOVE_INNER) * radius;
+  const n = Math.max(26, Math.round(span / GROOVE_PITCH_PX));
+  return Array.from({ length: n }, (_, i) => GROOVE_INNER + (i / (n - 1)) * (GROOVE_OUTER - GROOVE_INNER));
+}
 
 /** '#RRGGBB' → 'rgba(r,g,b,a)' — for animated colour interpolation. */
 /** See MAX_COAST_MS in useTrackClock — the deck keeps its own clock, and
@@ -151,6 +169,50 @@ function SparkleField({ size }: { size: number }) {
   );
 }
 
+/**
+ * THE LIGHT THE RECORD SITS IN — Classic only.
+ *
+ * Owner, 13.09, holding MD Vinyl beside ours: "it has that realistic, premium
+ * effect — can we transfer these design choices to our vinyl." Most of what
+ * reads as premium on that deck is not on the record at all; it is the warm
+ * pool of light the record sits in, which gives a black disc on a black
+ * ground something to be black AGAINST. Ours had a cast shadow and nothing to
+ * cast it from.
+ *
+ * ALL FALLOFF, NO EDGE. There is no blur filter available here, so this is one
+ * radial gradient drawn LARGER than the record and fading to nothing well
+ * before its own canvas ends — the rule this file already follows for the
+ * record's own sheen (25.08), and the mirror ball's rim before it: any light
+ * drawn as a hard-edged shape eventually gets reported as an artefact.
+ *
+ * IT TAKES THE STATION'S COLOUR rather than a fixed amber. MD's glow comes
+ * from whatever record is on; ours has a mood, and the accent is the slot this
+ * app already uses for it — the rim and the tonearm are already wearing it, so
+ * the light in the room agrees with them.
+ */
+function RecordBloom({ size, color }: { size: number; color: string }) {
+  const uid = useId().replace(/:/g, '');
+  const box = size * 1.62;
+  const c = box / 2;
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', left: (size - box) / 2, top: (size - box) / 2, width: box, height: box }}>
+      <Svg width={box} height={box}>
+        <Defs>
+          <RadialGradient id={`vb${uid}`} cx="50%" cy="50%" r="50%">
+            <Stop offset="0"    stopColor={color} stopOpacity={0.30} />
+            <Stop offset="0.34" stopColor={color} stopOpacity={0.17} />
+            <Stop offset="0.62" stopColor={color} stopOpacity={0.06} />
+            <Stop offset="1"    stopColor={color} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <SvgCircle cx={c} cy={c} r={c} fill={`url(#vb${uid})`} />
+      </Svg>
+    </View>
+  );
+}
+
 // ── Vinyl disc — clean bold design ───────────────────────────────────────────
 function VinylDisc({ size, spin, accent = V.gold, showLabel = false, classic = false }: { size: number; spin: Animated.AnimatedInterpolation<string>; accent?: string; showLabel?: boolean; classic?: boolean }) {
   // Gradient ids must be unique per instance: duplicate ids across separate
@@ -163,6 +225,15 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false, classic = f
 
   const cx = size / 2;
   const r  = size / 2;
+  // Held at a constant pitch, so the surface reads the same on a phone and on
+  // an iPad instead of thinning out into countable rings. See classicGrooves.
+  const grooves = useMemo(() => classicGrooves(r), [r]);
+  // AND THEIR WEIGHT, not just their spacing. A 0.75px cut is a hairline on a
+  // phone's 306px disc and an invisible scratch on an iPad's 670px one, so the
+  // surface came out smooth exactly where there is most room to see it. Scaled
+  // off the radius with the phone's own value as the floor, so no phone disc
+  // changes.
+  const grooveW = Math.max(0.75, r / 200);
 
   // Point on the disc at `deg` degrees, `rad` px from centre — for glass highlights.
   const pt = (deg: number, rad: number) => {
@@ -206,12 +277,12 @@ function VinylDisc({ size, spin, accent = V.gold, showLabel = false, classic = f
               painted onto it. The glow look keeps its seven accent rings —
               that disc is glass, and they belong to it. */}
           {classic
-            ? CLASSIC_GROOVES.map((f, i) => (
+            ? grooves.map((f, i) => (
                 <G key={i}>
                   <SvgCircle cx={cx} cy={cx} r={r * f} fill="none" stroke="#000"
-                    strokeOpacity={i % 3 === 0 ? 0.40 : 0.30} strokeWidth={0.75} />
-                  <SvgCircle cx={cx} cy={cx} r={r * f + 0.8} fill="none" stroke="#fff"
-                    strokeOpacity={i % 3 === 0 ? 0.055 : 0.038} strokeWidth={0.5} />
+                    strokeOpacity={i % 3 === 0 ? 0.40 : 0.30} strokeWidth={grooveW} />
+                  <SvgCircle cx={cx} cy={cx} r={r * f + grooveW} fill="none" stroke="#fff"
+                    strokeOpacity={i % 3 === 0 ? 0.075 : 0.052} strokeWidth={grooveW * 0.7} />
                 </G>
               ))
             : [0.56, 0.62, 0.68, 0.73, 0.78, 0.86, 0.90].map((f, i) => (
@@ -650,13 +721,21 @@ function TurntableHero({
           all the way round, reading as a second dark disc behind rather than
           as shade under this one, and worst at the foot where the pool is.
           It is inset by half the difference so the two are concentric. */}
+      {classic && <RecordBloom size={platSize} color={accent} />}
       <CastShadow
         width={recSize} height={recSize} radius={recSize / 2}
         x={(platSize - recSize) / 2} y={(platSize - recSize) / 2}
       />
       {!classic && <SparkleField size={platSize} />}
-      {/* Platter disc — pan responder applied here for record scrub */}
-      <View {...panHandlers} style={[th.platter, { width: platSize, height: platSize, borderRadius: platSize / 2, position: 'absolute', top: 0, left: 0 }]}>
+      {/* Platter disc — pan responder applied here for record scrub.
+          CLASSIC HAS NO PLATTER, and that is a removal rather than a restyle
+          (owner, 13.09). The translucent fill and hairline border are what
+          the GLASS pressing sits on — they let the station's scene show
+          through a clear record. Classic's record is opaque, so all they drew
+          was a grey ring standing a little outside it, which on a dark ground
+          is the one shape that says "app" rather than "object": MD Vinyl's
+          record simply floats. */}
+      <View {...panHandlers} style={[classic ? th.platterBare : th.platter, { width: platSize, height: platSize, borderRadius: platSize / 2, position: 'absolute', top: 0, left: 0 }]}>
         <VinylDisc size={recSize} spin={spin} accent={accent} classic={classic} />
       </View>
       {/* Disco light rays — rotate at half record speed */}
@@ -735,6 +814,17 @@ function TurntableHero({
   );
 }
 const th = StyleSheet.create({
+  // Classic: no fill, no rim AND NO SHADOW. The shadow is the subtle one —
+  // it belongs to the translucent platter and is drawn at the PLATTER's
+  // radius, which is wider than the record; with a fill behind it that reads
+  // as depth, and with the fill gone it is a soft circle hanging in open space
+  // about 40 points outside the disc, i.e. the drawn ring this change existed
+  // to remove. Caught by cropping the render rather than by reading the style.
+  // The record's real shadow is CastShadow, which is sized to the RECORD and
+  // is already mounted above.
+  platterBare: {
+    alignItems: 'center', justifyContent: 'center',
+  },
   platter: {
     // Translucent — the blurred station scene shows through the clear pressing.
     backgroundColor: 'rgba(16,16,16,0.38)', borderWidth: 1.5, borderColor: V.platBorder,
@@ -1381,7 +1471,15 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   // modes. On a phone winW*0.9 / winH*0.46 always win, so phones are untouched.
   const platSize     = isLandscape
     ? Math.min(winH * 0.86, heroCeil(350, winW))
-    : Math.min(winW * 0.9, winH * 0.46, heroCeil(430, winW));
+    // 0.46 OF THE HEIGHT IS A PHONE'S NUMBER. A tablet's portrait window is far
+    // taller relative to the type and transport below it — measured on a 12.9"
+    // iPad, the old formula left roughly a third of the screen empty between
+    // the record and the song line — so the record takes a larger share there
+    // and lands near two thirds of the width, which is the proportion MD
+    // Vinyl's deck reads at (owner, 13.09: "the vinyl should also be enlarged
+    // to a similar size"). A phone never reaches WIDE_MIN, so its disc is
+    // byte-identical.
+    : Math.min(winW * 0.9, winH * (isWide(winW) ? 0.58 : 0.46), heroCeil(430, winW));
 
   // Swipe-down to dismiss
   /**

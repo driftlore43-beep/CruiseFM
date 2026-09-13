@@ -20,7 +20,7 @@ import { resolveAnyStation } from '@/utils/customStations';
 import { ModeScrim } from '@/components/ModeScrim';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
-import { Fonts } from '@/constants/theme';
+import { Fonts, heroCeil } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
@@ -1092,7 +1092,11 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             {/* The head-unit display */}
             <View style={{ alignItems: 'center' }}>
               <TunerReadout
-                width={Math.min(winW - 32, 420)}
+                // The dial ruler under this panel has always run the full
+                // width, so on an iPad a 420-capped display sat as a small
+                // box over a scale three times its length. heroCeil lets the
+                // panel keep up; phones never reach it (see theme.ts).
+                width={Math.min(winW - 32, heroCeil(420, winW))}
                 accent={accent}
                 band={band}
                 onBand={pickBand}

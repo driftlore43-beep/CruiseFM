@@ -10,7 +10,7 @@ import Svg, {
   Rect as SvgRect, Circle as SvgCircle, Line as SvgLine, Path as SvgPath, Text as SvgText,
   Defs, ClipPath, G, LinearGradient as SvgLinearGradient, Stop,
 } from 'react-native-svg';
-import { Fonts } from '@/constants/theme';
+import { Fonts, heroCeil } from '@/constants/theme';
 import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
 import { mmss } from '@/utils/formatTime';
@@ -1062,12 +1062,22 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   // side-column size and reads small alone on a full screen.
   // Landscape had room left over: the deck docks at 0.86 scale beside the
   // panel, so 1.30/0.60 was leaving a band of empty table on both sides.
-  // The 560 cap is the tablet guard: on a phone winW*0.92 always wins, but on
-  // an iPad an uncapped deck would sprawl the full width while the round modes
-  // (CD 430, orb 460) stay a tidy hero. 560 matches the radio deck — the widest
-  // capped object — so the cassette reads as the same class of thing on a big
-  // screen instead of a poster.
-  const cassetteW = isLandscape ? Math.min(winH * 1.46, winW * 0.66) : Math.min(winW * 0.92, 560);
+  // THE TABLET GUARD IS THE HEIGHT TERM, NOT THE CEILING — and it used to be
+  // the other way round. 560 was picked as the iPad guard back when the round
+  // modes were themselves frozen at 430-460, so matching the radio deck kept
+  // the set consistent. Now that every hero grows with the screen (heroCeil),
+  // 560 would be the one object left phone-sized, while simply lifting it lets
+  // winW*0.92 bind and sprawls the shell across 92% of an iPad — a poster, the
+  // exact thing the old ceiling was avoiding.
+  //
+  // A SHELL IS WIDE, SO ITS LIMIT BELONGS ON THE HEIGHT. At 0.638 aspect,
+  // winH*0.58 lands ~798x509 on a 12.9" iPad: visually the same mass as the
+  // 647 disc beside it, with a real margin either side. On a phone
+  // winW*0.92 still wins by a distance (396 against 541 on the widest iPhone),
+  // so every phone is byte-identical to what shipped.
+  const cassetteW = isLandscape
+    ? Math.min(winH * 1.46, winW * 0.66)
+    : Math.min(winW * 0.92, winH * 0.58, heroCeil(560, winW));
   const cassetteH = cassetteW * 0.638;   // 217/340 — the taller option-D body
 
 

@@ -106,6 +106,35 @@ export const PAGE_MAX_W      = 720;
 export const isWide = (winW: number) => winW >= WIDE_MIN;
 
 /**
+ * THE CEILING ON A MODE'S CENTRAL OBJECT — and why an iPad needed it lifted.
+ *
+ * Every fullscreen mode sizes its hero (the record, the disc, the ball, the
+ * jewel case, the orb, the head unit) as `Math.min(<a share of the window>,
+ * <an absolute pixel ceiling>)`. Those ceilings — 330 to 560 — were chosen so
+ * an unusually tall PHONE window could not drive one mode's object past the
+ * others and make the set look inconsistent (see `VinylMode`'s `platSize`).
+ *
+ * On an iPad that arithmetic inverts. The window is wide and tall enough that
+ * the share-of-the-window term is always the LARGER number, so the pixel
+ * ceiling is what actually decides the size in every mode at once — the
+ * backdrop fills a 1032-point screen while the object it is meant to be
+ * showing stays the size it was on a phone, marooned in the middle of it.
+ * That is the owner's report on 13.09: "the modes remain small".
+ *
+ * `heroCeil` lifts the ceiling on a tablet so the mode's OWN share term —
+ * already tuned to look right against a screen — gets to decide instead, and
+ * the object grows with the screen the way the photograph behind it already
+ * does. The multiplier is deliberately generous rather than exact: it is a
+ * safety rail for a freak aspect ratio, not the number that should normally
+ * bind.
+ *
+ * A PHONE CAN NEVER REACH `WIDE_MIN` (the widest is 430 points), so this
+ * returns `phone` untouched there and every phone layout stays byte-identical
+ * to what shipped — the same safety `PAGE_MAX_W` is built on.
+ */
+export const heroCeil = (phone: number, winW: number) => (isWide(winW) ? phone * 1.8 : phone);
+
+/**
  * The reading column itself, for a page's scroll content container.
  *
  * ONE OBJECT RATHER THAN FOUR COPIES, because the floating tab bar is capped

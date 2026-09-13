@@ -18,7 +18,7 @@ import { resolveAnyStation } from '@/utils/customStations';
 import { ModeScrim } from '@/components/ModeScrim';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { FloatingNotes } from '@/components/FloatingNotes';
-import { Fonts } from '@/constants/theme';
+import { Fonts, heroCeil } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
@@ -358,8 +358,8 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
   // Landscape sizes off HEIGHT alone — the portrait formula shrinks a
   // sideways orb to a bangle (the "squish", owner 30.07).
   const orbSize = isLandscape
-    ? Math.min(winH * 0.88, 360)
-    : Math.min(winW * 1.02, winH * 0.54, 460);
+    ? Math.min(winH * 0.88, heroCeil(360, winW))
+    : Math.min(winW * 1.02, winH * 0.54, heroCeil(460, winW));
 
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>

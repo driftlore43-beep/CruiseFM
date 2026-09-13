@@ -18,7 +18,7 @@ import { mmss } from '@/utils/formatTime';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
-import { Fonts } from '@/constants/theme';
+import { Fonts, heroCeil } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
@@ -1082,9 +1082,11 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
   // term was written for a tall window and turns a sideways ball into a
   // grapefruit. 0.62 of a 393pt-high screen ≈ 244 — big enough to be the
   // whole show, small enough that the chrome never touches it.
+  // Both ceilings go through heroCeil so an iPad lets the share-of-the-window
+  // term decide instead — see its note in theme.ts. Phones are untouched.
   const ballSize = isLandscape
-    ? Math.min(winH * 0.74, 330)
-    : Math.min(winW * 0.71, winH * 0.39, 340);
+    ? Math.min(winH * 0.74, heroCeil(330, winW))
+    : Math.min(winW * 0.71, winH * 0.39, heroCeil(340, winW));
   const ballSizeRef = useRef(ballSize);
   ballSizeRef.current = ballSize;
   const station = resolveAnyStation(activeId);

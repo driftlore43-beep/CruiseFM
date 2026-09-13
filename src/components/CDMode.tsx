@@ -22,7 +22,7 @@ import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { ModeScrim } from '@/components/ModeScrim';
-import { Fonts } from '@/constants/theme';
+import { Fonts, heroCeil } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
@@ -340,8 +340,8 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   // Landscape sizes off HEIGHT alone — the portrait formula's winH*0.44 term
   // shrinks a sideways case to a coaster (the "squish", owner 30.07).
   const caseSize = isLandscape
-    ? Math.min(winH * 0.94, 384)
-    : Math.min(winW * 0.97, winH * 0.47, 430);
+    ? Math.min(winH * 0.94, heroCeil(384, winW))
+    : Math.min(winW * 0.97, winH * 0.47, heroCeil(430, winW));
   const discSize = caseSize * DISC_FRACTION;
   const station = resolveAnyStation(activeId);
   const spotify = useMusicPlayback(visible);

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OWNER_MODE } from '@/constants/config';
-import { Fonts } from '@/constants/theme';
+import { Fonts, heroCeil } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { mmss } from '@/utils/formatTime';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
@@ -1379,7 +1379,9 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   // The 430 cap is the tablet guard (matches the CD disc): without it, an iPad's
   // tall window drives winH*0.46 past 500pt and the platter dwarfs the capped
   // modes. On a phone winW*0.9 / winH*0.46 always win, so phones are untouched.
-  const platSize     = isLandscape ? Math.min(winH * 0.86, 350) : Math.min(winW * 0.9, winH * 0.46, 430);
+  const platSize     = isLandscape
+    ? Math.min(winH * 0.86, heroCeil(350, winW))
+    : Math.min(winW * 0.9, winH * 0.46, heroCeil(430, winW));
 
   // Swipe-down to dismiss
   /**

@@ -21,7 +21,7 @@ import { useDsegFont } from '@/components/StationIdentity';
 import { usePalette, useStyles } from '@/context/AppearanceContext';
 import type { Palette } from '@/utils/appearance';
 import { clampAm, stationAm, stationDial } from '@/constants/stations';
-import { Cruise, Fonts } from '@/constants/theme';
+import { Cruise, Fonts, PAGE_MAX_W } from '@/constants/theme';
 import { saveCustomStation, updateCustomStation, type CustomStation } from '@/utils/customStations';
 import {
   choosePhoto, deleteStationPhoto, saveStationPhoto, stationPhotoAvailable,
@@ -548,6 +548,11 @@ const makeStyles = (p: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
+    // CENTRED HORIZONTALLY SO THE SHEET CAN BE CAPPED. On an iPad a full-width
+    // sheet spreads the 25 colour swatches into one 25-across row and puts the
+    // name field a foot wider than anything anyone types into it — the same
+    // stretched-phone fault the reading column fixes on the pages behind it.
+    alignItems: 'center',
     backgroundColor: p.mode === 'light' ? 'rgba(40,36,28,0.32)' : 'rgba(0,0,0,0.6)',
   },
   sheet: {
@@ -568,6 +573,11 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     // ScrollView inside then scrolls instead of pushing the top off.
     flexShrink: 1,
     maxHeight: SCREEN_H * 0.9,
+    // Width has to be stated as well as capped: with the backdrop centring it,
+    // a sheet with no width would shrink to its content instead of filling a
+    // phone. Never binds below PAGE_MAX_W, so phones are unchanged.
+    width: '100%',
+    maxWidth: PAGE_MAX_W,
     borderWidth: 1,
     borderBottomWidth: 0,
     borderColor: p.ink(0.12),

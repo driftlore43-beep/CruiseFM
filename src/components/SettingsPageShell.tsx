@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { Animated, Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePalette, useStyles } from '@/context/AppearanceContext';
+import { pageColumn } from '@/constants/theme';
 import type { Palette } from '@/utils/appearance';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -142,7 +143,12 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth, borderColor: p.ink(0.16),
   },
   title: { color: p.text, fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
-  content: { paddingHorizontal: 20, paddingTop: 8 },
+  // The same reading column every tab page takes (10.09). Without it a
+  // settings row runs the full 1032 points of an iPad, which puts each toggle
+  // a hand's width from the label it belongs to — the row stops reading as one
+  // thing. `pageColumn` is spread last so its own alignSelf/maxWidth win, and
+  // it never binds on a phone (see PAGE_MAX_W).
+  content: { paddingHorizontal: 20, paddingTop: 8, ...pageColumn },
 });
 
 const makeSectionStyles = (p: Palette) => StyleSheet.create({

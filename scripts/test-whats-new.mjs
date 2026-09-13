@@ -61,6 +61,10 @@ if (NOTE) {
   check('one sentence, not an essay', NOTE.body.length <= 160, `${NOTE.body.length} chars`);
 }
 
+// The phone can do everything the note might need — the baseline the cases
+// below were written against.
+const CAPS = { hasWidgets: true };
+
 if (!NOTE) {
   console.log('\n  CURRENT_NOTE is null — nothing to announce, which is a valid state.');
   process.exit(fails ? 1 : 0);
@@ -70,7 +74,7 @@ console.log('\n  a brand-new install is NOT told what is new:');
 {
   // Never seen a note, never seen the welcome explainer = brand new.
   const { mod, store } = load({});
-  const got = await mod.noteToShow(false);
+  const got = await mod.noteToShow(false, CAPS);
   check('says nothing', got === null, `got ${got && got.id}`);
   check('...and writes the current note down, so they are not told later either',
     store[KEY] === NOTE.id, `store holds ${store[KEY]}`);
@@ -82,25 +86,45 @@ console.log('\n  somebody who already uses the app IS told:');
 {
   // Seen the welcome explainer, never seen a note = existing user, first note.
   const { mod } = load({});
-  const got = await mod.noteToShow(true);
+  const got = await mod.noteToShow(true, CAPS);
   check('gets the note', got?.id === NOTE.id, `got ${got && got.id}`);
 }
 
 console.log('\n  once means once:');
 {
   const { mod } = load({ [KEY]: NOTE.id });
-  check('already seen this note — silent', (await mod.noteToShow(true)) === null);
-  check('...and silent for a new install too', (await mod.noteToShow(false)) === null);
+  check('already seen this note — silent', (await mod.noteToShow(true, CAPS)) === null);
+  check('...and silent for a new install too', (await mod.noteToShow(false, CAPS)) === null);
 }
 
 console.log('\n  an older note does not block a newer one:');
 {
   const { mod, store } = load({ [KEY]: 'an-older-note' });
-  const got = await mod.noteToShow(true);
+  const got = await mod.noteToShow(true, CAPS);
   check('a phone holding a stale id gets the current note', got?.id === NOTE.id);
   await mod.markNoteSeen(NOTE.id);
   check('marking it seen stores the id', store[KEY] === NOTE.id);
-  check('and then it stops', (await mod.noteToShow(true)) === null);
+  check('and then it stops', (await mod.noteToShow(true, CAPS)) === null);
+}
+
+console.log('\n  a note about something only a new build has:');
+{
+  // THE CARD SHIPS OVER THE AIR AND WIDGETS DO NOT. The runtime is held back
+  // so the App Store binary keeps receiving updates, so this exact phone
+  // exists: newest JS, older native side, no widget extension.
+  const { mod, store } = load({});
+  const got = await mod.noteToShow(true, { hasWidgets: false });
+  if (NOTE.needsWidgets) {
+    check('silent on a build without the feature', got === null, `got ${got && got.id}`);
+    check('and does NOT mark itself seen, so the note survives the update',
+      store[KEY] === undefined, `store holds ${store[KEY]}`);
+    const { mod: m2 } = load({});
+    check('the same phone IS told once it has the feature',
+      (await m2.noteToShow(true, { hasWidgets: true }))?.id === NOTE.id);
+  } else {
+    check('note needs nothing native — shown regardless of the build',
+      got?.id === NOTE.id, `got ${got && got.id}`);
+  }
 }
 
 console.log('\n  storage that will not answer:');
@@ -108,7 +132,7 @@ console.log('\n  storage that will not answer:');
   const { mod } = load({}, { broken: true });
   let threw = false;
   let got;
-  try { got = await mod.noteToShow(true); } catch { threw = true; }
+  try { got = await mod.noteToShow(true, CAPS); } catch { threw = true; }
   check('does not throw on the home page', !threw);
   check('fails quiet rather than showing on every launch', got === null, `got ${got && got.id}`);
   let markThrew = false;

@@ -27,7 +27,28 @@ export type ReleaseNote = {
   title: string;
   /** One sentence. If it needs two, it is not one release note. */
   body: string;
+  /**
+   * Set when the note announces something only a NEW BINARY has.
+   *
+   * THIS CARD SHIPS OVER THE AIR AND THE THING IT ANNOUNCES MAY NOT. An update
+   * carries JS and assets onto a binary that is already installed, and the
+   * runtime is deliberately held back so the App Store build keeps receiving
+   * them — which is exactly the arrangement that would let this card tell
+   * somebody on the old binary to go and look at a widget they do not have.
+   * That is the one thing the card may never do (see `body`'s own test).
+   *
+   * A VERSION NUMBER CANNOT ANSWER THIS. `Constants.expoConfig.version` is the
+   * version in the BUNDLE, so a phone running the store binary reports the
+   * version of whatever update it last pulled — 1.4.0 — while its widgets do
+   * not exist. The capability itself is the only honest test, which is why
+   * this is a flag checked against `widgetsAvailable()` at the call site
+   * rather than a `minVersion` string.
+   */
+  needsWidgets?: boolean;
 };
+
+/** What the phone can actually do, for a note that depends on it. */
+export type NoteCaps = { hasWidgets: boolean };
 
 /**
  * THE NEWEST NOTE, or null for a release with nothing worth saying.
@@ -39,9 +60,10 @@ export type ReleaseNote = {
  * your own station" passes, "improved reliability" does not.
  */
 export const CURRENT_NOTE: ReleaseNote | null = {
-  id: '2026-09-01',
-  title: 'Brighter greens, and a proper welcome',
-  body: 'Mint is the lime it always looked like in the picker, and the app now says what it is when you first open it.',
+  id: '2026-09-13-widgets',
+  title: 'Cruise FM on your Home Screen',
+  body: 'Press and hold your Home Screen to add a widget — what’s on air, the last song you played, or a one-tap way straight into a drive.',
+  needsWidgets: true,
 };
 
 /**
@@ -57,8 +79,12 @@ export const CURRENT_NOTE: ReleaseNote | null = {
  * `introSeen` is passed in rather than read here so the two sheets cannot
  * disagree about who is new — the welcome card owns that question.
  */
-export async function noteToShow(introSeen: boolean): Promise<ReleaseNote | null> {
+export async function noteToShow(introSeen: boolean, caps: NoteCaps): Promise<ReleaseNote | null> {
   if (!CURRENT_NOTE) return null;
+  // NOTHING IS WRITTEN DOWN IN THIS BRANCH, deliberately: a phone that cannot
+  // do the thing yet has not "seen" the note, so when it gets the build that
+  // can, the note is still waiting for it.
+  if (CURRENT_NOTE.needsWidgets && !caps.hasWidgets) return null;
   try {
     const seen = await AsyncStorage.getItem(KEY);
     if (seen === CURRENT_NOTE.id) return null;

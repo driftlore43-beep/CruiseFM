@@ -7,6 +7,7 @@ import { usePalette, useStyles } from '@/context/AppearanceContext';
 import type { Palette } from '@/utils/appearance';
 import { hasSeenIntro } from '@/utils/intro';
 import { markNoteSeen, noteToShow, type ReleaseNote } from '@/utils/whatsNew';
+import { widgetsAvailable } from '@/utils/widgetData';
 
 /**
  * WHAT CHANGED IN THE UPDATE THAT JUST LANDED — owner's ask, 01.09.
@@ -39,7 +40,7 @@ export function WhatsNewCard() {
       let active = true;
       (async () => {
         const introSeen = await hasSeenIntro();
-        const n = await noteToShow(introSeen);
+        const n = await noteToShow(introSeen, { hasWidgets: widgetsAvailable() });
         if (!active || !n) return;
         setNote(n);
         // Shown is told. See the rule above.

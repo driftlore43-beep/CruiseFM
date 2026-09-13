@@ -23,7 +23,7 @@ import { useDsegFonts } from '@/components/StationIdentity';
 import { isCustomStation, type CustomStation } from '@/utils/customStations';
 import { backOnLabel, isOnAir, needsOffAirAsk } from '@/constants/schedule';
 import { OffAirAsk } from '@/components/OffAirAsk';
-import { Cruise, PAGE_MAX_W } from '@/constants/theme';
+import { Cruise, PAGE_MAX_W, isWide } from '@/constants/theme';
 import { GlossSheen } from '@/components/GlossSheen';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { useTheme } from '@/context/ThemeContext';
@@ -413,23 +413,39 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
           scrollEventThrottle={16}
           onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }}>
 
-          {/* Push the title block just below the hero image */}
-          <View style={{ flex: 1, minHeight: SCREEN_H * 0.50 }} />
+          {/* Push the title block just below the hero image.
+              HALF A PHONE IS HALF A PICTURE; HALF AN iPAD IS 688 POINTS OF
+              EMPTY SKY. The spacer is a share of the screen, so on a tablet it
+              pushed the whole block — dial, name, mode grid, Start — into the
+              bottom third with nothing above it but backdrop. A third puts the
+              content back near the middle where a reader's eye starts, and the
+              photograph is full-bleed behind it either way, so nothing is lost
+              by moving the type up onto it. Phones keep 0.50 exactly. */}
+          <View style={{ flex: 1, minHeight: SCREEN_H * (isWide(SCREEN_W) ? 0.32 : 0.50) }} />
 
           {/* The dial position in the seven-segment face, above the title —
               the receiver identity, same as the Stations page. */}
-          <Text style={[styles.dialLine, { fontFamily: dseg }]}>
-            {dial.label}
-            <Text style={[styles.dialBand, { fontFamily: seg14 }]}>  {dial.band}</Text>
+          {/* A SIBLING, NOT A NESTED Text, AND THAT IS THE WHOLE POINT. A
+              nested <Text> INHERITS fontFamily, so the schedule was being set
+              in the seven-segment face however firmly its own style said
+              otherwise — "BACK AT 5PM" came out "bAcH At 5Pn", because seven
+              segments have no diagonal and no vertical centre bar (the 31.07
+              lesson, which the style's comment below already knew and could
+              not enforce). A row lets each part keep its own face. */}
+          <View style={styles.dialRow}>
+            <Text style={[styles.dialLine, { fontFamily: dseg }]}>
+              {dial.label}
+              <Text style={[styles.dialBand, { fontFamily: seg14 }]}>  {dial.band}</Text>
+            </Text>
             {/* The schedule, on the row that already carries the receiver
                 identity — this page has the room the dial's fixed-height rows
                 do not. Custom stations are unscheduled and print nothing. */}
             {!isCustom && (
               <Text style={styles.schedNote}>
-                {'   '}{live ? '● ON AIR' : (backOnLabel(station.id) ?? '').toUpperCase()}
+                {live ? '● ON AIR' : (backOnLabel(station.id) ?? '').toUpperCase()}
               </Text>
             )}
-          </Text>
+          </View>
           <Text style={styles.stationName}>{station.name}</Text>
           <Text style={styles.stationTagline}>{station.tagline}</Text>
 
@@ -652,7 +668,11 @@ const styles = StyleSheet.create({
   },
   linkToastText: { color: '#fff', fontSize: 13.5, fontWeight: '600', flexShrink: 1 },
 
-  dialLine: { color: 'rgba(255,255,255,0.6)', fontSize: 15, marginBottom: 10 },
+  // Baseline-aligned so the 15pt readout and the 11pt schedule sit on one
+  // line rather than being centred against each other. The marginBottom lives
+  // on the row now that the row, not the readout, is the block.
+  dialRow: { flexDirection: 'row', alignItems: 'baseline', gap: 12, marginBottom: 10 },
+  dialLine: { color: 'rgba(255,255,255,0.6)', fontSize: 15 },
   dialBand: { color: 'rgba(255,255,255,0.4)', fontSize: 12 },
   // Plain face, not the segment one: seven segments cannot draw most of these
   // letters (the 31.07 lesson), and this is printed text rather than a readout.

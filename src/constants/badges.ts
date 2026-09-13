@@ -32,15 +32,34 @@ export type JudgedBadge = Badge & { earned: boolean };
  * both. The split that IS visible lives where it belongs: the stats strip,
  * which counts drives and desk sessions separately and says which is which.
  */
+/**
+ * THE FIVE CAR-SHAPED BADGES WERE RENAMED, NOT REPLACED (owner, 13.09: "the
+ * app needs to remove the driving badges — suggest other badges that can come
+ * instead"). Ignition, Warm Engine, Road Tripper, Long Hauler and Regular's
+ * car icon all described a car; none of them MEASURED one, which is the point
+ * the note above already makes. So the criteria are untouched and only the
+ * name, the icon and the wording moved into the radio and record voice the
+ * rest of the app speaks.
+ *
+ * KEEPING THE IDS IS THE WHOLE REASON THIS IS A RENAME. Earned badges are
+ * remembered by id (`noteBadgesEarned`), so a new id would empty a listener's
+ * shelf and then congratulate them all over again for something they earned
+ * weeks ago. Never change an id to change a name.
+ *
+ * WHY THESE WORDS: a record's two sides make an hour the natural first
+ * milestone; "Long Player" is what LP stands for; a box set is what fifty
+ * hours of listening looks like on a shelf. They mean the same thing at a
+ * desk and in a car, which is the bar every badge here has to clear.
+ */
 export const BADGES: Badge[] = [
-  { id: 'ignition',     name: 'Ignition',      desc: 'Your first session on the books.',          icon: 'key-variant' },
+  { id: 'ignition',     name: 'Tuned In',      desc: 'Your first session on the books.',          icon: 'radio-tower' },
   { id: 'night-owl',    name: 'Night Owl',     desc: 'Three sessions after dark (10pm–5am).',     icon: 'weather-night' },
   { id: 'three-peat',   name: 'Three-Peat',    desc: 'Three days in a row.',                      icon: 'fire' },
   { id: 'full-week',    name: 'Full Week',     desc: 'Seven days in a row.',                      icon: 'calendar-week' },
-  { id: 'warm-engine',  name: 'Warm Engine',   desc: 'One hour of music.',                        icon: 'engine-outline' },
-  { id: 'road-tripper', name: 'Road Tripper',  desc: 'Ten hours listened.',                       icon: 'map-marker-distance' },
-  { id: 'long-hauler',  name: 'Long Hauler',   desc: 'Fifty hours listened.',                     icon: 'highway' },
-  { id: 'regular',      name: 'Regular',       desc: 'Ten sessions with Cruise FM.',              icon: 'car' },
+  { id: 'warm-engine',  name: 'Side A',        desc: 'One hour of music.',                        icon: 'album' },
+  { id: 'road-tripper', name: 'Long Player',   desc: 'Ten hours listened.',                       icon: 'record-player' },
+  { id: 'long-hauler',  name: 'Box Set',       desc: 'Fifty hours listened.',                     icon: 'archive-music-outline' },
+  { id: 'regular',      name: 'Regular',       desc: 'Ten sessions with Cruise FM.',              icon: 'headphones' },
   { id: 'veteran',      name: 'Veteran',       desc: 'Fifty sessions with Cruise FM.',            icon: 'medal-outline' },
   { id: 'local-legend', name: 'Local Legend',  desc: 'Ten sessions on a single station.',         icon: 'star-circle-outline' },
   { id: 'dial-surfer',  name: 'Dial Surfer',   desc: 'Every mood, heard.',                        icon: 'radio' },

@@ -1,14 +1,26 @@
 import { Image as RNImage, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg from 'react-native-svg';
 
-import { ModeHero, CARD_W, STAGE_H, STAGE_TOP, type Eq } from '@/components/ShareModeArt';
+import { CARD_W, STAGE_H } from '@/components/ShareModeArt';
 import type { Station } from '@/constants/stations';
 import { useStyles } from '@/context/AppearanceContext';
 import type { Palette } from '@/utils/appearance';
 
 /**
- * THE IPAD HERO — a real object, not a bigger version of the phone banner.
+ * THE IPAD HERO — the station's own photograph at a shape that suits a tablet.
+ *
+ * THE MODE'S OBJECT CAME OUT AGAIN ON 13.09 (owner: "I think Cursor placed the
+ * music mode in the 'let's put something on' card — let's remove that, it
+ * doesn't look too clean"). Everything below about WHY the art was drawn here
+ * is left standing because it explains the shape that remains: this is still a
+ * 1.46:1 banner rather than the phone's 4:1 letterbox, and it still sits on the
+ * blurred backdrop rather than a stretched sharp file. What it no longer does
+ * is put a record on the home page — the record belongs to the Vinyl deck, and
+ * a second one on the card that OPENS that deck said the same thing twice.
+ *
+ * ---- the original note, for the reasoning that still applies ----
+ *
+ * A real object, not a bigger version of the phone banner.
  *
  * Owner, 10.09 and 12.09: the reading-column fix stretched the phone's flat
  * hero into a 4:1 letterbox, and her own reaction to the turntable mockup was
@@ -75,10 +87,9 @@ function photoUri(image: unknown): string | null {
 const HERO_RATIO = STAGE_H / CARD_W; // 740 / 1080
 
 export function IPadHero({
-  station, mode, eyebrow, headline, buttonLabel, onPress, width,
+  station, eyebrow, headline, buttonLabel, onPress, width,
 }: {
   station: Station;
-  mode: string;
   eyebrow: string;
   headline: string;
   buttonLabel: string;
@@ -87,9 +98,7 @@ export function IPadHero({
 }) {
   const styles = useStyles(makeStyles);
   const height = Math.round(width * HERO_RATIO);
-  const eq = (station.eqColors ?? ['#5EE7FF', '#5B7BFF', '#C44CFF']) as Eq;
   const bgUri = photoUri(station.imageBlur ?? station.image);
-  const artUri = photoUri(station.image) ?? bgUri;
 
   return (
     <Pressable onPress={onPress} style={[styles.wrap, { width, height }]}>
@@ -103,31 +112,13 @@ export function IPadHero({
         />
       )}
 
-      {/* The object — transparent everywhere but the record/ball/disc itself,
-          so the photo shows through around it exactly like a live mode. */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Svg width="100%" height="100%" viewBox={`0 ${STAGE_TOP} ${CARD_W} ${STAGE_H}`}>
-          <ModeHero
-            modeId={mode}
-            eq={eq}
-            art={artUri}
-            uid="ipadhero"
-            title={station.name}
-            artist=""
-            freq={0}
-          />
-        </Svg>
-      </View>
-
       {/* Scrim, heaviest at the foot where the type sits — same "the type
           bands are shaded more than the picture between them" rule every
-          mode's own backdrop follows (ModeScrim). MEASURED against the
-          Equalizer's own art, which is the tallest of the eight (its bars
-          fill the whole STAGE band): a gentle single ramp left the headline
-          sitting on bright bar-tops at 0.30 opacity — nearly clear was the
-          fault, not the colour, so the ramp now stays almost untouched
-          until well past the object's own height and only darkens hard in
-          the last quarter, where nothing but type and the button live. */}
+          mode's own backdrop follows (ModeScrim). It stays almost untouched
+          across the picture and only darkens hard in the last quarter, where
+          nothing but type and the button live — which is the shape it was
+          measured into when an object still sat above it, and is now simply
+          what lets the photograph be the picture. */}
       <LinearGradient
         colors={['rgba(4,4,10,0.02)', 'rgba(4,4,10,0.05)', 'rgba(4,4,10,0.62)', 'rgba(4,4,10,0.94)']}
         locations={[0, 0.55, 0.78, 1]}

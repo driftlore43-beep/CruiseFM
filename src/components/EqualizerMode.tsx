@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Cruise, deckColumn, Fonts } from '@/constants/theme';
+import { Cruise, deckColumn, Fonts, PAGE_MAX_W } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { mmss } from '@/utils/formatTime';
 import { confirmedPlaying } from '@/utils/confirmedPlaying';
@@ -43,7 +43,10 @@ import { RepeatButton, ShuffleButton } from '@/components/TransportToggle';
 import { ModeCloseButton } from '@/components/ModeCloseButton';
 import { SeekBar } from '@/components/SeekBar';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+// Module-load size, and the ONLY thing still allowed to use it is the slide-in's
+// starting value, which the open effect immediately resets from the live window.
+// Anything else derived here is stale the moment the device turns.
+const { height: SCREEN_H } = Dimensions.get('window');
 
 // ── Card bar geometry ─────────────────────────────────────────────────────────
 const BAR_COUNT   = 30;
@@ -57,31 +60,22 @@ const MAX_SEGS    = 16;
 const MIN_SEGS    = 2;
 const MAX_H       = MAX_SEGS * UNIT;
 const MIN_H       = MIN_SEGS * UNIT;
-const CARD_BAR_W  = Math.floor((SCREEN_W - 48) / BAR_COUNT) - 2;
 
-// ── Fullscreen bar geometry — must match the vizSection height below,
-// otherwise the tallest bars get clipped at the top ─────────────────────────
-// 0.285 of the screen (was 0.26): the meter had room to grow upright too,
-// not only sideways (owner, 30.07 — "we can still buff it out"). Anything
-// much taller starts crowding the song title on a short phone; checked at
-// 667pt.
-const VIZ_H       = Math.round(SCREEN_H * 0.285);
-const FS_MAX_SEGS = Math.max(14, Math.floor(VIZ_H / UNIT));
-const FS_MAX_H    = FS_MAX_SEGS * UNIT;
+// The meter's own floor. Everything ELSE about the upright meter is worked
+// out per render from the live window — see `fsBarW` and friends in the
+// component. It used to live here, computed once from `Dimensions.get` at
+// module load, and that is two bugs in one line: the numbers are stale the
+// moment the device turns, and on a tablet they sized the bar row to the
+// FULL 1032 points while every other element sits in the reading column, so
+// the meter ran out past both edges of everything around it (owner, 13.09:
+// "the equaliser mode appears to be cut off").
 const FS_MIN_H    = MIN_H;
-// 24px side margins + the row's 2px gaps, so the first/last bars never clip.
-const FS_BAR_W    = Math.floor((SCREEN_W - 48 - (BAR_COUNT - 1) * 2) / BAR_COUNT);
 
 // ── Bar animation helpers ─────────────────────────────────────────────────────
 
 function cardBellMaxH(i: number): number {
   const t = (i - (BAR_COUNT - 1) / 2) / (BAR_COUNT / 4.2);
   return Math.round(MIN_SEGS + (MAX_SEGS - MIN_SEGS) * Math.exp(-0.5 * t * t)) * UNIT;
-}
-
-function fsBellMaxH(i: number): number {
-  const t = (i - (BAR_COUNT - 1) / 2) / (BAR_COUNT / 4.2);
-  return Math.round(MIN_SEGS + (FS_MAX_SEGS - MIN_SEGS) * Math.exp(-0.5 * t * t)) * UNIT;
 }
 
 function barDur(i: number): number {
@@ -284,6 +278,22 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
     const t = (i - (BAR_COUNT - 1) / 2) / (BAR_COUNT / 4.2);
     return Math.round(MIN_SEGS + (lsMaxSegs - MIN_SEGS) * Math.exp(-0.5 * t * t)) * UNIT;
   }, [lsMaxSegs]);
+
+  // ── Upright bar geometry — live, and held to the same reading column the
+  // controls are. The meter IS this mode's object, so on a tablet it should
+  // grow with the screen the way every other mode's does (heroCeil) — but not
+  // past the column, or it is the one thing on the deck running edge to edge.
+  // 0.285 of the height is unchanged and scales by itself. ──
+  const fsSide     = 24;
+  const fsAvailW   = Math.min(winW, PAGE_MAX_W) - fsSide * 2;
+  const fsBarW     = Math.max(3, Math.floor((fsAvailW - (BAR_COUNT - 1) * 2) / BAR_COUNT));
+  const fsVizH     = Math.round(winH * 0.285);
+  const fsMaxSegs  = Math.max(14, Math.floor(fsVizH / UNIT));
+  const fsMaxH     = fsMaxSegs * UNIT;
+  const fsBellMaxH = useCallback((i: number) => {
+    const t = (i - (BAR_COUNT - 1) / 2) / (BAR_COUNT / 4.2);
+    return Math.round(MIN_SEGS + (fsMaxSegs - MIN_SEGS) * Math.exp(-0.5 * t * t)) * UNIT;
+  }, [fsMaxSegs]);
 
   // ── Open: start bars, slide in ────────────────────────────────────────────
   useEffect(() => {
@@ -627,12 +637,12 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
           <View style={{ flex: 1 }} pointerEvents="none" />
 
           <Animated.View
-            style={[fs.vizSection, restScene]}
+            style={[fs.vizSection, { width: fsAvailW + fsSide * 2, height: fsVizH + 12 }, restScene]}
             onLayout={(e) => setSceneBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
             <Bars
               values={fsValues}
-              barW={FS_BAR_W}
-              maxH={FS_MAX_H}
+              barW={fsBarW}
+              maxH={fsMaxH}
               colors={currentStation.eqColors ?? ['#00BFFF', currentStation.glowColor, '#FF00AA']}
             />
             <FloatingNotes playing={live} color={currentStation.eqColors?.[1] ?? currentStation.glowColor} />
@@ -796,13 +806,15 @@ const card = StyleSheet.create({
 
 // ── Fullscreen styles ─────────────────────────────────────────────────────────
 const fs = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#02020c', minHeight: SCREEN_H },
+  // minHeight comes from the call site off the live window — a rotation has to
+  // move it, and a stylesheet is built once.
+  container: { flex: 1, backgroundColor: '#02020c' },
 
   // Ambient glow band — soft vertical falloff, no hard edge
   glowBand: {
     position: 'absolute',
     left: 0, right: 0,
-    top: SCREEN_H * 0.40,
+    top: '40%',
     bottom: 0,
   },
 
@@ -857,9 +869,9 @@ const fs = StyleSheet.create({
 
   // ── Visualizer section — flex to fill available space ────────────────────
   vizSection: {
-    width: SCREEN_W,
-    // A little taller than the bars' max height so peaks never touch the edge.
-    height: VIZ_H + 12,
+    // width and height come from the call site — they depend on the live
+    // window, and a stylesheet is built once.
+    alignSelf: 'center',
     justifyContent: 'flex-end',
     alignItems: 'center',
     overflow: 'hidden',
@@ -875,7 +887,7 @@ const fs = StyleSheet.create({
   },
   vizBloomBottom: {
     position: 'absolute', bottom: -12, alignSelf: 'center',
-    width: SCREEN_W * 0.8, height: 90, borderRadius: 90,
+    width: '80%', height: 90, borderRadius: 90,
     backgroundColor: 'rgba(90, 28, 200, 0.32)',
   },
 

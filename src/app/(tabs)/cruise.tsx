@@ -266,7 +266,6 @@ export default function CruiseScreen() {
         {tablet ? (
           <IPadHero
             station={heroStation}
-            mode={heroCruise.mode}
             eyebrow={lastCruise ? 'PICK UP WHERE YOU LEFT OFF' : 'TONIGHT’S PICK'}
             headline={words(kind).heroLine}
             buttonLabel={lastCruise ? words(kind).resume : words(kind).start}

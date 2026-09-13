@@ -85,13 +85,19 @@ export const ON_AIR: Nudge[] = [
 /** Badge lines. Sent only when something is genuinely earned, or one drive
  *  away — and the "one more" variant fires ONCE per badge, ever. */
 export const BADGE_COPY: Record<string, { title: string; body: string }> = {
-  ignition:      { title: 'Ignition', body: "Your first one's on the books." },
-  'night-owl':   { title: 'Night Owl, earned', body: 'Three after dark. It suits you.' },
-  'three-peat':  { title: 'Three-Peat', body: 'Three days running. Something is forming.' },
-  'full-week':   { title: 'Full Week', body: "Seven days straight. That's a habit now." },
-  'warm-engine': { title: 'Warm Engine', body: 'An hour of music.' },
-  regular:       { title: 'Regular', body: 'Ten in. You know the dial by now.' },
-  'dial-surfer': { title: 'Dial Surfer', body: "Every mood, heard. There isn't one left." },
+  // KEEP THESE TITLES IN STEP WITH BADGES[] IN constants/badges.ts. The id is
+  // what the app remembers; the title is what the listener reads, and a
+  // notification congratulating them on a badge their shelf calls something
+  // else is the kind of small wrongness nobody reports and everybody notices.
+  ignition:       { title: 'Tuned In', body: "Your first one's on the books." },
+  'night-owl':    { title: 'Night Owl, earned', body: 'Three after dark. It suits you.' },
+  'three-peat':   { title: 'Three-Peat', body: 'Three days running. Something is forming.' },
+  'full-week':    { title: 'Full Week', body: "Seven days straight. That's a habit now." },
+  'warm-engine':  { title: 'Side A', body: 'An hour of music.' },
+  'road-tripper': { title: 'Long Player', body: 'Ten hours in. That is a proper collection.' },
+  'long-hauler':  { title: 'Box Set', body: 'Fifty hours. Hardly anyone gets here.' },
+  regular:        { title: 'Regular', body: 'Ten in. You know the dial by now.' },
+  'dial-surfer':  { title: 'Dial Surfer', body: "Every mood, heard. There isn't one left." },
 };
 
 /** One drive away — the only forward-looking line, and never a countdown. */

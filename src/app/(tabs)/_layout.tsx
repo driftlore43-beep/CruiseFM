@@ -16,7 +16,7 @@ const TABS: { name: string; label: string; icon: IoniconName; iconActive: Ionico
   // deep links, in the widgets' own urls and in every harness — so this is the
   // LABEL only. "Cruise" also read as a fourth thing to do beside Stations and
   // Modes, when it is simply where you land.
-  { name: 'cruise',  label: 'HOME',     icon: 'car-sport-outline',    iconActive: 'car-sport' },
+  { name: 'cruise',  label: 'HOME',     icon: 'musical-note-outline', iconActive: 'musical-note' },
   { name: 'stations', label: 'STATIONS', icon: 'radio-outline',        iconActive: 'radio' },
   { name: 'modes',   label: 'MODES',    icon: 'disc-outline',          iconActive: 'disc' },
   { name: 'profile', label: 'PROFILE',  icon: 'person-circle-outline', iconActive: 'person-circle' },

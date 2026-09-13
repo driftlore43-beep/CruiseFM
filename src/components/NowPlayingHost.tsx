@@ -3,7 +3,7 @@ import * as Brightness from 'expo-brightness';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, ImageBackground, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Animated, AppState, ImageBackground, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { stationImageSource } from '@/utils/stationImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -361,10 +361,56 @@ export function NowPlayingHost() {
   const mode = np.session?.mode;
   const sid = np.session?.stationId;
 
+  /**
+   * THE PAGE UNDERNEATH USED TO FLASH FOR A QUARTER OF A SECOND EVERY TIME A
+   * DECK ARRIVED — found in the owner's own preview footage, 13.09, where
+   * pressing Start Listening showed the stations list between the station page
+   * closing and the deck opening, and a mode switch did the same.
+   *
+   * THE CAUSE IS THE ONE THING THAT MAKES THE ENTRANCE GOOD. Every mode
+   * presents in a `transparent` Modal and slides its own content up from the
+   * bottom — and the content carries the dark background, so until it arrives
+   * the window really is transparent and whatever is behind shows through.
+   *
+   * SO THE VEIL GOES HERE, NOT IN THE EIGHT MODES. This component is mounted
+   * in the tab layout ABOVE the pages, so a plain opaque view here is exactly
+   * what a mode's transparent window looks through at. One place, all eight
+   * decks, both orientations, and neither the slide nor any mode's own layout
+   * has to change.
+   *
+   * AND IT ONLY COVERS THE ARRIVAL. Pulling a deck down to dismiss it reveals
+   * the page you are going back to, which is the affordance that makes the
+   * gesture discoverable — so this holds for as long as the entrance takes
+   * (the spring settles in about 450ms) and then fades out, long before
+   * anybody could start dismissing. KEYED ON THE MODE as well as on
+   * `expanded`, because switching mode unmounts one deck and mounts the next,
+   * which is the second flash and the same cause.
+   */
+  const veil = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!np.expanded) { veil.setValue(0); return; }
+    veil.setValue(1);
+    const t = setTimeout(() => {
+      Animated.timing(veil, { toValue: 0, duration: 160, useNativeDriver: true }).start();
+    }, 430);
+    return () => clearTimeout(t);
+  }, [np.expanded, mode, veil]);
+
   // Only the session's mode is mounted — it stays alive while minimized so
   // re-expanding resumes instantly, and idle modes cost nothing.
   return (
     <>
+      {!!mode && (
+        <Animated.View
+          // Named so a harness can find THIS layer rather than whichever
+          // full-screen near-black view it happens to match first — the
+          // reason the first check reported the veil at full strength before
+          // anything had even been pressed.
+          testID="deck-arrival-veil"
+          style={[StyleSheet.absoluteFill, { backgroundColor: '#02020c', opacity: veil }]}
+          pointerEvents="none"
+        />
+      )}
       {mode === 'equalizer' && <EqualizerFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       {mode === 'cassette' && <CassetteFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}
       {mode === 'vinyl' && <VinylFullscreen visible={np.expanded} onClose={np.minimize} stationId={sid} />}

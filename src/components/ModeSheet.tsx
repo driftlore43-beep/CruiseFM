@@ -1,8 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Animated, Dimensions, Easing, ScrollView, StyleSheet, Text, TouchableOpacity, View,
-} from 'react-native';
+  Animated, Dimensions, Easing, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MirrorBallGlyph } from '@/components/MirrorBallGlyph';
@@ -77,18 +76,24 @@ export function ModeSheet({ visible, onClose, onPick, currentId, title = 'CHANGE
   }, [visible]);
   const y = useRef(new Animated.Value(SCREEN_H)).current;
   const fade = useRef(new Animated.Value(0)).current;
+  // THE LIVE HEIGHT, NOT THE ONE THIS MODULE LOADED WITH. A sheet is hidden by
+  // being pushed its own screen-height down; after a rotation the module's
+  // value is the OTHER orientation's, so on a tablet turned to landscape the
+  // sheet is pushed 1366 points instead of 1032 (harmless) — and turned back,
+  // 1032 instead of 1366, which leaves it visible along the bottom edge.
+  const { height: winH } = useWindowDimensions();
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(y, {
-        toValue: visible ? 0 : SCREEN_H,
+        toValue: visible ? 0 : winH,
         duration: visible ? 300 : 240,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.timing(fade, { toValue: visible ? 1 : 0, duration: 220, useNativeDriver: true }),
     ]).start();
-  }, [visible]);
+  }, [visible, winH]);
 
   const activeId = np.session?.mode ?? currentId;
   const s = useStyles(makeStyles);

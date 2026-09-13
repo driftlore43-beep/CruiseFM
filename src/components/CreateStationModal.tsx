@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
@@ -149,6 +150,10 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
   const insets = useSafeAreaInsets();
   const pal = usePalette();
   const styles = useStyles(makeStyles);
+  // Live, so the sheet's own cap and its exit both follow a rotation. The
+  // slide-in's starting value keeps the module-load height and is reset from
+  // this on open.
+  const { height: winH } = useWindowDimensions();
   const slideY = useRef(new Animated.Value(SCREEN_H)).current;
 
   const [name, setName] = useState('');
@@ -219,7 +224,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
 
   function handleHide(cb?: () => void) {
     setSettled(false);
-    Animated.timing(slideY, { toValue: SCREEN_H, duration: 280, useNativeDriver: true }).start(() => {
+    Animated.timing(slideY, { toValue: winH, duration: 280, useNativeDriver: true }).start(() => {
       resetForm();
       cb?.();
     });
@@ -301,7 +306,7 @@ export function CreateStationModal({ visible, onClose, onCreated, existingCount,
         <Animated.View
           style={[
             styles.sheet,
-            { paddingBottom: insets.bottom + 16 },
+            { paddingBottom: insets.bottom + 16, maxHeight: winH * 0.9 },
             // Lifts the sheet clear of the keyboard — see the keyboardHeight
             // effect above for why this is done by hand rather than left to
             // KeyboardAvoidingView. flexShrink on the sheet (and its
@@ -572,7 +577,10 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     // goes missing"). flexShrink lets it give way to the container, and the
     // ScrollView inside then scrolls instead of pushing the top off.
     flexShrink: 1,
-    maxHeight: SCREEN_H * 0.9,
+    // maxHeight comes from the call site off the live window — a stylesheet is
+    // built once, so after a rotation this capped the sheet at the OTHER
+    // orientation's height and it ran past the bottom of the screen.
+
     // Width has to be stated as well as capped: with the backdrop centring it,
     // a sheet with no width would shrink to its content instead of filling a
     // phone. Never binds below PAGE_MAX_W, so phones are unchanged.

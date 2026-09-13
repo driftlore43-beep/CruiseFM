@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, ImageBackground, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -454,11 +454,14 @@ export default function StationsScreen() {
 
   // The red line parks on whatever's playing, falling back to the station
   // that suits the hour when nothing is.
+  const { height: winH } = useWindowDimensions();
   const tunedId = np.session?.stationId ?? onAirStation.id;
 
   // The hero fills the top half of the phone. Clamped so it stays generous on
   // a small screen without eating a tall one whole.
-  const heroH = Math.max(340, Math.min(SCREEN_H * 0.52, 470));
+  // The live height, so turning the device re-sizes the hero instead of
+  // leaving it at whatever shape the app happened to launch in.
+  const heroH = Math.max(340, Math.min(winH * 0.52, 470));
 
   return (
     <View style={styles.safe}>

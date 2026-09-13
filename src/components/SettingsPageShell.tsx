@@ -1,12 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRef } from 'react';
-import { Animated, Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePalette, useStyles } from '@/context/AppearanceContext';
 import { pageColumn } from '@/constants/theme';
 import type { Palette } from '@/utils/appearance';
 
-const SCREEN_W = Dimensions.get('window').width;
 
 export function SettingsPageShell({
   title, onBack, children,
@@ -18,6 +17,12 @@ export function SettingsPageShell({
   const styles = useStyles(makeStyles);
   const pal = usePalette();
   const insets = useSafeAreaInsets();
+  // A REF, because the back-swipe responder is built once: closing over the
+  // width would slide the page off by whatever the app launched at, so after a
+  // rotation a strip of it stays on screen.
+  const { width: winW } = useWindowDimensions();
+  const widthRef = useRef(winW);
+  widthRef.current = winW;
 
   // Settings live in a modal, so the iOS edge-swipe-back doesn't exist here —
   // recreate it. Move-based claiming loses to the native ScrollView on iOS
@@ -53,7 +58,7 @@ export function SettingsPageShell({
       onPanResponderMove: (_, g) => { if (g.dx > 0) slideX.setValue(g.dx); },
       onPanResponderRelease: (_, g) => {
         if (g.dx > 70 || g.vx > 0.5) {
-          Animated.timing(slideX, { toValue: SCREEN_W, duration: 180, useNativeDriver: true }).start(() => {
+          Animated.timing(slideX, { toValue: widthRef.current, duration: 180, useNativeDriver: true }).start(() => {
             slideX.setValue(0);
             onBackRef.current();
           });

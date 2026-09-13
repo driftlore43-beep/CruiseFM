@@ -12,8 +12,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View,
-} from 'react-native';
+  View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -46,9 +45,10 @@ import {
   type LinkedPlaylist,
 } from '@/utils/stationPlaylists';
 
-const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get('window');
-/** The width the page's content actually gets, once capped to the column. */
-const COL_W = Math.min(SCREEN_W, PAGE_MAX_W);
+// Module-load size. The ONLY thing still entitled to it is the slide-in's
+// starting value, which the open effect resets from the live window anyway;
+// everything else reads `winW`/`winH` or the `windowRef` below.
+const { width: SCREEN_W } = Dimensions.get('window');
 const APPLE_MUSIC_RED = '#FA243C';
 const SPOTIFY_GREEN = '#1DB954';
 
@@ -120,6 +120,16 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
   // The station page pushes in from the RIGHT, like turning to a page rather
   // than pulling up a sheet. slideY stays because the downward pull-to-dismiss
   // is muscle memory and the drag pill at the top still promises it.
+  // The reading column, live. See modeBtn for what a stale one costs.
+  const { width: winW, height: winH } = useWindowDimensions();
+  const colW = Math.min(winW, PAGE_MAX_W);
+  // THE DISMISS RESPONDER IS BUILT ONCE, so it cannot close over winW/winH —
+  // it would hold the first render's numbers for ever, which after a rotation
+  // means sliding the page off by the OTHER orientation's width and leaving a
+  // strip of it on screen. A ref is this file's own documented answer to that
+  // (see `scrollY` below, added for the same reason).
+  const windowRef = useRef({ w: winW, h: winH });
+  windowRef.current = { w: winW, h: winH };
   const slideX = useRef(new Animated.Value(SCREEN_W)).current;
   const slideY = useRef(new Animated.Value(0)).current;
   const [selectedMode, setSelectedMode] = useState('cassette');
@@ -151,7 +161,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
         setPlatformReady(true);
       });
       slideY.setValue(0);
-      slideX.setValue(SCREEN_W);
+      slideX.setValue(winW);
       // Timing rather than a spring: a page push wants to arrive and stop, not
       // wobble at the end.
       Animated.timing(slideX, {
@@ -196,7 +206,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
         const axis = swipeAxis.current;
         swipeAxis.current = null;
         if (axis === 'x') {
-          if (g.dx > SCREEN_W * 0.3 || g.vx > 0.7) closeRef.current(false);
+          if (g.dx > windowRef.current.w * 0.3 || g.vx > 0.7) closeRef.current(false);
           else Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
           return;
         }
@@ -213,7 +223,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
 
   /** `down` sends it out of the bottom; everything else slides it off right. */
   function handleClose(down = false) {
-    const [value, target] = down ? [slideY, SCREEN_H] : [slideX, SCREEN_W];
+    const [value, target] = down ? [slideY, windowRef.current.h] : [slideX, windowRef.current.w];
     Animated.timing(value, {
       toValue: target, duration: 280, easing: Easing.in(Easing.cubic), useNativeDriver: true,
     }).start(onClose);
@@ -349,7 +359,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
 
         {/* Custom stations: their icon becomes the hero, glowing in their colour */}
         {custom && (
-          <View style={[styles.customHero, { top: SCREEN_H * 0.16 }]} pointerEvents="none">
+          <View style={[styles.customHero, { top: winH * 0.16 }]} pointerEvents="none">
             <View
               style={[
                 styles.customHeroIcon,
@@ -421,7 +431,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
               content back near the middle where a reader's eye starts, and the
               photograph is full-bleed behind it either way, so nothing is lost
               by moving the type up onto it. Phones keep 0.50 exactly. */}
-          <View style={{ flex: 1, minHeight: SCREEN_H * (isWide(SCREEN_W) ? 0.32 : 0.50) }} />
+          <View style={{ flex: 1, minHeight: winH * (isWide(winW) ? 0.32 : 0.50) }} />
 
           {/* The dial position in the seven-segment face, above the title —
               the receiver identity, same as the Stations page. */}
@@ -505,6 +515,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
                   key={mode.id}
                   style={[
                     styles.modeBtn,
+                    { width: (colW - 48 - 10) / 2 },
                     active && { backgroundColor: stationAccent + '40', borderColor: stationAccent },
                     !unlocked && styles.modeBtnLocked,
                   ]}
@@ -706,9 +717,13 @@ const styles = StyleSheet.create({
   },
   modeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 28 },
   modeBtn: {
-    // Two to a row, measured off the COLUMN rather than the screen — the
-    // column is what the chips actually sit in once it is capped.
-    width: (COL_W - 48 - 10) / 2,
+    // WIDTH COMES FROM THE CALL SITE. Two to a row, measured off the COLUMN
+    // rather than the screen — the column is what the chips actually sit in
+    // once it is capped — and off the LIVE window, because a stylesheet is
+    // built once and this page is reachable in either orientation. It used to
+    // be a module constant, so turning an iPad left the chips at the other
+    // orientation's width: two of them no longer fit a row, and the grid fell
+    // to one chip per line.
     backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 14,
     paddingVertical: 16, paddingHorizontal: 14,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.20)',

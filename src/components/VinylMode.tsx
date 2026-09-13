@@ -192,7 +192,12 @@ function SparkleField({ size }: { size: number }) {
  */
 function RecordBloom({ size, color }: { size: number; color: string }) {
   const uid = useId().replace(/:/g, '');
-  const box = size * 1.62;
+  // 1.34, not something more generous: at 1.62 the canvas came out 1254 points
+  // wide on a 1032-point iPad, so a fifth of the glow was drawn off the screen
+  // — invisible, and paid for every frame. Measured by a rotation probe that
+  // flags any layer wider than the window. The halo still reaches ~130 points
+  // past the record, which is well past where the falloff stops reading.
+  const box = size * 1.34;
   const c = box / 2;
   return (
     <View

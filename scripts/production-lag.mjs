@@ -27,6 +27,16 @@
  * carries the identical job name and publishes nothing, so matching on the
  * name alone would report a check as a release.
  *
+ * THE ONE THING IT CANNOT SEE, and it bit on 13 September: a publish run BY
+ * HAND from someone's own laptop (`eas update --branch production ...`) leaves
+ * no trace in the workflow's run history, so this reports the last WORKFLOW
+ * publish and calls anything newer "behind" even when it already went out.
+ * The tell is the update's message — the workflow always sends "Update from
+ * GitHub" (or whatever the dispatch box said), so a hand-written one on
+ * expo.dev's production branch is a publish this script never saw. It says so
+ * in its own output rather than only here, because a caveat nobody reads is
+ * the same as no caveat.
+ *
  * The repo is public, so this needs no token.
  */
 
@@ -55,18 +65,31 @@ function api(path) {
   return JSON.parse(out);
 }
 
+// HOW FAR BACK TO LOOK. Every push to this branch publishes to PREVIEW, so
+// preview runs vastly outnumber production ones and a short window silently
+// loses the answer: at one page of 40 this stopped finding ANY production
+// publish on 13 September, a week after the last one, purely because eleven
+// days of pushes had buried it. Five pages is about a month of ordinary work.
+const PAGES = 5;
+const PER_PAGE = 40;
+
 /** The commit of the last run that genuinely published to production. */
 function lastProductionPublish() {
-  const runs = api(`/actions/workflows/${WORKFLOW}/runs?per_page=40&status=success`);
-  for (const run of runs.workflow_runs ?? []) {
-    const { jobs = [] } = api(`/actions/runs/${run.id}/jobs`);
-    for (const job of jobs) {
-      if (!job.name?.includes('--branch production')) continue;
-      // A diagnose run has the same job name and publishes nothing, so the
-      // Publish step's own conclusion is the only honest signal.
-      const published = (job.steps ?? []).some(
-        (s) => s.name === 'Publish' && s.conclusion === 'success');
-      if (published) return { sha: run.head_sha, at: run.updated_at, url: run.html_url };
+  for (let page = 1; page <= PAGES; page++) {
+    const runs = api(
+      `/actions/workflows/${WORKFLOW}/runs?per_page=${PER_PAGE}&page=${page}&status=success`);
+    const list = runs.workflow_runs ?? [];
+    if (list.length === 0) return null;
+    for (const run of list) {
+      const { jobs = [] } = api(`/actions/runs/${run.id}/jobs`);
+      for (const job of jobs) {
+        if (!job.name?.includes('--branch production')) continue;
+        // A diagnose run has the same job name and publishes nothing, so the
+        // Publish step's own conclusion is the only honest signal.
+        const published = (job.steps ?? []).some(
+          (s) => s.name === 'Publish' && s.conclusion === 'success');
+        if (published) return { sha: run.head_sha, at: run.updated_at, url: run.html_url };
+      }
     }
   }
   return null;
@@ -81,7 +104,7 @@ const last = process.env.SELFTEST
   ? { sha: git('rev-parse', 'HEAD'), at: new Date().toISOString(), url: '(selftest)' }
   : lastProductionPublish();
 if (!last) {
-  console.log('Could not find a production publish in the last 40 runs.');
+  console.log(`Could not find a production publish in the last ${PAGES * PER_PAGE} runs.`);
   console.log('That is not proof there was none — widen the search before acting on it.');
   process.exit(2);
 }
@@ -101,6 +124,11 @@ const when = `${days} day${days === 1 ? '' : 's'} ago`;
 
 console.log(`Last production publish: ${last.sha.slice(0, 7)}, ${when} (${last.at.slice(0, 10)})`);
 console.log(last.url);
+console.log('');
+console.log('This reads the WORKFLOW\'s history only. A publish run by hand from a');
+console.log('laptop leaves no run here, so check expo.dev -> production branch before');
+console.log('believing the count below — an update whose message was written by a');
+console.log('person, rather than "Update from GitHub", is one of those.');
 console.log('');
 
 if (behind.length === 0) {

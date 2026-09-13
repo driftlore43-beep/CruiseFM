@@ -12,7 +12,7 @@ import Svg, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaylistSheet } from '@/components/PlaylistSheet';
-import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
+import { LandscapeChrome, restGrowFor, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
 import { mmss } from '@/utils/formatTime';
@@ -22,7 +22,7 @@ import { confirmedPlaying } from '@/utils/confirmedPlaying';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { ModeScrim } from '@/components/ModeScrim';
-import { deckColumn, Fonts, heroCeil } from '@/constants/theme';
+import { DECK_CHROME_H, deckColumn, Fonts, heroCeil, isWide } from '@/constants/theme';
 import { getStationPlaylist, setStationPlaylist, type LinkedPlaylist } from '@/utils/stationPlaylists';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { useTrackClock } from '@/utils/useTrackClock';
@@ -341,7 +341,19 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   // shrinks a sideways case to a coaster (the "squish", owner 30.07).
   const caseSize = isLandscape
     ? Math.min(winH * 0.94, heroCeil(384, winW))
-    : Math.min(winW * 0.97, winH * 0.47, heroCeil(430, winW));
+    // 0.47 OF THE HEIGHT IS A PHONE'S NUMBER, and on a tablet it left the case
+    // stranded in the middle of the screen — measured at 768x1024 the case
+    // came to 481 points inside 700 points of clear space between the station
+    // block and the tagline, i.e. a third of the room unused (owner, 13.09:
+    // "this is the same goes for the CD mode"). A tablet takes everything the
+    // controls are not using instead; see DECK_CHROME_H, where that
+    // measurement is written down. On her iPad the case goes 481 -> 674.
+    // A phone never reaches WIDE_MIN, so its case is byte-identical.
+    : Math.min(
+        winW * 0.97,
+        isWide(winW) ? winH - DECK_CHROME_H : winH * 0.47,
+        heroCeil(430, winW),
+      );
   const discSize = caseSize * DISC_FRACTION;
   const station = resolveAnyStation(activeId);
   const spotify = useMusicPlayback(visible);
@@ -391,7 +403,9 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   // restShiftFor in LandscapeChrome.
   const [contentH, setContentH] = useState(0);
   const [sceneBox, setSceneBox] = useState({ y: 0, h: 0 });
-  const restScene = useRestScene(chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape);
+  const restScene = useRestScene(
+    chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape,
+    restGrowFor(caseSize, winW, winH));
 
   const wrap01 = (v: number) => ((v % 1) + 1) % 1;
   const readAnim = (a: Animated.Value) => (a as unknown as { __getValue?: () => number }).__getValue?.() ?? 0;

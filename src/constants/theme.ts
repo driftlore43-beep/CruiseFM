@@ -135,6 +135,43 @@ export const isWide = (winW: number) => winW >= WIDE_MIN;
 export const heroCeil = (phone: number, winW: number) => (isWide(winW) ? phone * 1.8 : phone);
 
 /**
+ * HOW MUCH OF A TABLET'S HEIGHT A DECK'S OWN CONTROLS NEED.
+ *
+ * On a tablet the binding number for a mode's object stopped being the
+ * ceiling (13.09 lifted that) and became the SHARE — `winH * 0.58` on the
+ * vinyl, `winH * 0.47` on the CD. A share is a guess at how much room the
+ * chrome wants, and on a 1024-point iPad it guessed far too much: the owner,
+ * with her own screenshot, "i still really want the vinyl to take up a more
+ * room - we have more space use it up!"
+ *
+ * SO THIS IS MEASURED RATHER THAN GUESSED — AND MEASURED AGAINST A REAL SONG,
+ * which is the half that matters. Rendered at 768x1024, the station block
+ * above a deck ends at y=105. With no track the deck shows a one-line tagline
+ * starting at y=788, i.e. 341 points of furniture; with a song it shows a
+ * title, an artist, a seek bar and two times, and the title's own glyphs
+ * start at y=695 — 434 points. Sizing against the tagline and then meeting a
+ * long song title is how an object gets squeezed by flex and its tonearm
+ * pushed off the top of the screen, which is exactly what a 350 here did when
+ * it was tried. 440 is the real number with a little air.
+ *
+ * THE CONSEQUENCE IS WORTH STATING PLAINLY: on a 1024-point iPad this leaves
+ * 584 points, and the vinyl was already at 594 — so the record was very
+ * slightly OVER its own budget rather than under it, and there was never any
+ * headroom to give it while the controls are up. What the owner could see
+ * going spare is the room the controls themselves occupy, and the answer to
+ * that is `restGrowFor` in LandscapeChrome, not a bigger number here.
+ *
+ * IT ALSO BEHAVES IN A SHORT WIDE WINDOW, which a share does not: an iPad
+ * split view 700 points tall gets 350 rather than a share that would have
+ * overflowed the screen and left flex to squeeze it.
+ *
+ * FOR TABLETS ONLY. Phones keep their own share term untouched, so every
+ * phone layout stays byte-identical — the same safety `heroCeil` and
+ * `PAGE_MAX_W` are built on.
+ */
+export const DECK_CHROME_H = 440;
+
+/**
  * The reading column itself, for a page's scroll content container.
  *
  * ONE OBJECT RATHER THAN FOUR COPIES, because the floating tab bar is capped

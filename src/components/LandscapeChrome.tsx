@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MarqueeText } from '@/components/MarqueeText';
 import { ModeActionRow } from '@/components/ModeActionRow';
+import { isWide } from '@/constants/theme';
 import { useDaylight } from '@/context/MotionContext';
 import { SeekBar } from '@/components/SeekBar';
 import { StationBackdrop } from '@/components/StationBackdrop';
@@ -201,14 +202,62 @@ export function useChromeFade({ active, playing, sheetOpen, hold = false }: {
  * transport, pills, and some of those come and go with the track), so one
  * number would leave half of them visibly off-centre.
  */
-export function useRestScene(chrome: Animated.Value, shift: number, active = true) {
+/**
+ * `grow` IS THE TABLET'S ANSWER TO "USE THE SPACE" (owner, 13.09, with an
+ * iPad screenshot of a rested deck: "i still really want the vinyl to take up
+ * a more room - we have more space use it up!").
+ *
+ * MEASURED, AND THE MEASUREMENT IS THE WHOLE POINT: at 768x1024 with a real
+ * song on screen the station block above a deck ends at y=105 and the song
+ * title's own glyphs start at y=695, so the controls need 434 points and the
+ * object already has every one of the other 590. The record could not grow
+ * by a single point without the arm riding over the chevron — proven by
+ * rendering it at 674 and watching flex squeeze it back to 641 and push its
+ * counterweight off the top of the screen.
+ *
+ * BUT ALL 434 OF THOSE POINTS GO AWAY WHEN THE DECK RESTS, and resting is the
+ * state she screenshotted, because it is the state you actually look at while
+ * listening. So the object grows into the room the controls just vacated and
+ * shrinks back the moment anything is touched. Transform only, on the native
+ * driver, riding the same `chrome` value as the fade — so it costs nothing
+ * and can never disagree with it.
+ *
+ * SCALING ABOUT THE CENTRE IS WHAT KEEPS THE GESTURES HONEST: the vinyl and
+ * the CD are wound by the ANGLE from the object's centre, and an angle is
+ * scale-invariant, so a rested deck winds exactly like a woken one.
+ *
+ * A phone passes 1 and its decks are byte-identical.
+ */
+export function useRestScene(chrome: Animated.Value, shift: number, active = true, grow = 1) {
   return useMemo(() => ({
-    transform: [{
-      translateY: chrome.interpolate({
-        inputRange: [0, 1], outputRange: [active ? shift : 0, 0],
-      }),
-    }],
-  }), [chrome, shift, active]);
+    transform: [
+      {
+        translateY: chrome.interpolate({
+          inputRange: [0, 1], outputRange: [active ? shift : 0, 0],
+        }),
+      },
+      {
+        scale: chrome.interpolate({
+          inputRange: [0, 1], outputRange: [active ? grow : 1, 1],
+        }),
+      },
+    ],
+  }), [chrome, shift, active, grow]);
+}
+
+/**
+ * How much bigger an object may be drawn once the controls have faded.
+ *
+ * Both targets leave a real margin rather than running to the screen edge:
+ * the record's arm overhangs its own box at the top and both decks carry a
+ * glow that is meant to fade out beyond the object rather than stop at it.
+ * 1.22 is a hard ceiling so a freak window can never turn a rest into a zoom.
+ *
+ * Returns exactly 1 below WIDE_MIN, so no phone ever scales.
+ */
+export function restGrowFor(size: number, winW: number, winH: number): number {
+  if (!size || !isWide(winW)) return 1;
+  return Math.max(1, Math.min(1.22, (winW * 0.92) / size, (winH * 0.88) / size));
 }
 
 /**

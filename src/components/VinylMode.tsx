@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OWNER_MODE } from '@/constants/config';
-import { deckColumn, Fonts, heroCeil, isWide } from '@/constants/theme';
+import { DECK_CHROME_H, deckColumn, Fonts, heroCeil, isWide } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { mmss } from '@/utils/formatTime';
 import { createScrubHaptics } from '@/utils/scrubHaptics';
@@ -18,7 +18,7 @@ import { useMotion } from '@/context/MotionContext';
 import { resolveAnyStation } from '@/utils/customStations';
 import { StationBackdrop } from '@/components/StationBackdrop';
 import { ModeScrim } from '@/components/ModeScrim';
-import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
+import { LandscapeChrome, restGrowFor, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
 import { FloatingNotes } from '@/components/FloatingNotes';
 import { getSavedPlatform, openMusicPlatform, PLATFORMS, PlatformId } from '@/utils/musicPlatform';
@@ -571,11 +571,24 @@ function Tonearm({
             <SvgRect x={PX - cwW * 0.37} y={PY - cwMid - cwH * 0.34} width={cwW * 0.12} height={cwH * 0.68} rx={cwW * 0.06} fill="rgba(255,255,255,0.16)" />
           </G>
 
-          {/* Tube — a round chrome pipe: outline, body, inner light, hot hairline */}
-          <Path d={tube} stroke="#3c3e47" strokeWidth={armW + Math.max(1.2, armW * 0.18)} fill="none" strokeLinecap="round" />
-          <Path d={tube} stroke="#8a8d99" strokeWidth={armW} fill="none" strokeLinecap="round" />
+          {/* TUBE — A ROUND CHROME PIPE, LIT FROM THE LEFT.
+              Six strokes on the SAME path, each a slice across the tube's
+              width, because one flat stroke is the whole difference between a
+              tube and a drawn line (03.08). Read left to right they are the
+              cross-section of a cylinder: hot hairline, inner light, body,
+              then the far side turning out of the light and a dark edge under
+              it. The two right-hand strokes are new — the owner asked to
+              "define its features and textures" (13.09), and without them the
+              pipe was bright on one side and simply stopped on the other, so
+              it read as flat however thick it got. A seam hairline at the
+              tube's own centre is what makes it look DRAWN from metal rather
+              than extruded, and it is the only mark here that is not falloff. */}
+          <Path d={tube} stroke="#2b2d34" strokeWidth={armW + Math.max(1.2, armW * 0.18)} fill="none" strokeLinecap="round" />
+          <Path d={tube} stroke="#7c808c" strokeWidth={armW} fill="none" strokeLinecap="round" />
+          <Path d={tube} stroke="#4c4f59" strokeWidth={armW * 0.34} fill="none" strokeLinecap="round" transform={`translate(${(armW * 0.31).toFixed(2)},0)`} />
           <Path d={tube} stroke="#c9ccd6" strokeWidth={armW * 0.5} fill="none" strokeLinecap="round" transform={`translate(${(-armW * 0.13).toFixed(2)},0)`} />
           <Path d={tube} stroke="rgba(255,255,255,0.9)" strokeWidth={Math.max(0.9, armW * 0.15)} fill="none" strokeLinecap="round" transform={`translate(${(-armW * 0.27).toFixed(2)},0)`} />
+          <Path d={tube} stroke="rgba(255,255,255,0.16)" strokeWidth={Math.max(0.6, armW * 0.07)} fill="none" strokeLinecap="round" transform={`translate(${(armW * 0.09).toFixed(2)},0)`} />
 
           {/* Headshell — collar, graphite shell, slots, screws, finger lift, cartridge */}
           <G transform={headRot}>
@@ -618,12 +631,38 @@ function Tonearm({
         const dialR = Math.max(3.5, R * 0.32);
         const bw = R * 2 + dialR * 2 + 8;
         const bcx = R;
+        // ROOM FOR THE SHADOW, or it ends in a straight line at the canvas
+        // edge — the 25.07 bottom-seam rule. Everything else keeps its old
+        // coordinates and is shifted by this instead of being re-derived.
+        const pad = R * 0.85;
+        const gid = `armBaseShadow${Math.round(R * 10)}`;
         return (
           <Svg
-            width={bw} height={R * 2 + 4}
-            style={{ position: 'absolute', top: -R, left: armW / 2 - R, zIndex: 10 }}
+            width={bw + pad * 2} height={R * 2 + 4 + pad * 2}
+            style={{ position: 'absolute', top: -R - pad, left: armW / 2 - R - pad, zIndex: 10 }}
             pointerEvents="none"
           >
+            {/* THE ARM WAS FLOATING, AND A SHADOW IS WHY (owner, 13.09: "the
+                tonearm stick with the vinyl is floating"). A real arm's
+                bearing stands on a machined pillar rising out of the plinth;
+                this deck has no plinth — the record floats on the station's
+                photograph — so the only thing that can put the assembly ON
+                something is the light. Pure falloff, offset down and right to
+                agree with the key light every other object here is lit by,
+                and drawn as its own gradient rather than a stroked shape,
+                which is this file's standing rule for anything made of light. */}
+            <Defs>
+              <RadialGradient id={gid} cx="50%" cy="50%" r="50%">
+                <Stop offset="0%"   stopColor="#000" stopOpacity={0.55} />
+                <Stop offset="52%"  stopColor="#000" stopOpacity={0.30} />
+                <Stop offset="100%" stopColor="#000" stopOpacity={0} />
+              </RadialGradient>
+            </Defs>
+            <SvgEllipse
+              cx={pad + bcx + R * 0.18} cy={pad + R + R * 0.34}
+              rx={R * 1.5} ry={R * 1.18} fill={`url(#${gid})`}
+            />
+            <G transform={`translate(${pad.toFixed(2)},${pad.toFixed(2)})`}>
             <SvgCircle cx={bcx} cy={R} r={R} fill="#212228" stroke="#3f414a" strokeWidth={1.5} />
             <SvgCircle cx={bcx} cy={R} r={R * 0.84} fill="none" stroke="#585b66" strokeWidth={Math.max(0.9, R * 0.07)} />
             {/* Radial vents around the bearing */}
@@ -649,6 +688,7 @@ function Tonearm({
             <SvgCircle cx={bcx} cy={R} r={R * 0.22} fill="#5c5f6a" />
             <Path d={`M ${bcx - R * 0.16} ${R} H ${bcx + R * 0.16}`} stroke="#26272d" strokeWidth={Math.max(0.8, R * 0.06)} />
             <SvgCircle cx={bcx - R * 0.30} cy={R - R * 0.30} r={Math.max(1, R * 0.09)} fill="#9AA0AC" />
+            </G>
           </Svg>
         );
       })()}
@@ -687,8 +727,24 @@ function TurntableHero({
 }) {
   const recSize  = platSize * 0.865;
   const armLen   = platSize * 0.70;
-  const armW     = 10;
-  const headW    = 26;
+  // THE ARM IS A FRACTION OF ITSELF, NOT A FIXED NUMBER OF POINTS.
+  //
+  // These were 10 and 26 flat, and that is the whole of why the owner saw a
+  // "really small and thin" arm on her iPad (13.09) while the same arm reads
+  // correctly on a phone: the RECORD grows with the screen and the arm did
+  // not, so at 594 points of platter the tube had gone from 4% of the arm's
+  // own length to 2.4% — a hair laid over a dinner plate. It is the same
+  // fault as the hero ceilings one layer in: a number tuned against a phone
+  // deciding a tablet's layout.
+  //
+  // THE FRACTIONS ARE SET FROM THE WIDEST PHONE so nothing on a phone moves.
+  // At 430 points the platter is 387 and the arm 270.9, and 10 / 270.9 =
+  // 0.0369, 26 / 270.9 = 0.0959 — so on the largest iPhone these return
+  // exactly the old numbers, on every smaller one the floor binds and returns
+  // them too, and only a tablet ever gets a thicker arm (17.4 and 45.2 at
+  // 674 points of platter).
+  const armW     = Math.max(10, armLen * 0.0369);
+  const headW    = Math.max(26, armLen * 0.0959);
   const pivotX   = platSize * 0.935;
   const pivotY   = platSize * 0.048;
   // 0 = parked clear of the record (negative swings right, off the platter),
@@ -963,7 +1019,6 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   // restShiftFor in LandscapeChrome.
   const [contentH, setContentH] = useState(0);
   const [sceneBox, setSceneBox] = useState({ y: 0, h: 0 });
-  const restScene = useRestScene(chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape);
 
   // ── Real-track layer ────────────────────────────────────────────────────────
   // With Spotify connected the deck runs on the REAL song: true duration,
@@ -1299,8 +1354,30 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     return () => progress.removeListener(id);
   }, []);
 
-  // One slow revolution (~23 rpm) — relaxed, not a fast blur.
-  const SPIN_MS = 2600;
+  /**
+   * ONE SLOW REVOLUTION — AND A BIGGER RECORD TAKES LONGER TO COME ROUND.
+   *
+   * 2600ms (~23 rpm) is a phone's number and stays a phone's number. Owner,
+   * 13.09: "i would suggest the vinyls to also spin slower - larger vinyl
+   * should need to turn much longer around." She is describing EDGE SPEED,
+   * which is the thing the eye actually reads: at a fixed period a disc twice
+   * as wide has its rim travelling twice as fast across the screen, so the
+   * bigger record looked like it had been sped up. Holding the rim's speed
+   * constant means scaling the period with the diameter, which is exactly
+   * what she asked for.
+   *
+   * SCALED OFF THE WIDEST PHONE (387 points of platter) with a floor of 1, so
+   * every phone keeps 2600ms to the millisecond and only a tablet slows down:
+   * 674 points comes to 4530ms, i.e. 13 rpm. A real LP is 1.8s a turn, so
+   * this deck has always been slower than life — it is a mood, not a
+   * measurement.
+   *
+   * READ THROUGH A REF because `run()` below recurses and would otherwise
+   * hold the period from the render that started the loop — so turning the
+   * iPad would leave the record at the old rate until it was next stopped.
+   * That is the stale-closure rule this file keeps relearning.
+   */
+  const spinMsRef = useRef(2600);
 
   // Steady loop. Each cycle is a FULL revolution measured from wherever the
   // record currently sits — a plain Animated.loop(0→1) only spins correctly
@@ -1314,7 +1391,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
       const from = ((spinCurrentRef.current % 1) + 1) % 1;
       spinValue.setValue(from);
       spinRef.current = Animated.timing(spinValue, {
-        toValue: from + 1, duration: SPIN_MS, easing: Easing.linear, useNativeDriver: true,
+        toValue: from + 1, duration: spinMsRef.current, easing: Easing.linear, useNativeDriver: true,
       });
       spinRef.current.start((result: { finished: boolean }) => {
         if (result.finished && playingRef.current && isSpinning.current) run();
@@ -1476,15 +1553,30 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   // modes. On a phone winW*0.9 / winH*0.46 always win, so phones are untouched.
   const platSize     = isLandscape
     ? Math.min(winH * 0.86, heroCeil(350, winW))
-    // 0.46 OF THE HEIGHT IS A PHONE'S NUMBER. A tablet's portrait window is far
-    // taller relative to the type and transport below it — measured on a 12.9"
-    // iPad, the old formula left roughly a third of the screen empty between
-    // the record and the song line — so the record takes a larger share there
-    // and lands near two thirds of the width, which is the proportion MD
-    // Vinyl's deck reads at (owner, 13.09: "the vinyl should also be enlarged
-    // to a similar size"). A phone never reaches WIDE_MIN, so its disc is
-    // byte-identical.
-    : Math.min(winW * 0.9, winH * (isWide(winW) ? 0.58 : 0.46), heroCeil(430, winW));
+    // 0.46 OF THE HEIGHT IS A PHONE'S NUMBER, and on a tablet a SHARE was the
+    // wrong kind of number entirely. `winH * 0.58` is a guess at how much room
+    // the controls want; measured at 768x1024 with the chrome awake they want
+    // 341 points, so the guess was leaving 90 points of dead sky above the
+    // record and 90 below it (owner, 13.09, with her own screenshot: "i still
+    // really want the vinyl to take up a more room - we have more space use it
+    // up!"). A tablet therefore takes everything the controls are NOT using —
+    // see DECK_CHROME_H, where that measurement is written down. On her iPad
+    // the record goes 594 -> 674, and the binding term becomes the honest one.
+    // A phone never reaches WIDE_MIN, so its disc is byte-identical.
+    : Math.min(
+        winW * 0.9,
+        isWide(winW) ? winH - DECK_CHROME_H : winH * 0.46,
+        heroCeil(430, winW),
+      );
+  // The turn's period, once the record's size is known — see spinMsRef.
+  spinMsRef.current = Math.round(2600 * Math.max(1, platSize / 387));
+
+  // Declared HERE rather than beside the other chrome values because it needs
+  // platSize, which is settled just above. `useRestScene` is a useMemo, so all
+  // that matters is that it is called unconditionally on every render.
+  const restScene = useRestScene(
+    chrome, restShiftFor(contentH, sceneBox.y, sceneBox.h), !isLandscape,
+    restGrowFor(platSize, winW, winH));
 
   // Swipe-down to dismiss
   /**

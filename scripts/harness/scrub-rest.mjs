@@ -32,7 +32,7 @@ try {
 }
 const BASE = (process.env.BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
 import { answerOffAir, visibleClicker } from './visible.mjs';
-const b = await chromium.launch({ args:['--no-sandbox'] });
+const b = await chromium.launch({ args:['--no-sandbox'], executablePath: process.env.CHROMIUM_PATH || undefined });
 const problems = [];
 for (const MODE of ['Vinyl','CD']) {
   const ctx = await b.newContext({ viewport:{width:393,height:852} });

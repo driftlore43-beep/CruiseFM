@@ -31,7 +31,7 @@ try {
 const BASE = (process.env.BASE_URL || 'http://localhost:8081').replace(/\/$/, '');
 import { answerOffAir, visibleClicker } from './visible.mjs';
 const MODES = ['Equalizer','Cassette','Vinyl','Tuner','Horizon','Circular EQ','Mirror Ball','CD'];
-const b = await chromium.launch({ args:['--no-sandbox'] });
+const b = await chromium.launch({ args:['--no-sandbox'], executablePath: process.env.CHROMIUM_PATH || undefined });
 const problems = [];
 for (const MODE of MODES) {
   const ctx = await b.newContext({ viewport:{width:393,height:852} });

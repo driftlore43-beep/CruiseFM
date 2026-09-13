@@ -95,7 +95,7 @@ await step('first-run platform sheet dismisses',
   async () => !(await has('Connect Your Music')));
 
 for (const [tab, route, marker] of [
-  ['CRUISE', '/cruise', 'Recommended'],
+  ['HOME', '/cruise', 'Recommended'],
   ['STATIONS', '/stations', 'Now tuning'],
   ['MODES', '/modes', 'Modes'],
   ['PROFILE', '/profile', 'Badges'],

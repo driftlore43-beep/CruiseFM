@@ -263,15 +263,13 @@ function EmptySlotRow({ onPress }: { onPress: () => void }) {
  * list looking exactly like everything else — just with their MINE chip.
  */
 function StationRow({
-  station, dial, tuned, locked, lcd, last, onAir, featured, onPress,
+  station, dial, tuned, locked, lcd, onAir, featured, onPress,
 }: {
   station: Station | CustomStation;
   dial: { band: Band; label: string };
   tuned: boolean;
   locked?: boolean;
   lcd: boolean;
-  /** Last row in its group — no hairline under it. */
-  last?: boolean;
   /**
    * Broadcasting right now — drives the dimming ONLY. PRESENTATION ONLY: an
    * off-air station is still fully playable, because a listener who wants
@@ -316,8 +314,6 @@ function StationRow({
       disabled={!onPress}
       style={({ pressed }) => [
         styles.row,
-        !last && styles.rowRule,
-        !last && day && styles.rowRuleDay,
         locked && styles.rowLocked,
         // Nothing is taken away when a station is off air — it simply sits
         // back, the way a quiet frequency does.
@@ -498,8 +494,6 @@ export default function StationsScreen() {
             onAir={isScheduled(station.id) ? live.includes(station.id) : true}
             featured={station.id === onAirStation.id}
             lcd={lcd}
-            // Never the last row of the band any more: either YOUR STATIONS
-            // follows, or the empty slot does.
             onPress={() => setSelectedStation(station)}
           />
         ))}
@@ -514,7 +508,6 @@ export default function StationsScreen() {
             // Deliberately unscheduled: nobody puts their own station off air,
             // and a lamp on every one of them would be noise rather than news.
             lcd={lcd}
-            last={i === amCustom.length - 1}
             onPress={() => setSelectedStation(station)}
           />
         ))}
@@ -536,7 +529,6 @@ export default function StationsScreen() {
             featured={station.id === onAirStation.id}
             locked={!isPro}
             lcd={lcd}
-            last={i === fmBand.length - 1}
             onPress={isPro ? () => setSelectedStation(station) : undefined}
           />
         ))}
@@ -700,18 +692,18 @@ const makeStyles = (p: Palette) => StyleSheet.create({
   },
 
   // ── Station rows ──────────────────────────────────────────────────────────
-  // A list, not a card stack: the only furniture is a hairline, and it stops
-  // at the last row of each group so the group reads as one block.
+  // A list, and now a list with NO furniture at all (owner, 13.09: "the lines
+  // under the stations need to be removed"). There used to be a hairline under
+  // every row but the last of each group. What separates the rows is what
+  // always did most of the work anyway — 19 points of air, the band headers,
+  // and the dial numbers running down their own column. A rule under each one
+  // read as a table, and this page is a printed scale, not a spreadsheet.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
     paddingVertical: 19,
     paddingHorizontal: PAGE_GUTTER,
-  },
-  rowRule: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: p.ink(0.14),
   },
   // Dimmer, not grey — the premium band still has to sell itself.
   rowLocked: {
@@ -776,7 +768,6 @@ const makeStyles = (p: Palette) => StyleSheet.create({
   // the tuned one keeps its glow to stay distinguishable.
   numLitDay: { color: p.ink(0.88) },
   rowNameDay: { color: p.text },
-  rowRuleDay: { borderBottomColor: p.ink(0.34) },
   numLitTuned: {
     color: p.text,
     // The glow is what separates the tuned number from the rest of the scale
@@ -800,9 +791,8 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     color: p.text,
     fontWeight: '700',
   },
-  // The vacant frequency: no hairline (it is the last row of the band) and a
-  // quieter name than a real station's, so it reads as an offer rather than as
-  // something already on air.
+  // The vacant frequency: a quieter name than a real station's, so it reads as
+  // an offer rather than as something already on air.
   emptySlot: { opacity: 0.92 },
   emptySlotName: { color: p.ink(0.72), fontWeight: '600' },
   emptySlotDash: {

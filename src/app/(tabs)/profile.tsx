@@ -22,6 +22,7 @@ import { judgeBadges, type JudgedBadge } from '@/constants/badges';
 import { isFounder } from '@/utils/founder';
 import { appVersionLabel } from '@/utils/appVersion';
 import { DEFAULT_DRIVER_NAME, getDriverName, initialsFor } from '@/utils/driverName';
+import { useSessionKind, words } from '@/utils/sessionKind';
 import { useAppearance, usePalette, useStyles } from '@/context/AppearanceContext';
 import { readableOn, type Appearance, type Palette } from '@/utils/appearance';
 import { DrivesPage, logTitle } from '@/components/DrivesPage';
@@ -212,7 +213,7 @@ function AppearanceRow() {
         <View style={styles.settingsTextBlock}>
           <Text style={styles.settingsLabel}>Appearance</Text>
           <Text style={styles.dataSaverSub}>
-            Light pages for daylight · the drives themselves stay dark either way
+            Light pages for daylight · the modes themselves stay dark either way
           </Text>
         </View>
       </View>
@@ -243,6 +244,11 @@ export default function ProfileScreen() {
   // would offer a setting that can never do anything there.
   const tablet = isWide(winW);
   const { theme } = useTheme();
+  // Driving or just listening — on an iPad this is always 'listening' and
+  // there is no question to ask, which is what keeps the line below off the
+  // subject of driving there without a tablet special case.
+  const kind = useSessionKind();
+  const w = words(kind);
   const { dataSaver, setDataSaver, autoDim, setAutoDim, atmosphere, setAtmosphere, softAtmosphere, setSoftAtmosphere, daylight, setDaylight, vinylClassic, setVinylClassic } = useMotion();
   const { devFreePreview, setDevFreePreview, isPro } = useEntitlements();
   const { name: platformName, color: rawPlatformColor, id: platformId, refresh: refreshPlatform } = useMusicPlatformInfo();
@@ -252,7 +258,7 @@ export default function ProfileScreen() {
   const platformColor = rawPlatformColor ? readableOn(rawPlatformColor, pal.mode) : null;
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [settingsPage, setSettingsPage] = useState<SettingsPage | null>(null);
-  const [stats, setStats] = useState<{ totalDrives: number; totalMinutes: number; favoriteStationId: string | null } | null>(null);
+  const [stats, setStats] = useState<{ totalDrives: number; totalSessions: number; totalMinutes: number; favoriteStationId: string | null } | null>(null);
   const [driverName, setDriverNameState] = useState(DEFAULT_DRIVER_NAME);
   const [badges, setBadges] = useState<JudgedBadge[]>([]);
 
@@ -275,13 +281,26 @@ export default function ProfileScreen() {
   const judgeable = badges.filter((b) => !b.reserved || b.earned).length;
 
   // One line, not three rows. Favourite station is dropped when there isn't
-  // one yet rather than printing a dash — a new driver reads two facts, not
+  // one yet rather than printing a dash — a new listener reads two facts, not
   // two facts and an apology.
-  const drives = stats?.totalDrives ?? 0;
+  //
+  // THE LINE SPEAKS THE SESSION'S OWN VOCABULARY (owner, 13.09: "remove the
+  // driving stats on the iPad, since we are removing the driving aspects").
+  // It used to say "3 drives · 2h cruised" whoever was reading it — so an iPad,
+  // where `loadSessionKind` answers 'listening' and there is no question to
+  // ask, still told its owner they had been driving. It was wrong on a PHONE
+  // in listening mode too, and had been since 13.08; a tablet is simply where
+  // it could never be right.
+  //
+  // AND THE NUMBER FOLLOWS THE NOUN. In driving mode that is the drive count,
+  // which deliberately excludes desk time. In listening mode it is
+  // `totalSessions` — every drive IS a session, so counting both is true, and
+  // it means nobody's history disappears when they flip the switch.
+  const count = kind === 'driving' ? (stats?.totalDrives ?? 0) : (stats?.totalSessions ?? 0);
   const fave = stats?.favoriteStationId ? stationName(stats.favoriteStationId) : null;
   const STAT_LINE = [
-    `${drives} ${drives === 1 ? 'drive' : 'drives'}`,
-    `${formatHours(stats?.totalMinutes ?? 0)}h cruised`,
+    `${count} ${count === 1 ? w.noun : w.plural}`,
+    `${formatHours(stats?.totalMinutes ?? 0)}h ${w.timeLabel.toLowerCase()}`,
     fave,
   ].filter(Boolean).join(' · ');
 
@@ -392,7 +411,10 @@ export default function ProfileScreen() {
           <LinearGradient colors={UPGRADE_GRADIENT} locations={GRADIENT_LOCATIONS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           <View style={styles.upgradeGlow} pointerEvents="none" />
           <Text style={styles.upgradeEyebrow}>CRUISE FM PREMIUM</Text>
-          <Text style={styles.upgradeTitle}>Unlock the full driving atmosphere.</Text>
+          {/* "the full driving atmosphere" until 13.09. The modes are the same
+              modes at a desk and on an iPad there is no driving mode to sell, so
+              the word was narrowing the offer rather than describing it. */}
+          <Text style={styles.upgradeTitle}>Unlock the full atmosphere.</Text>
           {/* The four-item feature list lived here; /premium exists to make the
               pitch properly, and repeating it on the way there made this card
               taller than the badge collection it sat under. */}
@@ -443,8 +465,13 @@ export default function ProfileScreen() {
               <IconChip icon="white-balance-sunny" size={34} />
               <View style={styles.settingsTextBlock}>
                 <Text style={styles.settingsLabel}>Daylight</Text>
+                {/* On a tablet the trailing clause names a toggle that is not
+                    on the page — auto-dim is removed there outright — and "for
+                    driving" is a claim an iPad can never support. */}
                 <Text style={styles.dataSaverSub}>
-                  Stronger contrast for driving in sun · brighter labels, deeper scrims · turns auto-dim off
+                  {tablet
+                    ? 'Stronger contrast in sun · brighter labels, deeper scrims'
+                    : 'Stronger contrast for driving in sun · brighter labels, deeper scrims · turns auto-dim off'}
                 </Text>
               </View>
             </View>

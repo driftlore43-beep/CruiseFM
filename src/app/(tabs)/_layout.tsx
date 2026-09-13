@@ -12,7 +12,11 @@ import { PAGE_GUTTER, PAGE_MAX_W, TAB_BAR_BOTTOM, TAB_BAR_HEIGHT } from '@/const
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const TABS: { name: string; label: string; icon: IoniconName; iconActive: IoniconName }[] = [
-  { name: 'cruise',  label: 'CRUISE',   icon: 'car-sport-outline',    iconActive: 'car-sport' },
+  // HOME, not CRUISE (owner, 13.09). The route stays /cruise — it is named in
+  // deep links, in the widgets' own urls and in every harness — so this is the
+  // LABEL only. "Cruise" also read as a fourth thing to do beside Stations and
+  // Modes, when it is simply where you land.
+  { name: 'cruise',  label: 'HOME',     icon: 'car-sport-outline',    iconActive: 'car-sport' },
   { name: 'stations', label: 'STATIONS', icon: 'radio-outline',        iconActive: 'radio' },
   { name: 'modes',   label: 'MODES',    icon: 'disc-outline',          iconActive: 'disc' },
   { name: 'profile', label: 'PROFILE',  icon: 'person-circle-outline', iconActive: 'person-circle' },
@@ -118,7 +122,7 @@ export default function TabLayout() {
       <Tabs
         tabBar={(props) => <FloatingTabBar state={props.state} navigation={props.navigation} />}
         screenOptions={{ headerShown: false }}>
-        <Tabs.Screen name="cruise"  options={{ title: 'Cruise' }} />
+        <Tabs.Screen name="cruise"  options={{ title: 'Home' }} />
         <Tabs.Screen name="stations" options={{ title: 'Stations' }} />
         <Tabs.Screen name="modes"   options={{ title: 'Modes' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />

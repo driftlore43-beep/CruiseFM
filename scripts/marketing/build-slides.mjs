@@ -30,14 +30,14 @@ const SLIDES = [
   { f: '01-mirrorball-downtown',  t: '#453663', s: 'B', a: 'Your music,',            b: 'wrapped in a drive' },
   // Amber, not the old teal: the re-shot page is the dial itself, and amber is
   // the dial's own colour (tints.py re-sampled it after the reshoot).
-  { f: '03-stations-dial',        t: '#774222', s: 'A', a: 'Ten moods.',             b: 'Not ten genres.' },
+  { f: '03-stations-dial',        t: '#774522', s: 'A', a: 'Ten moods.',             b: 'Not ten genres.' },
   // 1.3.0's headline, placed third on purpose: Apple shows the first two or
   // three in search results, and nothing else on the listing shows that the
   // picture behind a drive can be YOURS. The framing screen says it better
   // than a finished mode does — a mode with a photo behind it just looks
   // like the built-in stations, whereas a viewfinder can only mean one thing.
   { f: '08-yourphoto-framing',    t: '#685531', s: 'A', a: 'Your own photo,',        b: 'behind your own station' },
-  { f: '02-vinyl-sunset',         t: '#653437', s: 'A', a: 'Your Apple Music',       b: 'or Spotify playlists' },
+  { f: '02-vinyl-sunset',         t: '#653439', s: 'A', a: 'Your Apple Music',       b: 'or Spotify playlists' },
   { f: '05-cassette-daylight',    t: '#635436', s: 'A', a: 'Eight ways to',          b: 'watch your music' },
   { f: '06-cd-coastal',           t: '#365163', s: 'A', a: 'Every disc',             b: 'catches the light' },
   // Teal, not the blue it wore until 08.09: Night Run's whole palette moved to
@@ -128,7 +128,12 @@ const CARDS = s => `<style>${base}
     <div class="foot">Three card styles. Saved straight to Photos.</div>
   </div>`;
 
-const br = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+// CHROMIUM_PATH because the browser's own directory carries its version and
+// moves with it — a hardcoded path is a rebuild that dies on a fresh machine
+// for a reason that has nothing to do with the slides.
+const br = await chromium.launch({
+  executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium',
+});
 const p = await (await br.newContext({ viewport: { width: 1284, height: 2778 } })).newPage();
 let i = 0;
 for (const s of SLIDES) {

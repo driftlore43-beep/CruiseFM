@@ -165,8 +165,11 @@ struct ModeView: View {
       // about 75% of the way to black rather than genuinely dark, which is
       // exactly "uniform" rather than "glowing". A tighter radius plus a
       // brighter, more saturated core stop is what turns a wash into a glow.
-      RadialGradient(colors: [Color(hex: "#4a3160"), Color(hex: "#241a2b"), Color(hex: "#050308")],
-                     center: .init(x: 0.5, y: 0.34), startRadius: 0, endRadius: 100)
+      //
+      // AND THE COLOUR IS THE STATION'S NOW, not a fixed purple (owner,
+      // 13.09). The whole derivation, and why a colourless station correctly
+      // comes out silver-to-black, is on `ballHalo` in Snapshot.swift.
+      s.ballHalo
       BeamField()
       MirrorBall(size: 126, rows: 17, cols: 30, eqColors: s.eqColors, accent: s.accent)
         .overlay(alignment: .top) {

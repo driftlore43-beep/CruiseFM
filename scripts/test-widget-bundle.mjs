@@ -105,24 +105,50 @@ for (const [f, s] of Object.entries(src)) {
   // The property that matters is not HOW the choice is written but that only
   // ONE of the pair is ever registered — two widgets sharing a `kind` in one
   // bundle is a duplicate registration. Since the `else` is gone, the split is
-  // made by putting each half in a different bundle, and that is what is
-  // checked: the modern one and the legacy one, never both in either.
+  // made by putting each half in a different bundle.
+  //
+  // THERE ARE FOUR BUNDLES NOW, NOT TWO, and this check said so the moment
+  // there were: the iPad gets its own list with Start Drive left out (13.09),
+  // so each half legitimately appears in two of them. "Registered exactly
+  // once, in a different bundle from its twin" was never the property — it
+  // was the shape the property happened to have while there were two
+  // bundles, which is the same class of mistake as the `else` this file
+  // replaced. Only ONE bundle ever runs in a process, so what actually
+  // matters is: each half is reachable somewhere, no single bundle holds
+  // both, and no bundle lists either twice.
   const intentName = s.match(/struct (\w+): Widget \{\s*\n\s*var body: some WidgetConfiguration \{\s*\n\s*AppIntentConfiguration/)?.[1];
   const staticName = s.match(new RegExp(
     `struct (\\w+): Widget \\{\\s*\\n\\s*var body: some WidgetConfiguration \\{\\s*\\n\\s*StaticConfiguration\\(kind: "${kind}"`))?.[1];
   check(`${f}: both halves of the pair are named`, !!intentName && !!staticName,
     `intent ${intentName}, static ${staticName}`);
   if (intentName && staticName) {
+    const timesIn = (w, body) =>
+      (body.match(new RegExp(`^\\s*${w}\\(\\)\\s*$`, 'gm')) ?? []).length;
     const homes = (w) => Object.entries(bundleBodies)
-      .filter(([, body]) => new RegExp(`^\\s*${w}\\(\\)\\s*$`, 'm').test(body)).map(([n]) => n);
+      .filter(([, body]) => timesIn(w, body) > 0).map(([n]) => n);
     const inIntent = homes(intentName), inStatic = homes(staticName);
-    check(`${f}: each half is registered exactly once`,
-      inIntent.length === 1 && inStatic.length === 1,
+    check(`${f}: both halves are registered somewhere`,
+      inIntent.length >= 1 && inStatic.length >= 1,
       `${intentName} in [${inIntent}], ${staticName} in [${inStatic}]`);
-    check(`${f}: the pair is split across two bundles`,
-      inIntent.length === 1 && inStatic.length === 1 && inIntent[0] !== inStatic[0],
-      `both in ${inIntent[0]} would register one kind twice`);
+    const together = Object.entries(bundleBodies)
+      .filter(([, body]) => timesIn(intentName, body) > 0 && timesIn(staticName, body) > 0)
+      .map(([n]) => n);
+    check(`${f}: no bundle holds both halves`, together.length === 0,
+      `${together} would register kind "${kind}" twice in one process`);
+    const doubled = Object.entries(bundleBodies)
+      .filter(([, body]) => timesIn(intentName, body) > 1 || timesIn(staticName, body) > 1)
+      .map(([n]) => n);
+    check(`${f}: no bundle lists a half twice`, doubled.length === 0, String(doubled));
   }
+}
+
+// ── a bundle nobody launches is a list that never reaches the gallery ─────
+// Four bundles are picked between by plain statements in `main()`, above the
+// result builder, so a new one is easy to write and just as easy to leave
+// unreachable — which looks exactly like a widget that failed to appear.
+for (const name of Object.keys(bundleBodies)) {
+  check(`${name} is reachable from main()`,
+    new RegExp(`\\b${name}\\.main\\(\\)`).test(bundle), 'declared but never launched');
 }
 
 // ── every AppEnum look has a display representation for each case ─────────

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WidgetKit
 
 /**
@@ -53,10 +54,29 @@ import WidgetKit
 @main
 struct CruiseWidgets {
   static func main() {
+    // AN iPAD IS NOT OFFERED START DRIVE, and that is the same decision the
+    // app itself already made rather than a new one (owner, 13.09: "there's
+    // still a start drive widget that shouldn't be present in the iPad
+    // version"). A tablet never asks whether anyone is heading anywhere — it
+    // is always LISTENING, so it counts sessions rather than drives and says
+    // so everywhere — and a tile whose entire name is a claim about being in
+    // a car is the one widget that cannot be reworded into that. Every other
+    // row is about a station, a song or an object and reads correctly on
+    // either device.
+    //
+    // THE CHOICE IS MADE HERE, ABOVE THE BUILDER, for exactly the reason the
+    // iOS-version choice is: `@WidgetBundleBuilder` has no `buildEither`, so
+    // an if/else inside a bundle's body is rejected outright and took two
+    // builds to find. A plain `if` with no else would probably be accepted
+    // (it needs only `buildOptional`, which is what the Lock Screen's
+    // availability check already leans on) — but Swift cannot be compiled in
+    // this environment and a wrong guess here costs a whole build cycle, so
+    // this takes the shape that is already PROVEN to build.
+    let pad = UIDevice.current.userInterfaceIdiom == .pad
     if #available(iOSApplicationExtension 17.0, *) {
-      ModernWidgets.main()
+      if pad { ModernPadWidgets.main() } else { ModernWidgets.main() }
     } else {
-      LegacyWidgets.main()
+      if pad { LegacyPadWidgets.main() } else { LegacyWidgets.main() }
     }
   }
 }
@@ -83,6 +103,36 @@ struct LegacyWidgets: WidgetBundle {
   @WidgetBundleBuilder
   var body: some Widget {
     StartDriveWidget()
+    DeckWidget()
+    LastPlayedWidget()
+    OnAirWidget()
+    ModeWidget()
+    // No `else` here, and there must never be one — see the note above.
+    if #available(iOSApplicationExtension 16.0, *) {
+      LockScreenWidget()
+    }
+  }
+}
+
+/// The iPad's list: the same rows with Start Drive left out. Kept as its own
+/// bundle rather than as a conditional inside the one above — see the note in
+/// the launcher for why a bundle body may not branch.
+@available(iOSApplicationExtension 17.0, *)
+struct ModernPadWidgets: WidgetBundle {
+  @WidgetBundleBuilder
+  var body: some Widget {
+    DeckConfigurableWidget()
+    LastPlayedConfigurableWidget()
+    OnAirWidget()
+    ModeConfigurableWidget()
+    LockScreenWidget()
+  }
+}
+
+/// The iPad's list on iOS 16 and older.
+struct LegacyPadWidgets: WidgetBundle {
+  @WidgetBundleBuilder
+  var body: some Widget {
     DeckWidget()
     LastPlayedWidget()
     OnAirWidget()

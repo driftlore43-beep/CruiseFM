@@ -191,6 +191,52 @@ extension WidgetStation {
     )
   }
 
+  /// THE ROOM BEHIND THE MIRROR BALL, IN THE STATION'S OWN LIGHT.
+  ///
+  /// This was three fixed purples — #4a3160 / #241a2b / #050308 — and the
+  /// owner asked the right question of it (13.09): "the mirror ball seems to
+  /// stay with a purple glow which I thought would be based on the mood
+  /// stations. but if it isn't it should be just a black background." She is
+  /// right that a fixed hue is the wrong answer either way: every other mood
+  /// on the dial was being lit by a colour it does not own, and the app's own
+  /// ball takes all of its colour from the station's lamps.
+  ///
+  /// SO THE GLOW IS DERIVED, AND THE APPROVED PURPLE IS STILL WHAT A VIOLET
+  /// STATION PRODUCES. Run the app's own violet through this and the stops
+  /// come out (0.28, 0.18, 0.44) / (0.12, 0.08, 0.19) / (0.023, 0.012, 0.040)
+  /// against the old (0.29, 0.19, 0.38) / (0.14, 0.10, 0.17) / (0.020, 0.012,
+  /// 0.031) — the same room, reached by a rule rather than by a literal.
+  ///
+  /// TWO THINGS IN THE ARITHMETIC ARE LOAD-BEARING. (1) Every stop is
+  /// normalised on the accent's OWN brightness, so a cream station and a deep
+  /// navy one arrive at the same strength of glow; without that a pale
+  /// station floods the tile and a dark one shows nothing, which is the
+  /// failure the Winamp title bar already taught this file. (2) Each stop is
+  /// pulled part of the way toward a neutral of the same brightness, because
+  /// this is LIGHT IN A ROOM rather than a slab of the station's colour —
+  /// and it is also what answers her second sentence honestly: a station with
+  /// no colour in it at all (Mountain Pass is three whites) comes out a plain
+  /// silver-grey falling to near-black, which is the "just a black
+  /// background" she asked for, arrived at by the same rule rather than by a
+  /// special case.
+  var ballHalo: RadialGradient {
+    let src = !accent.isEmpty ? accent : (colors.count > 1 ? colors[1] : "#7B38E0")
+    let (r, g, b) = rgbOf(src)
+    let mean = max(0.02, (r + g + b) / 3)
+    let peak = max(0.02, max(r, max(g, b)))
+    func stop(_ target: Double, _ neutral: Double) -> Color {
+      // Scale to the target brightness, but never past the point where the
+      // brightest channel clips — a clipped channel shifts the hue, which is
+      // exactly the "we manufactured a colour" fault from 10.09.
+      let k = min(target / mean, 1 / peak)
+      func c(_ x: Double) -> Double { min(1, x * k) * (1 - neutral) + target * neutral }
+      return Color(red: c(r), green: c(g), blue: c(b))
+    }
+    return RadialGradient(
+      colors: [stop(0.30, 0.30), stop(0.13, 0.22), stop(0.025, 0.10)],
+      center: .init(x: 0.5, y: 0.34), startRadius: 0, endRadius: 100)
+  }
+
   /// THE WINAMP'S TITLE BAR IS THE STATION'S OWN COLOUR, UNCHANGED (owner,
   /// 10.09: "the Winamp top banner still comes with this murkey-yellow top
   /// banner. We need to stop guessing and re[mo]ve the yellow colour").

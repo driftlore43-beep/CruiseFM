@@ -169,10 +169,35 @@ OPTIONS = {
     'G_orange': [(34, 84, 0.90, 'warm_p'),(214, 72, 0.74, 'cool'),  (128, 44, 0.28, 'pink')],
     'G_light':  [(34, 84, 0.88, 'warm'),  (214, 72, 0.74, 'cool'),  (128, 44, 0.28, 'pink')],
     'G_turq':   [(34, 84, 0.88, 'warm'),  (214, 72, 0.80, 'cool_p'),(128, 44, 0.28, 'pink')],
+    # 14.09 — owner: "add some transparency to the CD widget. The rainbow
+    # reflective effect is also missing, or it's not as visible." Same beams
+    # as G_A; what changes is DISC_ALPHA (the disc stops being an opaque puck
+    # and lets the case and the tile show through, which is what a clear
+    # pressing does) and, for I, the fans' own intensity.
+    'H_clear':  [(34, 84, 0.88, 'warm'),  (214, 72, 0.74, 'cool'),  (128, 44, 0.28, 'pink')],
+    'I_vivid':  [(34, 84, 0.88, 'warm'),  (214, 72, 0.74, 'cool'),  (128, 44, 0.28, 'pink')],
+    'J_less_silver': [(34, 84, 0.88, 'warm'), (214, 72, 0.74, 'cool'), (128, 44, 0.28, 'pink')],
+    'K_wider':       [(34, 104, 0.88, 'warm'),(214, 92, 0.74, 'cool'), (128, 56, 0.28, 'pink')],
+    # WHAT THE SWIFT CAN ACTUALLY DO. `strength` reaches SwiftUI as
+    # `.opacity(strength)`, which CLAMPS at 1 — so an option that leans on a
+    # 1.4x multiplier is showing something the widget will not draw, and a
+    # mockup that lies about the code costs a round of confusion every time
+    # (03.09). These are the numbers as they will be written.
+    'L_swift':       [(34, 104, 1.00, 'warm'),(214, 92, 1.00, 'cool'), (128, 56, 0.39, 'pink')],
 }
+
+# How opaque the disc itself is. 1.0 is a solid puck, which is what shipped;
+# below that the jewel case and the tile behind show through the pressing.
+DISC_ALPHA = {'H_clear': 0.74, 'I_vivid': 0.74, 'J_less_silver': 0.74, 'K_wider': 0.74,
+              'L_swift': 0.74}
+
+# The clear-silver SCREEN over the whole face (11.09). It is what lifts a dark
+# cover toward metal — and it is also what washes the rainbow out, so it is the
+# real dial for "the rainbow is not as visible".
+SILVER = {'J_less_silver': 0.26, 'K_wider': 0.30, 'L_swift': 0.30}
 # option-level colour intensity multiplier (default 1.0); G_light rides lower
 # to read even softer.
-INTENSITY = {'G_light': 0.80}
+INTENSITY = {'G_light': 0.80, 'I_vivid': 1.5, 'J_less_silver': 1.5, 'K_wider': 1.4}
 
 WHEEL = ['#6ad0ff', '#b98cff', '#ff9ad0', '#ffd68a', '#a8ffcf', '#6ad0ff']
 
@@ -312,7 +337,8 @@ def disc(option, size=DISC):
         # specular sweep keep their own brightness (screen keeps the lighter
         # of the two), so the disc reads clear without washing the rainbow
         # into the flat colour-wheel of option A.
-        img = screen(img, np.full_like(img, 0.62), np.full(ang.shape, 0.42))
+        img = screen(img, np.full_like(img, 0.62),
+                     np.full(ang.shape, SILVER.get(option, 0.42)))
 
     # The base tracks everywhere on the silver — now HAIRLINES (owner 11.09:
     # "reduce the groove thickness significantly — make them hairline
@@ -380,7 +406,8 @@ def disc(option, size=DISC):
     out = Image.alpha_composite(out, rim)
 
     mask = Image.new('L', (n, n), 0)
-    ImageDraw.Draw(mask).ellipse([0, 0, n - 1, n - 1], fill=255)
+    ImageDraw.Draw(mask).ellipse([0, 0, n - 1, n - 1],
+                                 fill=int(255 * DISC_ALPHA.get(option, 1.0)))
     out.putalpha(mask)
     return out
 
@@ -442,12 +469,10 @@ def tile(option):
     return base.resize((158 * 3, 158 * 3), Image.LANCZOS)
 
 if __name__ == '__main__':
-    names = [('G_A',      'A  faint orange one side, turquoise the other — pink/purple main, light'),
-             ('G_orange', 'B  a touch more orange'),
-             ('G_light',  'C  lighter overall'),
-             ('G_turq',   'D  a touch more turquoise')]
-    W = 158 * 3
-    sheet = Image.new('RGB', (W * 4 + 100, W + 130), (14, 14, 17))
+    names = [('G_A',      'A  what ships now'),
+             ('L_swift',  'B  transparent disc, wider + stronger rainbow')]
+    W = 158 * 4
+    sheet = Image.new('RGB', (W * 2 + 60, W + 130), (14, 14, 17))
     dd = ImageDraw.Draw(sheet)
     for i, (key, cap) in enumerate(names):
         im = tile(key)

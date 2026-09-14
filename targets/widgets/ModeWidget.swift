@@ -311,6 +311,16 @@ struct ModeView: View {
       // Centred on the case's INTERIOR rather than on the tile — dead centre
       // would leave the disc visibly closer to the hinge than to the far wall.
       CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 132 * k)
+        // A CLEAR PRESSING, NOT A SOLID PUCK (owner, 14.09: "add some
+        // transparency to the CD widget"). The app's own CD deck has drawn a
+        // translucent disc since 25.07 — the drive shows through it, which is
+        // most of what makes it read as an object — and this one was fully
+        // opaque. 0.74 lets the case's hinge and clips show through the
+        // pressing the way the prototype does; the honest cost is brightness
+        // (median luminance 91 -> 73 on the prototype), which is what
+        // transparency over a dark case means, and the stronger rainbow
+        // above is what keeps it from reading merely dimmer.
+        .opacity(0.74)
         .offset(x: 6 * k)
     }
     .widgetURL(s.url(mode: "cd"))
@@ -963,14 +973,24 @@ struct CompactDisc: View {
       // The two main beams are NO LONGER IDENTICAL (owner 11.09): the warm
       // beam carries the faint orange, the cool beam the turquoise, both
       // pink/purple-led and lighter than before so the face stays soft.
-      DiffractionFan(size: size, bearing: 34, spread: 84, strength: 0.88,
+      //
+      // WIDER AND AT FULL STRENGTH (owner, 14.09: "the rainbow reflective
+      // effect is also missing, or it's not as visible"). Prototyped first in
+      // docs/design/cd_widget.py, with the numbers written as SwiftUI will
+      // draw them — `strength` lands as `.opacity`, which clamps at 1, so a
+      // mockup leaning on a multiplier past that would be showing something
+      // the widget cannot do. Measured on the prototype: the share of the
+      // disc carrying real colour goes 19.7% -> 42.4% and mean saturation
+      // 0.108 -> 0.170, most of it from the silver wash below coming down
+      // rather than from the fans themselves, which were already near full.
+      DiffractionFan(size: size, bearing: 34, spread: 104, strength: 1.00,
                      spectrum: DiffractionFan.warmStops)
-      DiffractionFan(size: size, bearing: 214, spread: 72, strength: 0.74,
+      DiffractionFan(size: size, bearing: 214, spread: 92, strength: 1.00,
                      spectrum: DiffractionFan.coolStops)
       // A third, much fainter fan — a real disc catches a weaker second source
       // (a window, a wall) as well as the main one, and one lone fan reads as
       // a mistake rather than as light. Pink/purple only, no accent.
-      DiffractionFan(size: size, bearing: 128, spread: 44, strength: 0.28,
+      DiffractionFan(size: size, bearing: 128, spread: 56, strength: 0.39,
                      spectrum: DiffractionFan.pinkStops)
 
       // AND THE FACE BETWEEN THE FANS HAS TO READ AS METAL, or the fans are
@@ -1004,9 +1024,15 @@ struct CompactDisc: View {
       // pressing without washing the rainbow back into the flat colour-wheel
       // of the old build-45 look. On the prototype this moves B's median
       // luminance from ~48 to ~93 — a clear disc, the fans still localised.
+      //
+      // 0.42 -> 0.30 (14.09). This wash is the one thing that lifts a dark
+      // cover toward metal AND the one thing that washes the rainbow out, so
+      // it is the real dial for "the rainbow is not as visible" — the fans
+      // above were already close to full. Dropped rather than removed: at
+      // 0.30 the disc still reads as silver where no fan lands.
       Circle().fill(Color(white: 0.62))
         .blendMode(.screen)
-        .opacity(0.42)
+        .opacity(0.30)
 
       // The base pressed tracks, faint everywhere on the silver (opacity
       // 0.015, thinned). The DiffractionFans lift these SAME tracks where the

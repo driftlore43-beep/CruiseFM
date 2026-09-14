@@ -1475,14 +1475,22 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
   // Safety net — restart spin if it stopped unexpectedly. Stops dead when the
   // app is backgrounded: a repeating timer is one of the things iOS kills a
   // background app for, and there is nothing to keep spinning off-screen.
+  //
+  // AND IT STOPS WHEN THE DECK IS MINIMISED, which it did not. `visible`
+  // flipping false runs the effect below that calls stopSpin() — and then
+  // this fired three seconds later and started it again, because it asks
+  // whether the MUSIC is playing and never whether the record is on screen.
+  // So a minimised deck kept turning a record nobody could see, for the whole
+  // time the mini-player was up, restarting an animation from JavaScript
+  // every few seconds. A scene that cannot be seen must not animate.
   const appActive = useAppActive();
   useEffect(() => {
-    if (!appActive) return;
+    if (!appActive || !visible) return;
     const interval = setInterval(() => {
       if (playingRef.current && !isSpinning.current) startSpin();
     }, 3000);
     return () => clearInterval(interval);
-  }, [live, appActive]);
+  }, [live, appActive, visible]);
 
   // Tonearm
   useEffect(() => {

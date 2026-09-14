@@ -283,8 +283,15 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
                     is white with dark type; on paper it has to invert, or a
                     white pill on a near-white sheet disappears entirely. */}
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: pal.mode === 'light' ? pal.text : '#ffffff' }]} />
+                {/* NOT "Let's Drive" (owner, 14.09). This is the first screen
+                    anyone sees, before the app has asked whether they are
+                    heading anywhere and on a device where it never asks at
+                    all — an iPad is always LISTENING, so a button here that
+                    claims a car is the app assuming something it has not been
+                    told. It is also just a confirm for which music app they
+                    picked, and that is true in a room as much as on a road. */}
                 <Text style={[styles.confirmText, { color: pal.mode === 'light' ? pal.bg : '#0a0a10' }]}>
-                  Let&apos;s Drive
+                  Let&apos;s Jam
                 </Text>
               </View>
             ) : (

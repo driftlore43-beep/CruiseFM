@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { clearSpotifyConnectAsked } from './spotifyConnectAsk';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -216,6 +218,10 @@ async function saveTokens(
   // question "does this connection have permission to read playlists?" can be
   // ANSWERED rather than argued about — two rounds were lost to guessing.
   if (scope) await AsyncStorage.setItem(SCOPE_KEY, scope);
+  // A successful connection spends the "ask them to connect" prompt, so if
+  // this device is ever disconnected the app offers it again rather than
+  // silently going back to handing drives to the Spotify app.
+  await clearSpotifyConnectAsked();
 }
 
 /** The scopes Spotify granted this connection, or null if unknown (a token
@@ -243,6 +249,9 @@ export async function isSpotifyConnected(): Promise<boolean> {
 export async function disconnectSpotify(): Promise<void> {
   await AsyncStorage.multiRemove([TOKEN_KEY, REFRESH_TOKEN_KEY, EXPIRY_KEY, RESTRICTED_KEY, SCOPE_KEY]);
   restrictedCache = null;
+  // Disconnecting puts them back where a fresh device starts, so the one-time
+  // offer to reconnect comes back with them.
+  await clearSpotifyConnectAsked();
 }
 
 // ── Dev-mode allowlist detection ─────────────────────────────────────────────
@@ -550,6 +559,9 @@ export type StartResult =
   | 'restricted'      // account not on the dev-mode allowlist
   | 'handoff'         // playlist handed to the Spotify app (set by the caller)
   | 'no-playlist'     // station has no linked playlist — nothing to play (set by the caller)
+  /** Spotify is the chosen platform but this device has never signed in.
+   *  Asked once, then the hand-off takes over — see spotifyConnectAsk.ts. */
+  | 'not-connected'
   | 'error';
 
 /**

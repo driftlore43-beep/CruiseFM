@@ -16,6 +16,7 @@ import {
 } from '@/utils/appleMusic';
 import { getPlaybackState, isRestrictedAccount, isSpotifyConnected, looksOffline, pause as pauseSpotify, probePlaybackState, startPlayback, type StartResult } from '@/utils/spotify';
 import { openInSpotify } from '@/utils/spotifyHandoff';
+import { markSpotifyConnectAsked, spotifyConnectAsked } from '@/utils/spotifyConnectAsk';
 import { getStationPlaylist } from '@/utils/stationPlaylists';
 
 /**
@@ -169,6 +170,25 @@ async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean 
       if (r !== 'restricted' && r !== 'error' && r !== 'no-device' && r !== 'offline') return r;
     }
 
+    // ASK BEFORE THROWING SOMEONE OUT OF THE APP, ONCE.
+    //
+    // Reaching here without a connection means Spotify is the chosen platform
+    // and this device has never signed in — and the hand-off below opens the
+    // Spotify app, which on a device where THAT is not signed in either lands
+    // on its login screen. Owner, 14.09: "when I clicked on the station card
+    // it opened to Spotify with needing to sign in."
+    //
+    // ONE ASK, NEVER A BLOCK. Spotify grants in-app control to five invited
+    // accounts and refuses everyone else before a token ever exists, so the
+    // app genuinely cannot tell who could connect — and for the people who
+    // cannot, the hand-off is not a failure, it is the product. So the first
+    // Start explains what is missing and the next one hands off as before.
+    if (!connected && !restricted && (await getSavedPlatform()) === 'spotify'
+        && !(await spotifyConnectAsked())) {
+      await markSpotifyConnectAsked();
+      return 'not-connected';
+    }
+
     // If even the hand-off fails there is nothing left to try, and the honest
     // reason matters: offline is not Spotify being unresponsive.
     if (await openInSpotify(linked.uri)) return 'handoff';
@@ -191,6 +211,13 @@ const START_NOTICES: Record<StartResult, string | null> = {
   // Handoff is explained by the persistent in-mode panel, not a transient toast.
   'handoff': null,
   'no-playlist': "This station doesn't have its own playlist yet. Tap Add Playlist to give it one — every drive here will play it.",
+  // SAID ONCE, ON THE FIRST TRY ONLY. Picking Spotify in the picker does not
+  // sign you in, and pressing Start with no connection used to hand the
+  // playlist straight to the Spotify app — which, on a device where that app
+  // is not signed in either, dumps you on ITS login screen with no
+  // explanation (owner, 14.09, on a fresh iPad). Press Start again and the
+  // hand-off happens as before, because most people cannot connect at all.
+  'not-connected': 'Spotify is chosen but not connected on this device. Tap Connect Spotify on the home page for full control here — or press play again to open the playlist in the Spotify app instead.',
   'error': "Spotify didn't respond. Check the Spotify app is open and logged in, then press play to retry.",
   // NOT "Spotify didn't respond" — offline, Spotify is fine and so is the
   // login, and telling someone to check both is advice that cannot help.

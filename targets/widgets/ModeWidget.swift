@@ -218,12 +218,29 @@ struct ModeView: View {
       // behind the CD"). The disc already casts a contact shadow onto the
       // case, which is depth — this is light, the same distinction the app's
       // own decks draw everywhere else, so it is the station's own colour
-      // rather than plain black. `.blur` is a real modifier here, unlike the
-      // React Native SVG side of this app, which has none — so this is
-      // genuine falloff rather than a stack of stepped rings.
-      Circle().fill(s.accentColor.opacity(0.32))
-        .frame(width: 146, height: 146)
-        .blur(radius: 20)
+      // rather than plain black.
+      //
+      // DRAWN AS FALLOFF RATHER THAN AS A BLUR (14.09). It was a filled
+      // circle with `.blur(radius: 20)`, and a blur is the one thing in this
+      // tile that forces the renderer to draw to an offscreen buffer and
+      // filter it — by some way the most expensive operation in the target,
+      // in the one look the owner reports coming up blank on an iPad while
+      // the mirror ball beside it, which has no offscreen work at all, draws
+      // fine. THAT IS NOT A DIAGNOSIS and it is not offered as one; nothing
+      // is crashing, so the honest reading is that the render is being given
+      // up on rather than failing, and this removes the biggest single reason
+      // it might be. A radial gradient IS the blur of a filled circle, so the
+      // look is the same — it is what the app's own React Native side has
+      // always used, having no blur at all.
+      RadialGradient(
+        stops: [
+          .init(color: s.accentColor.opacity(0.32), location: 0.00),
+          .init(color: s.accentColor.opacity(0.26), location: 0.52),
+          .init(color: s.accentColor.opacity(0.10), location: 0.80),
+          .init(color: s.accentColor.opacity(0.00), location: 1.00),
+        ],
+        center: .center, startRadius: 0, endRadius: 96)
+        .frame(width: 192, height: 192)
         .offset(x: 6)
       // THE DISC ALL BUT FILLS THE CASE (owner, 10.09: "the CD is still quite
       // small... the edges are close to the case"), grown again with case

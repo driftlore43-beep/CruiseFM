@@ -125,15 +125,40 @@ struct ModeIntentProvider: AppIntentTimelineProvider {
 struct ModeView: View {
   var entry: ModeEntry
 
+  /**
+   * EVERY SIZE IN THIS TILE IS A SHARE OF THE TILE, NOT A NUMBER OF POINTS.
+   *
+   * They were all constants tuned against an iPhone's ~158pt small widget —
+   * and a small widget is NOT 158 points everywhere. On a 768x1024 iPad it is
+   * about 141, which is SMALLER than a phone's, so a record drawn at a fixed
+   * 144 was wider than the tile it sat in. Owner, 14.09: "the vinyl is a bit
+   * too big in the square widget - it's currently just touching the edges."
+   *
+   * The CD had the same fault one layer in and it is worth naming, because it
+   * is not visible as an overflow: the jewel case fills the tile and so
+   * shrinks with it, while the disc inside it did not — on a 141pt tile a
+   * fixed 132 disc is wider than the case's own 119pt interior, so it ran
+   * over the hinge and the far wall.
+   *
+   * `k` is the tile's own size against that 158pt reference, so an iPhone
+   * gets exactly the numbers that were approved (k = 1) and every other
+   * device gets the same DESIGN rather than the same measurements. It is the
+   * widget-side version of the rule the decks learned on 13.09: a number
+   * tuned against a phone must never be the thing deciding another screen's
+   * layout.
+   */
   var body: some View {
     if !entry.ready || entry.station == nil {
       NotReadyView()
     } else {
       let s = entry.station!
-      switch entry.style {
-      case .mirrorBall: ball(s)
-      case .cd:         disc(s)
-      case .record:     record(s)
+      GeometryReader { geo in
+        let k = min(geo.size.width, geo.size.height) / 158
+        switch entry.style {
+        case .mirrorBall: ball(s, k: k)
+        case .cd:         disc(s, k: k)
+        case .record:     record(s, k: k)
+        }
       }
     }
   }
@@ -155,7 +180,7 @@ struct ModeView: View {
    * The stem hangs off the ball itself for the same reason as before: a ball
    * hangs from something, but that something must not push it down the tile.
    */
-  private func ball(_ s: WidgetStation) -> some View {
+  private func ball(_ s: WidgetStation, k: CGFloat) -> some View {
     ZStack {
       // A GENUINE HALO, NOT A UNIFORM WASH (owner, 10.09: "a soft radial
       // purple halo behind it rather than the current more uniform purple
@@ -169,9 +194,9 @@ struct ModeView: View {
       // AND THE COLOUR IS THE STATION'S NOW, not a fixed purple (owner,
       // 13.09). The whole derivation, and why a colourless station correctly
       // comes out silver-to-black, is on `ballHalo` in Snapshot.swift.
-      s.ballHalo
-      BeamField()
-      MirrorBall(size: 126, rows: 17, cols: 30, eqColors: s.eqColors, accent: s.accent)
+      s.ballHalo(k)
+      BeamField(k: k)
+      MirrorBall(size: 126 * k, rows: 17, cols: 30, eqColors: s.eqColors, accent: s.accent)
         .overlay(alignment: .top) {
           // THIN AND METALLIC, FADING INTO THE GLOW (owner, 10.09: "make it
           // thinner and slightly metallic instead of the current thick
@@ -189,11 +214,11 @@ struct ModeView: View {
             .init(color: Color(hex: "#c7d2e8").opacity(0.40), location: 0.80),
             .init(color: .clear, location: 1),
           ], startPoint: .top, endPoint: .bottom)
-            .frame(width: 1, height: 30).offset(y: -28)
+            .frame(width: 1, height: 30 * k).offset(y: -28 * k)
         }
         // Nudged up by the small amount the stem needs, so the BALL reads as
         // centred rather than the ball-and-stem together.
-        .offset(y: 4)
+        .offset(y: 4 * k)
     }
     .widgetURL(s.url(mode: "disco"))
   }
@@ -209,7 +234,7 @@ struct ModeView: View {
   // radius reach the tile's: JewelCase is inset 8 with a 16pt radius, i.e.
   // 24 against the tile's ~22, so it clears with a little to spare and is
   // still very nearly the whole tile.
-  private func disc(_ s: WidgetStation) -> some View {
+  private func disc(_ s: WidgetStation, k: CGFloat) -> some View {
     ZStack {
       LinearGradient(colors: [Color(hex: "#1c1f26"), Color(hex: "#080a0e")],
                      startPoint: .topLeading, endPoint: .bottomTrailing)
@@ -239,9 +264,9 @@ struct ModeView: View {
           .init(color: s.accentColor.opacity(0.10), location: 0.80),
           .init(color: s.accentColor.opacity(0.00), location: 1.00),
         ],
-        center: .center, startRadius: 0, endRadius: 96)
-        .frame(width: 192, height: 192)
-        .offset(x: 6)
+        center: .center, startRadius: 0, endRadius: 96 * k)
+        .frame(width: 192 * k, height: 192 * k)
+        .offset(x: 6 * k)
       // THE DISC ALL BUT FILLS THE CASE (owner, 10.09: "the CD is still quite
       // small... the edges are close to the case"), grown again with case
       // option D's slimmer frame (owner, 11.09 "D"). 124 -> 132:
@@ -259,8 +284,8 @@ struct ModeView: View {
       //
       // Centred on the case's INTERIOR rather than on the tile — dead centre
       // would leave the disc visibly closer to the hinge than to the far wall.
-      CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 132)
-        .offset(x: 6)
+      CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 132 * k)
+        .offset(x: 6 * k)
     }
     .widgetURL(s.url(mode: "cd"))
   }
@@ -279,19 +304,24 @@ struct ModeView: View {
    * is the only thing naming the station, and the label is the one place on a
    * record where type belongs.
    */
-  private func record(_ s: WidgetStation) -> some View {
+  private func record(_ s: WidgetStation, k: CGFloat) -> some View {
     ZStack {
       RadialGradient(colors: [Color(hex: "#1a1a1f"), Color(hex: "#08080a")],
-                     center: .init(x: 0.38, y: 0.30), startRadius: 0, endRadius: 150)
+                     center: .init(x: 0.38, y: 0.30), startRadius: 0, endRadius: 150 * k)
       // NOT ONE WORD ON IT, AND AS BIG AS THE TILE ALLOWS (owner, 09.09:
       // "increase the size of the vinyl too, remove the station's text so
       // it's just the vinyl"). It carried the frequency on its label; a
       // record on its own is the whole idea of this look, and the station
       // still names itself on every other row in the gallery.
       //
-      // 144 in a ~158pt tile leaves 7pt of room each side. The record's own
-      // shadow needs somewhere to fall, which is what stops it going wider.
-      RecordView(accent: s.accentColor, label: nil, size: 144, plainLabel: true)
+      // 139 OF THE TILE, WHATEVER THE TILE IS — see the note on `body`. It
+      // was a flat 144, which leaves 7pt each side on an iPhone and is WIDER
+      // THAN THE WHOLE TILE on a 141pt iPad, where the owner found it
+      // "currently just touching the edges" (14.09). 144 -> 139 is also the
+      // fraction off she asked for, so even at k = 1 there is a little more
+      // air than before; the record's own shadow needs somewhere to fall,
+      // which is what stops it going wider again.
+      RecordView(accent: s.accentColor, label: nil, size: 139 * k, plainLabel: true)
     }
     .widgetURL(s.url(mode: "vinyl"))
   }
@@ -300,6 +330,10 @@ struct ModeView: View {
 /// Beams thrown off the ball. Fixed, never turning — a lamp is bolted to the
 /// room, and there is nothing here that could animate anyway.
 private struct BeamField: View {
+  /// The tile's size against the 158pt reference the beams were drawn at —
+  /// see the note on ModeView's body. A beam is part of the object, so it
+  /// shrinks with it rather than staying a fixed number of points long.
+  var k: CGFloat = 1
   var body: some View {
     ZStack {
       ForEach(Array([(-74.0, 0.15), (-48.0, 0.10), (-20.0, 0.13),
@@ -307,9 +341,9 @@ private struct BeamField: View {
               id: \.offset) { _, b in
         LinearGradient(colors: [Color(hex: "#d6e6ff").opacity(b.1), .clear],
                        startPoint: .top, endPoint: .bottom)
-          .frame(width: 1.2, height: 190)
+          .frame(width: 1.2, height: 190 * k)
           .rotationEffect(.degrees(b.0), anchor: .top)
-          .offset(y: -46)
+          .offset(y: -46 * k)
       }
     }
     .allowsHitTesting(false)

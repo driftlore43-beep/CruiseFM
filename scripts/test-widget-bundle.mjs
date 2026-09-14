@@ -151,6 +151,33 @@ for (const name of Object.keys(bundleBodies)) {
     new RegExp(`\\b${name}\\.main\\(\\)`).test(bundle), 'declared but never launched');
 }
 
+// ── a small tile is not 158 points everywhere ─────────────────────────────
+// Every hero size in The Mode was a constant tuned against an iPhone's ~158pt
+// small widget — and a small widget is about 141 on a 768x1024 iPad, SMALLER
+// than a phone's. A 144pt record in a 141pt tile is wider than the tile it
+// sits in, which is what the owner photographed on 14.09; the CD's disc had
+// the same fault against the jewel case's own interior. They are shares of
+// the tile now, so this refuses a bare number creeping back in.
+{
+  const mode = src['ModeWidget.swift'] ?? '';
+  // Match to the END OF THE LINE, not to the first `)`. CompactDisc's own
+  // argument list contains a call (`Art.songCover(station:)`), so a lazy
+  // bracket match stopped inside it and the check silently tested two heroes
+  // out of three — a pass that costs nothing, which this file has shipped
+  // more than once. The count assertion below is what caught it.
+  const heroes = [...mode.matchAll(/^\s*(MirrorBall|CompactDisc|RecordView)\((.*)$/gm)]
+    .filter((m) => /\bsize:/.test(m[2]));
+  check('the three heroes are found at all', heroes.length >= 3,
+    heroes.map((m) => m[1]).join(', '));
+  for (const m of heroes) {
+    const size = m[2].match(/size:\s*([^,)]+)/)?.[1]?.trim() ?? '';
+    check(`${m[1]} sizes off the tile, not a constant`, /\bk\b/.test(size), `size: ${size}`);
+  }
+  check('ModeView measures the tile', /GeometryReader \{ geo in/.test(mode) &&
+    /min\(geo\.size\.width, geo\.size\.height\) \/ 158/.test(mode),
+    'the 158 reference is what k is a share of');
+}
+
 // ── every AppEnum look has a display representation for each case ─────────
 for (const [f, s] of Object.entries(src)) {
   for (const em of s.matchAll(/enum (\w+): String, AppEnum \{([\s\S]*?)\n\}/g)) {

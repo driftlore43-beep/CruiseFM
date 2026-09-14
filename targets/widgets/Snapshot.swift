@@ -219,7 +219,7 @@ extension WidgetStation {
   /// silver-grey falling to near-black, which is the "just a black
   /// background" she asked for, arrived at by the same rule rather than by a
   /// special case.
-  var ballHalo: RadialGradient {
+  func ballHalo(_ k: CGFloat = 1) -> RadialGradient {
     let src = !accent.isEmpty ? accent : (colors.count > 1 ? colors[1] : "#7B38E0")
     let (r, g, b) = rgbOf(src)
     let mean = max(0.02, (r + g + b) / 3)
@@ -234,7 +234,7 @@ extension WidgetStation {
     }
     return RadialGradient(
       colors: [stop(0.30, 0.30), stop(0.13, 0.22), stop(0.025, 0.10)],
-      center: .init(x: 0.5, y: 0.34), startRadius: 0, endRadius: 100)
+      center: .init(x: 0.5, y: 0.34), startRadius: 0, endRadius: 100 * k)
   }
 
   /// THE WINAMP'S TITLE BAR IS THE STATION'S OWN COLOUR, UNCHANGED (owner,

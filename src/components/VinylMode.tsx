@@ -460,6 +460,10 @@ function Tonearm({
   pivotX: number; pivotY: number;
   rotation: Animated.AnimatedInterpolation<string>;
 }) {
+  // Gradient ids are namespaced per instance: two arms can be mounted at once
+  // (the deck and a preview card), and duplicate ids across Svg roots render
+  // one of them blank — the trap already recorded for the record's own light.
+  const uid = useId().replace(/:/g, '');
   const L  = armLen;
   const A  = { x: ARM_A.x * L, y: ARM_A.y * L };
   const J  = { x: ARM_J.x * L, y: ARM_J.y * L };
@@ -486,6 +490,8 @@ function Tonearm({
   const PX = -minX, PY = -minY;
   const svgW = maxX - minX, svgH = maxY - minY;
 
+  // Across the tube rather than along it — the axis its shading runs on.
+  const perp = { x: -tA.y, y: tA.x };
   const p = (q: { x: number; y: number }) => `${(PX + q.x).toFixed(2)} ${(PY + q.y).toFixed(2)}`;
   const d1 = 0.40 * Math.hypot(J.x - A.x, J.y - A.y);
   const d2 = 0.40 * Math.hypot(B.x - J.x, B.y - J.y);
@@ -562,7 +568,19 @@ function Tonearm({
             <SvgRect x={PX - armW * 0.24} y={PY - stubLen + armW * 0.1} width={armW * 0.17} height={stubLen - armW * 0.2} rx={armW * 0.08} fill="rgba(255,255,255,0.5)" />
             <SvgRect x={PX - armW * 0.66} y={PY - stubLen * 0.46} width={armW * 1.32} height={armW * 0.46} rx={armW * 0.16} fill="#3a3c45" />
             {/* Cylinder */}
-            <SvgRect x={PX - cwW / 2} y={PY - cwMid - cwH / 2} width={cwW} height={cwH} rx={cwH * 0.34} fill="#25262d" stroke="#4a4d58" strokeWidth={1} />
+            {/* The counterweight is a machined cylinder, so it takes the same
+                treatment as the tube: shaded across its own width rather than
+                filled flat with a highlight band painted on. */}
+            <Defs>
+              <SvgLinearGradient id={`cw${uid}`} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0"    stopColor="#3c3e48" />
+                <Stop offset="0.22" stopColor="#6a6e7b" />
+                <Stop offset="0.42" stopColor="#8d92a0" />
+                <Stop offset="0.68" stopColor="#3a3c45" />
+                <Stop offset="1"    stopColor="#1d1e24" />
+              </SvgLinearGradient>
+            </Defs>
+            <SvgRect x={PX - cwW / 2} y={PY - cwMid - cwH / 2} width={cwW} height={cwH} rx={cwH * 0.34} fill={`url(#cw${uid})`} stroke="#4a4d58" strokeWidth={1} />
             <SvgRect x={PX - cwW / 2} y={PY - cwMid - cwH / 2} width={cwW} height={cwH * 0.19} rx={cwH * 0.16} fill="#34363f" />
             <SvgRect x={PX - cwW / 2} y={PY - cwMid - cwH * 0.07} width={cwW} height={cwH * 0.13} fill="#7d818d" />
             {[-0.30, -0.20, 0.22, 0.32].map((f, i) => (
@@ -571,24 +589,43 @@ function Tonearm({
             <SvgRect x={PX - cwW * 0.37} y={PY - cwMid - cwH * 0.34} width={cwW * 0.12} height={cwH * 0.68} rx={cwW * 0.06} fill="rgba(255,255,255,0.16)" />
           </G>
 
-          {/* TUBE — A ROUND CHROME PIPE, LIT FROM THE LEFT.
-              Six strokes on the SAME path, each a slice across the tube's
-              width, because one flat stroke is the whole difference between a
-              tube and a drawn line (03.08). Read left to right they are the
-              cross-section of a cylinder: hot hairline, inner light, body,
-              then the far side turning out of the light and a dark edge under
-              it. The two right-hand strokes are new — the owner asked to
-              "define its features and textures" (13.09), and without them the
-              pipe was bright on one side and simply stopped on the other, so
-              it read as flat however thick it got. A seam hairline at the
-              tube's own centre is what makes it look DRAWN from metal rather
-              than extruded, and it is the only mark here that is not falloff. */}
-          <Path d={tube} stroke="#2b2d34" strokeWidth={armW + Math.max(1.2, armW * 0.18)} fill="none" strokeLinecap="round" />
-          <Path d={tube} stroke="#7c808c" strokeWidth={armW} fill="none" strokeLinecap="round" />
-          <Path d={tube} stroke="#4c4f59" strokeWidth={armW * 0.34} fill="none" strokeLinecap="round" transform={`translate(${(armW * 0.31).toFixed(2)},0)`} />
-          <Path d={tube} stroke="#c9ccd6" strokeWidth={armW * 0.5} fill="none" strokeLinecap="round" transform={`translate(${(-armW * 0.13).toFixed(2)},0)`} />
-          <Path d={tube} stroke="rgba(255,255,255,0.9)" strokeWidth={Math.max(0.9, armW * 0.15)} fill="none" strokeLinecap="round" transform={`translate(${(-armW * 0.27).toFixed(2)},0)`} />
-          <Path d={tube} stroke="rgba(255,255,255,0.16)" strokeWidth={Math.max(0.6, armW * 0.07)} fill="none" strokeLinecap="round" transform={`translate(${(armW * 0.09).toFixed(2)},0)`} />
+          {/* TUBE — ONE STROKE, SHADED ACROSS ITS OWN WIDTH.
+              THIS WAS SIX STACKED STROKES AND IT IS WHY THE ARM READ AS
+              "CHEAP" ONCE IT GREW (owner, 14.09: "it currently looks cheap on
+              iPad... it's fine on iPhone"). Six slices approximate a
+              cylinder, and at a phone's 10pt the steps between them are under
+              two points and invisible; at an iPad's 17pt they are three or
+              four points each and the tube reads as a set of flat stripes
+              rather than a round pipe. More detail could never have fixed
+              that — the banding IS the detail.
+              A real cross-section is CONTINUOUS, so this is a single stroke
+              painted with a gradient running perpendicular to the tube:
+              turning away at the near edge, a hot line a third of the way
+              across where the light sits, then falling to shadow at the far
+              edge. It is exact at every size and costs five fewer paths.
+              USER-SPACE, NOT THE PATH'S BOX. An objectBoundingBox gradient
+              would run across the whole diagonal bounding rectangle of a long
+              thin arm, which is nothing like across the tube. The axis is
+              built from the tube's own direction instead, through the
+              inflection point, exactly `armW` wide. */}
+          <Defs>
+            <SvgLinearGradient
+              id={`arm${uid}`} gradientUnits="userSpaceOnUse"
+              x1={(PX + J.x - perp.x * armW * 0.5).toFixed(2)}
+              y1={(PY + J.y - perp.y * armW * 0.5).toFixed(2)}
+              x2={(PX + J.x + perp.x * armW * 0.5).toFixed(2)}
+              y2={(PY + J.y + perp.y * armW * 0.5).toFixed(2)}>
+              <Stop offset="0"    stopColor="#3f424b" />
+              <Stop offset="0.10" stopColor="#aeb4c2" />
+              <Stop offset="0.24" stopColor="#f2f5fb" />
+              <Stop offset="0.40" stopColor="#c2c7d3" />
+              <Stop offset="0.62" stopColor="#838793" />
+              <Stop offset="0.84" stopColor="#4b4e57" />
+              <Stop offset="1"    stopColor="#2a2c33" />
+            </SvgLinearGradient>
+          </Defs>
+          <Path d={tube} stroke="#23252c" strokeWidth={armW + Math.max(1.2, armW * 0.18)} fill="none" strokeLinecap="round" />
+          <Path d={tube} stroke={`url(#arm${uid})`} strokeWidth={armW} fill="none" strokeLinecap="round" />
 
           {/* Headshell — collar, graphite shell, slots, screws, finger lift, cartridge */}
           <G transform={headRot}>
@@ -753,13 +790,32 @@ function TurntableHero({
   // inside the rim — needles never sit on the edge), then creeps toward the
   // label as the song progresses, exactly like a real pressing. The creep is
   // gated by tonearmAnim so a parked arm never wanders.
+  /**
+   * WHERE THE NEEDLE IS IN THE SONG — AND IT WAS BARELY MOVING.
+   *
+   * Owner, 14.09: "when I scrub the vinyl the stick doesn't move forward or
+   * back." It did, by five degrees across an ENTIRE song — so winding through
+   * half a minute moved the arm by well under one degree, which is invisible
+   * at any size. The creep was real and far too small to be information.
+   *
+   * MEASURED AGAINST THE RECORD RATHER THAN CHOSEN. The stylus sits 1.03 arm
+   * lengths from the pivot, so its distance from the spindle falls as the arm
+   * swings in: 6 degrees puts it at 81.7% of the record's radius, 11 at 69.1%
+   * — the old end — and 18 at 51.8%. The label's edge is at 45%, so 18 is the
+   * furthest it can travel and still be on grooves, and it is what a record
+   * actually does: outer edge to just above the label. Twelve degrees rather
+   * than five, so half a minute of winding moves the arm visibly.
+   *
+   * The sweep's top end moves with it, or the interpolation would clamp and
+   * the last third of every song would show a stationary arm.
+   */
   const armAngle = Animated.add(
     tonearmAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 6] }),
     progressAnim
-      ? Animated.multiply(tonearmAnim, Animated.multiply(progressAnim, 5))
+      ? Animated.multiply(tonearmAnim, Animated.multiply(progressAnim, 12))
       : new Animated.Value(0),
   );
-  const armRot = armAngle.interpolate({ inputRange: [-16, 11], outputRange: ['-16deg', '11deg'] });
+  const armRot = armAngle.interpolate({ inputRange: [-16, 18], outputRange: ['-16deg', '18deg'] });
   const platOff  = (platSize - recSize) / 2;
   const rayLen   = recSize / 2;
   const rayPivot = recSize / 2 - rayLen / 2;
@@ -1577,7 +1633,18 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         heroCeil(430, winW),
       );
   // The turn's period, once the record's size is known — see spinMsRef.
-  spinMsRef.current = Math.round(2600 * Math.max(1, platSize / 387));
+  // SLOWER AGAIN ON A BIG RECORD (owner, 14.09: "make the vinyl spin more
+  // slower", after 13.09's "larger vinyl should need to turn much longer
+  // around"). Holding the RIM's speed constant means scaling the period
+  // linearly with the diameter, which is what shipped this morning; she has
+  // now asked for more than that, so the exponent goes past 1. At 1.6 an
+  // iPad's 584-point record takes 5.0s a turn against a phone's 2.6s — 12
+  // rpm. A phone is `max(1, ...)` raised to anything, i.e. exactly 2600ms.
+  // CAPPED, because the curve keeps going: a 12.9" iPad's 774-point record
+  // would take 7.9s a turn, which stops reading as a record turning and
+  // starts reading as one that has stalled. 5600ms is about 11 rpm.
+  spinMsRef.current = Math.min(5600,
+    Math.round(2600 * Math.pow(Math.max(1, platSize / 387), 1.6)));
 
   // Declared HERE rather than beside the other chrome values because it needs
   // platSize, which is settled just above. `useRestScene` is a useMemo, so all

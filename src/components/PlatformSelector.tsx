@@ -19,14 +19,18 @@ import {
   getSavedPlatform,
   savePlatform,
 } from '@/utils/musicPlatform';
+import { isBetaBuild } from '@/utils/betaBuild';
 import { usePalette, useStyles } from '@/context/AppearanceContext';
 import { readableOn, type Palette } from '@/utils/appearance';
 
 const NONE_ENTRY = { id: 'none' as PlatformId, name: 'None / Other', color: '#666666' };
 
 /**
- * SPOTIFY IS NOT OFFERED (owner, 01.09: "remove the option to have Spotify as
- * it's not available").
+ * SPOTIFY IS NOT OFFERED TO THE PUBLIC (owner, 01.09: "remove the option to
+ * have Spotify as it's not available") — BUT IT IS OFFERED IN BETA (owner,
+ * 14.09: "the Spotify option is missing for my devices - this iPhone and the
+ * iPad both within the user cap - could there be a way to open the access to
+ * only the TestFlight users").
  *
  * It is not a code limit and no amount of work here changes it: Spotify caps a
  * development-tier app at FIVE authorised accounts, and extension requests have
@@ -36,25 +40,43 @@ const NONE_ENTRY = { id: 'none' as PlatformId, name: 'None / Other', color: '#66
  * refused, and land in the visual companion mode they could have had without
  * the detour.
  *
- * `PLATFORMS.spotify` is deliberately LEFT IN PLACE. Anyone already running on
- * Spotify — the owner and the handful of allowlisted testers — keeps working
- * exactly as before, because the playback switchboard reads their saved choice
- * and never consults this list. This removes the offer, not the feature.
+ * THE ALLOWLIST AND THE BETA GROUP ARE VERY NEARLY THE SAME PEOPLE, which is
+ * what makes this safe rather than a reversal. Removing the offer outright
+ * took it away from the one group it genuinely works for, and they are the
+ * group most likely to need it — the owner tests on two devices and her
+ * testers are exactly who the five slots were reserved for. `isBetaBuild()`
+ * reads the build's own update channel, so a store build can never show it.
+ *
+ * IT IS STILL NOT A GUARANTEE, and the caption says so rather than repeating
+ * "Full in-app control": a beta tester whose Spotify account is not on the
+ * dashboard's allowlist will be refused at sign-in exactly as before. Being
+ * offered something honest-but-conditional is a different thing from being
+ * promised something impossible.
+ *
+ * `PLATFORMS.spotify` is LEFT IN PLACE either way. Anyone already running on
+ * Spotify keeps working, because the playback switchboard reads their saved
+ * choice and never consults this list.
  */
+const BETA = isBetaBuild();
+
 const PLATFORM_ENTRIES = [
   ...Object.entries(PLATFORMS)
-    .filter(([id]) => id !== 'spotify')
+    .filter(([id]) => id !== 'spotify' || BETA)
     .map(([id, p]) => ({ id: id as PlatformId, ...p })),
   NONE_ENTRY,
 ];
 
 // Honest tier line under each name. Apple Music is the full ride; everything
 // else runs as the visual companion beside the user's own music app, which
-// genuinely works today — never call it "upcoming". The `spotify` entry is
-// kept only so an existing Spotify listener's saved choice still resolves to a
-// caption; it is no longer offered (see PLATFORM_ENTRIES).
+// genuinely works today — never call it "upcoming".
+//
+// SPOTIFY'S LINE IS NOT APPLE MUSIC'S, and that difference is the whole of
+// what makes offering it again honest. Apple Music works for anyone with a
+// subscription; Spotify works for five invited accounts and refuses everyone
+// else, so the caption says "invited accounts" rather than promising control
+// it cannot deliver. It is only ever shown in a beta build (PLATFORM_ENTRIES).
 const TIER_CAPTIONS: Record<string, string> = {
-  spotify:      'Full in-app control',
+  spotify:      'Full control · invited accounts',
   appleMusic:   'Full in-app control',
   youtubeMusic: 'Visuals + your app',
   amazonMusic:  'Visuals + your app',
@@ -191,7 +213,9 @@ export function PlatformSelector({ visible, onDismiss }: Props) {
 
           <Text style={styles.title}>Connect Your Music</Text>
           <Text style={styles.subtitle}>
-            Apple Music plays inside Cruise FM, with the controls on the card. Anywhere else, the visuals run alongside your own music app.
+            {BETA
+              ? 'Apple Music and Spotify play inside Cruise FM, with the controls on the card. Anywhere else, the visuals run alongside your own music app.'
+              : 'Apple Music plays inside Cruise FM, with the controls on the card. Anywhere else, the visuals run alongside your own music app.'}
           </Text>
 
           {/* ── Platform grid ────────────────────────────────────────────── */}

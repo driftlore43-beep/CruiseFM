@@ -161,10 +161,22 @@ struct LastPlayedView: View {
   // rectangle with a gap all round it.
   private func cdPlayer(_ s: WidgetStation) -> some View {
     ZStack(alignment: .topLeading) {
-      // The face is not a flat fill: a moulded plastic panel is lit from
-      // above, so it is faintly brighter at the top than at the foot.
-      LinearGradient(colors: [faceLit.opacity(0.55), face, face,
-                              faceDim.opacity(0.30)],
+      // THE FACE CATCHES THE LIGHT AT THE TOP AND DOES NOT DARKEN AT THE FOOT.
+      //
+      // Owner, 14.09: "the winamp widget still has that bottom vignette -
+      // could we remove it? i really don't know where this is coming from."
+      // She could not find it because it was never a layer — the foot BAND
+      // came off on 09.09 when she first asked, and what was left is this
+      // gradient's own last stop, `faceDim.opacity(0.30)`, which shades the
+      // bottom of the panel from inside the fill that makes it plastic. Two
+      // different things wearing the same appearance, which is exactly why
+      // removing one of them looked like nothing had happened.
+      //
+      // The top lift stays: a moulded panel is lit from above and 03.09 added
+      // this shading precisely because dropping the raised rim had left the
+      // window reading flat. Only the darkening goes, so the face runs even
+      // from just below the title bar to the bottom edge.
+      LinearGradient(colors: [faceLit.opacity(0.55), face, face, face],
                      startPoint: .top, endPoint: .bottom)
       // NO FRAME AROUND THE WINDOW. This drew a raised bevel round the whole
       // widget and inset the title bar by 4pt, which left a grey rectangle

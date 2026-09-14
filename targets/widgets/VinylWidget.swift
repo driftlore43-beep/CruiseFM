@@ -177,7 +177,9 @@ struct DeckView: View {
             if let art = Art.lastPlayed() {
               RecordView(accent: s.accentColor, label: art, size: 118)
             } else {
-              pressing(s, size: 118)
+              // BARE LABEL HERE — the name and the frequency are already down
+              // the left of this card. See `pressing(_:size:showDial:)`.
+              pressing(s, size: 118, showDial: false)
             }
           }
           .padding(.trailing, 2)
@@ -259,18 +261,34 @@ struct DeckView: View {
   }
 
   /// A record whose label is printed rather than photographic — the station's
-  /// own pressing. Used only by the Label look; the other two want the cover.
-  private func pressing(_ s: WidgetStation, size: CGFloat) -> some View {
+  /// own pressing.
+  ///
+  /// `showDial` IS ABOUT WHAT ELSE IS ON THE CARD, NOT ABOUT THE RECORD.
+  /// Owner, 14.09, with a screenshot of the wide Road look: "could we remove
+  /// the station number from the middle of the vinyl". She is right, and only
+  /// there — that card already prints the station's name AND its frequency
+  /// down the left, so the label was the same number a third time in the
+  /// smallest type on the tile. This is the rule the 03.09 round already
+  /// wrote down for the medium Label look ("a number on the disc as well was
+  /// the duplication that made the label unreadable") arriving at the one
+  /// look that never got it.
+  ///
+  /// IT STAYS ON THE SMALL TILE, deliberately, and that is now the ONLY place
+  /// it appears: there the label is the only thing naming the station at all
+  /// (owner, 03.09: "put the station number in the centre of the vinyl, and
+  /// the name on the bottom"). The medium Label look had already dropped it
+  /// for exactly this reason — so with this change every wide tile in the
+  /// target carries a bare disc and the two looks agree again.
+  private func pressing(_ s: WidgetStation, size: CGFloat, showDial: Bool = true) -> some View {
     ZStack {
       RecordView(accent: s.accentColor, label: nil, size: size, plainLabel: true)
       // WHAT FITS ON A LABEL IS A FUNCTION OF THE LABEL, not of the design.
       // The label is 42% of the disc, so at 92pt there is 38pt of room —
       // "CRUISE FM" would set at under 4pt there, which is a grey smear
-      // rather than small type. The frequency alone, which is what the owner
-      // asked to see in the middle; the station's name goes at the foot of
-      // the card where it is legible, and printing it in both places is what
-      // made this circle unreadable in the first place.
-      DialText(dial: s.dial, size: size * 0.105, color: Color(hex: "#ffe7c2"))
+      // rather than small type. So the frequency alone, where it is wanted.
+      if showDial {
+        DialText(dial: s.dial, size: size * 0.105, color: Color(hex: "#ffe7c2"))
+      }
     }
   }
 

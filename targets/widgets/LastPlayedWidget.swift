@@ -95,7 +95,20 @@ private func lpTimeline(_ style: LastPlayedStyle) -> Timeline<LastPlayedEntry> {
 
 struct LastPlayedProvider: TimelineProvider {
   func placeholder(in c: Context) -> LastPlayedEntry {
-    LastPlayedEntry(date: Date(), station: nil, lastPlayed: nil, ready: false, style: .cdPlayer)
+    // A REAL ENTRY, NOT AN EMPTY ONE.
+    //
+    // WidgetKit draws `placeholder` REDACTED — every piece of text becomes a
+    // grey capsule — so a placeholder built from nothing renders as a blank
+    // grey tile, which is precisely what the owner reports on an iPad (14.09)
+    // and could not find a cause for. A tile stuck on its placeholder and a
+    // tile that failed outright look identical from the outside.
+    //
+    // Reading the snapshot here costs one synchronous read of shared
+    // UserDefaults, which the timeline does anyway, and it makes the two
+    // cases tell themselves apart: a widget stuck on its placeholder now
+    // shows real content, so if a grey tile fills in, the drawing was never
+    // the problem — it never received a timeline.
+    lpEntry(.cdPlayer)
   }
   func getSnapshot(in c: Context, completion: @escaping (LastPlayedEntry) -> Void) {
     completion(lpEntry(.cdPlayer))
@@ -108,7 +121,20 @@ struct LastPlayedProvider: TimelineProvider {
 @available(iOSApplicationExtension 17.0, *)
 struct LastPlayedIntentProvider: AppIntentTimelineProvider {
   func placeholder(in c: Context) -> LastPlayedEntry {
-    LastPlayedEntry(date: Date(), station: nil, lastPlayed: nil, ready: false, style: .cdPlayer)
+    // A REAL ENTRY, NOT AN EMPTY ONE.
+    //
+    // WidgetKit draws `placeholder` REDACTED — every piece of text becomes a
+    // grey capsule — so a placeholder built from nothing renders as a blank
+    // grey tile, which is precisely what the owner reports on an iPad (14.09)
+    // and could not find a cause for. A tile stuck on its placeholder and a
+    // tile that failed outright look identical from the outside.
+    //
+    // Reading the snapshot here costs one synchronous read of shared
+    // UserDefaults, which the timeline does anyway, and it makes the two
+    // cases tell themselves apart: a widget stuck on its placeholder now
+    // shows real content, so if a grey tile fills in, the drawing was never
+    // the problem — it never received a timeline.
+    lpEntry(.cdPlayer)
   }
   func snapshot(for configuration: LastPlayedLookIntent, in c: Context) async -> LastPlayedEntry {
     lpEntry(style(configuration.look))

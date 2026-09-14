@@ -76,7 +76,20 @@ private func deckTimeline(_ style: DeckStyle) -> Timeline<DeckEntry> {
 
 struct DeckProvider: TimelineProvider {
   func placeholder(in context: Context) -> DeckEntry {
-    DeckEntry(date: Date(), station: nil, lastPlayed: nil, ready: false, style: .road)
+    // A REAL ENTRY, NOT AN EMPTY ONE.
+    //
+    // WidgetKit draws `placeholder` REDACTED — every piece of text becomes a
+    // grey capsule — so a placeholder built from nothing renders as a blank
+    // grey tile, which is precisely what the owner reports on an iPad (14.09)
+    // and could not find a cause for. A tile stuck on its placeholder and a
+    // tile that failed outright look identical from the outside.
+    //
+    // Reading the snapshot here costs one synchronous read of shared
+    // UserDefaults, which the timeline does anyway, and it makes the two
+    // cases tell themselves apart: a widget stuck on its placeholder now
+    // shows real content, so if a grey tile fills in, the drawing was never
+    // the problem — it never received a timeline.
+    deckEntry(.road)
   }
   func getSnapshot(in context: Context, completion: @escaping (DeckEntry) -> Void) {
     completion(deckEntry(.road))
@@ -91,7 +104,20 @@ struct DeckProvider: TimelineProvider {
 @available(iOSApplicationExtension 17.0, *)
 struct DeckIntentProvider: AppIntentTimelineProvider {
   func placeholder(in context: Context) -> DeckEntry {
-    DeckEntry(date: Date(), station: nil, lastPlayed: nil, ready: false, style: .road)
+    // A REAL ENTRY, NOT AN EMPTY ONE.
+    //
+    // WidgetKit draws `placeholder` REDACTED — every piece of text becomes a
+    // grey capsule — so a placeholder built from nothing renders as a blank
+    // grey tile, which is precisely what the owner reports on an iPad (14.09)
+    // and could not find a cause for. A tile stuck on its placeholder and a
+    // tile that failed outright look identical from the outside.
+    //
+    // Reading the snapshot here costs one synchronous read of shared
+    // UserDefaults, which the timeline does anyway, and it makes the two
+    // cases tell themselves apart: a widget stuck on its placeholder now
+    // shows real content, so if a grey tile fills in, the drawing was never
+    // the problem — it never received a timeline.
+    deckEntry(.road)
   }
   func snapshot(for configuration: DeckLookIntent, in context: Context) async -> DeckEntry {
     deckEntry(style(configuration.look))

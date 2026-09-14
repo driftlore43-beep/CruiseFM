@@ -151,6 +151,27 @@ for (const name of Object.keys(bundleBodies)) {
     new RegExp(`\\b${name}\\.main\\(\\)`).test(bundle), 'declared but never launched');
 }
 
+// ── a placeholder must be real content, not an empty entry ───────────────
+// WidgetKit draws `placeholder` REDACTED: every piece of text becomes a grey
+// capsule. So a placeholder built from nothing renders as a blank grey tile —
+// which is indistinguishable from a widget that failed outright, and is
+// exactly what the owner could not find a cause for on 14.09. Reading the
+// snapshot costs one synchronous read the timeline makes anyway, and it lets
+// the two cases tell themselves apart.
+for (const [f, s2] of Object.entries(src)) {
+  for (const m of s2.matchAll(/func placeholder\(in [^)]*\) -> (\w+) \{([\s\S]*?)\n  \}/g)) {
+    const [, type, body] = m;
+    // JUST LOOK FOR `ready: false` IN THE BODY. The first version of this
+    // matched `${type}\\([^)]*ready: false`, and a bracket class cannot cross
+    // the `)` in `Date()` — so it never matched the one shape it exists to
+    // catch and passed on the real fault when that was put back deliberately.
+    // The negative test is the only reason it was noticed.
+    check(`${f}: ${type} placeholder is not an empty entry`,
+      !/ready:\s*false/.test(body.replace(/\/\/.*$/gm, '')),
+      'a redacted empty entry IS the blank grey tile');
+  }
+}
+
 // ── a small tile is not 158 points everywhere ─────────────────────────────
 // Every hero size in The Mode was a constant tuned against an iPhone's ~158pt
 // small widget — and a small widget is about 141 on a 768x1024 iPad, SMALLER

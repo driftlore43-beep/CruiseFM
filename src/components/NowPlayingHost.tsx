@@ -400,7 +400,13 @@ export function NowPlayingHost() {
   // re-expanding resumes instantly, and idle modes cost nothing.
   return (
     <>
-      {!!mode && (
+      {/* ONLY WHILE A DECK IS ACTUALLY OPEN. This used to be `!!mode`, which
+          is true for as long as a SESSION exists — so a full-screen layer sat
+          over all four tab pages the whole time the mini-player was on
+          screen, at zero opacity and with touches passing through, but there
+          for no reason at all. It exists to cover an ARRIVAL, and an arrival
+          only happens while the deck is expanded. */}
+      {!!mode && np.expanded && (
         <Animated.View
           // Named so a harness can find THIS layer rather than whichever
           // full-screen near-black view it happens to match first — the

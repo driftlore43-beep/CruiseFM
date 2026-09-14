@@ -4,10 +4,11 @@ import * as Haptics from 'expo-haptics';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing, Modal, PanResponder, Platform,
-  StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
+  StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Line, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DeckSizeProvider, useDeckMeasure } from '@/utils/deckSize';
 import { ModeSheet } from '@/components/ModeSheet';
 import { DECK_FRAC, LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
@@ -618,8 +619,10 @@ function TunerReadout({ width, accent, band, freq, lock, playing, title, artist,
 
 export function TunerFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
-  const { width: winW, height: winH } = useWindowDimensions();
-  const isLandscape = winW > winH;
+  // The deck's own measured box, never the window: on an iPad the window's
+  // size arrives late and a mode drew the wrong orientation outright.
+  // See src/utils/deckSize.tsx.
+  const { size: deckSize, winW, winH, isLandscape, onLayout: onDeckLayout } = useDeckMeasure();
   const topPad = Math.max(insets.top, 20);
 
   // How far the dial sits below the head unit. The owner wanted it lower, but
@@ -948,7 +951,9 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
   if (isLandscape) {
     return (
       <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+        <DeckSizeProvider value={deckSize}>
         <Animated.View
+          onLayout={onDeckLayout}
           style={[{ flex: 1, backgroundColor: '#05060f' }, { transform: [{ translateY: slideY }] }]}
           {...dismissPan.panHandlers}
           onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
@@ -1041,13 +1046,16 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
             />
           )}
         </Animated.View>
+        </DeckSizeProvider>
       </Modal>
     );
   }
 
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+      <DeckSizeProvider value={deckSize}>
       <Animated.View
+        onLayout={onDeckLayout}
         style={[{ flex: 1, backgroundColor: '#05060f' }, { transform: [{ translateY: slideY }] }]}
         {...dismissPan.panHandlers}
         /* Passive touch sniffer — never claims the gesture, just brings the
@@ -1207,6 +1215,7 @@ export function TunerFullscreen({ visible, onClose, stationId }: { visible: bool
         )}
 
       </Animated.View>
+      </DeckSizeProvider>
     </Modal>
   );
 }

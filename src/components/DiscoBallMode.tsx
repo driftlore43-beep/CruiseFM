@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing, Modal, PanResponder,
-  StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
+  StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import Svg, {
   Circle, Defs, Ellipse, G, LinearGradient as SvgLinearGradient, Path,
@@ -11,6 +11,7 @@ import Svg, {
 } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DeckSizeProvider, useDeckMeasure } from '@/utils/deckSize';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { StationIdentity } from '@/components/StationIdentity';
 import { ModeSheet } from '@/components/ModeSheet';
@@ -1070,11 +1071,13 @@ const DustField = memo(function DustField({ count, eq, live, winW, winH }: {
 
 export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
-  const { width: winW, height: winH } = useWindowDimensions();
+  // The deck's own measured box, never the window: on an iPad the window's
+  // size arrives late and a mode drew the wrong orientation outright.
+  // See src/utils/deckSize.tsx.
+  const { size: deckSize, winW, winH, isLandscape, onLayout: onDeckLayout } = useDeckMeasure();
   const topPad = Math.max(insets.top, 20);
 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
-  const isLandscape = winW > winH;
   // Declared up here because the scrub gesture needs the ball's size, and
   // the PanResponder is built before the render body reaches the ball.
   //
@@ -1640,7 +1643,9 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
 
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+      <DeckSizeProvider value={deckSize}>
       <Animated.View
+        onLayout={onDeckLayout}
         style={[{ flex: 1, backgroundColor: '#04040c' }, { transform: [{ translateY: slideY }] }]}
         {...dismissPan.panHandlers}
         /* A passive touch sniffer: it never claims the gesture (always false),
@@ -1904,6 +1909,7 @@ export function DiscoBallFullscreen({ visible, onClose, stationId }: { visible: 
           />
         )}
       </Animated.View>
+      </DeckSizeProvider>
     </Modal>
   );
 }

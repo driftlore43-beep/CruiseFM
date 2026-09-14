@@ -1,9 +1,10 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useDeckSize } from '@/utils/deckSize';
 import { MarqueeText } from '@/components/MarqueeText';
 import { ModeActionRow } from '@/components/ModeActionRow';
 import { isWide } from '@/constants/theme';
@@ -311,7 +312,7 @@ export function LandscapeChrome({
 }) {
   const insets = useSafeAreaInsets();
   const day = useDaylight();
-  const { width: winW } = useWindowDimensions();
+  const { width: winW } = useDeckSize();
   // Landscape safe areas live on the SIDES (the notch), not the top.
   const sideL = Math.max(insets.left, 22);
   const sideR = Math.max(insets.right, 22);

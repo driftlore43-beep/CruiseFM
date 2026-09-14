@@ -10,6 +10,7 @@ import Svg, {
   Rect as SvgRect, Circle as SvgCircle, Line as SvgLine, Path as SvgPath, Text as SvgText,
   Defs, ClipPath, G, LinearGradient as SvgLinearGradient, Stop,
 } from 'react-native-svg';
+import { DeckSizeProvider, useDeckMeasure } from '@/utils/deckSize';
 import { deckColumn, Fonts, heroCeil } from '@/constants/theme';
 import { OWNER_MODE } from '@/constants/config';
 import { STATIONS } from '@/constants/stations';
@@ -728,8 +729,10 @@ const rb = StyleSheet.create({
 // ── Full-screen component ─────────────────────────────────────────────────────
 export function CassetteFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
-  const { width: winW, height: winH } = useWindowDimensions();
-  const isLandscape = winW > winH;
+  // The deck's own measured box, never the window: on an iPad the window's
+  // size arrives late and a mode drew the wrong orientation outright.
+  // See src/utils/deckSize.tsx.
+  const { size: deckSize, winW, winH, isLandscape, onLayout: onDeckLayout } = useDeckMeasure();
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   const spotify = useMusicPlayback(visible);
@@ -1117,7 +1120,9 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   if (isLandscape) {
     return (
       <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent>
+        <DeckSizeProvider value={deckSize}>
         <Animated.View
+          onLayout={onDeckLayout}
           style={[fs.container, { backgroundColor: C.bg, transform: [{ translateY: slideY }] }]}
           {...dismissPan.panHandlers}
           onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
@@ -1170,6 +1175,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
             />
           )}
         </Animated.View>
+        </DeckSizeProvider>
       </Modal>
     );
   }
@@ -1177,7 +1183,9 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
   // ── Portrait ───────────────────────────────────────────────────────────────
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent>
+      <DeckSizeProvider value={deckSize}>
       <Animated.View
+        onLayout={onDeckLayout}
         style={[fs.container, { backgroundColor: C.bg, transform: [{ translateY: slideY }] }]}
         {...dismissPan.panHandlers}
         /* Passive touch sniffer — never claims the gesture, just brings the
@@ -1328,6 +1336,7 @@ export function CassetteFullscreen({ visible, onClose, stationId }: { visible: b
         )}
 
       </Animated.View>
+      </DeckSizeProvider>
     </Modal>
   );
 }

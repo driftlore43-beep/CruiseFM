@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 
+import { useDeckSize } from '@/utils/deckSize';
 import { useMotion } from '@/context/MotionContext';
 
 // One beat ≈ 100 BPM: quick swell, longer relax.
@@ -68,7 +69,7 @@ export function AmbientGlow({ active, beat, color, hero = true, trackKey }: {
   // band collapsed into a sliver at the bottom and the side plumes became a
   // patch in the lower-left corner. That is why atmosphere had to be gated
   // out of landscape at all — with live values it simply works in both.
-  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
+  const { width: SCREEN_W, height: SCREEN_H } = useDeckSize();
 
   // Song-transition hold: a new title means the old song just ended — the
   // 5s poll can't see the ~1s silent gap itself, so the moment the title

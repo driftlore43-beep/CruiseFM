@@ -144,6 +144,13 @@ const makeStyles = (_p: Palette) => StyleSheet.create({
     borderRadius: 28,
     overflow: 'hidden',
     backgroundColor: '#07070c',
+    // A SIZED CHILD OF A STRETCH COLUMN LANDS FLUSH LEFT, and every other
+    // block on the page is inset by the gutter on BOTH sides — so without
+    // this the hero sat 20 points left of the heading above it and of the
+    // tab bar below it, with all its slack piled on the right. That is the
+    // same "the bar plainly belonged to a different page" fault the single
+    // gutter exists to prevent (31.07), arrived at from the other side.
+    alignSelf: 'center',
   },
   foot: {
     position: 'absolute',

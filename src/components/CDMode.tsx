@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing, Modal, PanResponder,
-  StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
+  StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import Svg, {
   Circle, ClipPath, Defs, G, Image as SvgImage, LinearGradient as SvgLinearGradient, Path,
@@ -11,6 +11,7 @@ import Svg, {
 } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DeckSizeProvider, useDeckMeasure } from '@/utils/deckSize';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { LandscapeChrome, restGrowFor, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
@@ -323,7 +324,10 @@ function JewelCase({ size, children }: { size: number; children: React.ReactNode
 
 export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
-  const { width: winW, height: winH } = useWindowDimensions();
+  // The deck's own measured box, never the window: on an iPad the window's
+  // size arrives late and a mode drew the wrong orientation outright.
+  // See src/utils/deckSize.tsx.
+  const { size: deckSize, winW, winH, isLandscape, onLayout: onDeckLayout } = useDeckMeasure();
   const topPad = Math.max(insets.top, 20);
 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
@@ -336,7 +340,6 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
   // The height term is deliberately left where it was: on a small phone
   // (SE-sized) height binds instead, and raising it would push the case into
   // the controls below.
-  const isLandscape = winW > winH;
   // Landscape sizes off HEIGHT alone — the portrait formula's winH*0.44 term
   // shrinks a sideways case to a coaster (the "squish", owner 30.07).
   const caseSize = isLandscape
@@ -824,7 +827,9 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
 
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+      <DeckSizeProvider value={deckSize}>
       <Animated.View
+        onLayout={onDeckLayout}
         style={[{ flex: 1, backgroundColor: '#04040c' }, { transform: [{ translateY: slideY }] }]}
         {...dismissPan.panHandlers}
         onStartShouldSetResponderCapture={() => { requestWake(); return false; }}>
@@ -999,6 +1004,7 @@ export function CDFullscreen({ visible, onClose, stationId }: { visible: boolean
           />
         )}
       </Animated.View>
+      </DeckSizeProvider>
     </Modal>
   );
 }

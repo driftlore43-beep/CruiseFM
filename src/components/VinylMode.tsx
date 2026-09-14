@@ -4,9 +4,10 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Svg, { Circle as SvgCircle, Defs, Ellipse as SvgEllipse, G, LinearGradient as SvgLinearGradient, Path, RadialGradient, Rect as SvgRect, Stop } from 'react-native-svg';
 import {
   Animated, Dimensions, Easing, Image, Modal, PanResponder, ScrollView, StyleSheet,
-  Text, TouchableOpacity, useWindowDimensions, View,
+  Text, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DeckSizeProvider, useDeckMeasure } from '@/utils/deckSize';
 import { OWNER_MODE } from '@/constants/config';
 import { DECK_CHROME_H, deckColumn, Fonts, heroCeil, isWide } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
@@ -1026,8 +1027,10 @@ function TrackList({ activeIdx, onSelect }: { activeIdx: number; onSelect: (i: n
 // ── Fullscreen modal ──────────────────────────────────────────────────────────
 export function VinylFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
-  const { width: winW, height: winH } = useWindowDimensions();
-  const isLandscape = winW > winH;
+  // The deck's own measured box, never the window: on an iPad the window's
+  // size arrives late and a mode drew the wrong orientation outright.
+  // See src/utils/deckSize.tsx.
+  const { size: deckSize, winW, winH, isLandscape, onLayout: onDeckLayout } = useDeckMeasure();
 
   const { playing, setPlaying, setStationId: npSetStation, handoff, relinkStationPlaylist, musicSwitching } = useNowPlaying();
   // Classic Vinyl: the deck without its neon layer. See getVinylClassic.
@@ -1793,7 +1796,9 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
 
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent>
+      <DeckSizeProvider value={deckSize}>
       <Animated.View
+        onLayout={onDeckLayout}
         style={[fs.container, { transform: [{ translateY: slideY }] }]}
         {...dismissPan.panHandlers}
         onStartShouldSetResponderCapture={() => { requestWake(); return false; }}>
@@ -2006,6 +2011,7 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
         )}
 
       </Animated.View>
+      </DeckSizeProvider>
     </Modal>
   );
 }

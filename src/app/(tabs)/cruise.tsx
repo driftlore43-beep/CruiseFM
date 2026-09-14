@@ -270,7 +270,10 @@ export default function CruiseScreen() {
             headline={words(kind).heroLine}
             buttonLabel={lastCruise ? words(kind).resume : words(kind).start}
             onPress={handleStartDrive}
-            width={Math.min(winW, PAGE_MAX_W) - 44}
+            // The page's own gutter, not a remembered 44: every other block
+            // in this column is inset by PAGE_GUTTER, and the tab bar is capped
+            // to exactly this width, so the three line up by construction.
+            width={Math.min(winW, PAGE_MAX_W) - PAGE_GUTTER * 2}
           />
         ) : (
           <HeroCard

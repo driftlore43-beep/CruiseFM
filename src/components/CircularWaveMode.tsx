@@ -3,10 +3,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated, Dimensions, Easing, Modal, PanResponder, ScrollView,
-  StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
+  StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import Svg, { Circle, Defs, G, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DeckSizeProvider, useDeckMeasure } from '@/utils/deckSize';
 import { PlaylistSheet } from '@/components/PlaylistSheet';
 import { LandscapeChrome, restShiftFor, useChromeFade, useDeckScene, useRestScene } from '@/components/LandscapeChrome';
 import { StationIdentity } from '@/components/StationIdentity';
@@ -214,8 +215,10 @@ const R_MAX = VB / 2 - 3;
 // ── Fullscreen modal ────────────────────────────────────────────────────────────
 export function CircularWaveFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
-  const { width: winW, height: winH } = useWindowDimensions();
-  const isLandscape = winW > winH;
+  // The deck's own measured box, never the window: on an iPad the window's
+  // size arrives late and a mode drew the wrong orientation outright.
+  // See src/utils/deckSize.tsx.
+  const { size: deckSize, winW, winH, isLandscape, onLayout: onDeckLayout } = useDeckMeasure();
   const topPad = Math.max(insets.top, 20);
 
   const [activeId, setActiveId] = useState(stationId ?? 'night-run');
@@ -363,7 +366,9 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
 
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+      <DeckSizeProvider value={deckSize}>
       <Animated.View
+        onLayout={onDeckLayout}
         style={[{ flex: 1, backgroundColor: '#04060f' }, { transform: [{ translateY: slideY }] }]}
         {...dismissPan.panHandlers}
         onStartShouldSetResponderCapture={() => { wakeChrome(); return false; }}>
@@ -546,6 +551,7 @@ export function CircularWaveFullscreen({ visible, onClose, stationId }: { visibl
         )}
 
       </Animated.View>
+      </DeckSizeProvider>
     </Modal>
   );
 }

@@ -1,8 +1,9 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Dimensions, Platform, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets, type EdgeInsets } from 'react-native-safe-area-context';
 
+import { useDeckSize } from '@/utils/deckSize';
 import { useDaylight } from '@/context/MotionContext';
 
 import { ShareCardSheet } from '@/components/ShareCard';
@@ -119,7 +120,7 @@ export function ModeActionRow({
   // capture, and a landscape card needs its own design round first
   // (owner, 05.08: "the share option is available in the landscape mode —
   // I would remove this option").
-  const { width: winW, height: winH } = useWindowDimensions();
+  const { width: winW, height: winH } = useDeckSize();
   const isLandscape = winW > winH;
   const [sharing, setSharing] = useState(false);
   const [snap, setSnap] = useState<ModeSnapshot | null>(null);

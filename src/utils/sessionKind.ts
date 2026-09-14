@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { Dimensions } from 'react-native';
 
-import { WIDE_MIN } from '@/constants/theme';
+import { isTabletSize } from '@/constants/theme';
 
 /**
  * Driving, or just listening.
@@ -38,9 +38,12 @@ let cached: SessionKind | null = null;
  * so the honest answer is always 'listening' and there is no question to ask.
  *
  * SAME SIGNAL theme.ts ALREADY TRUSTS for "is this a tablet, not a phone":
- * the widest iPhone this app runs on is 430pt and the smallest iPad clears
- * 700pt, so a width check can never mistake one for the other in either
- * orientation — no separate definition of "iPad" to keep in step.
+ * the widest iPhone this app runs on is 440pt on its SHORTER edge and the
+ * smallest iPad clears 700pt on its, so comparing shorter edges can never
+ * mistake one for the other whichever way the device is held — and no
+ * separate definition of "iPad" to keep in step. It used to compare the
+ * WIDTH, which is the same test only while the app is pinned upright; it no
+ * longer is (14.09).
  *
  * WHY THE OVERRIDE LIVES HERE rather than as a prop threaded down from a
  * component: `cachedSessionKind()` is read from a dozen places with no
@@ -52,7 +55,12 @@ let cached: SessionKind | null = null;
  */
 function isIPadWindow(): boolean {
   try {
-    return Dimensions.get('window').width >= WIDE_MIN;
+    const { width, height } = Dimensions.get('window');
+    // THE SHORTER EDGE, not the width: a phone turned sideways is over 900
+    // points wide, and since every mode can now be landscape that is a real
+    // window this can be asked about — a phone would have been quietly
+    // recorded as a tablet and never asked the question. See isTabletSize.
+    return isTabletSize(width, height);
   } catch {
     return false;
   }

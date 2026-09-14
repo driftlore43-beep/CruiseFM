@@ -1,8 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useDeckSize } from '@/utils/deckSize';
 import { DECK_FRAC } from '@/components/LandscapeChrome';
 import { appleMusicAvailable } from '@/utils/appleMusic';
 import {
@@ -58,7 +59,7 @@ export function WakeSpotifyHint({ show, connected = true }: { show: boolean; con
       })
       .catch(() => {});
   }, []);
-  const { width: winW, height: winH } = useWindowDimensions();
+  const { width: winW, height: winH } = useDeckSize();
   const isLandscape = winW > winH;
   const [visible, setVisible] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;

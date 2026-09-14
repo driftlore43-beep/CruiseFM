@@ -12,11 +12,12 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
+ 
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DeckSizeProvider, useDeckMeasure } from '@/utils/deckSize';
 import { Cruise, deckColumn, Fonts, PAGE_MAX_W } from '@/constants/theme';
 import { STATIONS } from '@/constants/stations';
 import { mmss } from '@/utils/formatTime';
@@ -235,8 +236,10 @@ const formatMs = (ms: number) => mmss(ms);
 
 export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: boolean; onClose: () => void; stationId?: string }) {
   const insets = useSafeAreaInsets();
-  const { width: winW, height: winH } = useWindowDimensions();
-  const isLandscape = winW > winH;
+  // The deck's own measured box, never the window: on an iPad the window's
+  // size arrives late and a mode drew the wrong orientation outright.
+  // See src/utils/deckSize.tsx.
+  const { size: deckSize, winW, winH, isLandscape, onLayout: onDeckLayout } = useDeckMeasure();
 
   const fsValues = useRef(Array.from({ length: BAR_COUNT }, () => new Animated.Value(FS_MIN_H))).current;
   // Drives the ambient glow's brightness/breath — a big, cheap element that
@@ -481,7 +484,9 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   if (isLandscape) {
     return (
       <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+        <DeckSizeProvider value={deckSize}>
         <Animated.View
+          onLayout={onDeckLayout}
           style={[fs.container, { minHeight: winH, transform: [{ translateY: slideY }] }]}
           {...dismissPan.panHandlers}
           /* Passive touch sniffer — never claims the gesture, just brings the
@@ -544,6 +549,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
             />
           )}
         </Animated.View>
+        </DeckSizeProvider>
       </Modal>
     );
   }
@@ -553,7 +559,9 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <Modal supportedOrientations={['portrait', 'landscape']} visible={visible} transparent animationType="none" onRequestClose={() => {}} statusBarTranslucent>
+      <DeckSizeProvider value={deckSize}>
       <Animated.View
+        onLayout={onDeckLayout}
         style={[fs.container, { transform: [{ translateY: slideY }] }]}
         {...dismissPan.panHandlers}
         /* Passive touch sniffer — never claims the gesture, just brings the
@@ -754,6 +762,7 @@ export function EqualizerFullscreen({ visible, onClose, stationId }: { visible: 
         )}
 
       </Animated.View>
+      </DeckSizeProvider>
     </Modal>
   );
 }

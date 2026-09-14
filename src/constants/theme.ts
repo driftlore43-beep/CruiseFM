@@ -106,6 +106,18 @@ export const PAGE_MAX_W      = 720;
 export const isWide = (winW: number) => winW >= WIDE_MIN;
 
 /**
+ * A TABLET IN EITHER ORIENTATION — the SHORTER edge is the honest test.
+ *
+ * `isWide` asks about the window it is laying out, which is exactly right for
+ * a reading column. It is the wrong question for "what kind of device is
+ * this?", because a phone turned sideways is 932 points wide and would
+ * answer yes. Every iPad's shorter edge clears 700 (the smallest is 744) and
+ * every iPhone's falls well short of it (the widest is 440), so this can
+ * never mistake one for the other whichever way it is being held.
+ */
+export const isTabletSize = (w: number, h: number) => Math.min(w, h) >= WIDE_MIN;
+
+/**
  * THE CEILING ON A MODE'S CENTRAL OBJECT — and why an iPad needed it lifted.
  *
  * Every fullscreen mode sizes its hero (the record, the disc, the ball, the

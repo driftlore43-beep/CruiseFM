@@ -365,6 +365,80 @@ Sources checked on the day: [Apple's own App Preview specifications](https://www
 accepted frame sizes when new devices land, and this file will not update
 itself.
 
+### THE ROUGH CUT EXISTS — 15.09, and it is 80% of the job
+
+The owner recorded **five clips on the evening of 13 September** — about 65
+seconds of footage, which between them cover almost the whole shot list above.
+A 19.5-second cut has been assembled from them and sent to her. It is already
+at Apple's exact frame, has the silent audio track, and would upload today but
+for one thing (below).
+
+| # | Shot | Source clip | In / length |
+|---|---|---|---|
+| 1 | Mirror Ball, Sunset AM, rested | `22-12-54` (9.0s) | 1.2s / 4.4s |
+| 2 | Stations dial, scrolling AM into FM | `22-52-51` (10.1s) | 1.0s / 4.2s |
+| 3 | Station page → Start Listening → deck opens | `22-52-51` (14.2s) | 0.0s / 2.4s |
+| 4 | Vinyl, record turning, tonearm down | `22-52-51` (14.2s) | 11.4s / 2.7s |
+| 5 | Cassette, reels winding | `22-15-50` (14.0s) | 10.6s / 2.2s |
+| 6 | Tuner, dial dragged 101.30 → 103.50 | `01-39-28` (17.0s) | 0.2s / 3.6s |
+
+**The frame conversion is a cover-scale and a centre-crop, not a letterbox.**
+ReplayKit records at 1282×~2662 (it trims the status bar), which is 2.076:1
+against Apple's 886×1920 = 2.167:1. Scaling to *cover* and cropping loses about
+27px from each side of the source — roughly 2% — and the transport icons sit
+well inside that, so nothing is cut. Letterboxing instead would put black bars
+on a preview, which reads as an amateur export.
+
+    VF="scale=886:1920:force_original_aspect_ratio=increase,crop=886:1920,fps=30,format=yuv420p"
+    ffmpeg -ss <IN> -t <LEN> -i <clip>.mov -an -vf "$VF" \
+           -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p seg.mp4
+    # then concat the segments, then the silent track Apple insists on:
+    ffmpeg -f concat -safe 0 -i list.txt -c copy joined.mp4
+    ffmpeg -i joined.mp4 -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 \
+           -c:v copy -c:a aac -b:a 128k -shortest -movflags +faststart preview.mp4
+
+**THE HINT BANNER IS THE TRAP IN THIS FOOTAGE, and it is invisible until you
+look for it.** `WakeSpotifyHint` prints *"Visuals only for now — play music in
+any app and cruise on"* across the top of a deck opened with no music service,
+and it retires itself after about 9.5 seconds. So on every clip the first few
+seconds are clean, the middle carries a banner saying the app is not doing full
+playback, and only the tail is usable. Measured per clip rather than guessed:
+it is mid-fade at 11.0s on the Vinyl clip and gone by 11.3, and gone by 10.5 on
+the Cassette one. **Every in-point in the table above is set from that, not from
+where the shot looks best.** Crop the top 420px of a frame and look; a
+brightness average over the whole band cannot tell a banner from a backdrop.
+
+### THE ONE THING WRONG WITH IT: the footage predates the tagline round
+
+The clips were recorded on **13 September**; the taglines were rewritten on
+**15 September** (`8d0a4ae`). Every deck prints the station's tagline where the
+song title goes — which is the whole reason that round happened — so the cut
+shows wording the app no longer uses:
+
+| On screen in the footage | What the app says now |
+|---|---|
+| Empty expressways. Blue-lit dashboards. | Blue light. Empty hours. |
+| Golden hour. Open roads. | The sky turns gold. The day lets go. |
+| Cold air. Fog ahead. One more corner. | Cold air. Fog in the pines. Thin light. |
+| Ocean air. Open horizons. Golden hour. | *unchanged* |
+| City lights on — the night is young. | *unchanged* |
+
+About 8 of the 19.5 seconds carry a stale line — the Night Run material (station
+page, Vinyl, Cassette) and the last second of the Tuner. **The Mirror Ball opener
+and the whole dial section are clean**, because a rested deck shows no tagline at
+all and the dial page's copy did not change.
+
+That matters more than a normal continuity slip: the new screenshots on the same
+listing page carry the NEW wording, so the two would visibly disagree, and the
+line the video would be advertising is the exact line the 15.09 round removed for
+being drive-framed.
+
+**The fix is a re-record, and it is cheap.** The tagline round published to
+preview at 12:29 on 15.09 (run 381, success), so her phone already has the new
+wording — open and close the app twice and it is there. Only the Night Run shots
+and the Tuner need redoing; shots 1 and 2 could be kept as they are. Rebuild with
+the same table above and new in-points.
+
 ### One thing to decide at the same time
 
 The iPad build HAS shipped (build 51), so an **iPad preview** is now a real,

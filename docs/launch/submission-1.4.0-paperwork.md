@@ -219,6 +219,29 @@ is part-done. In order of what actually unblocks the next thing:
    key; the entitlement is called `premium`. Real keys and real products go in
    together, and `LAUNCH_FREE` flips off in the same change — never before.
 
+### If "compliance" sits in review for more than a few days
+
+Reported 15.09: Business showed complete while the compliance item stayed in
+review for over a week. Two things about that.
+
+**It does not block this release.** 1.4.0 is free with no products, so nothing
+about the app's own review depends on the verification clearing. Do not hold
+the submission for it. What it holds up is getting PAID, which matters at step
+3 above and not before.
+
+**CHECK THE SERVICE INBOX BEFORE ASSUMING APPLE IS SLOW.** A verification that
+appears stuck is very often one where Apple asked for a document and the
+message went to the account's own email — and the developer account is
+`cruisefmservice@gmail.com`, not a personal address. This project has already
+lost a day to exactly that shape once (26.08, where the Netlify site turned out
+to belong to that inbox rather than a personal login), so it is the cheapest
+thing to rule out and it costs one search.
+
+If the inbox is clear, contact Apple rather than waiting: App Store Connect's
+own Contact Us, or developer.apple.com/contact, under Agreements, Tax and
+Banking. A week with no word is past the point where waiting is telling you
+anything.
+
 A registered business entity is worth weighing before step 1: payments,
 business banking and any future trader status all point the same way, and it
 is also the only route to getting the App Store's Developer line to read

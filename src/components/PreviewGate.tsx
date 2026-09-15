@@ -65,8 +65,14 @@ export function PreviewGate({ onSilence }: { onSilence?: () => void }) {
         <GlossSheen radius={24} />
         <Text style={pg.crest}>✦</Text>
         <Text style={pg.title}>Like what you're seeing?</Text>
+        {/* THIS CARD DOES NOT NAME THE TERMS, on purpose.
+            It used to promise "free for 7 days", typed in — and a trial
+            length belongs to the product in App Store Connect, not to a
+            card drawn mid-drive that cannot wait on the store to answer.
+            The paywall reads the real trial and the real price and states
+            them; this only has to get somebody there. */}
         <Text style={pg.sub}>
-          {label} is a Premium mode. Try everything free for 7 days — cancel anytime.
+          {label} is a Premium mode. Unlock it along with every other mode and mood.
         </Text>
         <TouchableOpacity onPress={goPremium} activeOpacity={0.9} style={pg.cta}>
           <LinearGradient
@@ -74,7 +80,7 @@ export function PreviewGate({ onSilence }: { onSilence?: () => void }) {
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={StyleSheet.absoluteFill}
           />
-          <Text style={pg.ctaText}>Start free trial</Text>
+          <Text style={pg.ctaText}>See Premium</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={dismiss} hitSlop={{ top: 10, bottom: 10, left: 20, right: 20 }}>
           <Text style={pg.later}>Maybe later</Text>

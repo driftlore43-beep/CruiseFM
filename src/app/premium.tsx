@@ -1,17 +1,18 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { PaywallShowcase } from '@/components/PaywallShowcase';
+import { SettingsSheet, type SettingsPage } from '@/components/SettingsSheet';
 import { MODE_CATALOG } from '@/constants/modeCatalog';
 import { STATIONS } from '@/constants/stations';
 import { Cruise } from '@/constants/theme';
 import { useEntitlements } from '@/context/EntitlementsContext';
-import { purchasePremium, restorePremium } from '@/utils/purchases';
+import { getPlans, purchasePremium, restorePremium, type Plan } from '@/utils/purchases';
 
 const AMBER      = '#F59E0B';
 const AMBER_SOFT = 'rgba(245,158,11,0.14)';
@@ -84,6 +85,69 @@ function notify(title: string, message: string, onDone?: () => void) {
   Alert.alert(title, message, [{ text: 'OK', onPress: onDone }]);
 }
 
+const PLAN_NAME: Record<Plan['kind'], string> = {
+  monthly: 'Monthly',
+  annual: 'Yearly',
+  lifetime: 'One payment, forever',
+  other: 'Premium',
+};
+
+/**
+ * How much cheaper a plan works out than paying monthly — COMPUTED from the
+ * two real prices, never typed.
+ *
+ * "Save 25%" was a decision about £1.99 against £18, and it is only true in
+ * that one currency at those two exact numbers. Working it out from whatever
+ * the store actually charges keeps it true in every storefront, and keeps it
+ * true if either price is ever changed in App Store Connect without anybody
+ * remembering this line exists.
+ */
+function savingVs(monthly: Plan | undefined, plan: Plan): number | null {
+  if (!monthly || plan.kind === 'monthly') return null;
+  if (!plan.perMonth || !monthly.price) return null;
+  const pct = Math.round((1 - plan.perMonth / monthly.price) * 100);
+  return pct > 0 ? pct : null;
+}
+
+/** "3 days" / "1 week" / "1 month" — whatever the product's trial really is. */
+function trialLabel(days: number): string {
+  if (days % 365 === 0) return days === 365 ? '1 year' : `${days / 365} years`;
+  if (days % 30 === 0)  return days === 30 ? '1 month' : `${days / 30} months`;
+  if (days % 7 === 0)   return days === 7 ? '1 week' : `${days / 7} weeks`;
+  return days === 1 ? '1 day' : `${days} days`;
+}
+
+function PlanRow({ plan, on, saving, onPress }: {
+  plan: Plan; on: boolean; saving: number | null; onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: on }}
+      accessibilityLabel={`${PLAN_NAME[plan.kind]}, ${plan.priceString}`}
+      style={({ pressed }) => [styles.planRow, on && styles.planRowOn, pressed && { opacity: 0.9 }]}>
+      <View style={[styles.planTick, on && styles.planTickOn]}>
+        {on && <MaterialCommunityIcons name="check" size={13} color="#2a1a00" />}
+      </View>
+      <View style={styles.planText}>
+        <Text style={styles.planName}>{PLAN_NAME[plan.kind]}</Text>
+        {/* The monthly equivalent is the store's own arithmetic, so an annual
+            plan can be compared without anybody doing sums in their head. */}
+        {plan.kind !== 'monthly' && !!plan.perMonthString && (
+          <Text style={styles.planSub}>{plan.perMonthString} a month</Text>
+        )}
+      </View>
+      {saving != null && (
+        <View style={styles.saveChip}>
+          <Text style={styles.saveChipText}>SAVE {saving}%</Text>
+        </View>
+      )}
+      <Text style={styles.planPrice}>{plan.priceString}</Text>
+    </Pressable>
+  );
+}
+
 function TickCell({ on, amber }: { on: boolean; amber?: boolean }) {
   return (
     <View style={styles.compareIconCell}>
@@ -100,6 +164,31 @@ export default function PremiumScreen() {
   const insets = useSafeAreaInsets();
   const { refreshSubscription, isPro } = useEntitlements();
   const [busy, setBusy] = useState(false);
+  const [legal, setLegal] = useState<SettingsPage | null>(null);
+
+  /**
+   * What the store says is on sale.
+   *
+   *   undefined — still asking
+   *   null      — could not ask (offline, store refused, no billing here)
+   *   []        — asked, and nothing is on sale
+   *   [...]     — real plans, with real prices
+   *
+   * The three failure shapes are kept apart on purpose, because the screen
+   * must say something different about each and may never paper over any of
+   * them with a made-up number.
+   */
+  const [plans, setPlans] = useState<Plan[] | null | undefined>(undefined);
+  const [chosen, setChosen] = useState<string | null>(null);
+
+  const loadPlans = useCallback(async () => {
+    setPlans(undefined);
+    const found = await getPlans();
+    setPlans(found);
+    // Default to the entry price — getPlans() already sorts monthly first.
+    setChosen(found?.[0]?.id ?? null);
+  }, []);
+
 
   /**
    * NOTHING may reach a purchase offer while the app is free.
@@ -130,13 +219,24 @@ export default function PremiumScreen() {
     }, 0);
     return () => clearTimeout(t);
   }, [isPro]);
+
+  // Don't wake the store for a screen that is about to show nothing. The hook
+  // itself is unconditional (it sits above the isPro guard below); only the
+  // fetch is skipped.
+  useEffect(() => { if (!isPro) loadPlans(); }, [isPro, loadPlans]);
+
   if (isPro) return <View style={styles.root} />;
 
+  const selected = plans?.find((pl) => pl.id === chosen) ?? null;
+  const monthly = plans?.find((pl) => pl.kind === 'monthly');
+
   async function handleUnlock() {
-    if (busy) return;
+    // No plan means no price on screen, so there is nothing honest to charge
+    // for — the button is disabled in that state anyway.
+    if (busy || !selected) return;
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setBusy(true);
-    const outcome = await purchasePremium();
+    const outcome = await purchasePremium(selected.id);
     await refreshSubscription();
     setBusy(false);
     if (outcome === 'purchased') {
@@ -225,23 +325,90 @@ export default function PremiumScreen() {
             ))}
           </View>
 
-          {/* Price */}
-          <View style={styles.priceRow}>
-            <Text style={styles.price}>£1.99</Text>
-            <Text style={styles.pricePer}>/ month</Text>
-          </View>
-          <Text style={styles.trialNote}>7-day free trial · cancel anytime</Text>
+          {/* ── PRICE ────────────────────────────────────────────────────
+              EVERY NUMBER HERE COMES FROM THE STORE.
+
+              This block used to read `£1.99 / month · 7-day free trial`,
+              typed straight into the file. Both halves were claims the app
+              could not keep: the App Store prices per COUNTRY, so £1.99 is
+              simply not what an Australian, American or Japanese listener is
+              charged, and the trial length belongs to the product rather
+              than to this screen. A paywall showing a different number from
+              the one the till takes is dishonest before it is anything else,
+              and Apple rejects it besides.
+
+              So when there is no price to show, this says so and offers a
+              retry. It never falls back to a number — the same rule the seek
+              bar follows when it prints `--:--` rather than a `0:00` it
+              cannot stand behind. */}
+
+          {plans === undefined && (
+            <Text style={styles.priceStatus}>Checking prices…</Text>
+          )}
+
+          {plans === null && (
+            <View style={styles.priceProblem}>
+              <Text style={styles.priceStatus}>Prices aren&apos;t loading right now.</Text>
+              <Pressable onPress={loadPlans} hitSlop={10}>
+                <Text style={styles.retryText}>Try again</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {plans?.length === 0 && (
+            <Text style={styles.priceStatus}>
+              Premium isn&apos;t on sale yet. Everything you can see today is yours for free.
+            </Text>
+          )}
+
+          {/* One plan: the price IS the statement, so give it the room. */}
+          {selected && plans!.length === 1 && (
+            <View style={styles.priceRow}>
+              <Text style={styles.price}>{selected.priceString}</Text>
+              {!!selected.per && <Text style={styles.pricePer}>/ {selected.per}</Text>}
+            </View>
+          )}
+
+          {/* Several: a picker, with the saving worked out rather than typed. */}
+          {selected && plans!.length > 1 && (
+            <View style={styles.planList} accessibilityRole="radiogroup">
+              {plans!.map((pl) => (
+                <PlanRow
+                  key={pl.id}
+                  plan={pl}
+                  on={pl.id === selected.id}
+                  saving={savingVs(monthly, pl)}
+                  onPress={() => setChosen(pl.id)}
+                />
+              ))}
+            </View>
+          )}
+
+          {selected && (
+            <Text style={styles.trialNote}>
+              {selected.trialDays
+                ? `${trialLabel(selected.trialDays)} free, then ${selected.priceString}`
+                : selected.priceString}
+              {selected.per ? ` per ${selected.per} · cancel anytime` : ' · one payment'}
+            </Text>
+          )}
 
           {/* CTAs */}
           <Pressable
-            style={({ pressed }) => [styles.unlockBtn, (pressed || busy) && { opacity: 0.9 }]}
+            style={({ pressed }) => [
+              styles.unlockBtn,
+              (pressed || busy) && { opacity: 0.9 },
+              !selected && styles.unlockBtnOff,
+            ]}
             onPress={handleUnlock}
-            disabled={busy}>
+            disabled={busy || !selected}>
             <LinearGradient
               colors={['#F7B733', '#F59E0B']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.unlockGradient}>
-              <Text style={styles.unlockText}>{busy ? 'One moment…' : 'Unlock Premium'}</Text>
+              <Text style={styles.unlockText}>
+                {busy ? 'One moment…' : selected?.trialDays ? 'Start free trial' : 'Unlock Premium'}
+              </Text>
             </LinearGradient>
           </Pressable>
 
@@ -253,8 +420,44 @@ export default function PremiumScreen() {
             <Text style={styles.laterText}>Maybe Later</Text>
           </Pressable>
 
+          {/* ── THE SMALL PRINT APPLE REQUIRES ───────────────────────────────
+              A screen selling an auto-renewing subscription has to carry, in
+              the app itself: what it is called, how long it runs, what it
+              costs, and working links to the Terms of Use and the Privacy
+              Policy. Both documents have existed in Settings all along and
+              this screen never linked them, which is one of the commonest
+              rejections there is — and a cheap one to leave lying around,
+              given what the last two cost.
+
+              The renewal sentence only appears for something that actually
+              renews, so a one-off Founder purchase is never described as a
+              subscription. */}
+          {!!selected?.per && (
+            <Text style={styles.finePrint}>
+              Cruise FM Premium renews automatically at {selected.priceString} per {selected.per}{' '}
+              unless it is cancelled at least 24 hours before the period ends. Manage or cancel it
+              any time in your App Store account settings.
+            </Text>
+          )}
+
+          <View style={styles.legalRow}>
+            <Pressable onPress={() => setLegal('terms')} hitSlop={10}>
+              <Text style={styles.legalLink}>Terms of Use</Text>
+            </Pressable>
+            <Text style={styles.legalDot}>·</Text>
+            <Pressable onPress={() => setLegal('privacyPolicy')} hitSlop={10}>
+              <Text style={styles.legalLink}>Privacy Policy</Text>
+            </Pressable>
+          </View>
+
         </ScrollView>
       </SafeAreaView>
+
+      {/* The legal documents, read in place rather than thrown out to a
+          browser — leaving the app mid-purchase is how a purchase is lost.
+          Safe as a Modal because /premium is a plain route rather than a
+          modal presentation, which is the same arrangement Profile uses. */}
+      <SettingsSheet page={legal} onClose={() => setLegal(null)} />
     </View>
   );
 }
@@ -335,6 +538,40 @@ const styles = StyleSheet.create({
   compareColHead: { color: 'rgba(255,255,255,0.4)', fontSize: 11, letterSpacing: 0.5 },
   compareIconCell: { width: 58, alignItems: 'center' },
 
+  // Prices that could not be fetched — stated, never invented.
+  priceStatus: {
+    color: 'rgba(255,255,255,0.55)', fontSize: 14,
+    textAlign: 'center', lineHeight: 20, marginBottom: 4,
+  },
+  priceProblem: { alignItems: 'center', gap: 6 },
+  retryText: { color: AMBER, fontSize: 14, fontWeight: '700' },
+
+  planList: { gap: 10, marginBottom: 4 },
+  planRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14, paddingVertical: 14, paddingHorizontal: 14,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+  },
+  planRowOn: { borderColor: AMBER_LINE, backgroundColor: AMBER_SOFT },
+  planTick: {
+    width: 21, height: 21, borderRadius: 11,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.28)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  planTickOn: { backgroundColor: AMBER, borderColor: AMBER },
+  planText: { flex: 1, gap: 2 },
+  planName: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  planSub: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
+  saveChip: {
+    backgroundColor: AMBER, borderRadius: 7,
+    paddingHorizontal: 7, paddingVertical: 3,
+  },
+  // Dark ink on amber: white on this fill measures under 2:1, which is the
+  // exact fault the shuffle pill was rebuilt around on 01.09.
+  saveChipText: { color: '#2a1a00', fontSize: 9.5, fontWeight: '800', letterSpacing: 0.6 },
+  planPrice: { color: '#fff', fontSize: 16, fontWeight: '800' },
+
   priceRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 4 },
   price: { color: '#fff', fontSize: 34, fontWeight: '800' },
   pricePer: { color: 'rgba(255,255,255,0.5)', fontSize: 15, fontWeight: '600' },
@@ -350,6 +587,21 @@ const styles = StyleSheet.create({
   },
   unlockGradient: { paddingVertical: 17, alignItems: 'center', justifyContent: 'center' },
   unlockText: { color: '#2a1a00', fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },
+  unlockBtnOff: { opacity: 0.4 },
   laterBtn: { alignItems: 'center', paddingTop: 16 },
   laterText: { color: 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: '600' },
+
+  finePrint: {
+    color: 'rgba(255,255,255,0.34)', fontSize: 11, lineHeight: 16,
+    textAlign: 'center', marginTop: 22, paddingHorizontal: 4,
+  },
+  legalRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 10, marginTop: 14,
+  },
+  legalLink: {
+    color: 'rgba(255,255,255,0.55)', fontSize: 12.5, fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  legalDot: { color: 'rgba(255,255,255,0.3)', fontSize: 12.5 },
 });

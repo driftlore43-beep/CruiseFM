@@ -217,19 +217,10 @@ export type ShowcaseChrome = {
   height?: number;
   /** Mode chips: amber (the old look) or the app's white selected-pill. */
   chips?: 'amber' | 'white' | 'none';
-  /**
-   * The box's own surface. These are props rather than constants because the
-   * card used to hardcode an AMBER border, which survived into a look whose
-   * whole point was that the amber is gone — so the one screen that uses this
-   * component could not actually change its own appearance.
-   */
-  cardBg?: string;
-  cardBorder?: string;
 };
 
 export function PaywallShowcase({
   boxed = true, badge = true, height, chips = 'amber',
-  cardBg, cardBorder,
 }: ShowcaseChrome = {}) {
   const [t, setT] = useState(0);
 
@@ -258,16 +249,7 @@ export function PaywallShowcase({
   const scene = SCENES[active];
 
   return (
-    <View
-      style={
-        boxed
-          ? [
-              sc.card,
-              !!cardBg && { backgroundColor: cardBg },
-              !!cardBorder && { borderColor: cardBorder },
-            ]
-          : sc.bare
-      }>
+    <View style={boxed ? sc.card : sc.bare}>
       {badge && (
         <View style={sc.liveBadge}>
           <View style={sc.liveDot} />

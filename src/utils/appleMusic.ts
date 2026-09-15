@@ -65,9 +65,24 @@ type RawEntry = {
    * build without it (nothing shipped between builds is guaranteed to have
    * it) sends `undefined` here, not a wrong answer. See useAppleMusicPlayback
    * for why the caller must treat "missing" and "false"/"off" differently.
+   *
+   * NULL IS ALSO "MISSING" (15.09): the player reports `.default` when it is
+   * deferring to the listener's own preference, which is an unknown rather
+   * than an off, and the bridge now passes that through honestly as null.
    */
-  shuffleOn?: boolean;
-  repeatMode?: 'off' | 'context' | 'track';
+  shuffleOn?: boolean | null;
+  repeatMode?: 'off' | 'context' | 'track' | null;
+  /**
+   * The same two settings, raw and unmapped, straight off each of the two
+   * players that both claim to drive the Music app. DIAGNOSTIC ONLY —
+   * nothing in the app may read these to decide anything. They exist because
+   * three rounds have now guessed which surface is real, so the check in
+   * Settings prints what the phone actually says instead of a fourth theory.
+   */
+  mpRepeatRaw?: number;
+  mpShuffleRaw?: number;
+  mkRepeatRaw?: string;
+  mkShuffleRaw?: string;
 };
 
 /**
@@ -456,5 +471,61 @@ export async function diagnoseAppleMusic(playlistUri: string | null): Promise<st
       out.push(`Catalogue artwork: ${await probeAppleArtwork(entry.title, entry.artist)}`);
     }
   } catch { out.push('Now playing: no answer'); }
+  out.push(...await probeRepeat());
   return out;
+}
+
+/**
+ * DOES THE REPEAT COMMAND ACTUALLY REACH THE MUSIC APP?
+ *
+ * Three rounds have now answered that by reasoning about which of Apple's
+ * two player surfaces is the real one, and the owner has reported the same
+ * symptom after every one. So this stops theorising and MEASURES: read both
+ * players raw, send a real `setRepeat('context')`, read both again, then put
+ * the setting back where it was.
+ *
+ * IT MUST ISSUE THE COMMAND, not merely read — a probe that does not do the
+ * same work as the code proves nothing about the code (03.08, the Spotify
+ * playlist round, where four probes passed against an endpoint the app was
+ * drowning in). A surface whose raw value MOVES is the one that obeys; one
+ * that sits still is being written to for nothing. That is the fact the next
+ * fix needs, and no amount of reading the Swift can supply it.
+ *
+ * Raw and unabbreviated on purpose: "repeat on" is exactly the kind of
+ * summary that hid an unloadable artwork url for a whole round (04.08).
+ */
+async function probeRepeat(): Promise<string[]> {
+  if (!bridge) return [];
+  const read = async () => {
+    const e = await safe(() => bridge!.currentEntry(), null);
+    if (!e) return null;
+    return {
+      mp: e.mpRepeatRaw, mk: e.mkRepeatRaw,
+      mode: e.repeatMode === undefined ? 'missing' : String(e.repeatMode),
+    };
+  };
+  const before = await read();
+  if (!before) return ['Repeat: nothing playing, so nothing to test'];
+  if (before.mp === undefined && before.mk === undefined) {
+    return ['Repeat: this build does not report it'];
+  }
+  // A number Apple's own docs give meaning to, so the screenshot is readable
+  // without a table: 0 default (i.e. UNKNOWN), 1 none, 2 one, 3 all.
+  const show = (r: NonNullable<Awaited<ReturnType<typeof read>>>) =>
+    `MediaPlayer ${r.mp ?? '?'} · MusicKit ${r.mk ?? '?'} · app sees "${r.mode}"`;
+  const lines = [`Repeat before: ${show(before)}`];
+  await safe(() => bridge!.setRepeat('context'), undefined);
+  await new Promise((r) => setTimeout(r, 900));
+  const after = await read();
+  lines.push(after ? `Repeat after asking for all: ${show(after)}` : 'Repeat after: no answer');
+  if (after) {
+    lines.push(`Which surface moved: ${
+      [after.mp !== before.mp && 'MediaPlayer', after.mk !== before.mk && 'MusicKit']
+        .filter(Boolean).join(' + ') || 'NEITHER — the command is not landing'}`);
+  }
+  // Put it back, so running the check does not quietly change what the
+  // listener had set.
+  await safe(() => bridge!.setRepeat(
+    before.mode === 'track' || before.mode === 'context' ? before.mode : 'off'), undefined);
+  return lines;
 }

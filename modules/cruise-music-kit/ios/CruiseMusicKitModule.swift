@@ -89,21 +89,57 @@ public class CruiseMusicKitModule: Module {
         artist = entry.subtitle ?? ""
       }
 
-      // THE TRUTH ABOUT SHUFFLE AND REPEAT, READ BACK FROM THE SAME OLD
-      // BRIDGE `setShuffle`/`setRepeat` NOW WRITE THROUGH (26.08). Before
-      // this the JS side had NOTHING to poll against, so the button's
-      // highlight was purely the local optimistic guess made at the moment
-      // it was pressed — it could never notice a command that silently
-      // failed to take, which is indistinguishable from "the button lit up
-      // but nothing repeated". Spotify's own toggles have carried this same
-      // read-and-reconcile shape since 18.08; Apple's simply never had
-      // anything to reconcile against.
+      // THE TRUTH ABOUT SHUFFLE AND REPEAT — AND `.default` IS NOT `off`
+      // (owner, three rounds now: "the repeat button still doesn't work").
+      //
+      // `MPMusicRepeatMode` has FOUR cases, and `.default` means "whatever
+      // the listener's own preference is" — i.e. THIS PLAYER DOES NOT KNOW.
+      // The old `default:` arm swept it in with `.none` and answered "off",
+      // so an unknown was reported as a settled fact: the poll then wrote
+      // that over the button a second after it was pressed, which looks
+      // exactly like a command that never took. A player that cannot say
+      // must say nothing — the JS side already treats a missing answer as
+      // "leave the listener's own choice alone" (26.08) and a present one
+      // as gospel.
+      //
+      // BOTH SURFACES ARE ALSO REPORTED RAW, and that is the point of this
+      // round rather than a fourth theory: two builds have now guessed which
+      // of MusicKit's `state` and MediaPlayer's `systemMusicPlayer` actually
+      // drives the Music app, and neither guess moved the symptom. There is
+      // no Swift compiler here and no device, so the only honest next step is
+      // an instrument — `String(describing:)` cannot be wrong about what it
+      // read, and one screenshot of the check in Settings settles it. Same
+      // rule as the artwork url on 04.08: an instrument may never summarise
+      // the one detail under investigation.
       let sys = MPMusicPlayerController.systemMusicPlayer
-      let repeatString: String
-      switch sys.repeatMode {
-      case .one: repeatString = "track"
-      case .all: repeatString = "context"
-      default:   repeatString = "off"
+      let st = player.state
+
+      // MusicKit is asked FIRST, being the surface that owns the queue this
+      // app actually queued; MediaPlayer answers only where it has no view.
+      // Compared with `==` rather than matched in a `switch` so these lines
+      // hold whether or not the property is optional — which cannot be
+      // checked from here (04.09's rule: with no compiler, prefer the
+      // version with fewer ways to be wrong).
+      var repeatString: String? = nil
+      if st.repeatMode == MusicPlayer.RepeatMode.one {
+        repeatString = "track"
+      } else if st.repeatMode == MusicPlayer.RepeatMode.all {
+        repeatString = "context"
+      } else if st.repeatMode == MusicPlayer.RepeatMode.none {
+        repeatString = "off"
+      } else if sys.repeatMode == .one {
+        repeatString = "track"
+      } else if sys.repeatMode == .all {
+        repeatString = "context"
+      } else if sys.repeatMode == .none {
+        repeatString = "off"
+      }
+
+      var shuffleOn: Bool? = nil
+      if sys.shuffleMode == .songs || sys.shuffleMode == .albums {
+        shuffleOn = true
+      } else if sys.shuffleMode == .off {
+        shuffleOn = false
       }
 
       return [
@@ -116,13 +152,20 @@ public class CruiseMusicKitModule: Module {
         "artworkUrl": Self.artworkURL(for: entry),
         "durationMs": durationMs,
         "positionMs": player.playbackTime * 1000,
-        "isPlaying": player.state.playbackStatus == .playing,
+        "isPlaying": st.playbackStatus == .playing,
         // MusicKit exposes no name for the queue's source, so the pill falls
         // back to the station's own linked playlist name — which is what the
         // user chose anyway.
         "contextName": nil,
-        "shuffleOn": sys.shuffleMode == .songs || sys.shuffleMode == .albums,
+        // `nil` here means NOBODY COULD SAY, not "off" — see above.
+        "shuffleOn": shuffleOn,
         "repeatMode": repeatString,
+        // Raw and unmapped, from both players. Diagnostic only: nothing in
+        // the app reads these, and they cost two ints and two strings a poll.
+        "mpRepeatRaw": sys.repeatMode.rawValue,
+        "mpShuffleRaw": sys.shuffleMode.rawValue,
+        "mkRepeatRaw": String(describing: st.repeatMode),
+        "mkShuffleRaw": String(describing: st.shuffleMode),
       ]
     }
 
@@ -172,9 +215,19 @@ public class CruiseMusicKitModule: Module {
      * and Siri use to drive the Music app directly. Routed through there
      * instead, since it is the proven path to the same player rather than a
      * second, newer one reaching for the same target.
+     *
+     * AND NOW BOTH, because that guess did not move the symptom either
+     * (owner, 15.09: "the repeat button still doesn't work"). The two name
+     * the same Music app, so writing to each costs one assignment and cannot
+     * conflict: whichever surface the system actually honours, the command
+     * reaches it. That is deliberately belt and braces rather than a third
+     * theory about which one is real — `currentEntry` above now reports both
+     * raw, so the NEXT round has an answer instead of a guess.
      */
     AsyncFunction("setShuffle") { (on: Bool) in
       MPMusicPlayerController.systemMusicPlayer.shuffleMode = on ? .songs : .off
+      guard #available(iOS 16.0, *) else { return }
+      CruisePlayer.shared.state.shuffleMode = on ? .songs : .off
     }
 
     AsyncFunction("setRepeat") { (mode: String) in
@@ -183,6 +236,12 @@ public class CruiseMusicKitModule: Module {
       case "track":   player.repeatMode = .one
       case "context": player.repeatMode = .all
       default:        player.repeatMode = .none
+      }
+      guard #available(iOS 16.0, *) else { return }
+      switch mode {
+      case "track":   CruisePlayer.shared.state.repeatMode = .one
+      case "context": CruisePlayer.shared.state.repeatMode = .all
+      default:        CruisePlayer.shared.state.repeatMode = MusicPlayer.RepeatMode.none
       }
     }
 

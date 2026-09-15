@@ -215,6 +215,49 @@ console.log('\n  and a command that NEVER takes eventually gives up the lie:');
     out.shuffleOn === false, String(out.shuffleOn));
 }
 
+console.log("\n  a player that says \"I don't know\" must not be read as \"off\":");
+{
+  // THE 15.09 BUG, and it is the whole reason repeat looked broken for three
+  // rounds. `MPMusicRepeatMode.default` means "the listener's own
+  // preference" — an UNKNOWN — and the bridge used to flatten it into "off".
+  // The poll then wrote that over the button about a second after it was
+  // pressed, which from the outside is exactly a command that never took.
+  // The bridge now sends null there, and null must be as inert as a missing
+  // field. Proven to FAIL against the old `!== undefined` guard first.
+  const { call, state } = load({
+    guardMs: 1,     // deliberately EXPIRED, so nothing but the null itself
+                    // can be holding the button up.
+    entry: { title: 'S', artist: 'A', artworkUrl: null, durationMs: 1, positionMs: 0,
+      isPlaying: true, shuffleOn: false, repeatMode: 'off' },
+  });
+  let out = call();
+  await sleep(20); out = call();
+
+  out.repeat('context');
+  out = call();
+  check('optimistic: repeat the playlist', out.repeatMode === 'context');
+  // The player now declines to answer, which is what `.default` means.
+  state.entry = { ...state.entry, repeatMode: null, shuffleOn: null };
+  await sleep(20); out = call();
+  check("a null repeat leaves the listener's own choice alone",
+    out.repeatMode === 'context', String(out.repeatMode));
+  await sleep(20); out = call();
+  check('...and keeps leaving it alone', out.repeatMode === 'context', String(out.repeatMode));
+
+  out.shuffle(true);
+  out = call();
+  await sleep(20); out = call();
+  check('the same for a null shuffle', out.shuffleOn === true, String(out.shuffleOn));
+
+  // THE CONTROL that stops this passing vacuously: a REAL answer must still
+  // win once the guard is gone. Without it, a test that simply ignored every
+  // reading would score full marks here.
+  state.entry = { ...state.entry, repeatMode: 'off' };
+  await sleep(20); out = call();
+  check('but a real "off" still wins — the poll is not being ignored',
+    out.repeatMode === 'off', String(out.repeatMode));
+}
+
 console.log(fails ? `\n  ${fails} failure(s)\n`
   : "\n  the toggle believes the player, not just its own last press\n");
 process.exit(fails ? 1 : 0);

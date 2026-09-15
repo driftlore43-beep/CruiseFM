@@ -272,10 +272,17 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
         // optimistic guess exactly alone, not snap it back to 'off'/false.
         // Held against a stale reading the same way Spotify's is: a chase
         // poll landing 220ms after a press still carries the OLD setting.
-        if (entry.shuffleOn !== undefined && settled(pendingShuffleRef, entry.shuffleOn)) {
+        //
+        // `!= null` CATCHES BOTH MISSING AND NULL, and the difference is not
+        // cosmetic (15.09): the bridge now sends null when the system player
+        // answers `.default`, i.e. "the listener's own preference" — an
+        // unknown, not an "off". Reading that as a settled answer is what
+        // wrote over the button a second after it was pressed, which is
+        // indistinguishable from a repeat command that never took.
+        if (entry.shuffleOn != null && settled(pendingShuffleRef, entry.shuffleOn)) {
           setShuffleOn(entry.shuffleOn);
         }
-        if (entry.repeatMode !== undefined && settled(pendingRepeatRef, entry.repeatMode)) {
+        if (entry.repeatMode != null && settled(pendingRepeatRef, entry.repeatMode)) {
           setRepeatMode(entry.repeatMode);
         }
         // A missing cover is re-chased every ~20s, not claimed once forever:

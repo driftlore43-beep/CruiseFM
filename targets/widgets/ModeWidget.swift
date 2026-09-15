@@ -180,11 +180,39 @@ struct ModeView: View {
       let s = entry.station!
       GeometryReader { geo in
         let k = min(geo.size.width, geo.size.height) / 158
-        switch entry.style {
-        case .mirrorBall: ball(s, k: k)
-        case .cd:         disc(s, k: k)
-        case .record:     record(s, k: k)
+        // THE EXPLICIT FRAME IS LOAD-BEARING, AND ITS ABSENCE IS WHAT DROPPED
+        // THE BALL AND THE DISC DOWN THEIR TILES (owner, 15.09: "the small
+        // widgets for Mirror ball and CD have shifted its position").
+        //
+        // A GeometryReader aligns its content to `.topLeading`, NOT centre —
+        // and two of these three heroes contain a child that INSISTS on being
+        // bigger than the tile: the ball's BeamField is 190k tall (the beams
+        // radiate past the ball, deliberately) and the CD's glow carries an
+        // explicit 192k square. A ZStack takes the union of its children, so
+        // those ZStacks are ~190k and ~192k rather than the tile's size, and
+        // pinned to the top-leading corner the whole overflow hangs off the
+        // bottom and the right — which moves the object's centre down by half
+        // of it. MEASURED off her screenshots at 12-15% of the tile low, with
+        // the arithmetic predicting 12.7%.
+        //
+        // IT IS A REGRESSION FROM 14.09's `k`, which is what introduced the
+        // GeometryReader; before that the same oversized ZStack was centred
+        // by the ordinary layout, so the overflow was split evenly above and
+        // below and nothing moved. THE CONTROL IS THE RECORD: its background
+        // gradient carries no frame, so it is greedy, cannot overflow, and is
+        // the one look of the three she did not report.
+        //
+        // Framing to `geo.size` restores the centring without shrinking any
+        // of it — the beams are meant to run past the ball, and the widget's
+        // own rounded rect does the clipping, as it always has.
+        Group {
+          switch entry.style {
+          case .mirrorBall: ball(s, k: k)
+          case .cd:         disc(s, k: k)
+          case .record:     record(s, k: k)
+          }
         }
+        .frame(width: geo.size.width, height: geo.size.height)
       }
     }
   }

@@ -197,6 +197,18 @@ for (const [f, s2] of Object.entries(src)) {
   check('ModeView measures the tile', /GeometryReader \{ geo in/.test(mode) &&
     /min\(geo\.size\.width, geo\.size\.height\) \/ 158/.test(mode),
     'the 158 reference is what k is a share of');
+
+  // ...AND THE MEASUREMENT MUST NOT COST THE CENTRING. A GeometryReader
+  // aligns its content to `.topLeading`, not centre, and two of these three
+  // heroes hold a child that insists on being bigger than the tile (the
+  // ball's 190k beams, the CD's 192k glow). Pinned top-leading, that whole
+  // overflow hangs off the bottom and the right and drags the object with
+  // it — measured at 12-15% of the tile low off the owner's own screenshots
+  // on 15.09, against 12.7% predicted. Framing the content to `geo.size`
+  // puts it back; without it, adding `k` silently moved two widgets.
+  check('ModeView centres its hero in the tile it measured',
+    /\}\s*\n\s*\.frame\(width: geo\.size\.width, height: geo\.size\.height\)/.test(mode),
+    'GeometryReader aligns top-leading — the hero needs an explicit frame');
 }
 
 // ── every AppEnum look has a display representation for each case ─────────

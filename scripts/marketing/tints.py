@@ -1,9 +1,11 @@
 """Sample each screenshot's own lit colour, so the slide's surround belongs to
 the picture instead of being one brand slab repeated ten times."""
 from PIL import Image
-import colorsys, glob, os, json
+import colorsys, glob, os, json, sys
 
-SHOTS = 'screenshots-appstore'
+# The folder is an argument so the iPad set (screenshots-appstore-ipad) is
+# sampled the same way — its tints are its own, never copied from the phone's.
+SHOTS = sys.argv[1] if len(sys.argv) > 1 else 'screenshots-appstore'
 out = {}
 # The .png entries are the rendered share cards rather than device screenshots,
 # and the rule is the same: the surround is sampled from whatever the slide

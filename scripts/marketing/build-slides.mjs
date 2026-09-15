@@ -2,9 +2,15 @@
  * App Store marketing slides — a headline over each raw screenshot, at Apple's
  * 6.5" size (1284x2778).
  *
- *   node scripts/marketing/build-slides.mjs
+ *   node scripts/marketing/build-slides.mjs              # iPhone, 1284x2778
+ *   DEVICE=ipad node scripts/marketing/build-slides.mjs  # iPad 13", 2064x2752
  *
- * Reads screenshots-appstore/*.jpg, writes screenshots-marketing/*.png.
+ * Reads screenshots-appstore/*.jpg, writes screenshots-marketing/*.png; the
+ * iPad run reads screenshots-appstore-ipad/ and writes screenshots-marketing-ipad/.
+ * SAME HEADLINES ON BOTH — the listing's words are one set per version in
+ * App Store Connect, so the two sets must read as one thing; only the pictures
+ * and the frame around them change. The iPad set has no photo-framing slide
+ * and no share-cards slide: neither was shot at iPad size, and eight is plenty.
  * Slide 1 is full-bleed (style B); the rest float the phone on a glow (style
  * A); the share cards stand alone (style CARDS). Tints come from tints.py —
  * never hand-picked, so the surround always belongs to the picture it frames.
@@ -18,15 +24,50 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const SHOTS = `${ROOT}/screenshots-appstore`;
-const OUT = `${ROOT}/screenshots-marketing`;
+const IPAD = process.env.DEVICE === 'ipad';
+const SHOTS = `${ROOT}/screenshots-appstore${IPAD ? '-ipad' : ''}`;
+const OUT = `${ROOT}/screenshots-marketing${IPAD ? '-ipad' : ''}`;
+
+// Every number the two layouts differ on, in one place. The phone column is
+// the set that shipped on 08.09 and is byte-for-byte what it was; the iPad
+// column is a 3:4 canvas with a 3:4 screen inside it, so the device frame is
+// wider, squarer and thinner-bezelled — an iPad, not a stretched phone.
+const G = IPAD ? {
+  W: 2064, H: 2752, headTop: 150, pad: 120, h1: 150, h1Small: 136, h1B: 152,
+  devW: 1440, devTop: 96, devRadius: 56, devPad: 22, imgRadius: 34,
+  // The headline's foot sits at ~470px = 17% of the canvas, so the scrim
+  // stays fully opaque to 18% and fades out by 44% — the same rule as the
+  // phone's: opaque past the type, or the app's own header ghosts through it.
+  scrim: [18, 22, 32, 44],
+} : {
+  W: 1284, H: 2778, headTop: 168, pad: 92, h1: 98, h1Small: 88, h1B: 100,
+  devW: 906, devTop: 120, devRadius: 78, devPad: 14, imgRadius: 64,
+  scrim: [15.5, 20, 30, 42],
+};
 fs.mkdirSync(OUT, { recursive: true });
 const b64 = f => 'data:image/jpeg;base64,' + fs.readFileSync(`${SHOTS}/${f}.jpg`).toString('base64');
 const png = f => 'data:image/png;base64,' + fs.readFileSync(`${SHOTS}/${f}.png`).toString('base64');
 
 // Tints are sampled from each screenshot by tints.py — never hand-picked, so
 // the surround always belongs to the picture it frames.
-const SLIDES = [
+// The iPad set carries the SAME headlines as the phone set, in the same order
+// minus the two slides that only exist at phone size. Tints re-sampled from
+// the iPad shots themselves (tints.py screenshots-appstore-ipad) — two differ
+// from the phone's, honestly: the iPad Stations shot shows the mountain hero
+// (teal) where the phone's was scrolled to the amber dial, and the iPad CD
+// shot carries more of Coastal's green photograph.
+const IPAD_SLIDES = [
+  { f: '01-mirrorball-downtown',    t: '#443366', s: 'B', a: 'Your music,',       b: 'wrapped in a drive' },
+  { f: '03-stations-dial',          t: '#365663', s: 'A', a: 'Ten moods.',        b: 'Not ten genres.' },
+  { f: '02-vinyl-sunset',           t: '#643539', s: 'A', a: 'Your Apple Music',  b: 'or Spotify playlists' },
+  { f: '05-cassette-daylight',      t: '#635436', s: 'A', a: 'Eight ways to',     b: 'watch your music' },
+  { f: '06-cd-coastal',             t: '#566336', s: 'A', a: 'Every disc',        b: 'catches the light' },
+  { f: '07-tuner-nightrun',         t: '#226977', s: 'A', a: 'Tune the dial.',    b: 'Find the feeling.' },
+  { f: '04-horizon-afterhours',     t: '#772227', s: 'A', a: 'Drive into',        b: 'the sunset' },
+  { f: '09-equalizer-mountainpass', t: '#365463', s: 'A', a: 'The meter from',    b: 'an old hi-fi' },
+];
+
+const PHONE_SLIDES = [
   { f: '01-mirrorball-downtown',  t: '#453663', s: 'B', a: 'Your music,',            b: 'wrapped in a drive' },
   // Amber, not the old teal: the re-shot page is the dial itself, and amber is
   // the dial's own colour (tints.py re-sampled it after the reshoot).
@@ -63,9 +104,10 @@ const SLIDES = [
   { f: '10-sharecards',           t: '#223f77', s: 'CARDS', a: 'Share the drive,',   b: 'not just the song',
     front: 'card-y2k', behind: 'card-ticket' },
 ];
+const SLIDES = IPAD ? IPAD_SLIDES : PHONE_SLIDES;
 
 const base = `*{margin:0;padding:0;box-sizing:border-box}
-  html,body{width:1284px;height:2778px;overflow:hidden;background:#07070c}
+  html,body{width:${G.W}px;height:${G.H}px;overflow:hidden;background:#07070c}
   body{font-family:"Liberation Sans","DejaVu Sans",sans-serif;-webkit-font-smoothing:antialiased}
   h1{color:#fff;font-weight:700;letter-spacing:-3px;line-height:1.04}
   h1 span{display:block;font-weight:400;color:#ffffffc4}`;
@@ -74,12 +116,12 @@ const base = `*{margin:0;padding:0;box-sizing:border-box}
 const A = s => `<style>${base}
     body{background:radial-gradient(122% 60% at 50% 4%, ${s.t}e0 0%, ${s.t}55 36%, #07070c 76%),#07070c;
          display:flex;flex-direction:column;align-items:center}
-    .head{margin-top:168px;text-align:center;padding:0 92px}
-    h1{font-size:${s.a.length > 15 || s.b.length > 18 ? 88 : 98}px}
-    .phone{margin-top:120px;width:906px;border-radius:78px;padding:14px;
+    .head{margin-top:${G.headTop}px;text-align:center;padding:0 ${G.pad}px}
+    h1{font-size:${s.a.length > 15 || s.b.length > 18 ? G.h1Small : G.h1}px}
+    .phone{margin-top:${G.devTop}px;width:${G.devW}px;border-radius:${G.devRadius}px;padding:${G.devPad}px;
       background:linear-gradient(160deg,#2b2b36,#0b0b11 40%,#1b1b24);
       box-shadow:0 60px 130px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.09)}
-    .phone img{display:block;width:100%;border-radius:64px}
+    .phone img{display:block;width:100%;border-radius:${G.imgRadius}px}
   </style>
   <div class="head"><h1>${s.a}<span>${s.b}</span></h1></div>
   <div class="phone"><img src="${b64(s.f)}"></div>`;
@@ -90,9 +132,9 @@ const B = s => `<style>${base}
     .bleed{position:absolute;inset:0}
     .bleed img{width:100%;height:100%;object-fit:cover}
     .scrim{position:absolute;inset:0;background:linear-gradient(180deg,
-      #04040a 0%, #04040a 15.5%, rgba(4,4,9,.86) 20%, rgba(4,4,9,.34) 30%, rgba(4,4,9,0) 42%)}
-    .head{position:absolute;top:168px;left:0;right:0;text-align:center;padding:0 90px}
-    h1{font-size:100px}
+      #04040a 0%, #04040a ${G.scrim[0]}%, rgba(4,4,9,.86) ${G.scrim[1]}%, rgba(4,4,9,.34) ${G.scrim[2]}%, rgba(4,4,9,0) ${G.scrim[3]}%)}
+    .head{position:absolute;top:${G.headTop}px;left:0;right:0;text-align:center;padding:0 ${G.pad - 2}px}
+    h1{font-size:${G.h1B}px}
   </style>
   <div class="bleed"><img src="${b64(s.f)}"></div><div class="scrim"></div>
   <div class="head"><h1>${s.a}<span>${s.b}</span></h1></div>`;
@@ -134,7 +176,7 @@ const CARDS = s => `<style>${base}
 const br = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium',
 });
-const p = await (await br.newContext({ viewport: { width: 1284, height: 2778 } })).newPage();
+const p = await (await br.newContext({ viewport: { width: G.W, height: G.H } })).newPage();
 let i = 0;
 for (const s of SLIDES) {
   i++;

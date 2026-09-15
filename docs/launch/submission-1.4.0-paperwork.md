@@ -276,6 +276,33 @@ own Contact Us, or developer.apple.com/contact, under Agreements, Tax and
 Banking. A week with no word is past the point where waiting is telling you
 anything.
 
+The inbox WAS clear (owner, 15.09), so this is the message. Keep it short —
+support triages on specifics, and a long explanation buries them. Fill in the
+two brackets; the second matters most, because naming Apple's internal process
+wrongly gets a reply about the wrong thing.
+
+> **Subject:** Agreements, Tax and Banking — verification outstanding since [date]
+>
+> Apple Developer account: cruisefmservice@gmail.com
+> Team: Jessica Arroyo (individual)
+> App: Cruise FM — Apple ID 6793233679
+>
+> I submitted [exact label shown on the page, e.g. "trader status" /
+> "business verification"] on [date]. It has shown as in review since then,
+> and I have received no request for further information at the account's
+> email address.
+>
+> Could you tell me whether anything is outstanding from my side — and if any
+> documents are needed, which ones — or whether this is simply still queued?
+>
+> The app itself is free with no in-app purchases, so nothing about its review
+> depends on this. I would just like to know which of the two it is.
+
+**THE LAST TWO LINES ARE THE WHOLE POINT OF THE MESSAGE.** Asked openly, the
+likeliest reply is "it is in review", which is what the screen already says.
+Asked as a choice between *waiting on you* and *waiting on us*, they have to
+pick one, and only one of those answers is something to act on.
+
 A registered business entity is worth weighing before step 1: payments,
 business banking and any future trader status all point the same way, and it
 is also the only route to getting the App Store's Developer line to read

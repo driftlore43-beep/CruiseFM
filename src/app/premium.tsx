@@ -1,9 +1,11 @@
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 
 import { PaywallShowcase } from '@/components/PaywallShowcase';
@@ -14,9 +16,133 @@ import { Cruise } from '@/constants/theme';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { getPlans, purchasePremium, restorePremium, type Plan } from '@/utils/purchases';
 
+/**
+ * The photograph behind the full-bleed hero.
+ *
+ * WITHOUT ONE THAT LOOK DOES NOT WORK, and the render proved it: the showcase
+ * is DRAWN shapes on nothing, so running it to the screen's edges just gives a
+ * big black rectangle with a small tuner in it. Every real deck in this app is
+ * a blurred station photograph with the object standing on it — that backdrop
+ * IS the look being borrowed, so the hero has to borrow it too.
+ *
+ * Deliberately one of the PREMIUM stations (After Hours FM), since this screen
+ * exists to sell them, and deliberately the pre-blurred copy: re-blurring a
+ * full-size image on the main thread is what got the app killed once already.
+ */
+const HERO_PHOTO = require('../../assets/stations/blur/after-midnight.jpg');
+
 const AMBER      = '#F59E0B';
 const AMBER_SOFT = 'rgba(245,158,11,0.14)';
 const AMBER_LINE = 'rgba(245,158,11,0.35)';
+
+// ── HOW THIS SCREEN LOOKS ────────────────────────────────────────────────────
+//
+// The paywall was the last screen in the app still wearing the pre-July
+// treatment: a coloured GROUND with brand-coloured slabs on it and a gradient
+// button. Every other screen was talked out of that one at a time — the
+// platform picker on 03.08, the settings pages on 30.07, the "Are you
+// driving?" card on 06.08 — and each time the answer was the same shape:
+// neutral dark material, the brand colour kept for marks and lighting, and a
+// SOLID pill in the opposite of the page for the one button that matters.
+//
+// These are three answers to how far to take that here. Only the chosen one
+// should survive; delete the other two rather than leaving a switch behind.
+
+type LookId = 'glass' | 'hero' | 'lit';
+
+type Look = {
+  /** The page itself. */
+  ground: readonly [string, string, string];
+  /** Background light: a flat disc, a real radial bloom, or nothing. */
+  bloom: 'disc' | 'soft' | 'none';
+  /** Full-bleed showcase with the title laid over it. */
+  hero: boolean;
+  /** Feature list: five bordered cards, or one hairline-divided list. */
+  features: 'cards' | 'rows';
+  cardBg: string;
+  cardBorder: string;
+  iconBg: string;
+  iconBorder: string;
+  /** The app's primary button is a solid pill in the opposite of the page. */
+  whiteCta: boolean;
+};
+
+const GLASS_BG = 'rgba(255,255,255,0.04)';
+const GLASS_LINE = 'rgba(255,255,255,0.12)';
+
+const LOOKS: Record<LookId, Look> = {
+  // A — the app's own clothes. Neutral near-black, hairline glass, amber kept
+  // for the premium marks and nothing else.
+  glass: {
+    ground: ['#0a0a10', '#0a0a10', '#07070c'],
+    bloom: 'none',
+    hero: false,
+    features: 'cards',
+    cardBg: GLASS_BG,
+    cardBorder: GLASS_LINE,
+    iconBg: 'rgba(255,255,255,0.06)',
+    iconBorder: GLASS_LINE,
+    whiteCta: true,
+  },
+  // B — the modes ARE the pitch. The showcase runs to the screen's edges with
+  // the title on it, exactly the way a real deck is built, and everything
+  // below compresses to a list so the picture is what the page is.
+  hero: {
+    ground: ['#0a0a10', '#0a0a10', '#07070c'],
+    bloom: 'none',
+    hero: true,
+    features: 'rows',
+    cardBg: 'transparent',
+    cardBorder: 'transparent',
+    iconBg: 'rgba(255,255,255,0.06)',
+    iconBorder: GLASS_LINE,
+    whiteCta: true,
+  },
+  // C — keeps the warmth, but as LIGHT rather than paint. The material goes
+  // neutral and a real amber bloom sits behind the stage — the mirror ball's
+  // own rule, and the fix for the muddy brown the flat disc was making.
+  lit: {
+    ground: ['#0d0b08', '#0a0a0d', '#08080b'],
+    bloom: 'soft',
+    hero: false,
+    features: 'cards',
+    cardBg: 'rgba(255,255,255,0.045)',
+    cardBorder: 'rgba(255,255,255,0.10)',
+    iconBg: AMBER_SOFT,
+    iconBorder: AMBER_LINE,
+    whiteCta: true,
+  },
+};
+
+// TEMP_LOOK_PREVIEW — how the three are rendered side by side. Goes when one
+// is chosen.
+const LOOK_ID: LookId = ((globalThis as any).__paywallLook as LookId) ?? 'lit';
+const look = LOOKS[LOOK_ID];
+
+/**
+ * A real amber bloom — a radial falloff rather than a circle with a radius.
+ *
+ * The old one was a 340pt View with borderRadius 170 at 10% amber, which is a
+ * flat DISC: its edge is plainly visible behind the stage and it reads as a
+ * brown stain rather than light. Every other light layer in this app was
+ * talked out of exactly that shape (the mirror ball's rim, the vinyl's
+ * wedges, the CD's fan) for the same reason: a hard edge on a light reads as
+ * a sticker.
+ */
+function Bloom() {
+  return (
+    <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Defs>
+        <RadialGradient id="pwBloom" cx="50%" cy="20%" rx="78%" ry="42%">
+          <Stop offset="0" stopColor={AMBER} stopOpacity={0.20} />
+          <Stop offset="0.45" stopColor={AMBER} stopOpacity={0.07} />
+          <Stop offset="1" stopColor={AMBER} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill="url(#pwBloom)" />
+    </Svg>
+  );
+}
 
 // Everything on this page is DERIVED, never typed out. The last version was
 // written by hand and went stale the moment the line-up changed: it was still
@@ -265,13 +391,13 @@ export default function PremiumScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Warm amber ambience */}
       <LinearGradient
-        colors={['#1c1206', '#120b04', '#0a0602']}
+        colors={look.ground}
         start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <View style={styles.glowOrb} pointerEvents="none" />
+      {look.bloom === 'soft' && <Bloom />}
+      {look.bloom === 'disc' && <View style={styles.glowOrb} pointerEvents="none" />}
 
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <Pressable style={[styles.closeBtn, { top: insets.top + 8 }]} onPress={() => router.back()} hitSlop={12}>
@@ -282,21 +408,69 @@ export default function PremiumScreen() {
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
           showsVerticalScrollIndicator={false}>
 
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Cruise FM Premium</Text>
-            <Text style={styles.subtitle}>Unlock the full driving atmosphere.</Text>
-          </View>
-
-          {/* The premium modes, moving — sell the vibe before the words. */}
-          <PaywallShowcase />
+          {/* THE MODES ARE THE PITCH. Boxed, the showcase reads as a widget
+              demonstrating the app; full-bleed with the title on it, it reads
+              as the app — which is how every real deck in this app is built,
+              and the modes are the thing nobody else has. */}
+          {look.hero ? (
+            <View style={styles.heroWrap}>
+              <Image
+                source={HERO_PHOTO}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                transition={0}
+              />
+              {/* The drawn modes have to read ON the photograph, so it sits
+                  back the same way a deck's own scrim holds its backdrop
+                  down under white type. */}
+              <View style={styles.heroVeil} pointerEvents="none" />
+              <PaywallShowcase boxed={false} badge={false} height={302} chips="none" />
+              <LinearGradient
+                colors={['transparent', 'rgba(10,10,16,0.62)', look.ground[0]]}
+                locations={[0, 0.55, 1]}
+                style={styles.heroScrim}
+                pointerEvents="none"
+              />
+              <View style={styles.heroText}>
+                <Text style={styles.title}>Cruise FM Premium</Text>
+                <Text style={styles.subtitle}>Unlock the full atmosphere.</Text>
+              </View>
+            </View>
+          ) : (
+            <>
+              <View style={styles.header}>
+                <Text style={styles.title}>Cruise FM Premium</Text>
+                <Text style={styles.subtitle}>Unlock the full atmosphere.</Text>
+              </View>
+              <PaywallShowcase
+                badge={false}
+                chips={look.whiteCta ? 'white' : 'amber'}
+                cardBg={look.cardBg}
+                cardBorder={look.cardBorder}
+              />
+            </>
+          )}
 
           {/* Feature cards */}
-          <View style={styles.featureList}>
-            {FEATURES.map((f) => (
-              <View key={f.title} style={styles.featureCard}>
-                <View style={styles.featureIconWrap}>
-                  <MaterialCommunityIcons name={f.icon} size={22} color="#fff" />
+          <View style={look.features === 'rows' ? styles.featureRows : styles.featureList}>
+            {FEATURES.map((f, i) => (
+              <View
+                key={f.title}
+                style={
+                  look.features === 'rows'
+                    ? [styles.featureRow, i > 0 && styles.featureRowBorder]
+                    : [styles.featureCard, { backgroundColor: look.cardBg, borderColor: look.cardBorder }]
+                }>
+                <View style={[
+                  styles.featureIconWrap,
+                  { backgroundColor: look.iconBg, borderColor: look.iconBorder },
+                  look.features === 'rows' && styles.featureIconSmall,
+                ]}>
+                  <MaterialCommunityIcons
+                    name={f.icon}
+                    size={look.features === 'rows' ? 19 : 22}
+                    color="#fff"
+                  />
                 </View>
                 <View style={styles.featureText}>
                   <Text style={styles.featureTitle}>{f.title}</Text>
@@ -402,8 +576,13 @@ export default function PremiumScreen() {
             ]}
             onPress={handleUnlock}
             disabled={busy || !selected}>
+            {/* A SOLID PILL IN THE OPPOSITE OF THE PAGE is this app's primary
+                button everywhere else — the home hero, the create sheet, the
+                platform picker, the "Are you driving?" card. A gradient here
+                was the last survivor of the treatment they were all moved
+                off. */}
             <LinearGradient
-              colors={['#F7B733', '#F59E0B']}
+              colors={look.whiteCta ? ['#ffffff', '#f2f0ea'] : ['#F7B733', '#F59E0B']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.unlockGradient}>
               <Text style={styles.unlockText}>
@@ -488,6 +667,16 @@ const styles = StyleSheet.create({
   },
   content: { paddingHorizontal: 22, paddingTop: 48 },
 
+  // Full-bleed hero: escapes the scroll content's own gutter and top pad so
+  // the picture runs to the screen's edges, the way a real deck does.
+  heroWrap: { marginHorizontal: -22, marginTop: -48, marginBottom: 26, overflow: 'hidden' },
+  heroVeil: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(6,6,12,0.52)' },
+  heroScrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '76%' },
+  heroText: {
+    position: 'absolute', left: 22, right: 22, bottom: 20,
+    alignItems: 'center',
+  },
+
   header: { alignItems: 'center', marginBottom: 22 },
   title: {
     color: '#fff', fontSize: 27, fontWeight: '700',
@@ -499,6 +688,12 @@ const styles = StyleSheet.create({
   },
 
   featureList: { gap: 12, marginBottom: 32 },
+  // The list form: no five separate slabs, just rows on hairlines. Five
+  // bordered cards is most of this page's scrolling for no extra meaning.
+  featureRows: { marginBottom: 30 },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
+  featureRowBorder: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
+  featureIconSmall: { width: 38, height: 38, borderRadius: 11 },
   featureCard: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     backgroundColor: 'rgba(255,255,255,0.04)',
@@ -582,8 +777,10 @@ const styles = StyleSheet.create({
 
   unlockBtn: {
     borderRadius: 16, overflow: 'hidden',
-    shadowColor: AMBER, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5, shadowRadius: 18, elevation: 10,
+    shadowColor: look.whiteCta ? '#000' : AMBER,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: look.whiteCta ? 0.35 : 0.5,
+    shadowRadius: 18, elevation: 10,
   },
   unlockGradient: { paddingVertical: 17, alignItems: 'center', justifyContent: 'center' },
   unlockText: { color: '#2a1a00', fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },

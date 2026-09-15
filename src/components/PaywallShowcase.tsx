@@ -208,7 +208,29 @@ function CDScene({ clock }: { clock: number }) {
   );
 }
 
-export function PaywallShowcase() {
+export type ShowcaseChrome = {
+  /** Draw the bordered card around the stage, or let it run bare/full-bleed. */
+  boxed?: boolean;
+  /** The "LIVE PREVIEW" badge. The motion already says it is live. */
+  badge?: boolean;
+  /** How tall the stage is — a full-bleed hero wants far more room. */
+  height?: number;
+  /** Mode chips: amber (the old look) or the app's white selected-pill. */
+  chips?: 'amber' | 'white' | 'none';
+  /**
+   * The box's own surface. These are props rather than constants because the
+   * card used to hardcode an AMBER border, which survived into a look whose
+   * whole point was that the amber is gone — so the one screen that uses this
+   * component could not actually change its own appearance.
+   */
+  cardBg?: string;
+  cardBorder?: string;
+};
+
+export function PaywallShowcase({
+  boxed = true, badge = true, height, chips = 'amber',
+  cardBg, cardBorder,
+}: ShowcaseChrome = {}) {
   const [t, setT] = useState(0);
 
   // One clock for everything — throttled to ~30fps like the real modes.
@@ -236,13 +258,24 @@ export function PaywallShowcase() {
   const scene = SCENES[active];
 
   return (
-    <View style={sc.card}>
-      <View style={sc.liveBadge}>
-        <View style={sc.liveDot} />
-        <Text style={sc.liveText}>LIVE PREVIEW</Text>
-      </View>
+    <View
+      style={
+        boxed
+          ? [
+              sc.card,
+              !!cardBg && { backgroundColor: cardBg },
+              !!cardBorder && { borderColor: cardBorder },
+            ]
+          : sc.bare
+      }>
+      {badge && (
+        <View style={sc.liveBadge}>
+          <View style={sc.liveDot} />
+          <Text style={sc.liveText}>LIVE PREVIEW</Text>
+        </View>
+      )}
 
-      <View style={[sc.stage, { opacity: stageOpacity }]}>
+      <View style={[sc.stage, !!height && { height }, { opacity: stageOpacity }]}>
         {scene.id === 'vinyl' && <VinylScene clock={clock} />}
         {scene.id === 'radio' && <TunerScene clock={clock} />}
         {scene.id === 'horizon' && <HorizonScene clock={clock} />}
@@ -250,13 +283,27 @@ export function PaywallShowcase() {
         {scene.id === 'cd' && <CDScene clock={clock} />}
       </View>
 
-      <View style={sc.chipRow}>
-        {SCENES.map((s, i) => (
-          <View key={s.id} style={[sc.chip, i === active && sc.chipActive]}>
-            <Text style={[sc.chipText, i === active && sc.chipTextActive]}>{s.label}</Text>
-          </View>
-        ))}
-      </View>
+      {chips !== 'none' && (
+        <View style={sc.chipRow}>
+          {SCENES.map((s, i) => {
+            const on = i === active;
+            const white = chips === 'white';
+            return (
+              <View
+                key={s.id}
+                style={[sc.chip, on && (white ? sc.chipActiveWhite : sc.chipActive)]}>
+                <Text
+                  style={[
+                    sc.chipText,
+                    on && (white ? sc.chipTextActiveWhite : sc.chipTextActive),
+                  ]}>
+                  {s.label}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
@@ -286,6 +333,8 @@ const sc = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 2,
   },
+  // No box at all — for a hero that runs to the screen's own edges.
+  bare: { overflow: 'hidden' },
   stage: { height: 150, alignItems: 'center', justifyContent: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
 
@@ -307,8 +356,12 @@ const sc = StyleSheet.create({
     backgroundColor: 'rgba(245,158,11,0.16)',
     borderColor: 'rgba(245,158,11,0.5)',
   },
+  // The app's own selected-state language everywhere else: a solid fill in
+  // the opposite of the ground, with ink to match.
+  chipActiveWhite: { backgroundColor: '#fff', borderColor: '#fff' },
   chipText: { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '700' },
   chipTextActive: { color: AMBER },
+  chipTextActiveWhite: { color: '#14110c' },
 
   // Vinyl
   vinylDisc: {

@@ -320,24 +320,46 @@ struct ModeView: View {
         ],
         center: .center, startRadius: 0, endRadius: 96 * k)
         .frame(width: 192 * k, height: 192 * k)
-        .offset(x: 6 * k)
       // THE DISC ALL BUT FILLS THE CASE (owner, 10.09: "the CD is still quite
       // small... the edges are close to the case"), grown again with case
       // option D's slimmer frame (owner, 11.09 "D"). 124 -> 132:
       //
       //   THE HORIZONTAL IS THE BINDING AXIS, because the hinge eats one side.
-      //   With the frame at inset 5 the case now runs x 5..153 on a ~158pt
-      //   tile, the spine takes 12 off the left, so the INTERIOR is x 17..153
-      //   — 136 wide, still centred at 85 (the near and far walls both moved
-      //   out 3pt, so the centre held), i.e. 6pt right of the tile's centre,
-      //   which is where the offset below comes from. A 132 disc leaves ~2pt
-      //   clear of the hinge and ~2pt of the far wall.
+      //   With the frame at inset 5 the case runs x 5..153 on a ~158pt tile
+      //   and the spine takes 12 off the left, so the case's INTERIOR is
+      //   x 17..153 — 136 wide, centred at 85, i.e. 6pt right of the tile's
+      //   own centre.
       //
       //   Vertically there is room to spare and it is deliberately not spent:
       //   a disc squeezed to the edges would foul the corner clips, at 6pt in.
       //
-      // Centred on the case's INTERIOR rather than on the tile — dead centre
-      // would leave the disc visibly closer to the hinge than to the far wall.
+      // CENTRED ON THE TILE, NOT ON THE CASE'S INTERIOR (owner, 15.09: "the
+      // widget sits a bit in the right for iPhone"). This REVERSES 10.09's
+      // own reasoning — that dead centre would leave the disc visibly closer
+      // to the hinge than to the far wall — and it reverses it on evidence
+      // rather than on taste.
+      //
+      // MEASURED OFF HER SCREENSHOT: the disc's centre sat 20px right of the
+      // tile's on a 523px render, i.e. exactly the 6pt asked for here, so the
+      // geometry was doing precisely what it was told. What the same shot
+      // also shows is that THE SPINE IT IS CLEARING DOES NOT READ AT ALL —
+      // luminance across the case's left band runs 72.7, 72.5, 72.3, 72.4,
+      // 72.0, 71.1, 68.5 from x 2 to x 24, i.e. dead flat, with no trace of
+      // the 12pt gradient strip, its two hairlines, the frosted CRUISE FM
+      // spine or the knuckles. Quieted to the level the owner asked for on
+      // 10.09 ("reduce the heavy outer frame/borders") and washed over by the
+      // disc's own accent glow, the hinge is simply not a wall the eye can
+      // see — so the offset bought nothing and cost a disc that plainly sits
+      // off centre in its square.
+      //
+      // WHERE THE OBJECT AND THE FRAME DISAGREE, THE FRAME WINS: a widget is
+      // read as a tile among other tiles, and the tile's own edges are what
+      // the eye centres against. The same call the drag classifier made on
+      // 03.08 — intent over physics.
+      //
+      // The disc is 0.74 opaque, so where it now crosses the spine's inner
+      // ~4pt the hinge reads THROUGH the pressing, which is what a CD sitting
+      // in its tray beside the hinge actually looks like.
       CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 132 * k)
         // A CLEAR PRESSING, NOT A SOLID PUCK (owner, 14.09: "add some
         // transparency to the CD widget"). The app's own CD deck has drawn a
@@ -349,7 +371,6 @@ struct ModeView: View {
         // transparency over a dark case means, and the stronger rainbow
         // above is what keeps it from reading merely dimmer.
         .opacity(0.74)
-        .offset(x: 6 * k)
     }
     .widgetURL(s.url(mode: "cd"))
   }

@@ -209,6 +209,36 @@ for (const [f, s2] of Object.entries(src)) {
   check('ModeView centres its hero in the tile it measured',
     /\}\s*\n\s*\.frame\(width: geo\.size\.width, height: geo\.size\.height\)/.test(mode),
     'GeometryReader aligns top-leading — the hero needs an explicit frame');
+
+  // ...AND NOR MAY A HERO BE NUDGED SIDEWAYS OFF IT. The CD's disc was
+  // deliberately pushed 6pt right to sit in the middle of the case's INTERIOR
+  // rather than the middle of the tile, since the hinge spine eats 12pt of
+  // the left. Measured off the owner's own screenshot on 15.09 the geometry
+  // was exact — 20px right of centre on a 523px render, i.e. 6.0pt — and the
+  // spine it was clearing measured DEAD FLAT (72.7 down to 68.5 across x 2 to
+  // x 24), so the offset was clearing a wall nobody can see while plainly
+  // putting the disc off centre in its square. A widget is read against the
+  // TILE's edges; nothing here may sit off that centre horizontally.
+  //
+  // The vertical `.offset(y:)` on the ball's stem and its group is left
+  // alone — those position parts WITHIN a hero, not the hero within the tile.
+  //
+  // SCOPED TO ModeView's OWN THREE DRAWING FUNCTIONS, deliberately: inside a
+  // hero (CompactDisc's gripper holes, say) an x-offset is how a part is
+  // placed against its own object and is none of this check's business.
+  {
+    const start = mode.indexOf('struct ModeView');
+    const end = mode.indexOf('private struct BeamField');
+    const body = start >= 0 && end > start ? mode.slice(start, end) : '';
+    check('the hero-placement code was actually read', body.length > 2000,
+      `${body.length} chars between ModeView and BeamField`);
+    const nudged = [...body.matchAll(/^.*\.offset\(x:\s*([^,)]+).*$/gm)]
+      .filter((m) => !/^\s*(\/\/|\*)/.test(m[0]))
+      .filter((m) => m[1].trim() !== '0')
+      .map((m) => m[0].trim());
+    check('no hero is nudged off the tile\'s own centre', nudged.length === 0,
+      nudged.join(' | ') || 'none');
+  }
 }
 
 // ── nothing may call onAir.first the CURRENT station ──────────────────────

@@ -830,6 +830,117 @@ export async function diagnoseSpotify(playlistId: string | null): Promise<string
   return out;
 }
 
+/**
+ * DOES THE REPEAT COMMAND ACTUALLY REACH SPOTIFY?
+ *
+ * Three rounds of repeat work went into the APPLE MUSIC bridge, on this
+ * file's own record that "the owner is on Apple Music and so is essentially
+ * every user" (26.08). Her own Profile screenshot on 15.09 says **Spotify**,
+ * connected, with a track playing — so every one of those rounds was spent on
+ * a code path she was never running. That is this file's most-repeated
+ * mistake wearing new clothes: a mechanism that reads perfectly in the code is
+ * not the mechanism the reporter hit until you have checked which PATH they
+ * were on (25.08, 08.08).
+ *
+ * So this measures rather than theorising a fourth time, and it does it on the
+ * path she is actually using. `spotifyCommand` folds Spotify's whole answer
+ * into a boolean — deliberately, because the app only needs to know whether to
+ * put the button back — and that boolean is exactly the detail a diagnosis
+ * needs, so the probe re-issues the command RAW and keeps the status and
+ * Spotify's own message.
+ *
+ * IT MUST ISSUE THE COMMAND, not merely read: a probe that does not do the
+ * same work as the code proves nothing about the code (03.08, where four
+ * probes passed against an endpoint the app was drowning in). Then it puts the
+ * setting back, so running the check does not quietly change what the listener
+ * had chosen.
+ */
+export async function diagnoseSpotifyRepeat(): Promise<string[]> {
+  const token = await getAccessToken();
+  if (!token) return ['No Spotify connection at all.'];
+  const out: string[] = [];
+
+  // Premium is the single likeliest refusal, and it is a fact rather than a
+  // guess: Spotify refuses every player command outright on a free account.
+  try {
+    const me = await fetch('https://api.spotify.com/v1/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const j = me.ok ? await me.json() : null;
+    out.push(`Account: ${j?.product ? String(j.product) : `could not read (${me.status})`}`);
+  } catch {
+    out.push('Account: no answer');
+  }
+
+  /** The player's own raw words, never a summary of them (the 04.08 rule). */
+  const read = async (): Promise<{ repeat: string; shuffle: string; device: string; blocked: string }> => {
+    try {
+      const res = await fetch('https://api.spotify.com/v1/me/player', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // 204 means Spotify has no active player at all, which is its own answer
+      // and the one case where there is nothing to command.
+      if (res.status === 204) return { repeat: '—', shuffle: '—', device: 'none active', blocked: '—' };
+      if (!res.ok) {
+        return { repeat: `http ${res.status}`, shuffle: `http ${res.status}`, device: '?', blocked: '?' };
+      }
+      const d = await res.json();
+      // Spotify publishes `actions.disallows` precisely to say which commands
+      // the CURRENT context refuses — a radio or autoplay session commonly
+      // refuses repeat outright, and it answers with the same 403 as a
+      // permissions problem, so without this the two look identical.
+      const dis = d?.actions?.disallows ?? {};
+      const blocked = Object.keys(dis).filter((k) => dis[k]);
+      return {
+        repeat: String(d?.repeat_state ?? 'missing'),
+        shuffle: String(d?.shuffle_state ?? 'missing'),
+        device: d?.device?.name ? `${d.device.name}${d.device.is_restricted ? ' (restricted)' : ''}` : 'none named',
+        blocked: blocked.length ? blocked.join(', ') : 'nothing',
+      };
+    } catch {
+      return { repeat: 'no answer', shuffle: 'no answer', device: 'no answer', blocked: 'no answer' };
+    }
+  };
+
+  const before = await read();
+  out.push(`Playing on: ${before.device}`);
+  out.push(`Repeat before: ${before.repeat} · shuffle ${before.shuffle}`);
+  out.push(`Spotify won't allow: ${before.blocked}`);
+
+  let accepted = false;
+  try {
+    const res = await fetch('https://api.spotify.com/v1/me/player/repeat?state=context', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    accepted = res.ok;
+    let note = '';
+    if (!res.ok) {
+      const body = await res.text();
+      try { note = ` — ${JSON.parse(body)?.error?.message ?? body.slice(0, 90)}`; } catch { note = ` — ${body.slice(0, 90)}`; }
+    }
+    out.push(`Asking for repeat-all: ${res.status}${res.ok ? ' (accepted)' : ''}${note}`);
+  } catch {
+    out.push('Asking for repeat-all: no answer');
+  }
+
+  await new Promise((r) => setTimeout(r, 900));
+  const after = await read();
+  out.push(`Repeat after: ${after.repeat}`);
+  out.push(
+    after.repeat === before.repeat
+      ? (accepted
+          ? 'Verdict: Spotify SAID yes and then did not change it'
+          : 'Verdict: Spotify refused the command — the line above says why')
+      : 'Verdict: the command landed, repeat really did change',
+  );
+
+  if (before.repeat === 'off' || before.repeat === 'context' || before.repeat === 'track') {
+    await setRepeat(before.repeat);
+  }
+  return out;
+}
+
 export async function getPlaylistTracks(playlistId: string): Promise<PlaylistTracksResult> {
   const tracks: PlaylistTrack[] = [];
   let total = 0;

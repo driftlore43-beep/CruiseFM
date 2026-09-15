@@ -5,6 +5,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { usePalette, useStyles } from '@/context/AppearanceContext';
 import type { Palette } from '@/utils/appearance';
 import { appleMusicAvailable, diagnoseAppleMusic } from '@/utils/appleMusic';
+import { getSavedPlatform } from '@/utils/musicPlatform';
+import { diagnoseSpotifyRepeat, isSpotifyConnected } from '@/utils/spotify';
 
 /**
  * TEMPORARY — an instrument, not a feature. DELETE IT once the repeat
@@ -23,9 +25,15 @@ import { appleMusicAvailable, diagnoseAppleMusic } from '@/utils/appleMusic';
  * lives entirely inside iOS. So the answer has to come off her phone, and
  * this is the one tap that fetches it.
  *
- * It sends a REAL repeat command and reports what each player said before
- * and after — so "which surface moved" is a measurement rather than another
- * opinion. It puts the setting back afterwards.
+ * It sends a REAL repeat command and reports what the player said before
+ * and after — so "did it land" is a measurement rather than another opinion.
+ * It puts the setting back afterwards.
+ *
+ * AND THE FIRST ANSWER IT GAVE WAS THAT ALL THREE ROUNDS HAD BEEN SPENT ON
+ * THE WRONG SERVICE (15.09): it printed Apple Music state — "Subscription:
+ * not found · Now playing: nothing" — on a phone whose own Profile page read
+ * Spotify, connected, with a track playing. So it now follows the saved
+ * platform and NAMES the path it measured on its first line.
  */
 export function RepeatCheckRow() {
   const st = useStyles(makeSt);
@@ -33,18 +41,28 @@ export function RepeatCheckRow() {
   const [lines, setLines] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Gated on the MODULE being present and nothing else. Gating on the saved
-  // platform as well was the first version, and it is one more way for the
-  // one instrument that can answer this to be invisible on the one phone
-  // that can run it — which is a worse failure than showing a row that says
-  // "nothing playing". An instrument that does not appear teaches nothing.
-  if (!appleMusicAvailable()) return null;
+  // Never gated on the saved platform — that was the first version, and it is
+  // one more way for the only instrument that can answer this to be invisible
+  // on the only phone that can run it. But WHICH probe it runs follows the
+  // saved platform, because the previous round un-gated the row and then went
+  // on printing Apple Music state to a listener on Spotify: "Subscription: not
+  // found · Now playing: nothing" while a track was audibly playing. A reading
+  // taken on the wrong path is worse than no reading, because it is believed.
+  // Hence the first line of the output NAMES the path it measured.
 
   const run = async () => {
     if (busy) return;
     setBusy(true);
     try {
-      setLines(await diagnoseAppleMusic(null));
+      const platform = await getSavedPlatform();
+      const spotify = platform === 'spotify' || (platform == null && await isSpotifyConnected());
+      if (spotify) {
+        setLines(['Checking: Spotify', ...await diagnoseSpotifyRepeat()]);
+      } else if (appleMusicAvailable()) {
+        setLines(['Checking: Apple Music', ...await diagnoseAppleMusic(null)]);
+      } else {
+        setLines([`Checking: ${platform ?? 'no service'} — nothing here to test.`]);
+      }
     } catch {
       setLines(['The check itself failed — nothing to report.']);
     } finally {

@@ -24,5 +24,14 @@ import type { ImageSourcePropType } from 'react-native';
 export function stationImageSource(image: unknown): ImageSourcePropType | null {
   if (typeof image === 'number') return image;
   if (typeof image === 'string' && image.length > 0) return { uri: image };
+  // On WEB a bundled asset is not a number: Metro hands require() back as an
+  // `{ uri, width, height }` object, which RN's Image accepts as-is. Without
+  // this branch every built-in station's hero, shelf card and mini-player
+  // thumbnail drew black in the web build — which is where every App Store
+  // screenshot is taken (15.09: the iPad Stations shot came out with a black
+  // hero band at every settle time, at both sizes). A phone never hits this.
+  if (image && typeof image === 'object' && typeof (image as { uri?: unknown }).uri === 'string') {
+    return image as ImageSourcePropType;
+  }
   return null;
 }

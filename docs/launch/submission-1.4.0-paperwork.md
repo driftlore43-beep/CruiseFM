@@ -4,6 +4,14 @@ Written 15.09.2026 for the submission itself. Work down it in App Store
 Connect; each field says what to paste, whether it needs a review, and — where
 it is a decision rather than a copy job — what the choice costs either way.
 
+> **STATUS 15.09.2026: the owner reports the listing is entered.** Read the
+> rest of this as a RECORD of what was decided and why, not as a to-do list.
+> **It is not evidence about what is live** — this repository only knows what
+> was written here, and App Store Connect is the only thing that knows what
+> was actually typed in (the 21.08 lesson, where these notes lagged reality by
+> three releases). Anything below that still reads as outstanding is listed in
+> "Before pressing Submit for Review", directly under this.
+
 **The one-line summary of the paywall question: there isn't one in 1.4.0.**
 `LAUNCH_FREE = true` in `src/constants/config.ts`, so every station and every
 mode is unlocked for everybody, `premium.tsx` refuses to draw an offer at all,
@@ -12,6 +20,32 @@ monetisation answer below is **No / empty / none**, and that is the correct
 answer rather than an omission. See the last section for the paperwork that
 attaches to a paywall — it is real, it is outstanding, and **none of it may be
 started until 1.4.0 is through review.**
+
+---
+
+## Before pressing Submit for Review
+
+Four things, and the first is the only one that can cost a review cycle.
+
+1. **Put build 57 on the phone from TestFlight and open the three widgets.**
+   1.4.0 changes native code, and this project's own rule — earned on build 25,
+   which crashed 40ms into launch — is that such a build is LAUNCHED on a real
+   phone before it goes to Apple. 57 is native-identical to 59, so it satisfies
+   the rule; installing 59 would knock the phone off the preview channel and
+   stop it receiving updates (the 02.08 drought).
+2. **Confirm build 59 is actually in App Store Connect.** A submission that was
+   *scheduled* at build time is not a submission that *happened*, and the
+   diagnose tool cannot tell you either way (08.09). Only the TestFlight list
+   can.
+3. **Upload the preview video before pressing Submit**, into the iPhone 6.7"
+   slot only. It is reviewed together with the build, so adding it afterwards
+   means another pass.
+4. **Nothing waits on the compliance verification.** The app is free with no
+   products, so its review does not depend on that clearing. See section D.
+
+**AND ONCE IT IS SUBMITTED**, the standing rule applies: no publishing to the
+production channel while a build is in App Store review. Preview stays safe,
+so work can carry on reaching the phone and TestFlight as normal.
 
 ---
 

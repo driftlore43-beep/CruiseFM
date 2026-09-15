@@ -473,3 +473,35 @@ handled once rather than twice.
    the section above.
 5. **Promotional text** — after the build is live, since it names iPad and
    widgets.
+
+### DECIDED: the cut ships as it is (owner, 15.09)
+
+> "im happy using this footage - its more for iphone anyways."
+
+So the re-record above is **not** happening, and this section supersedes it.
+Nobody should go and reshoot the Night Run material on the strength of the
+paragraph above — read this one first.
+
+Why the cost is small, stated plainly rather than waved away:
+
+* **A preview is per device size, and optional at every one of them.** This is
+  the **iPhone 6.7"** slot only. The iPad listing carries no video at all, and
+  Apple does not require one.
+* **The iPad is where the driving language mattered most**, and since 12.09 the
+  app itself has no driving mode on a tablet. The video is on the one device
+  where the car framing is still true.
+* What remains is roughly **8 of 19.5 seconds** showing three lines the app has
+  stopped saying, on a page whose screenshots say the new ones.
+
+### HOW TO UPLOAD IT
+
+App Store Connect → the **1.4.0** version → **Previews and Screenshots** →
+**iPhone 6.7" Display** → drag the file into the preview well (it sits before
+the screenshots).
+
+* File: `CruiseFM-preview-roughcut-886x1920.mp4` — 19.5s, 886×1920, H.264,
+  silent stereo AAC, 8.4 MB.
+* Apple will ask for a **poster frame**; pick one from the dial sweep or the
+  tuner, not from a rested deck.
+* The preview goes through review with the build, so it must be in place
+  **before** Submit for Review.

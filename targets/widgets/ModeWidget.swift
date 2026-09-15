@@ -79,7 +79,7 @@ private func modeEntry(_ style: ModeStyle) -> ModeEntry {
   guard let snap = SnapshotStore.load() else {
     return ModeEntry(date: Date(), station: nil, lastPlayed: nil, ready: false, style: style)
   }
-  let station = snap.lastDrive ?? snap.onAir.first
+  let station = snap.lastDrive ?? snap.currentOnAir()
   return ModeEntry(date: Date(), station: station, lastPlayed: snap.lastPlayed,
                    ready: true, style: style)
 }

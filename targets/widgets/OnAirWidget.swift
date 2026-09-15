@@ -43,13 +43,13 @@ struct OnAirProvider: TimelineProvider {
     // shows real content, so if a grey tile fills in, the drawing was never
     // the problem — it never received a timeline.
     let snap = SnapshotStore.load()
-    return OnAirEntry(date: Date(), station: snap?.onAir.first,
+    return OnAirEntry(date: Date(), station: snap?.currentOnAir(),
                       upNext: snap?.upNextLine, ready: snap != nil)
   }
 
   func getSnapshot(in context: Context, completion: @escaping (OnAirEntry) -> Void) {
     let snap = SnapshotStore.load()
-    completion(OnAirEntry(date: Date(), station: snap?.onAir.first,
+    completion(OnAirEntry(date: Date(), station: snap?.currentOnAir(),
                           upNext: snap?.upNextLine, ready: snap != nil))
   }
 
@@ -62,22 +62,36 @@ struct OnAirProvider: TimelineProvider {
 
     let now = Date()
     var entries: [OnAirEntry] = []
+    // THE CURRENT STATION IS THE LAST CHANGEOVER THAT HAS ALREADY HAPPENED,
+    // NOT ENTRY 0 (owner, 15.09: "the on air station is still not loading
+    // quick enough"). Entry 0 is "now" as of when the APP wrote the snapshot,
+    // and this loop used to stamp it with the real `now` whatever its age —
+    // so hours later the widget confidently named a station that had gone
+    // off air before lunch, while every genuinely-current entry was thrown
+    // away by the `date <= now` test as "stale". It does not look like a
+    // wrong station, it looks like a widget that has stopped working, which
+    // is why it was reported as slowness rather than as an error.
+    let current = snap.currentOnAirIndex(at: now)
     for (i, station) in snap.onAir.enumerated() {
-      // `at` is epoch milliseconds from JS.
+      // Everything before the current changeover is genuinely over.
+      if i < current { continue }
+      // `at` is epoch milliseconds from JS. The current one is dated NOW so
+      // WidgetKit has something to show immediately; the rest keep the minute
+      // they actually happen.
       let when = Date(timeIntervalSince1970: (station.at ?? 0) / 1000)
-      // An entry already in the past is only useful as the CURRENT one, and
-      // the first entry is always "now" by construction — so keep that and
-      // drop any other stale entry rather than handing WidgetKit a timeline
-      // that starts behind the clock.
-      let date = i == 0 ? now : when
-      if i > 0 && date <= now { continue }
-      // The up-next line describes what follows the CURRENT station, so it
-      // only belongs on the entry that is current when it was written.
+      let date = i == current ? now : when
+      if i > current && date <= now { continue }
+      // The up-next line describes what follows the station that was current
+      // WHEN IT WAS WRITTEN. Once the day has moved past that it is about the
+      // wrong station, and a line that is quietly wrong is worse than none —
+      // so it is carried only while the snapshot is still on its first entry.
+      let sayNext = i == current && current == 0
       entries.append(OnAirEntry(date: date, station: station,
-                                upNext: i == 0 ? snap.upNextLine : nil, ready: true))
+                                upNext: sayNext ? snap.upNextLine : nil, ready: true))
     }
     if entries.isEmpty {
-      entries = [OnAirEntry(date: now, station: snap.onAir.first, upNext: snap.upNextLine, ready: true)]
+      entries = [OnAirEntry(date: now, station: snap.currentOnAir(at: now),
+                            upNext: nil, ready: true)]
     }
     // .atEnd: when the written-down day runs out, ask the app for more. This
     // is the only reload this widget ever needs.

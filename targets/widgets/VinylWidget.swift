@@ -58,7 +58,7 @@ private func deckEntry(_ style: DeckStyle) -> DeckEntry {
   }
   // Never driven? Show whatever is on air, so a first-time listener gets a
   // real record rather than an empty square.
-  let station = snap.lastDrive ?? snap.onAir.first
+  let station = snap.lastDrive ?? snap.currentOnAir()
   return DeckEntry(date: Date(), station: station, lastPlayed: snap.lastPlayed,
                    ready: true, style: style)
 }

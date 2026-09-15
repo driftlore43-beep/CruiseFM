@@ -211,6 +211,42 @@ for (const [f, s2] of Object.entries(src)) {
     'GeometryReader aligns top-leading — the hero needs an explicit frame');
 }
 
+// ── nothing may call onAir.first the CURRENT station ──────────────────────
+// `onAir` is a TIMELINE — entry 0 is "now" as of when the app wrote it, and
+// the rest are the day's changeovers. Reading entry 0 as the station on air
+// is only true while the snapshot is fresh; hours later it names a station
+// that went off air before lunch, and that is what the owner reported on
+// 15.09 as every widget being "stuck" on After Hours FM (a 23:00-05:00
+// station) in the afternoon. It does not read as a wrong station, it reads
+// as a widget that has stopped working. Snapshot.currentOnAir(at:) picks the
+// last changeover that has actually happened; this refuses the old shape.
+{
+  const offenders = [];
+  let scanned = 0;
+  for (const [f, s] of Object.entries(src)) {
+    if (f === 'Snapshot.swift') continue;   // the note there quotes the old form
+    scanned++;
+    for (const m of s.matchAll(/^.*\bonAir\.first\b.*$/gm)) {
+      if (/^\s*(\/\/|\*)/.test(m[0])) continue;   // a comment about it is fine
+      offenders.push(`${f}: ${m[0].trim()}`);
+    }
+  }
+  // A regex that quietly matched nothing would pass every case vacuously —
+  // this is the guard that caught exactly that in the hero check above.
+  check('the widget sources were actually read', scanned >= 5, `${scanned} files`);
+  check('no widget treats onAir.first as the current station',
+    offenders.length === 0, offenders.join(' | '));
+  check('Snapshot offers the honest one instead',
+    /func currentOnAir\(/.test(src['Snapshot.swift'] ?? '') &&
+    /func currentOnAirIndex\(/.test(src['Snapshot.swift'] ?? ''),
+    'currentOnAir(at:) / currentOnAirIndex(at:)');
+  // ...and the timeline must date the CURRENT entry, not entry 0.
+  check('the On Air timeline starts from the current changeover',
+    /currentOnAirIndex\(at: now\)/.test(src['OnAirWidget.swift'] ?? '') &&
+    !/let date = i == 0 \? now : when/.test(src['OnAirWidget.swift'] ?? ''),
+    'entry 0 is only "now" while the snapshot is fresh');
+}
+
 // ── every AppEnum look has a display representation for each case ─────────
 for (const [f, s] of Object.entries(src)) {
   for (const em of s.matchAll(/enum (\w+): String, AppEnum \{([\s\S]*?)\n\}/g)) {

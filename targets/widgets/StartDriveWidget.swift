@@ -53,7 +53,7 @@ struct StartDriveProvider: TimelineProvider {
     }
     // Never driven yet? Offer whatever is on air rather than an empty tile —
     // a first-time driver gets a real suggestion instead of a dead square.
-    let station = snap.lastDrive ?? snap.onAir.first
+    let station = snap.lastDrive ?? snap.currentOnAir()
     return StartDriveEntry(date: Date(), station: station, ready: true)
   }
 }

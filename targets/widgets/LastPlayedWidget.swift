@@ -81,7 +81,7 @@ private func lpEntry(_ style: LastPlayedStyle) -> LastPlayedEntry {
   }
   // Never driven? Fall back to whatever is on air, so a first-time listener
   // gets a real station rather than an empty frame.
-  let station = snap.lastDrive ?? snap.onAir.first
+  let station = snap.lastDrive ?? snap.currentOnAir()
   return LastPlayedEntry(date: Date(), station: station, lastPlayed: snap.lastPlayed,
                          ready: true, style: style)
 }

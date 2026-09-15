@@ -49,6 +49,8 @@ function mount({ platform = 'spotify' } = {}) {
   }).outputText;
 
   const calls = [];
+  /** Every station the app asked to REMEMBER, in order — see the case below. */
+  const remembered = [];
   const slow = (name, result) => async (...args) => {
     calls.push(name);
     await sleep(SERVICE_MS);
@@ -102,6 +104,12 @@ function mount({ platform = 'spotify' } = {}) {
     if (name === '@/utils/driveStats') return {
       noteDriveMode: async () => {}, recordDriveEnd: async () => null,
     };
+    // Recorded rather than swallowed: what the app remembers is the value
+    // five widgets and the home hero draw their station from, so it is worth
+    // asserting on rather than stubbing into silence.
+    if (name === '@/utils/lastCruise') return {
+      saveLastCruise: async (c) => { remembered.push(c); },
+    };
     if (name === '@/utils/musicPlatform') return { getSavedPlatform: async () => platform };
     if (name === '@/utils/appleMusic') return {
       appleMusicAvailable: () => platform === 'appleMusic',
@@ -150,7 +158,7 @@ function mount({ platform = 'spotify' } = {}) {
   }
 
   render();
-  return { calls, api: () => value };
+  return { calls, remembered, api: () => value };
 }
 
 // Four landings, each arriving while the last is still talking. This is a
@@ -181,6 +189,35 @@ console.log('\n  hunting across the dial:');
   check('it does start SOMETHING — a silent dial would be the worse bug',
     conversations > 0, JSON.stringify(calls));
   console.log('       calls:', JSON.stringify(calls));
+}
+
+console.log('\n  and it remembers where you ENDED UP, not where you started:');
+{
+  // The rule `setMode` has always stated for the mode, finally true of the
+  // station too. Retune off the dial and the app went on remembering the
+  // station the drive OPENED on — so the home hero offered to resume a
+  // station you had tuned away from, and all five widgets that read this one
+  // value sat on it for as long as you did not start a fresh drive. Owner,
+  // 15.09: "most of them are stuck in that station".
+  const { remembered, api } = mount();
+  api().open('tuner', 'night-run', { paused: true });
+  await sleep(50);
+  remembered.length = 0;
+
+  for (const id of LANDINGS) {
+    api().setStationId(id);
+    await sleep(GAP_MS);
+  }
+  await sleep(900 + SERVICE_MS + 1200);
+
+  const last = remembered[remembered.length - 1];
+  check('the station it remembers is the one it finished on',
+    last?.stationId === LANDINGS[LANDINGS.length - 1],
+    JSON.stringify(remembered.map((r) => r.stationId)));
+  // The CONTROL: it must remember the mode it is actually in, or "resume"
+  // would reopen the right station in the wrong deck.
+  check('...and the mode it was in, not a default', last?.mode === 'tuner',
+    JSON.stringify(last));
 }
 
 console.log('\n  one landing on its own is untouched:');

@@ -95,6 +95,37 @@ struct Snapshot: Codable {
   /// stays true however stale this gets. Any view drawing it must say so.
   let lastPlayed: LastPlayedInfo?
   let stats: WidgetStats?
+
+  /**
+   * WHICH STATION IS ON AIR *NOW* — NOT `onAir.first`, WHICH IS WHOEVER WAS
+   * ON AIR WHEN THE SNAPSHOT WAS WRITTEN (owner, 15.09: "the on air station
+   * is still not loading quick enough... most of them are stuck in that
+   * station", with every widget naming After Hours FM in the afternoon —
+   * a station whose window is 23:00 to 05:00, so it could not have been).
+   *
+   * `onAir` is a TIMELINE: entry 0 is "now" at the moment the app wrote it,
+   * and the rest are the changeovers over the following day, each stamped
+   * with the minute it happens. That is what lets a widget change through
+   * the day with the app never running. But every reader here took entry 0
+   * and called it the current station, which is only true for as long as the
+   * snapshot is fresh — hours later it names a station that went off air
+   * before lunch, and looks exactly like a widget that has stopped updating.
+   *
+   * The current station is the LAST changeover that has already happened.
+   */
+  func currentOnAirIndex(at now: Date = Date()) -> Int {
+    var idx = 0
+    for (i, s) in onAir.enumerated() {
+      guard let at = s.at else { continue }
+      if Date(timeIntervalSince1970: at / 1000) <= now { idx = i } else { break }
+    }
+    return idx
+  }
+
+  /// The station on air now, or nil if the snapshot carries no timeline.
+  func currentOnAir(at now: Date = Date()) -> WidgetStation? {
+    onAir.isEmpty ? nil : onAir[currentOnAirIndex(at: now)]
+  }
 }
 
 /// The newest shape this binary knows how to draw.

@@ -101,36 +101,43 @@ deck, so the still that sits on the page has something happening in it.
 **It goes through review with the build**, so it must be uploaded before
 Submit; adding it afterwards means another review.
 
-### A6. App name, subtitle, keywords — **a decision, not a copy job**
+### A6. App name, subtitle, keywords — **the name changes with this version**
 
-These three belong to a *version*, so this submission is the moment or they
-wait for the next one.
+These three belong to a *version*, so this submission is the moment.
 
-Live today:
-
-| Field | Live now |
+| Field | Type this |
 |---|---|
-| Name | `Cruise FM` |
-| Subtitle | `Music for how a drive feels` |
-| Keywords | `driving,road,trip,visualizer,equalizer,mood,commute,night,cassette,vinyl,car,radio,retro,aesthetic` |
+| Name | `Cruise FM: Driving Visuals` |
+| Subtitle | `Music for how a drive feels` *(unchanged)* |
+| Keywords | `road,trip,visualizer,equalizer,mood,night,cassette,vinyl,car,radio,retro,aesthetic,visualiser` |
 
-`docs/launch/app-store-listing.md` decided on 10.08 that the name should be
-**`Cruise FM: Driving Visuals`** and that decision was never applied. The
-reasoning still stands: the name field is the highest-weighted thing in App
-Store search and "Cruise FM" is nine characters carrying no search terms at
-all.
+**The name was decided on 10.08 and never actually typed in** — the live
+listing still says plain `Cruise FM`, which spends all nine characters of the
+single most important field in App Store search on a brand name carrying no
+search terms at all. The suffix puts *driving* and *visuals* into the strongest
+field there is.
 
-**Recommendation: apply the name, leave the subtitle and keywords alone.**
+**The keywords change because the name did, not for their own sake.** Apple
+indexes the name and the keyword field separately and then combines them, so a
+word in both is a word wasted: `driving` is now in the name and had to come out,
+which freed 8 characters. `commute` came out too, to make room for
+**`visualiser`** — Apple does not map British and American spellings onto each
+other, the owner is in Australia, and "music visualiser" is exactly what this
+app is, while somebody typing "commute" wants a journey planner. Change the two
+fields in the same sitting; changing the name alone leaves 8 characters
+throwing themselves away.
 
-- The name costs nothing and is the biggest single search win available.
-- The subtitle and keywords were chosen *for search*, and the 15.09 round
-  deliberately did not touch them — dropping the driving words for consistency
-  with the app's new wording would trade findability for tidiness. That is a
-  real trade and it is yours to make, not a tidy-up.
+**The subtitle is deliberately left alone.** It was chosen for search, and the
+15.09 round that took the driving language out of the app's own taglines
+deliberately did not touch it — dropping "drive" there would trade findability
+for tidiness, which is a decision rather than a tidy-up, and not one this
+submission needs to make.
 
 **This is the store listing name only.** Do not touch `expo.name` in
 `app.json` — that is the name under the icon, where iOS truncates at about
-twelve characters and "Cruise FM: Dri…" is what you would get.
+twelve characters and "Cruise FM: Dri…" is what you would get. The two are set
+in different places and are meant to differ: one is for being found, the other
+for being recognised. No code changes.
 
 ### A7. Description
 

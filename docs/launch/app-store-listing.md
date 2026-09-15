@@ -32,10 +32,23 @@ whatever shipped most recently.
 
 ## Keywords (100 characters, comma-separated, no spaces after commas)
 
-> driving,road,trip,visualizer,equalizer,mood,commute,night,cassette,vinyl,car,radio,retro,aesthetic
+> road,trip,visualizer,equalizer,mood,night,cassette,vinyl,car,radio,retro,aesthetic,visualiser
 
-(98 characters. Revised 10.08 — the previous list wasted about a tenth of the
-field.)
+(93 characters. Revised 10.08, then again **15.09 when the name change was
+applied** — see below.)
+
+**TWO WORDS MOVED WHEN THE NAME GAINED ITS SUFFIX, and both follow from rule 1.**
+`driving` came OUT, because it is now literally in the app name and a repeat
+buys nothing — that alone freed 8 characters. `commute` came out too, to make
+room for **`visualiser`**, the UK/AU spelling: Apple does not map US and
+British spellings onto each other, the owner is in Australia, and "music
+visualiser" is squarely what this app is, while somebody searching "commute"
+is looking for a journey planner. The US spelling stays in the list because the
+name carries *Visuals*, not *Visualizer*.
+
+7 characters are left spare. That is deliberate rather than an oversight — a
+weak word costs a slot, and there was no eighth term worth more than the room
+it would take.
 
 **The two rules this field runs on, both easy to get wrong:**
 
@@ -51,15 +64,19 @@ Those two changes freed enough room for `equalizer`, `retro` and `aesthetic` —
 all terms people genuinely search and none of which the listing previously
 claimed anywhere.
 
-Kept `driving` alongside the subtitle's `drive` on purpose: Apple handles
-plurals but is unreliable about derived forms, so the two are worth holding
-separately.
+`driving` used to sit here alongside the subtitle's `drive`, on the reasoning
+that Apple handles plurals but is unreliable about derived forms. That was
+right until 15.09, when the name itself took the word. The same reasoning is
+why `visualizer` and `visualiser` are both held: different spellings, not
+different forms of one.
 
-## App name (30 characters) — DECIDED 10.08
+## App name (30 characters) — DECIDED 10.08, **APPLIED 15.09**
 
 > Cruise FM: Driving Visuals
 
-(26 characters.) The name field is the **highest-weighted** thing in App Store
+(26 characters.) Decided on 10.08 and then, for five weeks, never actually
+typed into App Store Connect — the live listing stayed plain `Cruise FM`. It
+goes in with the 1.4.0 submission. The name field is the **highest-weighted** thing in App Store
 search, and the old name spent all of it on the brand — "Cruise FM" is nine
 characters carrying no search terms at all. The suffix puts *driving* and
 *visuals* into the strongest field there is.
@@ -71,9 +88,14 @@ The two names are set in different places and are meant to differ: the listing
 name is for being found, the home-screen name is for being recognised. No code
 change is involved in this at all.
 
-Set it in App Store Connect on the next version. The name belongs to an app
-*version*, so it needs a version submission — batch it with the 1.3.0 build
-rather than submitting for it alone.
+The name belongs to an app *version*, so it can only change attached to one.
+It is batched with **1.4.0**; the reference to 1.3.0 above was the version
+this was originally written against.
+
+**AND IT DRAGS THE KEYWORD FIELD WITH IT** — see the keywords section. Adding
+*Driving* to the name makes the keyword `driving` a repeat, which buys nothing,
+so the two fields have to be changed in the same sitting or 8 of the 100
+characters are simply thrown away.
 
 ## Description (max 4000 characters)
 

@@ -66,18 +66,36 @@ language**, so `en-AU`/`en-GB` could carry "Visualiser" in the name while
 `en-US` keeps "Visualizer". That is a real option, not needed now, and it
 would free those ten keyword characters for something else.
 
-**Alternatives considered, with counts, in case the owner prefers one:**
+**SETTLED 15.09 — `Cruise FM: Driving Visuals` goes in with 1.4.0**, i.e. the
+original 10.08 decision rather than this file's own recommendation, and the
+reason is the keyword rule rather than taste.
+
+`Cruise FM: Music Visualizer` was recommended here on the assumption that the
+**subtitle would change too**. It did not: the subtitle stays
+`Music for how a drive feels`, so a name carrying *Music* would repeat a word
+the subtitle already owns — and Apple indexes the two fields separately and
+combines them, so a repeat buys nothing. *Driving Visuals* adds two words the
+subtitle does not have. Keeping a search term is worth more than upgrading one.
 
 | Candidate | Chars | Note |
 |---|---|---|
-| `Cruise FM: Music Visualizer` | 27 | **Recommended.** Highest-demand term. |
-| `Cruise FM: Retro Music Visuals` | 30 | Adds *retro*, loses *visualizer* — a worse trade; retro is cheap to carry in the subtitle. |
-| `Cruise FM: Driving Visuals` | 26 | The 10.08 decision. Still far better than today's bare name. |
-| `Cruise FM: Music Visualiser` | 27 | Only if the AU/UK market is deliberately being put first. |
+| `Cruise FM: Driving Visuals` | 26 | **CHOSEN.** The 10.08 decision; the only candidate that repeats nothing in the unchanged subtitle. |
+| `Cruise FM: Music Visualizer` | 27 | Higher-demand term, but *Music* is already in the subtitle — worth revisiting only if the subtitle is rewritten. |
+| `Cruise FM: Retro Music Visuals` | 30 | Adds *retro*, loses *visualizer* — a worse trade; retro is cheap to carry in the keywords. |
+| `Cruise FM: Music Visualiser` | 27 | Superseded: `visualiser` now sits in the keyword field instead, which gets the AU/UK spelling in without spending name characters. |
 
 ---
 
-## Subtitle (30 characters)
+## Subtitle (30 characters) — **NOT CHANGED, owner's call 15.09**
+
+The subtitle stays `Music for how a drive feels`. Everything below is the
+argument for changing it, kept because it is a real argument and the decision
+may be revisited on a later version — but it was weighed at the 1.4.0
+submission and deliberately not taken: the current subtitle was chosen for
+search, and swapping it is a trade rather than a fix. Note that if it is ever
+rewritten, the **name should be re-examined in the same sitting** — the reason
+the name is *Driving Visuals* rather than *Music Visualizer* is that this
+subtitle already carries *Music*.
 
 **Proposed: `Vinyl, cassette & retro drive`** — 29 characters.
 
@@ -104,6 +122,26 @@ controls Apple Music or Spotify, and the listing should not blur that.
 ---
 
 ## Keywords (100 characters, comma-separated, no spaces after commas)
+
+**SUPERSEDED 15.09 — do not paste the list below.** It was built on the
+assumption that the subtitle would change too: it drops `visualizer`,
+`cassette`, `vinyl` and `retro` on the grounds that they "move UP into the name
+and subtitle". The subtitle did not change, so those four words are still
+carried by nothing but this field, and dropping them would lose four real
+search terms outright.
+
+What actually ships with 1.4.0 is the current list minus `driving` (now in the
+name, so a repeat) and minus `commute` (the weakest term), plus the British
+spelling `visualiser`:
+
+```
+road,trip,visualizer,equalizer,mood,night,cassette,vinyl,car,radio,retro,aesthetic,visualiser
+```
+
+The reasoning is in `app-store-listing.md`; the list below stays as the
+proposal to revisit **if and when the subtitle is ever rewritten**, since the
+two fields have to be planned together.
+
 
 **Proposed:**
 

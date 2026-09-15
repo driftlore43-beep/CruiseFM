@@ -95,7 +95,33 @@ struct OnAirProvider: TimelineProvider {
     }
     // .atEnd: when the written-down day runs out, ask the app for more. This
     // is the only reload this widget ever needs.
-    completion(Timeline(entries: entries, policy: .atEnd))
+    // A TIMELINE THAT HAS RUN OUT MUST NOT ASK TO BE RELOADED THE INSTANT IT
+    // IS HANDED OVER (owner, 15.09: the square On Air tile showing grey
+    // placeholder bars while the wide one beside it, on the same data through
+    // the same provider, drew perfectly).
+    //
+    // `.atEnd` means "come back when the last entry's date has passed". That
+    // is exactly right while there are changeovers still ahead. It is a trap
+    // the moment there are not: a snapshot more than a day old runs out of
+    // timeline, so the only entry left is the one stamped `now` — and
+    // `.atEnd` on a timeline whose last date is now means RELOAD NOW, which
+    // produces the same one-entry timeline, which asks again. iOS answers a
+    // widget that asks that often by cutting its refresh budget, and a tile
+    // with no budget keeps showing the placeholder rather than anything we
+    // drew. THE BUDGET IS PER PLACED WIDGET, not per kind, which is why one
+    // On Air tile can be stuck while another beside it is fine.
+    //
+    // NOT PROVEN, and it is not offered as proof — nothing here can read a
+    // device's refresh budget. What is checkable is that this was the ONLY
+    // widget in the target using `.atEnd`; every other one asks again in an
+    // hour, and every other one draws. That is the single structural
+    // difference between the tile that fails and the five that do not, and
+    // this removes it. An hour is also the resolution the schedule actually
+    // has — the on-air windows are whole hours — so nothing is lost.
+    let policy: TimelineReloadPolicy = entries.count > 1
+      ? .atEnd
+      : .after(now.addingTimeInterval(3600))
+    completion(Timeline(entries: entries, policy: policy))
   }
 }
 

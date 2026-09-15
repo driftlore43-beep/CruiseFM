@@ -232,13 +232,45 @@ for (const [f, s2] of Object.entries(src)) {
     const body = start >= 0 && end > start ? mode.slice(start, end) : '';
     check('the hero-placement code was actually read', body.length > 2000,
       `${body.length} chars between ModeView and BeamField`);
-    const nudged = [...body.matchAll(/^.*\.offset\(x:\s*([^,)]+).*$/gm)]
-      .filter((m) => !/^\s*(\/\/|\*)/.test(m[0]))
-      .filter((m) => m[1].trim() !== '0')
-      .map((m) => m[0].trim());
+    // A LINE THAT *STARTS* WITH `.offset(` is placing the hero itself; one
+    // that reaches it part-way along a chain (`.frame(...).offset(...)`, the
+    // ball's stem inside its own overlay) is placing a PART within the hero,
+    // which is none of this check's business. That is the whole distinction,
+    // and it is why the rule is written against the start of the line.
+    const nudged = [...body.matchAll(/^[ \t]*\.offset\(.*$/gm)]
+      .map((m) => m[0].trim())
+      .filter((l) => !/^\.offset\((x|y): 0[,)]/.test(l));
     check('no hero is nudged off the tile\'s own centre', nudged.length === 0,
       nudged.join(' | ') || 'none');
   }
+}
+
+// ── no widget may ask for a reload the instant it is handed over ──────────
+// `.atEnd` on a timeline whose last entry is stamped `now` means "reload
+// immediately", every time, for ever. iOS answers that by cutting the tile's
+// refresh budget, and a tile with no budget shows the grey placeholder rather
+// than anything the extension drew — which is what the owner photographed on
+// 15.09, a square On Air tile stuck in placeholder beside a wide one drawing
+// the same data fine. On Air was the ONLY widget in the target using `.atEnd`.
+// It may still use it while there are real changeovers ahead; a timeline that
+// has run out has to schedule instead.
+{
+  let scanned = 0;
+  const offenders = [];
+  for (const [f, s] of Object.entries(src)) {
+    if (!/TimelineProvider|AppIntentTimelineProvider|Timeline\(/.test(s)) continue;
+    scanned++;
+    for (const m of s.matchAll(/^.*policy:\s*\.atEnd.*$/gm)) {
+      if (/^\s*(\/\/|\*)/.test(m[0])) continue;
+      // Guarded by an entry count is the shape that is safe: it can only be
+      // reached while there is a FUTURE entry to wait for.
+      if (/entries\.count > 1/.test(s)) continue;
+      offenders.push(`${f}: ${m[0].trim()}`);
+    }
+  }
+  check('the timeline providers were actually read', scanned >= 3, `${scanned} files`);
+  check('no widget asks for an immediate reload when its timeline has run out',
+    offenders.length === 0, offenders.join(' | ') || 'none');
 }
 
 // ── nothing may call onAir.first the CURRENT station ──────────────────────

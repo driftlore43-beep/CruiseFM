@@ -250,6 +250,19 @@ struct ModeView: View {
       // comes out silver-to-black, is on `ballHalo` in Snapshot.swift.
       s.ballHalo(k)
       BeamField(k: k)
+      // THE BALL CENTRES ON THE TILE, NOT THE BALL-AND-STEM TOGETHER (owner,
+      // 15.09: "the mirror ball is dropped down"). It used to carry
+      // `.offset(y: 4 * k)`, on the reasoning that the stem hangs above the
+      // ball so the two read as centred together — which is true of the
+      // SILHOUETTE and false of what anyone looks at. The stem is a 1pt
+      // hairline fading to nothing at both ends; the ball is 126pt of chrome.
+      // Weighting the layout toward the thing you cannot see put the thing
+      // you can 4pt low in its square.
+      //
+      // Same call as the CD's 6pt sidestep the same day, and the same reason:
+      // a widget is read as a tile among tiles, so the TILE's edges are what
+      // the eye centres against. Where the object and the frame disagree, the
+      // frame wins (03.08).
       MirrorBall(size: 126 * k, rows: 17, cols: 30, eqColors: s.eqColors, accent: s.accent)
         .overlay(alignment: .top) {
           // THIN AND METALLIC, FADING INTO THE GLOW (owner, 10.09: "make it
@@ -270,9 +283,6 @@ struct ModeView: View {
           ], startPoint: .top, endPoint: .bottom)
             .frame(width: 1, height: 30 * k).offset(y: -28 * k)
         }
-        // Nudged up by the small amount the stem needs, so the BALL reads as
-        // centred rather than the ball-and-stem together.
-        .offset(y: 4 * k)
     }
     .widgetURL(s.url(mode: "disco"))
   }

@@ -125,13 +125,27 @@ export function subscribeSessionKind(fn: (k: SessionKind) => void): () => void {
  * THE VOCABULARY, in one place.
  *
  * The rule that shapes this, and it is a brand decision as much as a copy one:
- * KEEP THE DRIVING VOICE, SOFTEN ONLY THE CLAIMS. Cruise FM's character is the
- * road — it is the thing nobody else has, and the station names and taglines
- * work perfectly well at a desk ("Empty expressways. Blue-lit dashboards." is
- * evocative wherever you are sitting). So the atmosphere never changes. What
- * changes is every line that asserts something about the person: what the
- * start button promises, what the stats are counting, what a badge says you
- * did.
+ * KEEP THE PLACE, DROP THE DRIVING. Cruise FM's character is atmosphere —
+ * night, neon, rain on glass, golden hour — and that is the thing nobody else
+ * has. The CAR was never the character; it was one setting the atmosphere
+ * happened to be described in.
+ *
+ * REVISED 15.09, and it reverses this file's own earlier rule. Until today
+ * this said "keep the driving voice, soften only the claims", and the station
+ * taglines were held up as the example that worked at a desk. The owner,
+ * looking at the iPad screenshots: "they are currently based for a drive not
+ * just as a standalone music player… the app still has the same driving
+ * taglines that need to be removed." She is right, and the reason is
+ * mechanical rather than a matter of taste: a mode with no track playing
+ * prints the station's TAGLINE where the song title goes, so "Golden hour.
+ * Open roads." was the largest line on half the App Store screenshots — on a
+ * device that, since 12.09, has no driving mode in it at all.
+ *
+ * So the taglines are now about the hour and the light rather than the road,
+ * and this table still exists for everything that ASSERTS something about the
+ * person: what the start button promises, what the stats are counting, what a
+ * badge says you did. Those genuinely differ between a car and a desk; the
+ * atmosphere does not.
  */
 export type Words = {
   /** The big button with nothing saved yet. */

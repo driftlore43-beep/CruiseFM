@@ -52,7 +52,7 @@ const MODES: ModeDef[] = [
   { id: 'radio',     title: 'Tuner',       desc: 'Drag the dial — glide between moods and lock on.', colors: ['#1a4a5a', '#3a6aa8', '#6ad6e0'], pro: true },
   { id: 'horizon',   title: 'Horizon',     desc: 'An endless outrun grid rolling into a glowing sun.', colors: ['#200a45', '#8a2a7a', '#ff5aa0'], pro: true },
   { id: 'cd',        title: 'CD',          desc: 'Your album on a mirrored disc behind jewel-case plastic.', colors: ['#141a2e', '#5a6f9a', '#b0c6ff'], pro: true },
-  { id: 'disco',     title: 'Mirror Ball', desc: 'A slow-turning mirror ball scattering light across the drive.', colors: ['#22242c', '#8a92a4', '#e8edf6'], pro: true },
+  { id: 'disco',     title: 'Mirror Ball', desc: 'A slow-turning mirror ball scattering light across the room.', colors: ['#22242c', '#8a92a4', '#e8edf6'], pro: true },
 ];
 
 /** Whichever mode leads the page. Change this when a newer one lands. */

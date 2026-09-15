@@ -141,7 +141,7 @@ export default function PremiumScreen() {
     setBusy(false);
     if (outcome === 'purchased') {
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      notify('Welcome to Premium', 'Every mode, every mood — enjoy the drive.', () => router.back());
+      notify('Welcome to Premium', 'Every mode, every mood — they are all yours.', () => router.back());
     } else if (outcome === 'unavailable') {
       notify('Not available yet', 'Purchases only work in the installed app, not this preview.');
     } else if (outcome === 'error') {

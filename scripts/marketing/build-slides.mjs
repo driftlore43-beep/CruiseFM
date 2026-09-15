@@ -52,26 +52,27 @@ const png = f => 'data:image/png;base64,' + fs.readFileSync(`${SHOTS}/${f}.png`)
 // the surround always belongs to the picture it frames.
 // The iPad set carries the SAME headlines as the phone set, in the same order
 // minus the two slides that only exist at phone size. Tints re-sampled from
-// the iPad shots themselves (tints.py screenshots-appstore-ipad) — two differ
-// from the phone's, honestly: the iPad Stations shot shows the mountain hero
-// (teal) where the phone's was scrolled to the amber dial, and the iPad CD
-// shot carries more of Coastal's green photograph.
+// the iPad shots themselves (tints.py screenshots-appstore-ipad) — a couple
+// honestly differ from the phone's, because the pictures do: the Stations
+// shot is taken at whatever is on air, so its hero is a different station at
+// a different hour, and the iPad CD shot carries more of Coastal's green
+// photograph than the phone's crop does.
 const IPAD_SLIDES = [
-  { f: '01-mirrorball-downtown',    t: '#443366', s: 'B', a: 'Your music,',       b: 'wrapped in a drive' },
-  { f: '03-stations-dial',          t: '#365663', s: 'A', a: 'Ten moods.',        b: 'Not ten genres.' },
+  { f: '01-mirrorball-downtown',    t: '#453663', s: 'B', a: 'Your music,',       b: 'worth looking at' },
+  { f: '03-stations-dial',          t: '#635e36', s: 'A', a: 'Ten moods.',        b: 'Not ten genres.' },
   { f: '02-vinyl-sunset',           t: '#643539', s: 'A', a: 'Your Apple Music',  b: 'or Spotify playlists' },
   { f: '05-cassette-daylight',      t: '#635436', s: 'A', a: 'Eight ways to',     b: 'watch your music' },
-  { f: '06-cd-coastal',             t: '#566336', s: 'A', a: 'Every disc',        b: 'catches the light' },
-  { f: '07-tuner-nightrun',         t: '#226977', s: 'A', a: 'Tune the dial.',    b: 'Find the feeling.' },
-  { f: '04-horizon-afterhours',     t: '#772227', s: 'A', a: 'Drive into',        b: 'the sunset' },
+  { f: '06-cd-coastal',             t: '#635636', s: 'A', a: 'Every disc',        b: 'catches the light' },
+  { f: '07-tuner-nightrun',         t: '#226b77', s: 'A', a: 'Tune the dial.',    b: 'Find the feeling.' },
+  { f: '04-horizon-afterhours',     t: '#772227', s: 'A', a: 'A horizon that',  b: 'never arrives' },
   { f: '09-equalizer-mountainpass', t: '#365463', s: 'A', a: 'The meter from',    b: 'an old hi-fi' },
 ];
 
 const PHONE_SLIDES = [
-  { f: '01-mirrorball-downtown',  t: '#453663', s: 'B', a: 'Your music,',            b: 'wrapped in a drive' },
+  { f: '01-mirrorball-downtown',  t: '#443663', s: 'B', a: 'Your music,',            b: 'worth looking at' },
   // Amber, not the old teal: the re-shot page is the dial itself, and amber is
   // the dial's own colour (tints.py re-sampled it after the reshoot).
-  { f: '03-stations-dial',        t: '#774522', s: 'A', a: 'Ten moods.',             b: 'Not ten genres.' },
+  { f: '03-stations-dial',        t: '#774622', s: 'A', a: 'Ten moods.',             b: 'Not ten genres.' },
   // 1.3.0's headline, placed third on purpose: Apple shows the first two or
   // three in search results, and nothing else on the listing shows that the
   // picture behind a drive can be YOURS. The framing screen says it better
@@ -87,13 +88,16 @@ const PHONE_SLIDES = [
   // had stopped using. Re-running tints.py after a reshoot is what caught it —
   // which is the reason that step is not optional.
   { f: '07-tuner-nightrun',       t: '#226977', s: 'A', a: 'Tune the dial.',         b: 'Find the feeling.' },
-  { f: '04-horizon-afterhours',   t: '#772227', s: 'A', a: 'Drive into',             b: 'the sunset' },
+  { f: '04-horizon-afterhours',   t: '#73262b', s: 'A', a: 'A horizon that',       b: 'never arrives' },
   { f: '09-equalizer-mountainpass', t: '#365463', s: 'A', a: 'The meter from',       b: 'an old hi-fi' },
-  // The share cards, and there is more than one — so the slide shows two
-  // (owner, 12.08: "id like to have the y2k share card option displayed on the
-  // preview cards"). The Y2K one leads because it is the newest and the one
-  // nobody expects; the Ticket sits behind it so the slide says "styles",
-  // plural, without needing a word for it.
+  // The share card. It USED to show two, with the Ticket tilted behind the
+  // Y2K one so the slide said "styles" without needing a word for it — and
+  // the Ticket was removed from the app on 13.08 ("I would actually remove
+  // the ticket mode in the share option"), three days after this slide was
+  // built, so the listing has been advertising a style nobody can pick ever
+  // since. One card, and the headline no longer implies a set.
+  // CHECK SHARE_STYLES IN ShareCardStyles.tsx before changing this slide:
+  // the cards on it must be styles the app still offers.
   //
   // These are NOT device screenshots. The raw share screenshot was the share
   // SHEET — six buttons and a Cancel, which reads as a menu — and it also
@@ -101,8 +105,8 @@ const PHONE_SLIDES = [
   // rendered from the shipping components instead (scratchpad/share/render.js,
   // NO_ART=1 NO_SNAP=1), which keeps the address current and keeps real song
   // titles and album art off the listing, exactly like the rest of the set.
-  { f: '10-sharecards',           t: '#223f77', s: 'CARDS', a: 'Share the drive,',   b: 'not just the song',
-    front: 'card-y2k', behind: 'card-ticket' },
+  { f: '10-sharecards',           t: '#296370', s: 'CARDS', a: 'Share what',          b: 'you’re playing',
+    front: 'card-y2k' },
 ];
 const SLIDES = IPAD ? IPAD_SLIDES : PHONE_SLIDES;
 
@@ -139,9 +143,10 @@ const B = s => `<style>${base}
   <div class="bleed"><img src="${b64(s.f)}"></div><div class="scrim"></div>
   <div class="head"><h1>${s.a}<span>${s.b}</span></h1></div>`;
 
-// CARDS — two share styles, one behind the other. Both are rendered at their
-// own aspect and sized off WIDTH alone, because the three styles are different
-// shapes: forcing a common height would squash one of them.
+// CARDS — the share card, tilted on a glow. Sized off WIDTH alone, because
+// the styles are different shapes and forcing a common height would squash
+// one of them. `behind` is optional: with it, a second card tilts under the
+// first; without it, the one card takes the whole stack.
 const CARDS = s => `<style>${base}
     body{background:radial-gradient(122% 60% at 50% 4%, ${s.t}e0 0%, ${s.t}55 36%, #07070c 76%),#07070c;
          display:flex;flex-direction:column;align-items:center}
@@ -159,15 +164,18 @@ const CARDS = s => `<style>${base}
        out by about half its height times sin(7), roughly 50px here. */
     .back{width:790px;left:34px;top:20px;transform:rotate(-7deg)}
     .front{width:950px;left:300px;top:110px;transform:rotate(3.5deg)}
+    /* On its own it has the whole stack, so it is bigger and centred rather
+       than pushed right to make room for a card that is no longer there. */
+    .solo{width:1060px;left:112px;top:40px;transform:rotate(-2deg)}
     .foot{margin-top:64px;color:#ffffff8a;font-size:36px;letter-spacing:1px}
   </style>
   <div class="head"><h1>${s.a}<span>${s.b}</span></h1></div>
   <div class="mid">
     <div class="stack">
-      <img class="back" src="${png(s.behind)}">
-      <img class="front" src="${png(s.front)}">
+      ${s.behind ? `<img class="back" src="${png(s.behind)}">` : ''}
+      <img class="${s.behind ? 'front' : 'solo'}" src="${png(s.front)}">
     </div>
-    <div class="foot">Three card styles. Saved straight to Photos.</div>
+    <div class="foot">Or a real snapshot of the screen. Saved straight to Photos.</div>
   </div>`;
 
 // CHROMIUM_PATH because the browser's own directory carries its version and

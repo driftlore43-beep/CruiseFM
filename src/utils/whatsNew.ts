@@ -62,7 +62,7 @@ export type NoteCaps = { hasWidgets: boolean };
 export const CURRENT_NOTE: ReleaseNote | null = {
   id: '2026-09-13-widgets',
   title: 'Cruise FM on your Home Screen',
-  body: 'Press and hold your Home Screen to add a widget — what’s on air, the last song you played, or a one-tap way straight into a drive.',
+  body: 'Press and hold your Home Screen to add a widget — what’s on air, the last song you played, or a one-tap way straight into a station.',
   needsWidgets: true,
 };
 

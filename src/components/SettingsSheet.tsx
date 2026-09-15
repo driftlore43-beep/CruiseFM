@@ -264,7 +264,7 @@ function NotificationsBody() {
       <SettingsSection label={w.habitSection}>
         <ToggleRow label="Badges" sub="When you earn one"
           value={prefs.badges} onChange={(v) => update({ badges: v })} />
-        <ToggleRow label="Sunday recap" sub="Your week on the road — nothing sent on an empty week"
+        <ToggleRow label="Sunday recap" sub="Your week in music — nothing sent on an empty week"
           value={prefs.recap} onChange={(v) => update({ recap: v })} last />
       </SettingsSection>
       <SettingsSection label="WHAT'S NEW">

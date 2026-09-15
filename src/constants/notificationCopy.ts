@@ -35,27 +35,27 @@ export type Nudge = {
 export const ON_AIR: Nudge[] = [
   // Weekday evening — the drive home.
   { id: 'clock-off', kind: 'onair', days: [1, 2, 3, 4], hour: 17, minute: 15,
-    title: 'Clocking off?', body: 'Sunset AM is on air. Golden hour, open roads.', stationId: 'sunset' },
+    title: 'Clocking off?', body: 'Sunset AM is on air. Golden hour, and it lasts.', stationId: 'sunset' },
   { id: 'long-way-home', kind: 'onair', days: [1, 2, 3, 4], hour: 17, minute: 40,
     title: 'The long way home', body: "Sunset AM's playing. No need to rush back.", stationId: 'sunset' },
   // 17:10, not 18:05 — golden hour is 5-6pm since 13.08, and the truth test
   // caught this line the moment the window moved.
   { id: 'sun-going-down', kind: 'onair', days: [1, 2, 3], hour: 17, minute: 10,
-    title: "Sun's going down", body: 'Golden hour on Sunset AM. Take the scenic route.', stationId: 'sunset' },
+    title: "Sun's going down", body: 'Golden hour on Sunset AM. Take your time with it.', stationId: 'sunset' },
 
   // Friday — the week ends.
   { id: 'week-done', kind: 'onair', days: [5], hour: 17, minute: 20,
-    title: "That's the week done", body: 'Sunset AM is on air. Drive it out of your system.', stationId: 'sunset' },
+    title: "That's the week done", body: 'Sunset AM is on air. Play it out of your system.', stationId: 'sunset' },
   { id: 'friday-finally', kind: 'onair', days: [5], hour: 19, minute: 30,
     title: 'Friday, finally', body: "Downtown FM's on. Violet towers, sleeping streets.", stationId: 'downtown' },
 
   // Weekend mornings — the jam, and the one window Cars & Coffee keeps.
   { id: 'sat-nowhere', kind: 'onair', days: [6], hour: 10, minute: 15,
-    title: 'Saturday. Nowhere to be.', body: "Daylight AM's playing. Top down, open road.", stationId: 'daylight' },
+    title: 'Saturday. Nowhere to be.', body: "Daylight AM's playing. Sun high, nothing urgent.", stationId: 'daylight' },
   { id: 'cold-morning', kind: 'onair', days: [6], hour: 8, minute: 45,
-    title: 'Cold morning, warm cup', body: 'Cars & Coffee FM is on air. Engines idling.', stationId: 'cars-coffee' },
+    title: 'Cold morning, warm cup', body: 'Cars & Coffee FM is on air. The morning is slow.', stationId: 'cars-coffee' },
   { id: 'roads-are-yours', kind: 'onair', days: [6], hour: 11, minute: 30,
-    title: 'The roads are yours today', body: 'Daylight AM. Go somewhere.', stationId: 'daylight' },
+    title: 'The day is yours today', body: 'Daylight AM. Put it on loud.', stationId: 'daylight' },
   { id: 'sunday-coffee', kind: 'onair', days: [0], hour: 9, minute: 15,
     title: 'Sunday, slow start', body: 'Cars & Coffee FM is on air. Nowhere to be yet.', stationId: 'cars-coffee' },
 
@@ -63,23 +63,23 @@ export const ON_AIR: Nudge[] = [
   { id: 'sunday-last-light', kind: 'onair', days: [0], hour: 17, minute: 45,
     title: "Sunday's last light", body: 'Coastal FM is on. Ocean air, open horizons.', stationId: 'coastal' },
   { id: 'one-before-monday', kind: 'onair', days: [0], hour: 20, minute: 15,
-    title: 'One more before Monday', body: "Night Run AM's playing. Empty expressways.", stationId: 'night-run' },
+    title: 'One more before Monday', body: "Night Run AM's playing. Blue light, empty hours.", stationId: 'night-run' },
 
   // Weekday morning — the run in.
   { id: 'morning-air', kind: 'onair', days: [1, 2, 3, 4, 5], hour: 7, minute: 45,
-    title: 'Morning air', body: 'Mountain Pass FM. Cold air, fog ahead, one more corner.', stationId: 'mountain-pass' },
+    title: 'Morning air', body: 'Mountain Pass FM. Cold air, fog in the pines.', stationId: 'mountain-pass' },
   // WAS Cars & Coffee, and that was a lie: its window is weekend mornings, so
   // on a Tuesday at 8:20 the station named here was not on air. Caught by
   // scripts/test-notifications.mjs the day the schedule landed. Mountain Pass
   // is the station that genuinely broadcasts on a weekday morning.
   { id: 'beat-traffic', kind: 'onair', days: [1, 2, 3, 4, 5], hour: 8, minute: 20,
-    title: 'Beat the traffic', body: 'Mountain Pass FM is on air. Take the long way in.', stationId: 'mountain-pass' },
+    title: 'Morning, slowly', body: 'Mountain Pass FM is on air. Cold air and thin light.', stationId: 'mountain-pass' },
 
   // Late night — opt-in only, deliberately outside quiet hours.
   { id: 'world-asleep', kind: 'onair', hour: 23, minute: 30, lateNight: true,
-    title: "The world's asleep", body: 'After Hours FM. The road belongs to you.', stationId: 'after-midnight' },
+    title: "The world's asleep", body: 'After Hours FM. The hour belongs to you.', stationId: 'after-midnight' },
   { id: 'still-up', kind: 'onair', hour: 22, minute: 45, lateNight: true,
-    title: 'Still up?', body: "Night Run AM's on. Blue-lit dashboards.", stationId: 'night-run' },
+    title: 'Still up?', body: "Night Run AM's on. Wide awake, and that's fine.", stationId: 'night-run' },
 ];
 
 /** Badge lines. Sent only when something is genuinely earned, or one drive
@@ -118,7 +118,7 @@ export const BADGE_NEARLY: Record<string, { title: string; body: string }> = {
 export const WHATS_NEW: Record<string, { title: string; body: string; stationId?: string }> = {
   '1.3.0': {
     title: 'Your own photo, behind your own station',
-    body: 'Make a station, give it a picture from your camera roll, and drive to it.',
+    body: 'Make a station, give it a picture from your camera roll, and put it on.',
   },
 };
 

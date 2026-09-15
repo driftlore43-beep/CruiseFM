@@ -37,7 +37,7 @@ export const STATIONS: Station[] = [
   {
     id: 'night-run',
     name: 'Night Run AM',
-    tagline: 'Empty expressways. Blue-lit dashboards.',
+    tagline: 'Blue light. Empty hours.',
     tags: ['dark vibes', 'neon nights'],
     premium: false,
     // TEAL, station-wide, TAKEN FROM THE PHOTOGRAPH (owner, 19.08: "have the
@@ -71,7 +71,7 @@ export const STATIONS: Station[] = [
   {
     id: 'rain-drive',
     name: 'Rain Drive FM',
-    tagline: 'Streetlights reflected in glass. Slow roads.',
+    tagline: 'Rain on the glass. Everything slower.',
     tags: ['rainy', 'reflective'],
     premium: true,
     gradientColors: ['#051530', '#0a3a5c', '#2a1060'],
@@ -113,7 +113,7 @@ export const STATIONS: Station[] = [
   {
     id: 'mountain-pass',
     name: 'Mountain Pass FM',
-    tagline: 'Cold air. Fog ahead. One more corner.',
+    tagline: 'Cold air. Fog in the pines. Thin light.',
     tags: ['mountain', 'adventure'],
     premium: true,
     gradientColors: ['#021a15', '#0d4a3a', '#000000'],
@@ -136,7 +136,7 @@ export const STATIONS: Station[] = [
   {
     id: 'after-midnight',
     name: 'After Hours FM',
-    tagline: 'When the world is asleep. And the road belongs to you.',
+    tagline: 'When the world is asleep. And the hour is yours.',
     tags: ['late night', 'solitude'],
     premium: true,
     gradientColors: ['#111118', '#0a0f2b', '#000000'],
@@ -157,7 +157,7 @@ export const STATIONS: Station[] = [
   {
     id: 'sunset',
     name: 'Sunset AM',
-    tagline: 'Golden hour. Open roads.',
+    tagline: 'The sky turns gold. The day lets go.',
     tags: ['sunset glow', 'warm vibes'],
     premium: false,
     gradientColors: ['#8a3a05', '#5a1a6a', '#000000'],
@@ -185,8 +185,8 @@ export const STATIONS: Station[] = [
   {
     id: 'cars-coffee',
     name: 'Cars & Coffee FM',
-    tagline: 'Cold mornings. Warm cups. Engines idling.',
-    tags: ['sunday morning', 'motors'],
+    tagline: 'Cold mornings. Warm cups. Nowhere to be.',
+    tags: ['sunday morning', 'slow start'],
     premium: true,
     gradientColors: ['#2a1505', '#6b3a10', '#000000'],
     cardGradient: ['#ae6f32', '#77502d', '#49331d'],
@@ -207,7 +207,7 @@ export const STATIONS: Station[] = [
     id: 'tunnel',
     name: 'Tunnel FM',
     tagline: 'Underground. Neon tubes. Bass reverberating.',
-    tags: ['tunnel run', 'high energy'],
+    tags: ['underground', 'high energy'],
     premium: true,
     gradientColors: ['#2a0a5a', '#0a2a40', '#000000'],
     cardGradient: ['#3E66F2', '#232E82', '#C85A14'],
@@ -248,7 +248,7 @@ export const STATIONS: Station[] = [
   {
     id: 'daylight',
     name: 'Daylight AM',
-    tagline: 'Top down. Open road.',
+    tagline: 'Sun high. Nothing urgent.',
     tags: ['summer', 'sunny'],
     premium: false,
     gradientColors: ['#3a2c08', '#7a5810', '#c9922a'],

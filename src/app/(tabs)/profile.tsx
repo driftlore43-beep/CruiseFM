@@ -472,7 +472,7 @@ export default function ProfileScreen() {
                 <Text style={styles.dataSaverSub}>
                   {tablet
                     ? 'Stronger contrast in sun · brighter labels, deeper scrims'
-                    : 'Stronger contrast for driving in sun · brighter labels, deeper scrims · turns auto-dim off'}
+                    : 'Stronger contrast in bright sun · brighter labels, deeper scrims · turns auto-dim off'}
                 </Text>
               </View>
             </View>

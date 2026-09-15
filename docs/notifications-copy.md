@@ -1,5 +1,14 @@
 # Notifications — the restraint rules and the full copy set
 
+> **15.09 — the driving lines are gone.** Owner: "the app still has the same
+> driving taglines that need to be removed." Every line that put the reader in
+> a car (open road, engines idling, empty expressways, one more corner) has
+> been rewritten around the hour and the weather instead; the tables below are
+> the copy as it now ships. The rule is unchanged and is what made the rewrite
+> easy: a notification is a statement about the world, and the world outside a
+> car is the same world.
+
+
 **BUILT AND LIVE as of 12.08.** This document is the spec; the code is
 `src/utils/notifications.ts` (the engine and every rule below),
 `src/constants/notificationCopy.ts` (every line), `NotificationHost` (the tap
@@ -112,15 +121,15 @@ The app already maps hours to stations; the notification simply announces it.
 **Saturday morning — the weekend jam**
 | Title | Body |
 |---|---|
-| Saturday. Nowhere to be. | Daylight AM's playing. Top down, open road. |
-| Cold morning, warm cup | Cars & Coffee FM is on air. Engines idling. |
+| Saturday. Nowhere to be. | Daylight AM's playing. Sun high, nothing urgent. |
+| Cold morning, warm cup | Cars & Coffee FM is on air. The morning is slow. |
 | The roads are yours today | Daylight AM. Go somewhere. |
 
 **Sunday evening — the wind-down**
 | Title | Body |
 |---|---|
 | Sunday's last light | Coastal FM is on. Ocean air, open horizons. |
-| One more before Monday | Night Run AM's playing. Empty expressways. |
+| One more before Monday | Night Run AM's playing. Blue light, empty hours. |
 
 **Weekday morning — the run in** (only if they've driven mornings before)
 | Title | Body |
@@ -131,8 +140,8 @@ The app already maps hours to stations; the notification simply announces it.
 **Late night — opt-in only**
 | Title | Body |
 |---|---|
-| The world's asleep | After Hours FM. The road belongs to you. |
-| Still up? | Night Run AM's on. Blue-lit dashboards. |
+| The world's asleep | After Hours FM. The hour belongs to you. |
+| Still up? | Night Run AM's on. Wide awake, and that's fine. |
 
 ### B. Weather — phase two, and the only one with a privacy cost
 
@@ -171,8 +180,8 @@ Copy, once it exists — Rain Drive FM exists precisely for this:
 | Title | Body |
 |---|---|
 | It's raining | Rain Drive FM is on air. Streetlights in the glass. |
-| Wet roads tonight | Rain Drive FM. Slow roads, no hurry. |
-| Fog on the hills | Mountain Pass FM's playing. One more corner. |
+| Rain tonight | Rain Drive FM. Rain on the glass, no hurry. |
+| Fog on the hills | Mountain Pass FM's playing. Cold air, thin light. |
 
 ### C. Learned from their own driving
 

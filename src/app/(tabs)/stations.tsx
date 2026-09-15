@@ -60,13 +60,13 @@ const CTRL_SLOT_W = 16;
 
 // Time-flavoured tagline for the station currently "on air".
 const ON_AIR_LINES: Record<string, string> = {
-  'after-midnight': 'After hours — the road is all yours.',
-  'mountain-pass':  'Morning air — take the high road.',
+  'after-midnight': 'After hours — the night is all yours.',
+  'mountain-pass':  'Morning air — cold and clear.',
   'coastal':        'Midday light — the coast is clear.',
   'sunset':         'Golden hour — catch it while it lasts.',
   'night-run':      'City lights on — the night is young.',
-  'daylight':       'Open road, open sky — go somewhere.',
-  'rain-drive':     'Wipers on — slow roads and streetlight glass.',
+  'daylight':       'Wide open sky — put something on.',
+  'rain-drive':     'Rain on the glass — everything slower.',
 };
 
 function stationById(id: string): Station {

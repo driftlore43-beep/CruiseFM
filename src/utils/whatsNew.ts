@@ -45,6 +45,23 @@ export type ReleaseNote = {
    * rather than a `minVersion` string.
    */
   needsWidgets?: boolean;
+  /**
+   * Show this note to a BRAND-NEW INSTALL as well.
+   *
+   * The default below is silence, and for an ordinary note that is right: a
+   * person who installed the app an hour ago has no "before" to compare
+   * against, so telling them the green is brighter is noise.
+   *
+   * A NOTE ABOUT A WHOLE FEATURE IS THE EXCEPTION, and the widgets are the
+   * case that proves it — someone installing today gets a binary that has
+   * them and would otherwise never be told they exist, which is the opposite
+   * of what a what's-new card is for. The App Store shows its own What's New
+   * to people who have never had the app for the same reason.
+   *
+   * Set it only when the note would still be worth reading if the reader had
+   * never used an earlier version.
+   */
+  alsoForNewInstalls?: boolean;
 };
 
 /** What the phone can actually do, for a note that depends on it. */
@@ -64,6 +81,7 @@ export const CURRENT_NOTE: ReleaseNote | null = {
   title: 'Cruise FM on your Home Screen',
   body: 'Press and hold your Home Screen to add a widget — what’s on air, the last song you played, or a one-tap way straight into a station.',
   needsWidgets: true,
+  alsoForNewInstalls: true,
 };
 
 /**
@@ -75,6 +93,10 @@ export const CURRENT_NOTE: ReleaseNote | null = {
  * is consulted on a phone that has never seen a note, it writes the current
  * one down and answers no. They meet the app through the welcome explainer
  * instead, and get the NEXT note like everybody else.
+ *
+ * UNLESS THE NOTE SAYS `alsoForNewInstalls`, which the widgets note does. A
+ * note about a feature is worth reading with no "before" at all, and holding
+ * it back would leave a fresh install with widgets it was never told about.
  *
  * `introSeen` is passed in rather than read here so the two sheets cannot
  * disagree about who is new — the welcome card owns that question.
@@ -91,9 +113,11 @@ export async function noteToShow(introSeen: boolean, caps: NoteCaps): Promise<Re
 
     // Never seen ANY note. Two different people land here: a brand-new
     // install, and someone who has been using the app since before this
-    // feature existed. Only the second should be told anything, and having
-    // seen the welcome explainer is what tells them apart.
-    if (seen === null && !introSeen) {
+    // feature existed. By default only the second is told anything, and
+    // having seen the welcome explainer is what tells them apart — unless the
+    // note is worth reading with no "before" at all, which is what
+    // `alsoForNewInstalls` declares.
+    if (seen === null && !introSeen && !CURRENT_NOTE.alsoForNewInstalls) {
       await AsyncStorage.setItem(KEY, CURRENT_NOTE.id);
       return null;
     }

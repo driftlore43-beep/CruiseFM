@@ -7,7 +7,7 @@ import { appVersion } from '@/utils/appVersion';
 import { getDriveLog } from '@/utils/driveStats';
 import { loadLastCruise } from '@/utils/lastCruise';
 import {
-  announceReleaseIfNew, noteAppOpened, noteBadgesEarned, noteOpenedFromNotification,
+  announceEarlyAccessOnce, announceReleaseIfNew, noteAppOpened, noteBadgesEarned, noteOpenedFromNotification,
   notificationsAvailable, reschedule, scheduleRecapIfDue,
 } from '@/utils/notifications';
 
@@ -73,6 +73,7 @@ export function NotificationHost() {
     void reschedule();
     void scheduleRecapIfDue();
     void announceReleaseIfNew(appVersion());
+    void announceEarlyAccessOnce();
 
     const app = AppState.addEventListener('change', (s) => {
       if (s !== 'active') return;

@@ -13,6 +13,7 @@ import { ConnectSpotifyCard } from '@/components/ConnectSpotifyCard';
 import { SpotifyNudgeCard } from '@/components/SpotifyNudgeCard';
 import { MakeStationCard } from '@/components/MakeStationCard';
 import { WhatsNewCard } from '@/components/WhatsNewCard';
+import { EarlyAccessCard } from '@/components/EarlyAccessCard';
 import { HeadingAnywhereCard, SessionKindSwitch } from '@/components/HeadingAnywhereCard';
 import { DriveStatsStrip } from '@/components/DriveStatsStrip';
 import { EqualizerHeader } from '@/components/EqualizerHeader';
@@ -306,6 +307,9 @@ export default function CruiseScreen() {
               worth knowing and worth nobody's journey being delayed by. Above
               RateCard because telling someone something outranks asking them
               for something. Shows once per release note — see utils/whatsNew. */}
+          {/* What you OWN outranks what changed: the free-Premium card for
+              phones that were here before the paywall (17.09) sits first. */}
+          <EarlyAccessCard />
           <WhatsNewCard />
           {/* BELOW THE HERO ON PURPOSE. The cards above it are things the
               driver needs (a binary update, music already playing, the

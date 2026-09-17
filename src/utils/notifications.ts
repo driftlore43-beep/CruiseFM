@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-import { BADGE_COPY, BADGE_NEARLY, ON_AIR, WHATS_NEW, recapCopy, type Nudge } from '@/constants/notificationCopy';
+import { BADGE_COPY, BADGE_NEARLY, EARLY_ACCESS, ON_AIR, WHATS_NEW, recapCopy, type Nudge } from '@/constants/notificationCopy';
+import { hasEarlyAccess } from '@/utils/earlyAccess';
 import { isOnAir } from '@/constants/schedule';
 import { cachedSessionKind } from '@/utils/sessionKind';
 import { STATIONS } from '@/constants/stations';
@@ -96,6 +97,9 @@ type State = {
   badgesSeeded?: boolean;
   /** The app version last announced, so a release is announced at most once. */
   announcedVersion?: string;
+  /** Set once the free-Premium line has gone out (or been declined by the
+   *  new-in-the-app preference), so it can never be sent twice. */
+  earlyAccessTold?: boolean;
 };
 
 const DEFAULT_STATE: State = {
@@ -519,6 +523,49 @@ export async function announceReleaseIfNew(version: string): Promise<void> {
       },
       // A couple of minutes out, so it does not land while they are still
       // looking at the screen they just opened.
+      trigger: { type: 'timeInterval', seconds: 150, repeats: false } as never,
+    });
+  } catch { /* ignore */ }
+}
+
+/**
+ * "Premium is yours" — once, ever, and only on a phone utils/earlyAccess has
+ * granted free Premium for using the app before the paywall existed (17.09).
+ *
+ * THE HOME CARD IS THE PRIMARY TELLING; this is the backup. It needs the
+ * same consent as a release note — the new-in-the-app preference and the
+ * permission — and the permission is usually the missing piece, since it is
+ * only ever asked after the third drive. So: the preference being off counts
+ * as told (they have declined this class of line), but a missing permission
+ * or the quiet hours do NOT — those are "not yet", and the line is still
+ * true a week later. A fresh install never reaches this: the grant itself
+ * requires prior use.
+ */
+export async function announceEarlyAccessOnce(): Promise<void> {
+  if (!Notifications) return;
+  const s = await getState();
+  if (s.earlyAccessTold) return;
+  if (!(await hasEarlyAccess())) return;
+
+  const prefs = await getNotifPrefs();
+  if (!prefs.newStations) {
+    await updateState((x) => ({ ...x, earlyAccessTold: true }));
+    return;
+  }
+  if (!(await hasPermission())) return;
+  if (inQuietHours(new Date())) return;
+
+  await updateState((x) => ({ ...x, earlyAccessTold: true }));
+  const last = await loadLastCruise().catch(() => null);
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: EARLY_ACCESS.title,
+        body: EARLY_ACCESS.body,
+        data: { id: 'early-access', stationId: last?.stationId ?? 'night-run' },
+      },
+      // Same distance as a release note: not while they are still looking at
+      // the screen they just opened.
       trigger: { type: 'timeInterval', seconds: 150, repeats: false } as never,
     });
   } catch { /* ignore */ }

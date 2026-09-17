@@ -123,6 +123,17 @@ export const WHATS_NEW: Record<string, { title: string; body: string; stationId?
 };
 
 /**
+ * The one-off for a phone that was here before Premium existed (17.09).
+ * A statement of what they hold, never an offer — nothing is being sold and
+ * there is nothing to tap through to buy. Sent once, ever, and only to a
+ * phone utils/earlyAccess has already granted.
+ */
+export const EARLY_ACCESS = {
+  title: 'Premium is yours',
+  body: 'You were here before Premium existed. Every mode and every mood, unlocked — nothing to buy.',
+};
+
+/**
  * Sunday recap. Never sent when the week was empty — silence is the correct
  * message, and a nag about not driving is the fastest way to be muted forever.
  *

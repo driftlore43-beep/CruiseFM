@@ -26,7 +26,7 @@ the What's New should not be surprised by it.
 
 ## Before pressing Submit for Review
 
-1. **Confirm build 61 is in App Store Connect → TestFlight.** A submission
+1. ~~**Confirm build 61 is in App Store Connect → TestFlight.**~~ **DONE 17.09 — owner confirmed it is in TestFlight, and the listing text (description, promotional text, What's New) is entered.** A submission
    that was *scheduled* at build time is not one that *happened*, and the
    diagnose tool cannot tell you (08.09). If it is genuinely absent after
    Apple's processing window, run the workflow's `submit` mode — never before,

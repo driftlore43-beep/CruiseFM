@@ -47,7 +47,7 @@ console.log('\n  the platform sheet shows what is already chosen:');
   // The first-run sheet is up. Choose Apple Music properly.
   await click('Apple Music');
   await page.waitForTimeout(300);
-  await click('Let’s Drive').catch(async () => { await click("Let's Drive"); });
+  await click('Let’s Jam').catch(async () => { await click("Let's Jam"); }); // the sheet's confirm was renamed from "Let's Drive" on 14.09
   await page.waitForTimeout(1200);
 
   const saved = await page.evaluate(() => localStorage.getItem('cruisefm_platform'));
@@ -68,7 +68,7 @@ console.log('\n  the platform sheet shows what is already chosen:');
       .map((e) => (e.textContent || '').trim());
     return {
       prompting: txt.includes('Select a platform'),
-      ready: txt.some((t) => /Let.s Drive/.test(t)),
+      ready: txt.some((t) => /Let.s Jam/.test(t)), // renamed from "Let's Drive" on 14.09
     };
   });
   check('it does NOT ask you to select a platform again', !state.prompting, JSON.stringify(state));

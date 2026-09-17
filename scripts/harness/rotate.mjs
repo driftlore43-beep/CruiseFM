@@ -62,6 +62,20 @@ const overflow = async (tag) => {
       // taller than the window, and flagging it made every page look broken.
       // Width is the honest signal: nothing in this app scrolls sideways.
       if (r.width <= w + 2) continue;
+      // A HORIZONTAL SCROLLER'S CONTENT IS MEANT TO BE WIDER THAN THE WINDOW.
+      // The mode sheet's chip shelf is one (28.07), and the home page keeps
+      // that sheet mounted, parked off-screen (19.08) — so its ~1000px chip
+      // row is in the DOM on every page and is not an overflow of anything.
+      // Skip anything inside an ancestor that scrolls sideways; a row that
+      // is wider than the window with NO scroller around it is still caught.
+      {
+        let a = e.parentElement, scrolls = false;
+        for (let i = 0; i < 6 && a; i++, a = a.parentElement) {
+          const ox = getComputedStyle(a).overflowX;
+          if (ox === 'auto' || ox === 'scroll') { scrolls = true; break; }
+        }
+        if (scrolls) continue;
+      }
       // AND A TRANSPARENT LIGHT LAYER IS ALLOWED TO RUN OFF THE EDGE. Smoke
       // and glows are drawn past the frame ON PURPOSE — a haze that stops at
       // the screen edge ends in a straight line, which is the 25.07 bottom-seam

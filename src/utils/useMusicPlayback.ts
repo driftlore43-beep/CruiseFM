@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { noteTrackHeard } from './driveStats';
 import { noteSongForWidgets } from './widgetArtwork';
+import { publishWidgetData } from './widgetData';
 
 import { getSavedPlatform, type PlatformId } from './musicPlatform';
 import { appleMusicAvailable } from './appleMusic';
@@ -72,7 +73,13 @@ export function useMusicPlayback(visible: boolean, opts?: { pollMs?: number }) {
     // Fire-and-forget — nothing here may delay a song change.
     noteSongForWidgets(
       live.track.title, live.track.artist ?? '', live.track.albumArt ?? null,
-    ).catch(() => {});
+    )
+      // A new song means a new title for the tile as well as a new cover, and
+      // the title lives in the snapshot — republish it, or the widget redraws
+      // with this song's picture under the last song's name until the app
+      // is next backgrounded.
+      .then((isNew) => { if (isNew) return publishWidgetData(); })
+      .catch(() => {});
   }, [heard]);
 
   return useApple ? { ...apple, platform } : { ...spotify, platform };

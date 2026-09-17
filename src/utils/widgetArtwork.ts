@@ -46,25 +46,36 @@ function modules() {
 /**
  * Remember a song, and if it is new, put its cover where the widgets can
  * draw it. Returns quietly on every failure.
+ *
+ * RETURNS WHETHER THE SONG WAS NEW, and the caller republishes the snapshot
+ * when it was. The title and artist the widget PRINTS live in the snapshot,
+ * not in the artwork file — and until 17.09 nothing rewrote the snapshot on
+ * a song change: `setArtwork` asked iOS to redraw, iOS redrew, and the tile
+ * came back with the NEW cover under the OLD title, which then sat there
+ * until the app was backgrounded (the next `publishWidgetData`). That read
+ * as "the widgets are slow to follow the music". The publish is the caller's
+ * job rather than done here because widgetData imports this file for the
+ * back-fill, and the two must not import each other in a circle.
  */
 export async function noteSongForWidgets(
   title: string, artist: string, artUrl: string | null,
-): Promise<void> {
+): Promise<boolean> {
   const isNew = await noteLastPlayed(title, artist, artUrl).catch(() => false);
-  if (!isNew || !bridge) return;
+  if (!isNew) return false;
+  if (!bridge) return true;
 
   // No artwork for this song: clear the old one rather than leave the
   // previous song's cover sitting on the record claiming to be this one.
-  if (!artUrl) { await bridge.setArtwork(null).catch(() => {}); return; }
+  if (!artUrl) { await bridge.setArtwork(null).catch(() => {}); return true; }
 
   const m = modules();
-  if (!m) return;
+  if (!m) return true;
   try {
     let local = artUrl;
     if (/^https?:/.test(artUrl)) {
       const to = `${m.fs.cacheDirectory}widget-art.jpg`;
       const res = await m.fs.downloadAsync(artUrl, to);
-      if (!res?.uri) return;
+      if (!res?.uri) return true;
       local = res.uri;
     }
     const out = await m.manip.manipulateAsync(
@@ -76,6 +87,7 @@ export async function noteSongForWidgets(
     // Offline, a dead URL, a codec that will not open it — all end here, and
     // all mean the widget keeps whatever cover it already had.
   }
+  return true;
 }
 
 

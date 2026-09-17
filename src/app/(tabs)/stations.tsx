@@ -314,7 +314,14 @@ function StationRow({
       disabled={!onPress}
       style={({ pressed }) => [
         styles.row,
-        locked && styles.rowLocked,
+        // A locked row sits back — EXCEPT the one the page is putting on air.
+        // Opacity multiplies down through children, so dimming that row dims
+        // the ON AIR chip with it: measured 2.3:1 on paper in the 17.09 sweep,
+        // the first one run with the paywall live, on an 8.5pt word that is
+        // the page's one signal. The padlock still says locked; the tuned row
+        // already escapes the off-air dim on the same reasoning (a row the
+        // page is pointing at is not a row it should be fading).
+        locked && !featured && styles.rowLocked,
         // Nothing is taken away when a station is off air — it simply sits
         // back, the way a quiet frequency does.
         tuned && styles.rowTuned,
@@ -727,7 +734,11 @@ const makeStyles = (p: Palette) => StyleSheet.create({
     paddingVertical: 2,
   },
   airChipText: {
-    color: p.amber,
+    // The chip sits on its OWN 10% amber tint, not on bare paper, and
+    // `p.amber` was tuned to clear 4.5:1 on paper (13.08) — on the tint it
+    // measured ~3.4:1 at 8.5px in the 17.09 sweep. One step deeper on the
+    // same hue clears it; dark mode's amber on its own dark tint was fine.
+    color: p.mode === 'light' ? '#8A4D05' : p.amber,
     fontSize: 8.5,
     fontWeight: '800',
     letterSpacing: 1,

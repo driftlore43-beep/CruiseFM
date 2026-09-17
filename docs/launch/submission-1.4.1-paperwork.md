@@ -72,9 +72,23 @@ Build 60 (commit `99e3058`) also exists and is also 1.4.1. It predates the
 early-access code. Do not attach it; if App Store Connect offers both, pick
 the higher number. Both are native-identical to 57/58/59.
 
-### A2. In-App Purchases and Subscriptions — **on the version page**
+### A2. Attaching the subscriptions — **from the subscription page, not the version page**
 
-Scroll to the section of that name and add **both**:
+**CORRECTED 17.09.** The first draft of this section said to scroll the version
+page to an "In-App Purchases and Subscriptions" section. That section does not
+exist in the current App Store Connect, and the owner spent a round looking
+for it. The way it actually works:
+
+1. Monetization → Subscriptions → open the group **Cruise FM Premium**.
+2. Each product must read **Ready for Review**. Press **Add for Review** (top
+   right). The page then shows a blue banner, *"This item has been added for
+   review, but you can still remove the item"*, and the button greys out.
+   That banner is the proof the products are attached — there is nothing to
+   tick on the version page.
+3. Back on the 1.4.1 version page press **Add for Review**, then on the
+   review submission page check the bundle lists **three items**: version
+   1.4.1 (build 61), Premium Monthly and Premium Annual. Then **Submit to
+   App Review**.
 
 - Premium Monthly — `com.driftlore.CruiseFM.monthly`
 - Premium Annual — `com.driftlore.CruiseFM.premium.annual`
@@ -115,7 +129,7 @@ decision for a later version, not a correction.)
 | Monetization → Subscriptions | **Two products in one group ("Cruise FM Premium")**, both attached to the 1.4.1 version (A2). |
 | Monetization → In-App Purchases | Empty — there is no one-off product. (The Founder lifetime idea was never created; leave it.) |
 | Pricing and Availability → Price | **Free** to download, unchanged. The subscriptions carry their own prices. |
-| Version page → In-App Purchases and Subscriptions | **Both subscriptions selected.** |
+| Subscription group page → Add for Review | **Both products showing the "added for review" banner** (A2). The version page has no subscriptions section to tick. |
 | App Review Information → Sign-in required | **No**, unchanged. |
 | App Review Information → Notes | Section C below. |
 | Subscription review notes (per product, optional) | "7-day free trial, then auto-renews. Unlocks the FM stations, five visual modes and unlimited custom stations." |

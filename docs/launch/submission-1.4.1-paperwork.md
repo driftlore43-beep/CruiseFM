@@ -1,7 +1,8 @@
 # 1.4.1 submission paperwork — the first version with a paywall
 
 Written 17.09.2026, the day the paywall went live on preview and build 60 was
-cut. Work down it in App Store Connect. Where 1.4.0's paperwork
+cut; updated the same day when build 61 was cut from the early-access commit
+(`16dad95`) — **attach 61, not 60.** Work down it in App Store Connect. Where 1.4.0's paperwork
 (`submission-1.4.0-paperwork.md`) still applies it is not repeated — this is
 the delta, and the delta is almost entirely about money.
 
@@ -25,14 +26,14 @@ the What's New should not be surprised by it.
 
 ## Before pressing Submit for Review
 
-1. **Confirm build 60 is in App Store Connect → TestFlight.** A submission
+1. **Confirm build 61 is in App Store Connect → TestFlight.** A submission
    that was *scheduled* at build time is not one that *happened*, and the
    diagnose tool cannot tell you (08.09). If it is genuinely absent after
    Apple's processing window, run the workflow's `submit` mode — never before,
    a build number can only be uploaded once.
-2. **Do NOT install build 60 on your phone.** It is a production-profile
-   build; installing it takes the phone off the preview channel and stops it
-   receiving updates (the 02.08 drought). Your phone stays on 57. 60 is
+2. **Do NOT install build 60 or 61 on your phone.** They are production-profile
+   builds; installing one takes the phone off the preview channel and stops it
+   receiving updates (the 02.08 drought). Your phone stays on 57. 61 is
    native-identical to 57, so the launch-on-a-phone rule is already met.
 3. **Both subscriptions say "Ready to Submit"** (Monetization → Subscriptions →
    Cruise FM Premium). Each needs its Review Screenshot (already uploaded —
@@ -62,14 +63,14 @@ safe.
 
 ### A1. Build
 
-Attach **build 60** (version 1.4.1, runtime 1.3.0, commit `99e3058`). It is
-the only 1.4.1 build.
+Attach **build 61** (version 1.4.1, runtime 1.3.0, commit `16dad95`). It
+carries the paywall AND the free-Premium-for-early-users code baked in, so a
+customer updating from the store keeps Premium from their very first launch
+of 1.4.1 — no one-launch gap.
 
-Note it does NOT carry the free-Premium-for-early-users code (that landed
-after it was cut, and ships over the air). That is fine for review — a
-reviewer never qualifies — and fine for customers, because of the publish
-order in section D. If you would rather the store binary carry it too, ask
-for build 61; it costs one build and changes nothing else.
+Build 60 (commit `99e3058`) also exists and is also 1.4.1. It predates the
+early-access code. Do not attach it; if App Store Connect offers both, pick
+the higher number. Both are native-identical to 57/58/59.
 
 ### A2. In-App Purchases and Subscriptions — **on the version page**
 
@@ -157,14 +158,14 @@ Premium unlocked without paying, decided on the device. A fresh install
    version is set to manual release, so there is a gap between "approved" and
    "live" — use it. The production publish carries the paywall AND the
    free-Premium-for-early-users code onto every 1.4.0 binary already
-   installed (they listen on runtime 1.3.0, same as 60), so an existing
+   installed (they listen on runtime 1.3.0, same as 61), so an existing
    customer's first launch after the update already knows they qualify. Publish
    AFTER approval and BEFORE release; the workflow's own "is a real build
    listening on this runtime" check must be allowed to run.
-2. **Press Release.** People updating from the store to 1.4.1 get build 60's
-   baked bundle on their first launch (paywall, no early-access code) and the
-   production update on their second — so a long-time user could see padlocks
-   for exactly one launch. If that bothers you, build 61 (A1) removes it.
+2. **Press Release.** Build 61's baked bundle already carries the
+   early-access code, so someone updating from the store keeps Premium from
+   their first launch of 1.4.1. The production publish in step 1 is still
+   needed for everyone who has NOT yet updated the binary.
 3. **Switch the DSA declaration to trader.** The moment real money moves,
    "non-trader" is untrue. It needs a public address, phone and email on the
    EU listing — **not your home address**; sort a real business address first

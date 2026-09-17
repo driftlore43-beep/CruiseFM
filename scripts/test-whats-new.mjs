@@ -70,8 +70,20 @@ if (!NOTE) {
   process.exit(fails ? 1 : 0);
 }
 
-console.log('\n  a brand-new install is NOT told what is new:');
-{
+// A brand-new install has no "before" to compare against, so an ordinary
+// note stays silent for them and is written down so it never fires later.
+// A note that says `alsoForNewInstalls` is the declared exception (16.09):
+// it describes a whole feature the binary they just installed HAS, so it
+// is worth reading with no earlier version in hand, and it shows.
+if (NOTE.alsoForNewInstalls) {
+  console.log('\n  a brand-new install IS told, because this note says alsoForNewInstalls:');
+  const { mod, store } = load({});
+  const got = await mod.noteToShow(false, CAPS);
+  check('gets the note', got?.id === NOTE.id, `got ${got && got.id}`);
+  check('...and nothing is written until it is marked seen', store[KEY] === undefined,
+    `store holds ${store[KEY]}`);
+} else {
+  console.log('\n  a brand-new install is NOT told what is new:');
   // Never seen a note, never seen the welcome explainer = brand new.
   const { mod, store } = load({});
   const got = await mod.noteToShow(false, CAPS);

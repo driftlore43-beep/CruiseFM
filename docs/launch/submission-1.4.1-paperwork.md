@@ -176,15 +176,13 @@ Premium unlocked without paying, decided on the device. A fresh install
    customer's first launch after the update already knows they qualify. Publish
    AFTER approval and BEFORE release; the workflow's own "is a real build
    listening on this runtime" check must be allowed to run.
-2. **Press Release — but not before the Paid Apps agreement reads Active
-   (section G).** Build 61's baked bundle already carries the early-access
-   code, so someone updating from the store keeps Premium from their first
-   launch of 1.4.1. The production publish in step 1 is still needed for
-   everyone who has NOT yet updated the binary. **Releasing while the
-   agreement is unfinished ships a paywall the store cannot take money
-   through**, so day-one customers meet "Premium isn't on sale right now"
-   instead of a price. Approval does not expire while you wait; manual
-   release exists precisely so the date is yours.
+2. **Press Release.** ~~Not before the Paid Apps agreement reads Active.~~
+   **THAT GATE IS LIFTED — the agreement has been Active since 25.08.2026 and
+   the whole of section G was already done before 1.4.1 was ever submitted
+   (see G0).** Build 61's baked bundle already carries the early-access code,
+   so someone updating from the store keeps Premium from their first launch of
+   1.4.1. The production publish in step 1 is still needed for everyone who
+   has NOT yet updated the binary.
 3. **Switch the DSA declaration to trader.** The moment real money moves,
    "non-trader" is untrue. It needs a public address, phone and email on the
    EU listing — **not your home address**; sort a real business address first
@@ -291,15 +289,46 @@ actually sell the products on release day.
 
 ---
 
-## G. The money paperwork — do it DURING the review, not after
+## G. The money paperwork — **ALREADY DONE, and this file said otherwise twice**
 
-**None of this blocks the review and all of it blocks the money.** Apple
-accepted the submission with the agreement unfinished, so review proceeds
-either way — and then the store refuses to sell the subscriptions until it
-reads **Active**. Finished during the review it costs nothing; finished after
-approval it either delays Release or, worse, is skipped and real customers
-meet a paywall that cannot charge them. It is also the likeliest reason for a
-subscription product to be knocked back on its own while the app passes.
+### G0. What the Business page actually shows — 18.09.2026
+
+The owner sent a screenshot of App Store Connect → Business, and it settles
+it. **Everything below was finished before 1.4.1 was ever submitted:**
+
+| Row | Status | Date |
+|---|---|---|
+| Free Apps Agreement | Active | 25.08.2026 |
+| **Paid Apps Agreement** | **Active** | **25.08.2026** |
+| Commonwealth Bank of Australia, bank currency AUD | Active | — |
+| ABN and GST Registration Documents | Active | 08.09.2026 |
+| U.S. Certificate of Foreign Status of Beneficial Owner | Active | 11.09.2026 |
+| **U.S. Form W-8BEN** | **Active** | **11.09.2026** |
+| Digital Services Act, 27 countries | **In Review** | last updated 07.09.2026 |
+
+**SO THE 17.09 NOTE THAT "THE MONEY IS NOT WIRED YET" WAS NEVER TRUE, AND
+NEITHER WAS THE 18.09 ADVICE BUILT ON TOP OF IT.** It came from the owner's
+own "i dont think i added payment", which was taken as fact and written into
+the log as one; on 18.09 it was repeated back to her as a thing still to do,
+and Release was gated on it. Both are wrong. **This is the 21.08 rule
+again, and it is the third time: this file records what was done FROM HERE,
+and App Store Connect is the only witness to what was typed into App Store
+Connect — including when the person typing it does not remember doing it.**
+The fix is the same as it was then: ask for the page before reasoning about
+what is on it.
+
+**What is left is therefore only the DSA row (G6) and the Small Business
+Program (G4).** G1 to G3 below are kept as a record of what each one is and
+why it matters, not as work to do.
+
+---
+
+**Why it mattered, for the record.** None of it blocks a review and all of it
+blocks the money: Apple will take a submission with the agreement unfinished
+and then refuse to sell the subscriptions until it reads **Active**. An
+unfinished agreement is also the likeliest reason for a subscription product
+to be knocked back on its own while the app itself passes. None of that is a
+risk here, because it was Active a month before submission.
 
 Where: **App Store Connect → Business** (older layouts call it Agreements,
 Tax and Banking). Three things have to go green, and they unlock in order.
@@ -337,12 +366,42 @@ Two of them, and both are normal for an Australian developer.
   at launch scale it is very unlikely to bind, but that is context rather
   than advice.
 
-### G4. Then enrol in the Small Business Program
+### G4. The Small Business Program — **OUTSTANDING, and worth real money**
 
-Once the agreement is Active, enrol (App Store Connect → Business). It cuts
+**Not on the Business screenshot, so it has probably not been enrolled in.**
+The agreement has been Active since 25.08, so nothing has been blocking it —
+**check first, then enrol if not.** It cuts
 Apple's commission from **30% to 15%** on up to a million US dollars a year.
 It is free, it takes one form, and at this scale there is no reason not to.
 It applies from the start of the next month, so earlier is better.
+
+### G6. The Digital Services Act row — **In Review since 07.09**
+
+The one row on that page that is not Active. It has been In Review for
+**eleven days**, which is longer than this normally takes, and the 15.09 entry
+records it already sitting there with nothing from Apple in the account's
+inbox.
+
+**Being In Review is not a problem by itself, and it does NOT hold up the app
+or the release.** 1.4.1 goes through review, gets approved and can be released
+with this row exactly as it is. What it holds up is the EU.
+
+**Two things to check on it, in this order.** First press **View** on that row
+and read **which status was declared** — trader or non-trader. That decides
+everything and cannot be guessed from the word "In Review":
+
+- **If it says non-trader**, it was the honest answer when the app was free
+  and it stops being honest the moment a subscription sells. It has to become
+  trader, and trader status **publishes a contact address, phone and email on
+  the EU listing** — so a real business address is needed first, not the home
+  address (25.08, still open).
+- **If it says trader**, the verification is Apple checking those details and
+  there is nothing to do but wait.
+
+Second, the 26.08 finding still stands and is the one that actually costs
+something: **selecting is not submitting**, and an app with **no** status
+submitted is the one Apple removes from the EU. In Review means it was
+submitted, so that trap is already avoided.
 
 ### G5. What to expect afterwards
 

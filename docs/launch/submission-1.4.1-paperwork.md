@@ -425,17 +425,26 @@ inert while the review runs:
 - **Account level:** Business → Agreements → Compliance → Digital Services
   Act → *Complete Compliance Requirements*.
 
-**THE LIVE QUESTION IS NOW THE ADDRESS, AND IT IS TIME-SENSITIVE.** Trader
-status **publishes a street address, a phone number and an email on the EU App
-Store product page** — that is the entire point of the declaration, so EU
-consumers can identify who they bought from. The only address on this account
-is the owner's home address, and 25.08 recorded in as many words that it must
-not be the published one. So read back what was actually typed into those
-contact fields **before the verification completes and the listing carries
-them**. If it is the home address, changing it means re-entering the details
-and going through the email/phone 2FA again — cheaper now than after it is
-public. A registered-office or virtual-office address for Strofi Technologies
-is the ordinary fix; a PO box is usually refused.
+**THE ADDRESS IS THE ACCOUNT'S, NOT A FORM ON THIS SCREEN — CORRECTED 18.09.**
+This section previously said to "read back what went into those contact
+fields", which sent the owner hunting for a form that does not exist. The
+pop-up's own wording settles it: *"Apple will publish the verified address and
+contact information **associated with your developer account**."* So trader
+status publishes whatever address, phone and email are already on the Apple
+Developer account — there is nothing typed in per app, and nothing to check on
+the App Information screen.
+
+Where to read it: **developer.apple.com → Account → Membership details**. The
+only address on this account is the owner's home address, and 25.08 recorded
+that it must not be the published one, so that is still worth looking at — but
+changing it means changing the ACCOUNT's address, which is a different and
+slower job than editing a field (and on an individual account, Apple verifies
+it). A registered-office or virtual-office address in Strofi Technologies'
+name is the ordinary fix; a PO box is usually refused.
+
+Also from that screenshot: the pop-up's **Next button is greyed out**, which is
+the confirmation that trader is already the saved state — there is no pending
+change to submit. Cancel out; do not press anything.
 
 The 26.08 finding still stands and is the one that actually costs something:
 **selecting is not submitting**, and an app with **no** status submitted is

@@ -57,15 +57,34 @@ const asyncStorage = {
 // notificationCopy reaches for the vocabulary (drives vs sessions), which
 // reaches for storage — so the real module is loaded against the same stub the
 // engine uses, rather than faked.
+// The real theme, not a copied threshold: sessionKind asks isTabletSize
+// whether this is an iPad, and a stub carrying its own 700 would silently
+// disagree the day that number moves.
+const theme = run(`${ROOT}/constants/theme.ts`, (m) => {
+  if (m === '@/global.css') return {};
+  if (m === 'react-native') return { Platform: { OS: 'ios', select: (o) => (o.ios ?? o.default) } };
+  throw new Error('unstubbed ' + m);
+});
 const sessionKind = run(`${ROOT}/utils/sessionKind.ts`, (m) => {
   if (m === '@react-native-async-storage/async-storage') return asyncStorage;
   // The module gained a hook (useSessionKind) when the car went on the scrub
   // bar; nothing here renders, so the hooks only need to exist.
   if (m === 'react') return { useEffect: () => {}, useState: (v) => [v, () => {}] };
+  // A PHONE window, deliberately. Since 14.09 sessionKind answers 'listening'
+  // unconditionally on a tablet, which would take the drive vocabulary out of
+  // every line here. These are phone notifications.
+  if (m === 'react-native') return { Dimensions: { get: () => ({ width: 393, height: 852 }) } };
+  if (m === '@/constants/theme') return theme;
   throw new Error('unstubbed ' + m);
 });
 const copy = run(`${ROOT}/constants/notificationCopy.ts`, (m) => {
   if (m === '@/utils/sessionKind') return sessionKind;
+  throw new Error('unstubbed ' + m);
+});
+
+const earlyAccess = run(`${ROOT}/utils/earlyAccess.ts`, (m) => {
+  if (m === '@react-native-async-storage/async-storage') return asyncStorage;
+  if (m === '@/constants/config') return { LAUNCH_FREE: false };
   throw new Error('unstubbed ' + m);
 });
 
@@ -94,6 +113,11 @@ function loadEngine() {
     }
     if (s === '@/utils/lastCruise') return { loadLastCruise: async () => null };
     if (s === '@/utils/sessionKind') return sessionKind;
+    // The REAL grant, on the same storage the engine reads, rather than a
+    // faked boolean: "Premium is yours" is a one-off line that must only
+    // reach a phone that genuinely qualified, and a stub that always says
+    // yes would never catch it going out to everyone.
+    if (s === '@/utils/earlyAccess') return earlyAccess;
     throw new Error('unstubbed ' + s);
   });
 }

@@ -37,12 +37,27 @@ function load(file, stubs = {}) {
 const S = load(`${ROOT}/constants/schedule.ts`, {
   '@/constants/stations': `({ STATIONS: ${JSON.stringify(IDS.map((id) => ({ id })))} })`,
 });
+// The real theme, not a copied threshold: sessionKind asks isTabletSize
+// whether this is an iPad, and a stub carrying its own 700 would silently
+// disagree the day that number moves. theme.ts only needs its stylesheet
+// import and Platform stubbed to load here.
+const TH = load(`${ROOT}/constants/theme.ts`, {
+  '@/global.css': '({})',
+  'react-native': "({ Platform: { OS: 'ios', select: (o) => (o.ios ?? o.default) } })",
+});
+globalThis.__th = TH;
 const SK = load(`${ROOT}/utils/sessionKind.ts`, {
   '@react-native-async-storage/async-storage':
     '({ __esModule: true, default: { getItem: async () => null, setItem: async () => {} } })',
   // sessionKind exports a hook as well as the plain functions, so it imports
   // React. Nothing here renders, so the hooks only need to exist.
   react: '({ useEffect: () => {}, useState: (v) => [v, () => {}] })',
+  // A PHONE window, deliberately. Since 14.09 sessionKind asks the window
+  // whether it is a tablet and answers 'listening' unconditionally if it is —
+  // which would make every line here a desk line and test nothing about the
+  // drive vocabulary. These are phone notifications.
+  'react-native': '({ Dimensions: { get: () => ({ width: 393, height: 852 }) } })',
+  '@/constants/theme': 'globalThis.__th',
 });
 globalThis.__sk = SK;
 const C = load(`${ROOT}/constants/notificationCopy.ts`, { '@/utils/sessionKind': 'globalThis.__sk' });

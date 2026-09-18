@@ -284,6 +284,11 @@ attached to anything.
    check is automated, so the resubmission is the answer. Do **not** press
    **Cancel Submission**; edit and resubmit instead.
 
+**DONE — RESUBMITTED 18.09.** Owner: "i added the terms of use links and
+resubmitted." The version page reads **1.4.1 Waiting for Review** again. The
+production channel therefore stays shut until Apple answers, and everything in
+section D still applies after approval: production publish BEFORE Release.
+
 Everything in section D — production publish BEFORE pressing Release, then the
 DSA trader declaration — still stands unchanged for after approval. So does
 the Paid Apps agreement, which is still what decides whether the store can

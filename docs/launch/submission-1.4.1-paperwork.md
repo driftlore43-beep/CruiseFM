@@ -176,10 +176,15 @@ Premium unlocked without paying, decided on the device. A fresh install
    customer's first launch after the update already knows they qualify. Publish
    AFTER approval and BEFORE release; the workflow's own "is a real build
    listening on this runtime" check must be allowed to run.
-2. **Press Release.** Build 61's baked bundle already carries the
-   early-access code, so someone updating from the store keeps Premium from
-   their first launch of 1.4.1. The production publish in step 1 is still
-   needed for everyone who has NOT yet updated the binary.
+2. **Press Release — but not before the Paid Apps agreement reads Active
+   (section G).** Build 61's baked bundle already carries the early-access
+   code, so someone updating from the store keeps Premium from their first
+   launch of 1.4.1. The production publish in step 1 is still needed for
+   everyone who has NOT yet updated the binary. **Releasing while the
+   agreement is unfinished ships a paywall the store cannot take money
+   through**, so day-one customers meet "Premium isn't on sale right now"
+   instead of a price. Approval does not expire while you wait; manual
+   release exists precisely so the date is yours.
 3. **Switch the DSA declaration to trader.** The moment real money moves,
    "non-trader" is untrue. It needs a public address, phone and email on the
    EU listing — **not your home address**; sort a real business address first
@@ -283,3 +288,68 @@ Everything in section D — production publish BEFORE pressing Release, then the
 DSA trader declaration — still stands unchanged for after approval. So does
 the Paid Apps agreement, which is still what decides whether the store can
 actually sell the products on release day.
+
+---
+
+## G. The money paperwork — do it DURING the review, not after
+
+**None of this blocks the review and all of it blocks the money.** Apple
+accepted the submission with the agreement unfinished, so review proceeds
+either way — and then the store refuses to sell the subscriptions until it
+reads **Active**. Finished during the review it costs nothing; finished after
+approval it either delays Release or, worse, is skipped and real customers
+meet a paywall that cannot charge them. It is also the likeliest reason for a
+subscription product to be knocked back on its own while the app passes.
+
+Where: **App Store Connect → Business** (older layouts call it Agreements,
+Tax and Banking). Three things have to go green, and they unlock in order.
+
+### G1. Paid Applications agreement
+
+Request it and accept it. Until this is in place the other two cannot be
+filled in. It is between Apple and whoever the developer account belongs to,
+which today is an individual, not a company — that is fine and changes
+nothing about the app.
+
+### G2. Bank details
+
+An Australian account in the account holder's own name: account name, bank,
+**BSB** and account number. Apple pays in AUD to an AUD account with no
+conversion.
+
+**These go in Apple's form and nowhere else.** Not in chat, not in this
+repository, not in a screenshot sent anywhere. Nothing in this project ever
+sees a payment.
+
+### G3. Tax forms
+
+Two of them, and both are normal for an Australian developer.
+
+- **US W-8BEN** — required of everyone outside the United States. It tells
+  the US you are not a US taxpayer, and the Australia/US treaty then drops
+  the withholding on US sales to **0%**. Skip it and the US keeps 30% of
+  every American sale. It is short and self-service.
+- **The Australian tax form** — asks for an **ABN** and whether you are
+  registered for **GST**. Answering it honestly is the whole job; whether to
+  get an ABN, and whether GST registration applies, is an **accountant's
+  question and not one for this file** (raised 25.08 and still open). You can
+  complete the form without an ABN. The GST threshold is a turnover test, so
+  at launch scale it is very unlikely to bind, but that is context rather
+  than advice.
+
+### G4. Then enrol in the Small Business Program
+
+Once the agreement is Active, enrol (App Store Connect → Business). It cuts
+Apple's commission from **30% to 15%** on up to a million US dollars a year.
+It is free, it takes one form, and at this scale there is no reason not to.
+It applies from the start of the next month, so earlier is better.
+
+### G5. What to expect afterwards
+
+- Nothing arrives immediately. Apple pays roughly **a month after the end of
+  its own fiscal month**, and only once the balance clears a small minimum.
+- A 7-day trial shows as a subscriber in **Sales and Trends** and in
+  RevenueCat straight away; the **money** appears a week later, when the
+  trial converts.
+- **Payments and Financial Reports** is where the real numbers live. Sales
+  and Trends is the live view, Payments is what was actually paid.

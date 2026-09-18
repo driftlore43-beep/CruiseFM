@@ -373,11 +373,29 @@ Two of them, and both are normal for an Australian developer.
   at launch scale it is very unlikely to bind, but that is context rather
   than advice.
 
-### G4. The Small Business Program — **OUTSTANDING, and worth real money**
+### G4. The Small Business Program — **ENROLMENT SUBMITTED 18.09**
 
-**Not on the Business screenshot, so it has probably not been enrolled in.**
-The Paid Apps agreement has been Active since 25.08, so nothing has been
-blocking it — **check first, then enrol if not.**
+**DONE — owner submitted the enrolment on 18.09**, before the paywall was ever
+live, which is the whole point: the rate does not backdate. Awaiting Apple's
+approval email.
+
+**THE ONE THING TO WATCH IS THE START DATE.** Apple's wording, read off their
+own page rather than remembered: *"15 days after the end of the fiscal
+calendar month in which enrollment is approved"* (their example: approved
+10 February → 15% from 14 March). So every sale before that date is charged at
+30% and is not refunded afterwards.
+
+**THE TEAM ID, since the enrolment form asked for it and nothing else here
+records where to find it:** `XWPL6DG7L8`, which is `ios.appleTeamId` in
+`app.json` (added 01.09 for the widget build) and also sits on
+developer.apple.com → Account → Membership details. It is not a secret — it is
+in every build's provisioning profile. "Associated Developer Accounts" means
+OTHER accounts under the same ownership, which exists to stop anyone splitting
+sales across accounts to stay under the threshold; there is only one account
+here, so there was nothing to associate.
+
+*(Historic: the Paid Apps agreement has been Active since 25.08, so nothing
+had been blocking enrolment for a month.)*
 
 | | |
 |---|---|

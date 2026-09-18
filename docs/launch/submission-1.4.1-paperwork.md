@@ -183,10 +183,12 @@ Premium unlocked without paying, decided on the device. A fresh install
    so someone updating from the store keeps Premium from their first launch of
    1.4.1. The production publish in step 1 is still needed for everyone who
    has NOT yet updated the binary.
-3. **Switch the DSA declaration to trader.** The moment real money moves,
-   "non-trader" is untrue. It needs a public address, phone and email on the
-   EU listing — **not your home address**; sort a real business address first
-   (25.08).
+3. ~~**Switch the DSA declaration to trader.**~~ **ALREADY DONE — confirmed
+   18.09, the declaration reads TRADER** (G6). Nothing to switch. What is
+   live instead is *which contact details it publishes on the EU listing* —
+   read them back before Apple's verification finishes, because trader status
+   puts a street address, a phone number and an email on the EU product page
+   and the only address on the account is a home address (25.08).
 4. **Check the first real sale in App Store Connect → Sales and Trends** a day
    or two later, and in RevenueCat → Overview. A trial that starts shows in
    both; money shows after the 7 days.
@@ -395,61 +397,50 @@ Earlier is strictly better: anything sold at 30% before approval is money that
 does not come back. **CORRECTION 18.09: an earlier draft of this section said
 it "applies from the start of the next month", which is not what Apple says.**
 
-### G6. The Digital Services Act row — **In Review since 07.09**
+### G6. The Digital Services Act row — **TRADER, CONFIRMED 18.09**
 
-The one row on that page that is not Active. It has been In Review for
-**eleven days**, which is longer than this normally takes, and the 15.09 entry
-records it already sitting there with nothing from Apple in the account's
-inbox.
+The owner opened the declaration on the App Information screen and it reads
+**trader**. So the status question is settled: the declaration was submitted,
+it is a trader declaration, and "In Review" on the Business page is Apple
+**verifying the contact details**, not something waiting on her. Section D
+step 3 is therefore done rather than pending.
 
-**Being In Review is not a problem by itself, and it does NOT hold up the app
-or the release.** 1.4.1 goes through review, gets approved and can be released
-with this row exactly as it is. What it holds up is the EU.
+That also confirms the inference this section made from the duration alone,
+which is worth keeping as a reading: a NON-trader declaration is two clicks
+and `Done` — nothing to verify — so it has no reason to sit In Review for
+eleven days, while the trader path takes contact details, validates the email
+and the phone by 2FA, and takes uploaded documents. The wait WAS the evidence.
 
-**THE STATUS IS NOT READABLE FROM THE BUSINESS PAGE, AND THE OWNER FOUND THAT
-OUT BEFORE THIS DOC DID (18.09).** The `View` link on that row opens the list
-of 27 countries, not the declaration, and the rest of it is inert while the
-review runs. There are **two different screens** and only one of them answers
-the question:
+**It has never held up the app, the approval or the release.** 1.4.1 goes
+through review and can be released with this row exactly as it is. What it
+governs is the EU listing.
 
-- **Per app, and this is the one to read:** Apps → **Cruise FM** → **App
-  Information** in the left sidebar → scroll to **App Store Regulations and
-  Permits** → under **Digital Services Act** press **Edit**. The pop-up names
-  the app's current trader status.
-- **Account level, which is the row on the Business page:** Business →
-  Agreements → Compliance → Digital Services Act → *Complete Compliance
-  Requirements*, where the account is declared "a trader account" or "not a
-  trader account". **While it reads In Review there is nothing to do there
-  but wait.**
+**WHERE TO READ IT**, since the Business row does not answer the question —
+its `View` link opens the list of 27 countries, and the rest of the row is
+inert while the review runs:
 
-**AND THE LENGTH OF THE REVIEW IS ITSELF EVIDENCE OF WHICH WAY IT WENT.** A
-NON-trader declaration is two clicks and `Done` — nothing to verify, so no
-reason to sit In Review for eleven days. The TRADER path takes contact
-details, validates the email and the phone by 2FA, and takes uploaded
-verification documents. **So this is very probably already declared as a
-trader**, which would make section D step 3 done rather than pending. Confirm
-it on the App Information screen rather than taking that as read.
+- **Per app, the readable one:** Apps → **Cruise FM** → **App Information** →
+  **App Store Regulations and Permits** → **Digital Services Act** → **Edit**.
+  The pop-up names the current trader status.
+- **Account level:** Business → Agreements → Compliance → Digital Services
+  Act → *Complete Compliance Requirements*.
 
-**IF IT IS TRADER, THERE IS A PRIVACY CONSEQUENCE WORTH CHECKING BEFORE THE
-VERIFICATION FINISHES.** Trader status publishes an address, a phone number
-and an email **on the EU App Store product page**. The only address on the
-account is the owner's home address, and 25.08 recorded in as many words that
-it must not be the published one. Read back what was actually put in those
-contact fields; if it is the home address, that is worth fixing before the
-listing carries it rather than after.
+**THE LIVE QUESTION IS NOW THE ADDRESS, AND IT IS TIME-SENSITIVE.** Trader
+status **publishes a street address, a phone number and an email on the EU App
+Store product page** — that is the entire point of the declaration, so EU
+consumers can identify who they bought from. The only address on this account
+is the owner's home address, and 25.08 recorded in as many words that it must
+not be the published one. So read back what was actually typed into those
+contact fields **before the verification completes and the listing carries
+them**. If it is the home address, changing it means re-entering the details
+and going through the email/phone 2FA again — cheaper now than after it is
+public. A registered-office or virtual-office address for Strofi Technologies
+is the ordinary fix; a PO box is usually refused.
 
-Two further things, whichever way it turns out:
-
-- **If it says non-trader**, it was the honest answer while the app was free
-  and it stops being honest the moment a subscription sells, so it has to
-  become trader, with a real business address sorted first.
-- **If it says trader**, there is nothing to do but wait, and the address
-  question above is the live one.
-
-The 26.08 finding still stands and is the one that actually costs
-something: **selecting is not submitting**, and an app with **no** status
-submitted is the one Apple removes from the EU. In Review means it was
-submitted, so that trap is already avoided.
+The 26.08 finding still stands and is the one that actually costs something:
+**selecting is not submitting**, and an app with **no** status submitted is
+the one Apple removes from the EU. In Review means it was submitted, so that
+trap is behind her.
 
 ### G5. What to expect afterwards
 

@@ -196,10 +196,90 @@ The likely reasons, in order:
 
 - **2.3 misleading metadata** — the description or promotional text still
   says "free" / "nothing to buy". Fix the text; no new build needed.
-- **3.1.2 subscription information** — the paywall must show the price,
-  length, what renews and links to Terms and Privacy. It does all four
-  (15.09), read from the store. If Apple says otherwise, ask which is missing
-  and send the reply with a screenshot of the paywall on a real phone.
+- **3.1.2 subscription information** — **THIS IS WHAT HAPPENED, 18.09, and
+  the half predicted here was the wrong half.** This bullet assumed 3.1.2
+  would be about the PAYWALL SCREEN, which does show the price, the length,
+  what renews and links to Terms and Privacy (15.09), read from the store.
+  Apple's rejection was about the **METADATA**: *"does not include a
+  functional link to the Terms of Use (EULA) in the app metadata that
+  appears on the app's App Store product page."* A different surface, a
+  different fix, and no build involved either way. See section F.
 - **The subscription itself rejected, the app approved** — happens. The app
   ships; the paywall then shows "Premium isn't on sale right now" until the
   product is fixed and re-reviewed. Nothing breaks.
+
+---
+
+## F. REJECTED 18.09 — 3.1.2, and it is the product page rather than the app
+
+Apple's message, in full: *"The submission offers auto-renewable
+subscriptions, such as Premium Monthly, Premium Annual, but does not include a
+functional link to the Terms of Use (EULA) in the app metadata that appears on
+the app's App Store product page."* Automated, so it never reached a human
+reviewer — nothing was judged and nothing about the app was found wanting.
+
+**THE APP IS NOT THE PROBLEM AND MUST NOT BE TOUCHED.** `premium.tsx` has
+carried working Terms of Use and Privacy Policy links since 15.09, in the
+binary, opening in place through `SettingsSheet`. That requirement is met.
+What Apple is asking for is a SECOND link, on the **App Store product page**,
+which is written in App Store Connect and not in any build. So: **no new
+build, no OTA, build 61 stays attached, the two subscriptions stay as they
+are.** It is a text edit and a resubmission.
+
+### F1. The fix — paste this at the end of the description
+
+App Store Connect → Cruise FM → the **1.4.1** version → **Description**.
+Leave every word of it alone and add these two lines at the very bottom,
+after "Cruise FM is made by Strofi Technologies.":
+
+```
+Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Privacy Policy: https://cruisefm.netlify.app/privacy/
+```
+
+**Why Apple's own EULA and not ours.** Apple's message offers two routes —
+link the standard Terms of Use in the description, or upload a custom EULA in
+App Store Connect — and the standard one is the right choice here for two
+reasons. It is the agreement Cruise FM is already distributed under (nothing
+has ever been uploaded to App Information → License Agreement, so the standard
+one is in force whether or not it is linked), and its URL is Apple's own, so
+the "functional link" test cannot fail on a website being down. A custom EULA
+has to carry Apple's minimum terms and is read by a human, which is a second
+review round to fix a link.
+
+The description is ~2,500 characters against a 4,000 limit, so there is room.
+
+**The Privacy line is a second belt.** The Privacy Policy URL field on the
+version page should already hold that address; check it matches, and **open
+both links in a browser before submitting** — "functional" is exactly what
+was checked and exactly what failed. This sandbox cannot reach
+`cruisefm.netlify.app` (the proxy refuses it), so nobody here can confirm the
+privacy page is up; the owner's own browser is the only witness.
+
+Cruise FM's own terms (`cruisefm.netlify.app/terms/`) are deliberately NOT
+named on the product page. They are linked inside the app, where they belong,
+and advertising a second document called "Terms" beside Apple's would invite a
+reviewer to ask which one governs the subscription.
+
+### F2. Resubmitting — check the bundle is three items again
+
+A rejection returns the whole submission, so the subscriptions are no longer
+attached to anything.
+
+1. Edit the description as above. Save.
+2. Monetization → Subscriptions → **Cruise FM Premium**: both products should
+   still read **Ready for Review** or still carry the "added for review"
+   banner. If the banner is gone, press **Add for Review** on each product's
+   own page again — A2 above has the detail, and there is still nothing to
+   tick on the version page.
+3. The 1.4.1 version page → **Add for Review** → confirm the bundle lists
+   **three items** (1.4.1 build 61, Premium Monthly, Premium Annual) →
+   **Submit to App Review**.
+4. Replying to the rejection message is optional and adds nothing here — the
+   check is automated, so the resubmission is the answer. Do **not** press
+   **Cancel Submission**; edit and resubmit instead.
+
+Everything in section D — production publish BEFORE pressing Release, then the
+DSA trader declaration — still stands unchanged for after approval. So does
+the Paid Apps agreement, which is still what decides whether the store can
+actually sell the products on release day.

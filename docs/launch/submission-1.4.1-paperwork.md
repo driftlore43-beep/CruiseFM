@@ -369,11 +369,31 @@ Two of them, and both are normal for an Australian developer.
 ### G4. The Small Business Program — **OUTSTANDING, and worth real money**
 
 **Not on the Business screenshot, so it has probably not been enrolled in.**
-The agreement has been Active since 25.08, so nothing has been blocking it —
-**check first, then enrol if not.** It cuts
-Apple's commission from **30% to 15%** on up to a million US dollars a year.
-It is free, it takes one form, and at this scale there is no reason not to.
-It applies from the start of the next month, so earlier is better.
+The Paid Apps agreement has been Active since 25.08, so nothing has been
+blocking it — **check first, then enrol if not.**
+
+| | |
+|---|---|
+| Apple's standard commission | **30%** |
+| Small Business Program | **15%** |
+| Eligibility | under **$1,000,000 USD** in proceeds in the prior calendar year |
+
+Proceeds means sales net of Apple's commission and certain taxes, across all
+associated developer accounts. Cruise FM has sold nothing, so eligibility is
+not in question.
+
+**Enrol at `developer.apple.com/app-store/small-business-program/enroll/`.**
+It needs the Account Holder (the owner), the latest Paid Apps agreement
+accepted (done, 25.08), and a list of any associated developer accounts
+(there are none).
+
+**WHEN IT TAKES EFFECT, in Apple's own words: "Your proceeds will be adjusted
+fifteen (15) days after the end of the fiscal calendar month in which your
+enrollment is approved."** So it attaches to the month the enrolment is
+APPROVED, and the adjustment lands a fortnight after that month closes.
+Earlier is strictly better: anything sold at 30% before approval is money that
+does not come back. **CORRECTION 18.09: an earlier draft of this section said
+it "applies from the start of the next month", which is not what Apple says.**
 
 ### G6. The Digital Services Act row — **In Review since 07.09**
 
@@ -386,19 +406,47 @@ inbox.
 or the release.** 1.4.1 goes through review, gets approved and can be released
 with this row exactly as it is. What it holds up is the EU.
 
-**Two things to check on it, in this order.** First press **View** on that row
-and read **which status was declared** — trader or non-trader. That decides
-everything and cannot be guessed from the word "In Review":
+**THE STATUS IS NOT READABLE FROM THE BUSINESS PAGE, AND THE OWNER FOUND THAT
+OUT BEFORE THIS DOC DID (18.09).** The `View` link on that row opens the list
+of 27 countries, not the declaration, and the rest of it is inert while the
+review runs. There are **two different screens** and only one of them answers
+the question:
 
-- **If it says non-trader**, it was the honest answer when the app was free
-  and it stops being honest the moment a subscription sells. It has to become
-  trader, and trader status **publishes a contact address, phone and email on
-  the EU listing** — so a real business address is needed first, not the home
-  address (25.08, still open).
-- **If it says trader**, the verification is Apple checking those details and
-  there is nothing to do but wait.
+- **Per app, and this is the one to read:** Apps → **Cruise FM** → **App
+  Information** in the left sidebar → scroll to **App Store Regulations and
+  Permits** → under **Digital Services Act** press **Edit**. The pop-up names
+  the app's current trader status.
+- **Account level, which is the row on the Business page:** Business →
+  Agreements → Compliance → Digital Services Act → *Complete Compliance
+  Requirements*, where the account is declared "a trader account" or "not a
+  trader account". **While it reads In Review there is nothing to do there
+  but wait.**
 
-Second, the 26.08 finding still stands and is the one that actually costs
+**AND THE LENGTH OF THE REVIEW IS ITSELF EVIDENCE OF WHICH WAY IT WENT.** A
+NON-trader declaration is two clicks and `Done` — nothing to verify, so no
+reason to sit In Review for eleven days. The TRADER path takes contact
+details, validates the email and the phone by 2FA, and takes uploaded
+verification documents. **So this is very probably already declared as a
+trader**, which would make section D step 3 done rather than pending. Confirm
+it on the App Information screen rather than taking that as read.
+
+**IF IT IS TRADER, THERE IS A PRIVACY CONSEQUENCE WORTH CHECKING BEFORE THE
+VERIFICATION FINISHES.** Trader status publishes an address, a phone number
+and an email **on the EU App Store product page**. The only address on the
+account is the owner's home address, and 25.08 recorded in as many words that
+it must not be the published one. Read back what was actually put in those
+contact fields; if it is the home address, that is worth fixing before the
+listing carries it rather than after.
+
+Two further things, whichever way it turns out:
+
+- **If it says non-trader**, it was the honest answer while the app was free
+  and it stops being honest the moment a subscription sells, so it has to
+  become trader, with a real business address sorted first.
+- **If it says trader**, there is nothing to do but wait, and the address
+  question above is the live one.
+
+The 26.08 finding still stands and is the one that actually costs
 something: **selecting is not submitting**, and an app with **no** status
 submitted is the one Apple removes from the EU. In Review means it was
 submitted, so that trap is already avoided.

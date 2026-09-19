@@ -1,5 +1,6 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { NativeModules, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { probeAppleArtwork } from './appleArtwork';
 import type { LinkedPlaylist } from './stationPlaylists';
@@ -243,6 +244,51 @@ let lastQueuedUri: string | null = null;
 export function lastAppleQueueUri(): string | null { return lastQueuedUri; }
 
 /**
+ * THE SAME THING, BUT REMEMBERED ACROSS LAUNCHES — AND IT IS A DIFFERENT
+ * QUESTION FROM THE ONE ABOVE, WHICH IS WHY IT IS A SECOND VALUE.
+ *
+ * `lastQueuedUri` answers "what did I queue in THIS session, so I can put it
+ * back?" and must stay in memory: `recoverApplePlayback` acts on it, and a
+ * value surviving from yesterday would have that function re-queue a playlist
+ * over music that is playing perfectly well.
+ *
+ * This one answers "what is the Music app most likely holding?", which is the
+ * question a drive start has to ask, and the answer has to outlive the app —
+ * because the case that matters most is a WIDGET TAP, which cold-starts the
+ * app while the Music app is already playing.
+ *
+ * IT IS OUR OWN MEMORY RATHER THAN THE SERVICE'S ANSWER, and that is a real
+ * difference from the Spotify side. `currentEntry` reports `contextName` as
+ * nil (the Swift has never filled it in), so MusicKit tells us nothing about
+ * where the queue came from. Making it say would be a native change and a new
+ * build; this is the honest thing available over the air, and it is checked
+ * against the playlist's own track list before it is trusted — see
+ * `appleQueueState`.
+ */
+const QUEUE_KEY = 'cruisefm_apple_queue_uri';
+let queuedUri: string | null | undefined;
+
+async function readQueuedUri(): Promise<string | null> {
+  if (queuedUri !== undefined) return queuedUri;
+  try {
+    queuedUri = (await AsyncStorage.getItem(QUEUE_KEY)) || null;
+  } catch {
+    queuedUri = null;
+  }
+  return queuedUri;
+}
+
+function rememberQueuedUri(uri: string): void {
+  queuedUri = uri;
+  try {
+    const w = AsyncStorage.setItem(QUEUE_KEY, uri) as unknown as Promise<void> | undefined;
+    w?.catch?.(() => {});
+  } catch {
+    // Storage is not worth failing a drive over; the in-memory copy stands.
+  }
+}
+
+/**
  * Races a native call against a timeout, REJECTING rather than resolving
  * quietly on it — the caller below is already inside a try/catch that turns
  * any throw into an honest 'error' verdict.
@@ -304,11 +350,120 @@ const START_VERIFY_MS = 3500;
  * has since tuned away from corrects whatever is actually meant to be
  * playing rather than stepping on it.
  */
+/**
+ * AND IT ASKS TWICE, BECAUSE ONE READING FROM THE SYSTEM PLAYER IS NEVER
+ * EVIDENCE — the 27.08 rule, which `verifyResume` learned and this never did.
+ *
+ * Ethan, 18.09: "I'm still having sync issues and it's auto restarting the
+ * playlist." This is the second way that happens. The owner's own screen
+ * recording measured the system player answering "not playing" for the better
+ * part of three seconds after a resume, and START_VERIFY_MS above says in as
+ * many words that a cold start has strictly more work to do than a resume —
+ * so a single reading at 3.5s can easily catch a playlist that started
+ * perfectly well, and the "recovery" then re-queues it FROM THE TOP a few
+ * seconds in. From the outside that is the app restarting your playlist for
+ * no reason, which is exactly what was reported.
+ *
+ * AND THE RECOVERY KEEPS THE POSITION NOW. If the player has loaded the
+ * queue but genuinely not started, it still knows where it is; re-queueing
+ * without that number threw the place away even when the recovery was right
+ * to fire.
+ */
+const START_RECHECK_MS = 2500;
+
 async function verifyPlaylistTook(): Promise<void> {
   await new Promise((r) => setTimeout(r, START_VERIFY_MS));
-  const entry = await getAppleNowPlaying().catch(() => null);
+  let entry = await getAppleNowPlaying().catch(() => null);
   if (entry?.isPlaying) return;
-  await recoverApplePlayback(null);
+  await new Promise((r) => setTimeout(r, START_RECHECK_MS));
+  entry = await getAppleNowPlaying().catch(() => null);
+  if (entry?.isPlaying) return;
+  const at = entry?.positionMs ?? null;
+  await recoverApplePlayback(at != null && at > 1500 ? at : null);
+}
+
+/**
+ * IS THE MUSIC APP ALREADY PLAYING THIS STATION'S PLAYLIST?
+ *
+ * Ethan, 18.09: "I'm still having sync issues and it's auto restarting the
+ * playlist… I believe pressing on the widget might be also telling the app to
+ * reset?" He is right, and it was never only the widget: EVERY start of a
+ * station's music on Apple Music re-queued the playlist, and queueing starts
+ * it at track one. Tap a widget, open a deck, come back to the station you
+ * were already listening to — the song you were in the middle of was thrown
+ * away every time. Spotify has been spared this since 18.08 (`startActionFor`
+ * in NowPlayingContext); the Apple branch went straight to `playPlaylist` and
+ * the note from that round says why — "the bridge exposes no queue-source id,
+ * so there is nothing to compare".
+ *
+ * THERE IS SOMETHING TO COMPARE NOW, in two halves, and it needs both.
+ *   1. What this app last handed the Music app (`readQueuedUri`), which
+ *      survives a cold start and so covers the widget tap.
+ *   2. Whether the song actually playing is IN that playlist — asked of the
+ *      library, not of our own memory. Without it, a listener who queued
+ *      something else in the Music app after our last drive would have that
+ *      music silently adopted under the station's name, which is a new kind
+ *      of wrong rather than a fix.
+ *
+ * WHEN IN DOUBT IT ANSWERS "NO". A missing memory, an unreadable track list,
+ * a song that is not in the playlist — all of them fall through to starting
+ * it properly, which is precisely today's behaviour. Being wrong toward
+ * "start" costs the restart being fixed here; being wrong toward "leave"
+ * costs silence, or somebody else's album playing under a station's name.
+ *
+ * Returns null when nothing is loaded at all, which is its own answer.
+ */
+async function queueHoldsTrack(playlistUri: string, title: string): Promise<boolean> {
+  const wanted = title.trim().toLowerCase();
+  if (!wanted) return false;
+  try {
+    const rows = await Promise.race([
+      getApplePlaylistTracks(playlistUri),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+    ]);
+    if (!rows || rows.length === 0) return false;
+    // Title alone. The now-playing entry and the library row do not always
+    // spell an artist the same way (featured credits, "&" against "and"),
+    // and a title collision inside one playlist would mean leaving music from
+    // the same song — which is not a failure worth guarding against.
+    return rows.some((t) => t.title.trim().toLowerCase() === wanted);
+  } catch {
+    return false;
+  }
+}
+
+export async function appleQueueState(
+  targetUri: string,
+): Promise<{ uri: string | null; isPlaying: boolean } | null> {
+  const entry = await getAppleNowPlaying().catch(() => null);
+  if (!entry) return null;
+  const remembered = await readQueuedUri();
+  if (remembered !== targetUri) return { uri: remembered, isPlaying: entry.isPlaying };
+  const holds = await queueHoldsTrack(targetUri, entry.title);
+  return { uri: holds ? targetUri : null, isPlaying: entry.isPlaying };
+}
+
+/**
+ * RESUME WHAT IS ALREADY LOADED, WITHOUT RE-QUEUEING IT.
+ *
+ * The paused half of the rule above: the right playlist is in the player and
+ * stopped, so the fix is a bare play — handing `playPlaylist` the same uri
+ * would restart it, which is the bug this whole round is about.
+ *
+ * Verified the same way a fresh start is, and for the same reason: `play()`
+ * is `try?` in Swift and answers nothing, so a refusal would otherwise leave
+ * the deck showing a drive over silence. If it has not taken by then the
+ * playlist IS queued properly, since at that point a restart is better than
+ * nothing playing.
+ */
+export async function resumeAppleQueue(uri: string): Promise<void> {
+  await applePlay();
+  (async () => {
+    await new Promise((r) => setTimeout(r, START_VERIFY_MS));
+    const entry = await getAppleNowPlaying().catch(() => null);
+    if (entry?.isPlaying) return;
+    await startApplePlaylist(uri);
+  })().catch(() => {});
 }
 
 export async function startApplePlaylist(uri?: string): Promise<'playing' | 'error'> {
@@ -317,6 +472,7 @@ export async function startApplePlaylist(uri?: string): Promise<'playing' | 'err
     if (uri && isApplePlaylist(uri)) {
       await withTimeout(bridge.playPlaylist(applePlaylistId(uri)), 6000);
       lastQueuedUri = uri;
+      rememberQueuedUri(uri);
     } else {
       await withTimeout(bridge.play(), 6000);
     }

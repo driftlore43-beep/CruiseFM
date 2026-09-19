@@ -11,8 +11,10 @@ import {
   appleMusicAvailable,
   applePause,
   applePlay,
+  appleQueueState,
   isAppleMusicConnected,
   isApplePlaylist,
+  resumeAppleQueue,
   startApplePlaylist,
 } from '@/utils/appleMusic';
 import { getPlaybackState, isRestrictedAccount, isSpotifyConnected, looksOffline, pause as pauseSpotify, probePlaybackState, startPlayback, type StartResult } from '@/utils/spotify';
@@ -65,6 +67,30 @@ async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean 
       // A Spotify link saved earlier can't play here — say so rather than
       // failing quietly, since the fix is to relink the station.
       if (!isApplePlaylist(linked.uri)) return 'no-playlist';
+
+      /**
+       * ALREADY PLAYING THIS PLAYLIST? THEN DON'T TOUCH IT — the same rule
+       * the Spotify branch below has followed since 18.08, arriving here
+       * after Ethan reported the consequence of its absence (18.09): "it's
+       * auto restarting the playlist… pressing on the widget might be also
+       * telling the app to reset". Queueing an Apple Music playlist starts
+       * it at track one, so every drive start threw away wherever he was.
+       *
+       * The three outcomes are identical to Spotify's and the same pure rule
+       * decides them; only where the answer COMES FROM differs. Spotify is
+       * asked directly; MusicKit reports nothing about its queue's source, so
+       * `appleQueueState` uses what this app itself last queued and then
+       * checks the playing song really is in that playlist before believing
+       * it. Anything uncertain comes back as a mismatch and starts properly.
+       */
+      const apple = await appleQueueState(linked.uri);
+      const appleAction = startActionFor(
+        apple ? apple.uri : undefined,
+        apple ? apple.isPlaying : undefined,
+        linked.uri,
+      );
+      if (appleAction === 'leave') return 'playing';
+      if (appleAction === 'resume') { await resumeAppleQueue(linked.uri); return 'playing'; }
       return await startApplePlaylist(linked.uri);
     }
 

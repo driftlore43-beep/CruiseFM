@@ -62,7 +62,16 @@ export function useMusicPlayback(visible: boolean, opts?: { pollMs?: number }) {
   // against the last song rather than trusting a single caller. It no-ops
   // entirely when no drive is open, and in companion mode there is no track
   // to record, which is exactly why the stub has to read well without one.
-  const heard = live.track ? `${live.track.title}\u0000${live.track.artist}` : null;
+  // THE COVER IS PART OF THE KEY, AND HAS TO BE. On Apple Music the artwork
+  // is not in the first sighting of a song — it is fetched from the public
+  // catalogue alongside the poll and patched in a beat later (04.08) — so an
+  // effect keyed on the title and artist alone never ran again once it had
+  // arrived, and the widgets were handed `null` for every song. That is
+  // Ethan's 18.09 report. noteTrackHeard below dedupes against the last song
+  // itself, so running a second time for the same song costs nothing there.
+  const heard = live.track
+    ? `${live.track.title}\u0000${live.track.artist}\u0000${live.track.albumArt ?? ''}`
+    : null;
   useEffect(() => {
     if (!live.track?.title) return;
     noteTrackHeard(live.track.title, live.track.artist ?? '').catch(() => {});

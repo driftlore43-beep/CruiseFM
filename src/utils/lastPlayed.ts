@@ -54,7 +54,27 @@ export async function noteLastPlayed(
   if (!title) return false;
   try {
     const prev = await getLastPlayed();
-    if (prev && prev.title === title && prev.artist === artist) return false;
+    const sameSong = !!prev && prev.title === title && prev.artist === artist;
+    /**
+     * THE COVER OFTEN ARRIVES AFTER THE SONG DOES, AND THAT USED TO LOSE IT.
+     *
+     * Ethan, 18.09, on Apple Music: "the Album Artwork doesn't show in the
+     * widgets as well it just shows the Station background." It never could.
+     * MusicKit returns nothing for a library track's artwork (04.08), so the
+     * cover comes from the public catalogue lookup, which runs BESIDE the
+     * poll and patches the url in a beat later. The first sighting of a song
+     * therefore carries `artUrl: null` — and this returned false for every
+     * call after it, so the real cover, when it finally landed, was never
+     * shipped across. Every Apple Music listener's widgets fell back to the
+     * station photograph for ever, including the CD look, whose whole point
+     * is the sleeve.
+     *
+     * So a LATE COVER FOR A SONG ALREADY KNOWN counts as news. Only in that
+     * direction: a null arriving after a real url is the lookup failing or a
+     * poll racing, and clearing a good cover on the strength of it would be
+     * the same bug pointing the other way.
+     */
+    if (sameSong && !(artUrl && !prev!.artUrl)) return false;
     await AsyncStorage.setItem(KEY, JSON.stringify({ title, artist, artUrl, at: Date.now() }));
     return true;
   } catch {

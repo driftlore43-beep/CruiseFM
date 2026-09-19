@@ -6,7 +6,7 @@ import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { noteDriveMode, recordDriveEnd, type DriveEvent } from '@/utils/driveStats';
 import { saveLastCruise } from '@/utils/lastCruise';
-import { getSavedPlatform } from '@/utils/musicPlatform';
+import { getSavedPlatform, type PlatformId } from '@/utils/musicPlatform';
 import {
   appleMusicAvailable,
   applePause,
@@ -58,7 +58,23 @@ async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean 
     // Apple Music plays through it entirely — their own phone, their own
     // subscription, none of Spotify's device-waking or allowlist machinery.
     if (appleMusicAvailable() && (await getSavedPlatform()) === 'appleMusic') {
-      if (!(await isAppleMusicConnected())) return 'no-playlist';
+      /**
+       * NOT AUTHORISED IS NOT THE SAME AS HAVING NO PLAYLIST, and saying so
+       * cost an honest message. This returned 'no-playlist', so a listener
+       * who had chosen Apple Music and not yet granted access was told "this
+       * station doesn't have its own playlist yet — tap Add Playlist" for a
+       * station that may well have one. The advice was unfollowable: adding a
+       * second playlist fixes nothing, and the real fix (Connect Apple Music
+       * on the home page) was never mentioned.
+       *
+       * Found auditing the Apple paths after Ethan's round, and it is the
+       * same shape as the two bugs `noticeFor` already exists for — the right
+       * machinery reporting the wrong situation. 'not-connected' is reused
+       * rather than invented: nothing downstream branches on it (the Spotify
+       * ask-once rule lives on that branch, gated on the saved platform), and
+       * noticeFor gives each service its own wording.
+       */
+      if (!(await isAppleMusicConnected())) return 'not-connected';
       if (!linked) {
         if (opts?.resumeAny) { await applePlay(); return 'playing'; }
         await applePause();
@@ -259,6 +275,34 @@ const START_NOTICES: Record<StartResult, string | null> = {
 const APPLE_START_ERROR =
   "Apple Music didn't respond. Make sure you have a subscription and are signed in, then press play to retry.";
 
+/** Said EVERY time, unlike Spotify's, which is asked once and then hands off.
+ *  There is no hand-off on Apple Music — access is the only way in — so the
+ *  advice stays true until it is followed. */
+const APPLE_NOT_CONNECTED =
+  "Apple Music is chosen, but Cruise FM hasn't been given access on this phone yet. Tap Connect Apple Music on the home page, then press play.";
+
+/**
+ * WHICH NOTICE A VERDICT DESERVES, GIVEN WHO IS LISTENING.
+ *
+ * Pure, and exported, for the same reason `startActionFor` is: it decides
+ * what the app TELLS someone when their music does not start, and advice
+ * aimed at the wrong service is worse than no advice — it sends a listener
+ * to check an app they do not use. That happened (25.08): `'error'` is the
+ * one verdict reachable from BOTH services, and its message names Spotify,
+ * so an Apple Music listener whose station failed was told to go and check
+ * Spotify was open and logged in.
+ *
+ * Left inside the provider it could not be tested at all, which is how it
+ * went wrong unnoticed in the first place. See scripts/test-apple-notices.mjs.
+ */
+export function noticeFor(result: StartResult, platform: PlatformId | null): string | null {
+  if (platform === 'appleMusic') {
+    if (result === 'error') return APPLE_START_ERROR;
+    if (result === 'not-connected') return APPLE_NOT_CONNECTED;
+  }
+  return START_NOTICES[result] ?? null;
+}
+
 /** The default companion note on every start attempt — Spotify only hands
  * over control once its own app is awake, and new users need to know that
  * up front, not after a timeout. A clean 'playing' verdict clears it. */
@@ -384,15 +428,23 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const [musicSwitching, setMusicSwitching] = useState(false);
   const reportStartResult = useCallback((result: StartResult) => {
     setHandoff(result === 'handoff');
-    if (result === 'error' && appleMusicAvailable()) {
-      // Which service actually failed decides which message is true — see
-      // the note on APPLE_START_ERROR.
-      getSavedPlatform().then((p) => {
-        setPlaybackNotice(p === 'appleMusic' ? APPLE_START_ERROR : START_NOTICES.error);
-      }).catch(() => setPlaybackNotice(START_NOTICES.error));
+    /**
+     * THE PLATFORM IS ASKED FOR EVERY VERDICT, NOT A CHOSEN FEW.
+     *
+     * This used to name the one result that differed by service ('error'),
+     * which worked until a second one did ('not-connected') — and a list of
+     * platform-sensitive verdicts kept in a different file from the messages
+     * themselves is a list that goes stale silently. `noticeFor` knows which
+     * ones differ; this just gives it the answer to work with. Costs a
+     * microtask on a build carrying MusicKit, which a toast cannot feel.
+     */
+    if (appleMusicAvailable()) {
+      getSavedPlatform()
+        .then((p) => setPlaybackNotice(noticeFor(result, p)))
+        .catch(() => setPlaybackNotice(noticeFor(result, null)));
       return;
     }
-    setPlaybackNotice(START_NOTICES[result] ?? null);
+    setPlaybackNotice(noticeFor(result, null));
   }, []);
   // Every play/pause is also a sign of life for the drive check.
   const setPlaying = useCallback((p: boolean) => {

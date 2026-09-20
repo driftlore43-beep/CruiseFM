@@ -790,11 +790,13 @@ private struct JewelCase: View {
   /// and never reached this, so the disc shrank on a smaller tile and its
   /// frame did not. IT IS NOT COSMETIC — the clearance worked out below is
   /// what stops the pressing fouling the hinge. On an iPhone the interior is
-  /// 158 - 10 - 12 = 136 against a 132 disc, i.e. 2pt each side; on a 141pt
-  /// iPad tile the disc came down to 117.7 while the interior stayed 119,
-  /// leaving 0.65pt each side, which is a disc touching its case. Scaled, the
-  /// iPad interior is 121.4 against 117.7 — the phone's own proportion, on
-  /// any tile.
+  /// 158 - 10 - 12 = 136 against a 132 disc, i.e. 2.00pt each side; on a
+  /// 141pt iPad tile the disc came down to 117.80 while the interior stayed
+  /// 119, leaving 0.60pt each side, which is a disc touching its case.
+  /// Scaled, the iPad interior is 121.37 against the same 117.80 — 1.78pt,
+  /// the phone's own proportion on any tile. Drawn as a clearance diagram
+  /// rather than argued: the CD's change cannot be photographed on a phone,
+  /// because at k = 1 nothing moves.
   ///
   /// HAIRLINES AND THE SPINE'S TYPE ARE DELIBERATELY NOT SCALED: a 1pt stroke
   /// is a 1pt stroke at every size, and 4.5pt is already the floor at which

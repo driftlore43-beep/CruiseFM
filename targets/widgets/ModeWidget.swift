@@ -246,8 +246,8 @@ struct ModeView: View {
       //
       // AND THE COLOUR IS THE STATION'S NOW, not a fixed purple (owner,
       // 13.09). The whole derivation, and why a colourless station correctly
-      // comes out silver-to-black, is on `ballHalo` in Snapshot.swift.
-      s.ballHalo(k)
+      // comes out silver-to-black, is on `tileHalo` in Snapshot.swift.
+      s.tileHalo(k)
       BeamField(k: k)
       // THE BALL CENTRES ON THE TILE, NOT THE BALL-AND-STEM TOGETHER (owner,
       // 15.09: "the mirror ball is dropped down"). It used to carry
@@ -262,7 +262,17 @@ struct ModeView: View {
       // a widget is read as a tile among tiles, so the TILE's edges are what
       // the eye centres against. Where the object and the frame disagree, the
       // frame wins (03.08).
-      MirrorBall(size: 126 * k, rows: 17, cols: 30, eqColors: s.eqColors, accent: s.accent)
+      // 21 x 38 RATHER THAN 17 x 30 (20.09). Rendered at the size a phone
+      // actually draws this — 126pt at 3x, not the harness's usual 720 —
+      // 17 x 30 gives 209 visible mirrors and reads as a tiled sphere; 21 x 38
+      // gives 343 and reads as a mirror ball. 24 x 44 was drawn too and is
+      // where it starts to lose the individual-mirror character that is the
+      // whole point of the object, for 469 paths, so it is not that.
+      //
+      // THE COST IS PATHS, and a widget pays it ONCE per timeline entry rather
+      // than per frame, which is what makes this affordable here and would not
+      // in the app. +134.
+      MirrorBall(size: 126 * k, rows: 21, cols: 38, eqColors: s.eqColors, accent: s.accent)
         .overlay(alignment: .top) {
           // THIN AND METALLIC, FADING INTO THE GLOW (owner, 10.09: "make it
           // thinner and slightly metallic instead of the current thick
@@ -301,7 +311,7 @@ struct ModeView: View {
     ZStack {
       LinearGradient(colors: [Color(hex: "#1c1f26"), Color(hex: "#080a0e")],
                      startPoint: .topLeading, endPoint: .bottomTrailing)
-      JewelCase()
+      JewelCase(k: k)
       // A SOFT GLOW BEHIND THE DISC (owner, 10.09: "add a soft glow/shadow
       // behind the CD"). The disc already casts a contact shadow onto the
       // case, which is depth — this is light, the same distinction the app's
@@ -400,8 +410,24 @@ struct ModeView: View {
    */
   private func record(_ s: WidgetStation, k: CGFloat) -> some View {
     ZStack {
-      RadialGradient(colors: [Color(hex: "#1a1a1f"), Color(hex: "#08080a")],
-                     center: .init(x: 0.38, y: 0.30), startRadius: 0, endRadius: 150 * k)
+      // THE STATION'S OWN GLOW, THE SAME ONE THE BALL STANDS IN (20.09). This
+      // was a fixed grey radial — #1a1a1f to #08080a — and it was why the
+      // record was the one square of the three carrying no trace of the
+      // station it is tuned to: a Home Screen with all of The Mode's looks on
+      // it had a coloured ball, a coloured disc and a monochrome record.
+      //
+      // `tileHalo` is derived from the accent and is hue-safe, so a station
+      // with no colour in it still arrives at the plain near-black the old
+      // literal gave. The whole derivation is on it in Snapshot.swift.
+      s.tileHalo(k)
+      // AND THE SHADOW IS NOT OPTIONAL ONCE THE HALO IS THERE, which the
+      // prototype measured rather than assumed: the halo ALONE made the record
+      // read LESS separate than before, because a black disc on a lit ground
+      // has less to stand against than a black disc on a black one. Measured
+      // on docs/design/record_widget.py, the record's own edge steps 1.67
+      // levels against its surround today, 0.33 with the halo alone, and 3.67
+      // with both. They are one change, not two.
+      RecordShadow(size: 139 * k)
       // NOT ONE WORD ON IT, AND AS BIG AS THE TILE ALLOWS (owner, 09.09:
       // "increase the size of the vinyl too, remove the station's text so
       // it's just the vinyl"). It carried the frequency on its label; a
@@ -441,6 +467,47 @@ private struct BeamField: View {
       }
     }
     .allowsHitTesting(false)
+  }
+}
+
+// BELOW BeamField ON PURPOSE: test-widget-bundle reads everything between
+// `struct ModeView` and `private struct BeamField` as ModeView's own hero
+// placement and refuses an `.offset` there. This carries one legitimately —
+// it places a shadow under an object rather than an object within a tile —
+// so it belongs on this side of that line.
+
+/**
+ * THE RECORD'S CONTACT WITH WHAT IT IS LYING ON.
+ *
+ * An object with nothing under it reads as a sticker — the finding the app's
+ * own Vinyl and Cassette decks were given `CastShadow` for on 19.08, and the
+ * same reason the disc beside this one carries a glow.
+ *
+ * DRAWN AS FALLOFF, NEVER `.blur`: a blur forces the renderer to an offscreen
+ * buffer and is by some way the most expensive thing available on one of these
+ * tiles, which is why it came off the CD's glow on 14.09. A radial gradient IS
+ * the blur of a filled circle.
+ *
+ * ITS CORE BEING OPAQUE COSTS NOTHING, because the record is opaque and covers
+ * it; what anyone sees is the ring outside the record's own edge, heavier
+ * below than above because the key light in this app comes from the upper
+ * left. The frame is deliberately WIDER THAN THE TILE — ModeView's
+ * GeometryReader already gives the whole group an explicit frame, which is
+ * what stops an oversized child dragging the object off centre (14.09).
+ */
+private struct RecordShadow: View {
+  let size: CGFloat
+  var body: some View {
+    RadialGradient(
+      stops: [
+        .init(color: .black.opacity(0.62), location: 0.00),
+        .init(color: .black.opacity(0.52), location: 0.70),
+        .init(color: .black.opacity(0.18), location: 0.87),
+        .init(color: .black.opacity(0.00), location: 1.00),
+      ],
+      center: .center, startRadius: 0, endRadius: size * 0.63)
+      .frame(width: size * 1.26, height: size * 1.26)
+      .offset(y: size * 0.048)
   }
 }
 
@@ -717,6 +784,23 @@ struct MirrorBall: View {
  * glass laid over a disc.
  */
 private struct JewelCase: View {
+  /// THE CASE SCALES WITH THE TILE, LIKE THE DISC INSIDE IT (20.09).
+  ///
+  /// Noted and not fixed on 15.09: 14.09's `k` pass reached the three heroes
+  /// and never reached this, so the disc shrank on a smaller tile and its
+  /// frame did not. IT IS NOT COSMETIC — the clearance worked out below is
+  /// what stops the pressing fouling the hinge. On an iPhone the interior is
+  /// 158 - 10 - 12 = 136 against a 132 disc, i.e. 2pt each side; on a 141pt
+  /// iPad tile the disc came down to 117.7 while the interior stayed 119,
+  /// leaving 0.65pt each side, which is a disc touching its case. Scaled, the
+  /// iPad interior is 121.4 against 117.7 — the phone's own proportion, on
+  /// any tile.
+  ///
+  /// HAIRLINES AND THE SPINE'S TYPE ARE DELIBERATELY NOT SCALED: a 1pt stroke
+  /// is a 1pt stroke at every size, and 4.5pt is already the floor at which
+  /// CRUISE FM can be read at all.
+  let k: CGFloat
+
   var body: some View {
     ZStack {
       // ── the glass body ──
@@ -742,7 +826,7 @@ private struct JewelCase: View {
       HStack(spacing: 0) {
         LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.04)],
                        startPoint: .leading, endPoint: .trailing)
-          .frame(width: 12)
+          .frame(width: 12 * k)
           .overlay(HStack { Spacer(); Rectangle().fill(.white.opacity(0.20)).frame(width: 1) })
           .overlay(
             Text("CRUISE FM")
@@ -751,17 +835,17 @@ private struct JewelCase: View {
               .foregroundColor(.white.opacity(0.28))
               .fixedSize()
               .rotationEffect(.degrees(-90)))
-          .overlay(Rectangle().fill(.white.opacity(0.26)).frame(width: 1).padding(.vertical, 18))
+          .overlay(Rectangle().fill(.white.opacity(0.26)).frame(width: 1).padding(.vertical, 18 * k))
           .overlay(
-            VStack(spacing: 20) {
+            VStack(spacing: 20 * k) {
               ForEach(0..<2, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: 4.5)
+                RoundedRectangle(cornerRadius: 4.5 * k)
                   .fill(.white.opacity(0.14))
-                  .overlay(RoundedRectangle(cornerRadius: 4.5).stroke(.white.opacity(0.26), lineWidth: 1))
-                  .frame(width: 9, height: 24)
+                  .overlay(RoundedRectangle(cornerRadius: 4.5 * k).stroke(.white.opacity(0.26), lineWidth: 1))
+                  .frame(width: 9 * k, height: 24 * k)
                   .overlay(
                     Circle().fill(Color(hex: "#0a0c12").opacity(0.55))
-                      .frame(width: 4.4, height: 4.4)
+                      .frame(width: 4.4 * k, height: 4.4 * k)
                       .overlay(Circle().stroke(.white.opacity(0.34), lineWidth: 0.7)))
               }
             })
@@ -774,7 +858,7 @@ private struct JewelCase: View {
         Spacer()
         HStack { clip(.bottomLeading); Spacer(); clip(.bottomTrailing) }
       }
-      .padding(6)
+      .padding(6 * k)
 
       // ── DUAL sweep of light on the plastic + a crisp top-edge glass
       // highlight (case option D) ──
@@ -802,8 +886,8 @@ private struct JewelCase: View {
   /// clip (its nearest point to the tile corner is ~18.7pt from the clip's
   /// corner centre, inside 22), so no corner is lost and the three points off
   /// the frame go straight to a bigger disc.
-  private var caseInset: CGFloat { 5 }
-  private var caseRadius: CGFloat { 13 }
+  private var caseInset: CGFloat { 5 * k }
+  private var caseRadius: CGFloat { 13 * k }
 
   /// A glossy moulded corner clip — two rounded ribs meeting at the corner,
   /// thicker and brighter than the old hairline L so it reads as a reinforced
@@ -812,11 +896,11 @@ private struct JewelCase: View {
     let top = corner == .topLeading || corner == .topTrailing
     let leading = corner == .topLeading || corner == .bottomLeading
     return ZStack {
-      VStack { if !top { Spacer() }; RoundedRectangle(cornerRadius: 1.6).frame(height: 3.2); if top { Spacer() } }
-      HStack { if !leading { Spacer() }; RoundedRectangle(cornerRadius: 1.6).frame(width: 3.2); if leading { Spacer() } }
+      VStack { if !top { Spacer() }; RoundedRectangle(cornerRadius: 1.6 * k).frame(height: 3.2 * k); if top { Spacer() } }
+      HStack { if !leading { Spacer() }; RoundedRectangle(cornerRadius: 1.6 * k).frame(width: 3.2 * k); if leading { Spacer() } }
     }
     .foregroundColor(.white.opacity(0.44))
-    .frame(width: 17, height: 17)
+    .frame(width: 17 * k, height: 17 * k)
   }
 }
 

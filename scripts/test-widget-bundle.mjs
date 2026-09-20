@@ -194,6 +194,19 @@ for (const [f, s2] of Object.entries(src)) {
     const size = m[2].match(/size:\s*([^,)]+)/)?.[1]?.trim() ?? '';
     check(`${m[1]} sizes off the tile, not a constant`, /\bk\b/.test(size), `size: ${size}`);
   }
+  // ...AND THE CD'S CASE IS A HERO'S FRAME, so it has to scale with the tile
+  // too. Noted and not fixed on 15.09: `k` reached the three heroes and never
+  // reached JewelCase, so on a 141pt iPad tile the disc came down to 117.7
+  // while the case interior stayed 119 — a pressing touching its own hinge.
+  // The clearance is what this is protecting, not the look.
+  check('the jewel case scales with the tile', /JewelCase\(k: k\)/.test(mode),
+    'a fixed-point case around a k-sized disc closes the gap on a small tile');
+  for (const [name, re] of [['caseInset', /private var caseInset: CGFloat \{ [\d.]+ \* k \}/],
+                            ['caseRadius', /private var caseRadius: CGFloat \{ [\d.]+ \* k \}/]]) {
+    check(`${name} is a share of the tile`, re.test(mode),
+      'a bare number here is the fault 15.09 wrote down and did not fix');
+  }
+
   check('ModeView measures the tile', /GeometryReader \{ geo in/.test(mode) &&
     /min\(geo\.size\.width, geo\.size\.height\) \/ 158/.test(mode),
     'the 158 reference is what k is a share of');

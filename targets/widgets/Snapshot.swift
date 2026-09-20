@@ -250,7 +250,14 @@ extension WidgetStation {
   /// silver-grey falling to near-black, which is the "just a black
   /// background" she asked for, arrived at by the same rule rather than by a
   /// special case.
-  func ballHalo(_ k: CGFloat = 1) -> RadialGradient {
+  ///
+  /// IT IS `tileHalo`, NOT `ballHalo`, FROM 20.09: the Record tile took the
+  /// same glow. It had a fixed grey radial of its own, so on a Home Screen
+  /// showing all three of The Mode's looks the record was the one square that
+  /// did not belong to the station it was tuned to. Nothing about this is
+  /// specific to the ball, and one derivation serving both is what stops the
+  /// two drifting apart the next time the rule is tuned.
+  func tileHalo(_ k: CGFloat = 1) -> RadialGradient {
     let src = !accent.isEmpty ? accent : (colors.count > 1 ? colors[1] : "#7B38E0")
     let (r, g, b) = rgbOf(src)
     let mean = max(0.02, (r + g + b) / 3)

@@ -177,6 +177,24 @@ struct RecordView: View {
     max(6, Int((size * (0.99 - innerEdge) / 2) / pitch))
   }
 
+  /// THE GAPS BETWEEN TRACKS (20.09).
+  ///
+  /// A pressing is not one continuous spiral to look at: the lead-out of one
+  /// track and the lead-in of the next leave a wider, glassier band, and
+  /// those bands are how anyone recognises a record across a room. Without
+  /// them the groove area is concentric circles, which is what the owner's
+  /// one outside user photographed on a Home Screen beside two tiles that
+  /// read as objects.
+  ///
+  /// SHARES OF THE RING COUNT, NOT RADII IN POINTS, so they land in the same
+  /// places on the Deck's 116pt pressing as on this tile's 139pt one — a band
+  /// that drifts toward the label as the record shrinks would read as damage
+  /// rather than as a side of music.
+  private var bandRings: Set<Int> {
+    let n = Double(ringCount)
+    return Set([0.20, 0.38, 0.55, 0.72].map { Int((n * $0).rounded()) })
+  }
+
   var body: some View {
     ZStack {
       Circle().fill(Color(white: 0.045))
@@ -184,12 +202,24 @@ struct RecordView: View {
       // One stroke alone is a line drawn on a surface; two is a cut into one.
       ForEach(0..<ringCount, id: \.self) { i in
         let d = size * 0.99 - CGFloat(i) * pitch * 2
-        Circle()
-          .stroke(Color.black.opacity(0.55), lineWidth: pitch * 0.62)
-          .frame(width: d, height: d)
-        Circle()
-          .stroke(Color.white.opacity(0.055), lineWidth: 0.5)
-          .frame(width: d + pitch * 0.66, height: d + pitch * 0.66)
+        if bandRings.contains(i) {
+          // A band between tracks: the land's own grey, wide enough to read
+          // as a gap, with the lit wall lifted because a mirror catches more
+          // than a groove does.
+          Circle()
+            .stroke(Color(white: 0.058), lineWidth: pitch * 1.9)
+            .frame(width: d, height: d)
+          Circle()
+            .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
+            .frame(width: d + pitch * 1.1, height: d + pitch * 1.1)
+        } else {
+          Circle()
+            .stroke(Color.black.opacity(0.55), lineWidth: pitch * 0.62)
+            .frame(width: d, height: d)
+          Circle()
+            .stroke(Color.white.opacity(0.055), lineWidth: 0.5)
+            .frame(width: d + pitch * 0.66, height: d + pitch * 0.66)
+        }
       }
       // TWO SMOOTH BANDS, and they are the detail that reads as "record"
       // rather than "black disc with rings on it". A pressing is not cut edge

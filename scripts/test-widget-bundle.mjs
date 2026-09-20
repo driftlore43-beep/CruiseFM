@@ -401,7 +401,9 @@ check('the Deck\'s dropped third look is gone', !/DeckLook\.set|case \.set:|case
   const drawers = ['LastPlayedWidget.swift', 'ModeWidget.swift', 'VinylWidget.swift'];
   for (const f of drawers) {
     const swift = src[f] ?? '';
-    if (!/Art\.(cover|lastPlayed)\(/.test(swift)) continue;
+    // Name every helper that can DRAW, or a rename quietly takes a file out
+    // of this check and it reports a pass for a file it never looked at.
+    if (!/Art\.(songCover|station|lastPlayed)\(/.test(swift)) continue;
     check(`${f}: never falls back to a grey slab`,
       !/Color\(white: 0\.8\d?\)\)\.padding/.test(swift),
       'a grey rectangle reads as broken rather than as empty');
@@ -411,27 +413,41 @@ check('the Deck\'s dropped third look is gone', !/DeckLook\.set|case \.set:|case
     check(`${f}: every cover has something to fall back to`, opens === elses,
       `${opens} slot(s), ${elses} with a fallback`);
   }
-  // THE ORDER IS THE DECISION, not an implementation detail, and there are two
-  // of them. Flipping the terms of a `??` is invisible in review and would
-  // undo an owner's call silently, so both are pinned — and so is WHICH
-  // widget uses WHICH, because the two helpers differ by one word and reading
-  // the wrong one at a call site would look perfectly fine.
+  // THE ORDER IS THE DECISION, not an implementation detail. Flipping the
+  // terms of a `??` is invisible in review and would undo an owner's call
+  // silently, so it is pinned — and so is WHICH WIDGET IS ABOUT WHAT, because
+  // that is the distinction the two rules encode and a call site reaching for
+  // the wrong one would look perfectly fine.
   const art = src['Artwork.swift'] ?? '';
-  check('the general rule is station first, cover second',
-    /static func cover\(station id: String\?\) -> Image\? \{\s*station\(id\) \?\? lastPlayed\(\)/.test(art),
-    'the owner chose this "so people can add their photos in"');
-  check('the CD\'s rule is cover first, station second',
+  check('the song-first rule is cover first, station second',
     /static func songCover\(station id: String\?\) -> Image\? \{\s*lastPlayed\(\) \?\? station\(id\)/.test(art),
-    'owner, 03.09: "I\'d rather keep the album art for the cd mode"');
-  check('only the CD uses the song-first rule',
-    (all.match(/Art\.songCover\(/g) || []).length === 1,
-    'a second caller means someone reached for whichever helper was nearer');
-  check('the CD is the one that calls it',
-    /Art\.songCover\(/.test(src['ModeWidget.swift'] ?? ''));
-  // The Deck's Road look must NOT use it — the station photo is already its
-  // backdrop, so the same picture would appear twice at two sizes.
-  check('the Deck\'s Road look does not print the backdrop twice',
-    !/Art\.cover\(/.test(src['VinylWidget.swift'] ?? ''));
+    'the station is the fallback, so no cover still means a real picture');
+  // 20.09: the station-first rule was deleted when Last Played flipped to the
+  // song, because nothing was left calling it. Reintroducing it is allowed —
+  // it is the owner's call — but it must come back with a caller, not sit
+  // there looking like working machinery.
+  check('the station-first rule is gone rather than unused',
+    !/static func cover\(station/.test(art) && !/Art\.cover\(/.test(all),
+    'a helper nothing calls reads as a decision that was made, and was not');
+  // A SONG widget draws the song; a STATION widget draws the station. The
+  // Deck's Road look is the sharpest case: the station photo is already its
+  // backdrop, so drawing a cover there is not merely wrong, it is the one
+  // place a picture would also appear twice at two sizes.
+  const songWidgets = ['LastPlayedWidget.swift', 'ModeWidget.swift'];
+  const stationWidgets = ['OnAirWidget.swift', 'StartDriveWidget.swift', 'VinylWidget.swift'];
+  for (const f of songWidgets) {
+    check(`${f}: a song widget draws the song's cover`,
+      /Art\.songCover\(/.test(src[f] ?? ''),
+      'it is named after the song, so the song is what it shows');
+  }
+  for (const f of stationWidgets) {
+    check(`${f}: a station widget never draws the song's cover`,
+      !/Art\.songCover\(/.test(src[f] ?? ''),
+      'the station is the subject there, and on the Deck it is already the backdrop');
+    check(`${f}: and does draw the station`,
+      /Art\.station\(/.test(src[f] ?? ''),
+      'if this stops matching the check above passes for the wrong reason');
+  }
 }
 
 // ── a check that cannot fail is worse than none ──────────────────────────

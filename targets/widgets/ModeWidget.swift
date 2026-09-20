@@ -22,13 +22,12 @@ import WidgetKit
  * caption underneath, which is backwards for a widget whose whole subject is
  * the object (owner, 09.09: "where it takes up most of the widget's space").
  *
- * THE DISC IS THE ONE PLACE THE SONG'S COVER COMES FIRST. Everything else in
- * the set draws the station's photograph, so a listener's own custom-station
- * picture shows up — but a disc with a record sleeve printed on it is the
- * whole idea of this one, and the owner kept it that way when she made that
- * call (03.09: "I'd rather keep the album art for the cd mode"). It falls
- * back to the station's photograph, so no cover still means a real picture.
- * See Art.songCover, which exists for this and nothing else.
+ * THE DISC DRAWS THE SONG'S COVER, because a disc with a record sleeve
+ * printed on it is the whole idea of this one — the owner's call on 03.09
+ * ("I'd rather keep the album art for the cd mode"), made when it was the
+ * ONLY widget that did, and it was the one she was right about: the Last
+ * Played looks joined it on 20.09. It falls back to the station's
+ * photograph, so no cover still means a real picture. See Art.songCover.
  *
  * AND NEITHER SPINS. iOS redraws a widget a handful of times a day and only
  * countdown text may animate itself — true of every app. A still ball is what

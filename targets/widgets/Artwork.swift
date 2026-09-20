@@ -91,45 +91,34 @@ enum Art {
   }
 
   /**
-   * WHAT GOES IN A PICTURE SLOT: the STATION'S OWN PHOTOGRAPH first, the
-   * song's cover only if there is no photograph.
+   * WHAT GOES IN A PICTURE SLOT ON A WIDGET THAT IS ABOUT A SONG: the SONG'S
+   * OWN COVER first, the station's photograph only if there isn't one.
    *
-   * THE OWNER PICKED THIS WAY ROUND, and her reason is the good one (03.09):
-   * "do it the station cover so people can add their photos in." A custom
-   * station can carry a photograph the listener chose themselves, and this is
-   * what puts it on their Home Screen — the feature is invisible otherwise.
+   * THIS REVERSES THE 03.09 DECISION, KNOWINGLY, ON THE OWNER'S OWN CALL
+   * (20.09), and the reversal is written out rather than quietly edited
+   * because the old reasoning was sound when it was made. It was "do it the
+   * station cover so people can add their photos in": a custom station
+   * carries a photograph the listener chose, and back then this was the only
+   * thing that would ever put it on a Home Screen. THAT IS NO LONGER TRUE —
+   * On Air, Start Drive and the Deck's Road look all draw `station` directly,
+   * so that photograph has three homes that do not depend on this one. What
+   * was left was a widget whose name says LAST PLAYED showing something that
+   * is not the last played thing, which is the first thing the app's only
+   * regular outside user noticed, twice (19.09 and 20.09).
    *
-   * IT IS ALSO THE ONE THAT IS ALWAYS THERE. The song's cover exists only
-   * once someone has driven with a service that reports the track, and
-   * Spotify caps full playback at five accounts, so most listeners are in
-   * companion mode with none; a fresh install has none either. The station
-   * photograph is BUNDLED in this extension for the ten built-ins and copied
-   * into the App Group for a custom one: no network, never stale.
+   * THE STATION IS KEPT AS THE FALLBACK, and that half of the 03.09 reasoning
+   * still stands: a cover exists only once someone has driven with a service
+   * that reports the track, and most listeners are in companion mode with
+   * none, so without it a fresh install would meet an empty panel. The
+   * station photograph is BUNDLED in this extension for the ten built-ins and
+   * copied into the App Group for a custom one: no network, never stale.
    *
-   * The cover is kept as the second choice rather than dropped, so a custom
-   * station with no photograph still shows something real.
-   *
-   * NOT USED BY THE DECK'S ROAD LOOK, deliberately: the station photo is
-   * already the backdrop there, so using it again on the label would print
-   * the same picture twice at two sizes. That one falls back to its printed
-   * pressing.
-   */
-  static func cover(station id: String?) -> Image? {
-    station(id) ?? lastPlayed()
-  }
-
-  /**
-   * THE OTHER WAY ROUND, for the one place the SONG is the subject.
-   *
-   * The CD look draws a disc, and a disc with a record sleeve printed on it
-   * is the whole idea — the owner kept it that way when she flipped
-   * everything else to the station (03.09: "I'd rather keep the album art for
-   * the cd mode"). It still falls back to the station's photograph, so a
-   * listener with no cover sees a real picture rather than a blank disc.
-   *
-   * Only the CD uses this. Everything else uses `cover` above; if a third
-   * caller ever appears, that is the moment to ask which rule it really wants
-   * rather than reaching for whichever is nearer.
+   * THIS IS FOR SONG WIDGETS ONLY. A widget that is about the STATION — On
+   * Air, Start Drive, the Deck — calls `station` directly and must never call
+   * this: printing a song's cover where the station belongs is the same
+   * mistake in the other direction, and on the Deck's Road look the station
+   * photo is already the backdrop, so it would also print the same picture
+   * twice at two sizes.
    */
   static func songCover(station id: String?) -> Image? {
     lastPlayed() ?? station(id)

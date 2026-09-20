@@ -12,11 +12,14 @@ import WidgetKit
  * keeps the gallery at one row instead of three (the same reasoning as
  * DeckLook, written out there).
  *
- * THE PICTURE IS THE STATION'S OWN PHOTOGRAPH, not the song's cover — the
- * owner's call (03.09) "so people can add their photos in", since a custom
- * station carries a picture the listener chose and a cover very often does
- * not exist at all. The WORDS still name the song, which is what the widget
- * is about. See Art.cover.
+ * THE PICTURE IS THE SONG'S OWN COVER, falling back to the station's
+ * photograph when there isn't one. It was the other way round from 03.09 to
+ * 20.09, on the owner's reasoning that a custom station's photograph would
+ * otherwise never appear anywhere; On Air, Start Drive and the Deck's Road
+ * look all show it now, so that no longer held, and a widget called LAST
+ * PLAYED showing something other than the last played thing was the first
+ * thing the app's only regular outside user noticed, twice. See
+ * Art.songCover, which carries the full reversal.
  *
  * IT SAYS "LAST PLAYED" AND NEVER "NOW PLAYING", in every look. A widget is
  * redrawn a handful of times a day, so by the time anyone reads this the song
@@ -253,7 +256,7 @@ struct LastPlayedView: View {
           ZStack {
             Color.white
             bevel(raised: false, width: 2)
-            if let art = Art.cover(station: s.image) {
+            if let art = Art.songCover(station: s.image) {
               art.resizable().aspectRatio(contentMode: .fill).padding(3)
             } else {
               // Neither a cover nor a photograph: a custom station with no
@@ -430,7 +433,7 @@ struct LastPlayedView: View {
               // corner rounding moves onto the stack where it can bite.
               ZStack {
                 RoundedRectangle(cornerRadius: 3).fill(Color(white: 0.16))
-                if let art = Art.cover(station: s.image) {
+                if let art = Art.songCover(station: s.image) {
                   art.cruiseBackdrop()
                 } else {
                   s.gradient

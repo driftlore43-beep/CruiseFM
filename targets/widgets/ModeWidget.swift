@@ -419,7 +419,15 @@ struct ModeView: View {
       // `tileHalo` is derived from the accent and is hue-safe, so a station
       // with no colour in it still arrives at the plain near-black the old
       // literal gave. The whole derivation is on it in Snapshot.swift.
-      s.tileHalo(k)
+      //
+      // EASED TO 0.70 FOR THIS TILE, at the owner's own suggestion (20.09),
+      // and it is not merely taste: the record is 139 of a 158pt tile against
+      // the ball's 126, so there is far less room here for a glow to live in,
+      // and every level of it is a level the black disc has to stand against.
+      // Measured on docs/design/record_widget.py the record's edge steps 5.67
+      // against its surround at full strength and 10.00 at 0.70 — a station
+      // that is still plainly named by its colour, on a record that reads.
+      s.tileHalo(k, strength: 0.70)
       // AND THE SHADOW IS NOT OPTIONAL ONCE THE HALO IS THERE, which the
       // prototype measured rather than assumed: the halo ALONE made the record
       // read LESS separate than before, because a black disc on a lit ground

@@ -48,8 +48,13 @@ def hexc(h):
     return np.array([int(h[i:i + 2], 16) for i in (0, 2, 4)], float)
 
 
-def ball_halo_stops(src):
-    """Snapshot.swift's ballHalo, ported: hue-safe, never clips a channel."""
+def ball_halo_stops(src, strength=1.0):
+    """Snapshot.swift's tileHalo, ported: hue-safe, never clips a channel.
+
+    `strength` scales each stop's TARGET BRIGHTNESS, which is the one knob
+    that dims the glow without touching its hue or its falloff — dropping the
+    whole layer's opacity instead would wash it toward whatever is behind it.
+    """
     r, g, b = hexc(src) / 255.0
     mean = max(0.02, (r + g + b) / 3)
     peak = max(0.02, max(r, g, b))
@@ -58,7 +63,8 @@ def ball_halo_stops(src):
         k = min(target / mean, 1 / peak)
         return np.array([min(1, x * k) * (1 - neutral) + target * neutral
                          for x in (r, g, b)]) * 255
-    return [stop(0.30, 0.30), stop(0.13, 0.22), stop(0.025, 0.10)]
+    return [stop(0.30 * strength, 0.30), stop(0.13 * strength, 0.22),
+            stop(0.025 * strength, 0.10)]
 
 
 def grid():
@@ -96,7 +102,7 @@ def angular(theta, stops, angle_deg):
     return out
 
 
-def draw_tile(*, halo=False, shadow=False, flecks=0, tracks=False,
+def draw_tile(*, halo=0.0, shadow=False, flecks=0, tracks=False,
               accent='#6E8CFF', eq=('#C6ECFF', '#2E7DFF', '#1340E6')):
     S = SIZE * SS
     R = S / 2
@@ -108,10 +114,10 @@ def draw_tile(*, halo=False, shadow=False, flecks=0, tracks=False,
 
     img = np.zeros((N, N, 3), float)
 
-    if halo:
+    if halo > 0:
         # ── CANDIDATE: the ball tile's own station halo, so the two squares
         #    belong to the same station rather than one being monochrome ──
-        st = ball_halo_stops(accent)
+        st = ball_halo_stops(accent, halo)
         hr = np.hypot(x - 0.5 * N, y - 0.34 * N) / (100 * SS)
         t = np.clip(hr, 0, 1)
         img = np.zeros((N, N, 3), float)
@@ -250,9 +256,10 @@ if __name__ == '__main__':
     # it again before anyone proposes it a second time.
     shots = [
         ('before  (what ships today)', dict()),
-        ('+ station halo', dict(halo=True)),
-        ('+ halo & contact shadow', dict(halo=True, shadow=True)),
-        ('after  (halo, shadow, track bands)', dict(halo=True, shadow=True, tracks=True)),
+        ('halo 1.00', dict(halo=1.0, shadow=True, tracks=True)),
+        ('halo 0.70', dict(halo=0.70, shadow=True, tracks=True)),
+        ('halo 0.50', dict(halo=0.50, shadow=True, tracks=True)),
+        ('halo 0.35', dict(halo=0.35, shadow=True, tracks=True)),
     ]
     ims = []
     for cap, kw in shots:

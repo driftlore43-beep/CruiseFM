@@ -257,7 +257,19 @@ extension WidgetStation {
   /// did not belong to the station it was tuned to. Nothing about this is
   /// specific to the ball, and one derivation serving both is what stops the
   /// two drifting apart the next time the rule is tuned.
-  func tileHalo(_ k: CGFloat = 1) -> RadialGradient {
+  /// `strength` SCALES EACH STOP'S TARGET BRIGHTNESS, and that is the one
+  /// knob that dims this without touching its hue or its falloff — dropping
+  /// the whole layer's opacity instead would wash it toward whatever happens
+  /// to be behind it, which on a widget is the container background rather
+  /// than anything this file controls. The Record tile asks for 0.70 (owner,
+  /// 20.09: "we can ease the station colour shadowing on the vinyl disc if
+  /// that helps more"), and it genuinely does help: the record's own edge
+  /// steps 5.67 luminance levels against its surround at full strength and
+  /// 10.00 at 0.70, because the object it has to stand against gets darker
+  /// while the colour saying which station this is stays plainly visible.
+  /// 0.50 is the next step down if it is ever wanted quieter still; below
+  /// about 0.35 the tile is back to the monochrome square this replaced.
+  func tileHalo(_ k: CGFloat = 1, strength: Double = 1) -> RadialGradient {
     let src = !accent.isEmpty ? accent : (colors.count > 1 ? colors[1] : "#7B38E0")
     let (r, g, b) = rgbOf(src)
     let mean = max(0.02, (r + g + b) / 3)
@@ -271,7 +283,8 @@ extension WidgetStation {
       return Color(red: c(r), green: c(g), blue: c(b))
     }
     return RadialGradient(
-      colors: [stop(0.30, 0.30), stop(0.13, 0.22), stop(0.025, 0.10)],
+      colors: [stop(0.30 * strength, 0.30), stop(0.13 * strength, 0.22),
+               stop(0.025 * strength, 0.10)],
       center: .init(x: 0.5, y: 0.34), startRadius: 0, endRadius: 100 * k)
   }
 

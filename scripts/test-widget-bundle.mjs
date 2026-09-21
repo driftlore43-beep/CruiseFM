@@ -750,5 +750,75 @@ if (declared.length < 5 || Object.keys(kinds).length < 5) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// EVERY BARE CALL MUST NAME SOMETHING THIS TARGET ACTUALLY DECLARES.
+//
+// Build 64 died on ONE line: `entry()` inside StartDriveProvider.placeholder,
+// left behind when that method was pulled out into the free function
+// `startDriveEntry(pinned:)` so the configurable provider could share it. Two
+// of the three call sites were updated and the third was not. It reads
+// perfectly — a widget's placeholder returning `entry()` is exactly what you
+// expect to see — and there is no Swift compiler here, so the whole build was
+// spent finding out that a name had gone stale.
+//
+// The property is cheap and general: inside this target, a call written
+// WITHOUT a receiver is nearly always one of our own free functions, because
+// SwiftUI and WidgetKit are reached through `.something()` on a value. So any
+// bare lowercase call that this target does not declare is either a typo or a
+// rename that missed a site.
+//
+// Receiver-qualified calls (`.foo()`), attributes (`@escaping`), compiler
+// directives (`#available`) and string interpolation are all excluded by
+// looking at the character in front, which is why the allowlists below are as
+// short as they are.
+{
+  const KEYWORDS = new Set(
+    ('if guard while for switch return init self super try await catch else in case ' +
+     'let var do repeat defer throw is as where break continue func struct enum class ' +
+     'extension protocol import public private static').split(' '));
+
+  // Swift's own free functions, plus the closure parameter every TimelineProvider
+  // is handed. None of these are ours and none can be declared here.
+  const STDLIB = new Set(
+    'completion min max abs pow sin cos tan floor ceil round sqrt atan2 print zip stride'.split(' '));
+
+  // Framework methods called on an IMPLICIT self inside an `extension`, which is
+  // the one honest way a bare call here is not ours. Both are load-bearing and
+  // documented where they are used; add to this list only with the same care.
+  const IMPLICIT_SELF = new Set(['resizable', 'contentMarginsDisabled']);
+
+  // Line-PRESERVING comment stripping, so a reported line number is the one
+  // you open the file at. The shared decomment() collapses block comments.
+  const blank = (t) => t
+    .replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))
+    .replace(/\/\/.*$/gm, '');
+  const bodies = Object.fromEntries(Object.entries(src).map(([f, t]) => [f, blank(t)]));
+  const declaredFns = new Set(
+    [...Object.values(bodies).join('\n').matchAll(/\bfunc\s+(\w+)\s*[(<]/g)].map((m) => m[1]));
+
+  const unknown = [];
+  let scanned = 0;
+  for (const [f, body] of Object.entries(bodies)) {
+    scanned += 1;
+    for (const m of body.matchAll(/([a-z]\w*)\s*\(/g)) {
+      const name = m[1];
+      if (KEYWORDS.has(name) || STDLIB.has(name) || IMPLICIT_SELF.has(name)) continue;
+      if (declaredFns.has(name)) continue;
+      const before = body.slice(0, m.index).replace(/\s+$/, '').slice(-1);
+      // A receiver, an attribute, a directive, an interpolation, or part of a
+      // longer identifier — none of these are a bare call.
+      if (before === '.' || before === '@' || before === '#' || before === '\\') continue;
+      if (/[\w$]/.test(before)) continue;
+      const line = body.slice(0, m.index).split('\n').length;
+      unknown.push(`${f}:${line} ${name}()`);
+    }
+  }
+
+  // A scan that matched nothing would pass whatever the code said.
+  check('bare calls: it read the target', scanned >= 8, `${scanned} file(s)`);
+  check('bare calls: every one names a function this target declares',
+    unknown.length === 0, unknown.join(', '));
+}
+
 console.log(fails ? `\n  ${fails} failure(s)\n` : '\n  the widget bundle hangs together\n');
 process.exit(fails ? 1 : 0);

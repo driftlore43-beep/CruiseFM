@@ -37,7 +37,7 @@ struct StartDriveProvider: TimelineProvider {
     // cases tell themselves apart: a widget stuck on its placeholder now
     // shows real content, so if a grey tile fills in, the drawing was never
     // the problem — it never received a timeline.
-    entry()
+    startDriveEntry()
   }
 
   func getSnapshot(in context: Context, completion: @escaping (StartDriveEntry) -> Void) {

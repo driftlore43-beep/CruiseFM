@@ -620,5 +620,64 @@ if (declared.length < 5 || Object.keys(kinds).length < 5) {
     'it must be Color.clear.overlay(...).clipped()');
 }
 
+
+// ── THE CD'S TRACKS MAY NOT DRIFT BACK INTO A RECORD'S GROOVES ────────────
+//
+// The two tiles sit in the same Look picker and one of them is a pressed disc
+// whose tracks are a shimmer while the other is a record whose grooves are
+// cut. They converged on each other from both sides: 10.09 widened the CD's
+// pitch to 0.07 of the radius in the name of "CDs aren't that textured"
+// (which is the opposite of what widening does) and 20.09 gave the record
+// real grooves. So the relationship is pinned rather than each number alone,
+// and BOTH sides are parsed out of the source — a constant copied into a test
+// is a constant that goes stale silently.
+{
+  const cd = /fileprivate let TRACK_PITCH:\s*CGFloat\s*=\s*([\d.]+)/.exec(src['ModeWidget.swift'] ?? '');
+  const discSize = /CompactDisc\(cover:[\s\S]*?size:\s*([\d.]+)\s*\*\s*k\)/.exec(src['ModeWidget.swift'] ?? '');
+  const rec = /private var pitch:\s*CGFloat\s*\{\s*([\d.]+)\s*\}/.exec(src['Artwork.swift'] ?? '');
+  check('the CD and the record both state their pitch', !!cd && !!discSize && !!rec,
+    `TRACK_PITCH ${cd?.[1]} · disc ${discSize?.[1]} · record ${rec?.[1]}`);
+  if (cd && discSize && rec) {
+    const cdPt = Number(cd[1]) * Number(discSize[1]) / 2;
+    check('the CD\'s tracks are no coarser than the record\'s grooves',
+      cdPt <= Number(rec[1]) + 0.001,
+      `${cdPt.toFixed(2)}pt against the record's ${rec[1]}pt — a CD's tracks are microns apart, a record's are not`);
+    // Below about 1.2pt neighbouring rings moire against the pixel grid, which
+    // is the record's own measured floor (20.09). Finer than that and the
+    // harness is flattering the code.
+    check('and not so fine that they moire', cdPt >= 1.2,
+      `${cdPt.toFixed(2)}pt`);
+  }
+}
+
+// ── THE PRESSING HAS AN EDGE OF ITS OWN ───────────────────────────────────
+// The clear polycarbonate margin (21.09). Without it the cover runs off the
+// rim and the only thing separating the disc from the case is the directional
+// rim stroke. Falloff, never a stroke — a hard ring here is the stacking ring
+// the owner had removed on 10.09.
+{
+  const m = src['ModeWidget.swift'] ?? '';
+  check('the disc carries its clear polycarbonate margin',
+    /location:\s*0\.945\)[\s\S]{0,200}?location:\s*0\.975\)/.test(m),
+    'CompactDisc must darken the outer ~1.65pt into a clear margin');
+  check('and it is falloff rather than a drawn ring',
+    !/Circle\(\)\.stroke\([^)]*\)\s*\n\s*\.frame\(width: size \* 0\.9[5-9]/.test(m),
+    'a hard ring at the rim reads as the stacking ring that was deleted');
+}
+
+// ── THE HUB IS METAL, NOT A PLATE ─────────────────────────────────────────
+// A flat pale fill was the brightest thing on the tile with no light on it at
+// all; it takes the RIM'S OWN bearing so the two catch the same lamp.
+{
+  const m = src['ModeWidget.swift'] ?? '';
+  check('the clamping ring is lit rather than filled flat',
+    !/Circle\(\)\.fill\(Color\(white: 0\.88\)\.opacity\(0\.60\)\)/.test(m),
+    'a flat fill is a drawn circle — the rim, the ball\'s rim and the record\'s edge have each been talked out of exactly this');
+  const hub = /hub ring and the four gripper holes[\s\S]{0,1400}?size \* 0\.31/.exec(m);
+  check('and it is lit on the rim\'s own bearing',
+    !!hub && /AngularGradient/.test(hub[0]) && /angle:\s*\.degrees\(-125\)/.test(hub[0]),
+    'a second, differently-lit hub reads as a separate object sitting on the disc');
+}
+
 console.log(fails ? `\n  ${fails} failure(s)\n` : '\n  the widget bundle hangs together\n');
 process.exit(fails ? 1 : 0);

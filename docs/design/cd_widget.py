@@ -1,11 +1,20 @@
 """
-Comparison sheet for the CD widget's disc, drawn the way the Swift draws it.
+The CD widget's TILE, drawn the way the Swift draws it at the size an iPhone
+renders it: a 158pt tile, k = 1.
 
-Written 2026-09-10, alongside ball_widget.py, because the owner asked to see
-prototypes before another build goes out. Build 47 already carries a rewrite
-of the rainbow that she has never seen, so option B here IS build 47 — the
-point of the sheet is that she can judge it now rather than after the build
-lands, and pick a different direction in the same round if she wants one.
+Written 2026-09-10 for the disc alone; the case and the tile around it were
+REBUILT 2026-09-21, because what was here drew build 47 — case inset 8,
+radius 16, three flat tabs, a 124pt disc sidestepped 6pt right — and every one
+of those has since moved (case option D on 11.09, the disc to 132 the same
+day, the sidestep off on 15.09). A harness drawing the build before last
+cannot answer a question about the tile on a phone, which is what the owner
+asked on 21.09: "could you fix the CD square for iPhone also?"
+
+TWO COVERS, ALWAYS. The demo station's photograph is a near-black night shot
+(after-midnight.jpg, mean 14.7/255), so a brightness or contrast change
+measured on it alone can look like nothing happened — the trap this file
+already fell into on 10.09. Every comparison runs a dark cover and a bright
+one side by side.
 
 EVERY LAYER IS PORTED FROM CompactDisc IN ModeWidget.swift, in the same order
 and with the same numbers: the jewel case, the album art beneath, the
@@ -62,6 +71,15 @@ def over(dst, src, a):
 def screen(dst, src, a):
     s = 1 - (1 - dst) * (1 - src)
     return dst * (1 - a[..., None]) + s * a[..., None]
+
+def ring_wave(t, pitch, band=0.006):
+    """pressedRingStops' own shape: full at each ring, falling to clear over
+    `band`, then ramping BACK UP across the rest of the pitch to the next
+    ring. It is a sawtooth rather than a hairline, which is why the shipped
+    tracks read as broad concentric banding inside the fans."""
+    ph = (t % pitch)
+    return np.where(ph < band, 1 - ph / band, (ph - band) / max(pitch - band, 1e-6))
+
 
 # ── the disc ─────────────────────────────────────────────────────────────
 # The station's own reference disc, sampled 11.09 (docs/design + /tmp/cd_ref):
@@ -232,7 +250,8 @@ STREAKS = {
 # slot so neighbours overlap): more/ wider = softer blending between colours.
 STREAK_PARAMS = {'S_streaks': (10, 2.2), 'S_dense': (14, 2.7), 'S_wide': (9, 2.4)}
 
-def disc(option, size=DISC):
+def disc(option, size=DISC, track_pitch=0.06, clear_margin=0.0,
+         art=None, lit_hub=False):
     n = size
     y, x = np.mgrid[0:n, 0:n].astype(float)
     cx = cy = (n - 1) / 2.0
@@ -243,7 +262,7 @@ def disc(option, size=DISC):
     ang = (np.degrees(np.arctan2(dy, dx))) % 360.0     # clockwise from 3 o'clock
 
     # album art, darkened and desaturated the way build 47 does
-    im = Image.open(ART).convert('RGB')
+    im = Image.open(art or ART).convert('RGB')
     s = min(im.size)
     im = im.crop(((im.width - s) // 2, (im.height - s) // 2,
                   (im.width - s) // 2 + s, (im.height - s) // 2 + s)).resize((n, n), Image.LANCZOS)
@@ -312,7 +331,7 @@ def disc(option, size=DISC):
         # of that pitch, so each groove is roughly a single pixel wide. Made
         # to CATCH THE LIGHT in the fans ("more visible near the reflected
         # area"). Same pitch as the base rings below so the two align.
-        track = np.where(((d / R) % 0.06) / 0.06 < 0.10, 1.0, 0.0)
+        track = ring_wave(d / R, track_pitch)
         for beam in fans:
             bearing, spread, strength = beam[0], beam[1], beam[2]
             # each beam may name its own spectrum (warm/cool/pink) so the two
@@ -346,16 +365,22 @@ def disc(option, size=DISC):
     # opacity 0.015. On plain metal they are a barely-there shimmer; the fan
     # loop above lifts the SAME tracks where the rainbow lands, which is where
     # a real disc shows them most.
-    ring_t = d / R
-    phase = (ring_t % 0.06) / 0.06
-    ring_a = np.where(phase < 0.10, 0.015, 0.0)
-    img = over(img, np.ones_like(img), ring_a)
+    img = over(img, np.ones_like(img), ring_wave(d / R, track_pitch) * 0.015)
 
     # specular sweep, topLeading -> bottomTrailing
     sw = np.clip(((x / n) + (y / n)) / 2.0, 0, 1)
     _, spa = stops_at([(0.04, (1, 1, 1), 0.52), (0.20, (1, 1, 1), 0.0),
                        (0.72, (1, 1, 1), 0.0), (0.95, (1, 1, 1), 0.30)], sw)
     img = over(img, np.ones_like(img), spa)
+
+    # ── THE CLEAR POLYCARBONATE MARGIN ──
+    # A pressing's aluminium stops about 1.5mm short of the edge, so the last
+    # of the disc is bare transparent plastic over whatever is behind it.
+    if clear_margin > 0:
+        _, ca = stops_at([(0.000, (0, 0, 0), 0.0), (0.945, (0, 0, 0), 0.0),
+                          (0.975, (0, 0, 0), 0.55 * clear_margin),
+                          (1.000, (0, 0, 0), 0.30 * clear_margin)], np.clip(d / R, 0, 1))
+        img = over(img, np.zeros_like(img), ca)
 
     # the dome — falls away at the rim
     dd = np.hypot(x - 0.40 * n, y - 0.34 * n) / (0.56 * n)
@@ -375,7 +400,25 @@ def disc(option, size=DISC):
     # between the centre and the edge"
     ring(0.375, 0.035 * n, (255, 255, 255, 51))
     r = 0.31 * n / 2
-    dr.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(224, 224, 224, 153), outline=(255, 255, 255, 115), width=SS)
+    if lit_hub:
+        # THE CLAMPING RING IS THE SAME METAL AS THE FACE. A flat pale fill is
+        # a drawn circle; an angular ramp on the rim's own bearing makes the
+        # hub catch the same lamp the rest of the disc does.
+        hub = np.zeros((n, n, 4))
+        hloc = ((ang - (-125 - 90)) % 360) / 360.0
+        hcol, ha = stops_at([(0.00, (0.92, 0.92, 0.92), 0.72),
+                             (0.30, (0.62, 0.62, 0.62), 0.40),
+                             (0.55, (0.88, 0.88, 0.88), 0.64),
+                             (0.82, (0.58, 0.58, 0.58), 0.36),
+                             (1.00, (0.92, 0.92, 0.92), 0.72)], hloc)
+        hm = (d <= r).astype(float)
+        hub[..., :3] = hcol
+        hub[..., 3] = ha * hm
+        ov = Image.alpha_composite(ov, Image.fromarray((hub * 255).astype(np.uint8), 'RGBA'))
+        dr = ImageDraw.Draw(ov)
+        dr.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(255, 255, 255, 115), width=SS)
+    else:
+        dr.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(224, 224, 224, 153), outline=(255, 255, 255, 115), width=SS)
     for i in range(4):
         a = math.radians(i * 90 + 45 - 90)
         hx = cx + 0.1175 * n * math.cos(a); hy = cy + 0.1175 * n * math.sin(a)
@@ -412,85 +455,245 @@ def disc(option, size=DISC):
     return out
 
 # ── the jewel case and the tile ──────────────────────────────────────────
-def tile(option):
-    n = TILE
-    base = Image.new('RGB', (n, n), (0, 0, 0))
+#
+# REBUILT 21.09 TO THE CASE AS IT ACTUALLY SHIPS. What was here drew build
+# 47's case — inset 8, radius 16, three flat tabs — under a 124pt disc
+# sidestepped 6pt to the right, and every one of those has since moved: case
+# option D landed 11.09 (inset 5, radius 13, a barrel hinge), the disc grew to
+# 132 the same day, and the sidestep came off on 15.09. A harness drawing the
+# build before last cannot answer a question about the tile on a phone.
+#
+# Everything below is ported from disc(_:k:) and JewelCase in ModeWidget.swift
+# at k = 1, i.e. the 158pt tile an iPhone draws.
+
+def rrect(draw, box, radius, fill=None, outline=None, width=1):
+    draw.rounded_rectangle([box[0], box[1], box[2], box[3]], radius=radius,
+                           fill=fill, outline=outline, width=max(1, int(round(width))))
+
+def lin_alpha(x, y, n, p0, p1, stops):
+    """SwiftUI LinearGradient alpha over a box, unit start/end points."""
+    sx, sy = p0[0] * n, p0[1] * n
+    ex, ey = p1[0] * n, p1[1] * n
+    vx, vy = ex - sx, ey - sy
+    L2 = vx * vx + vy * vy
+    t = ((x - sx) * vx + (y - sy) * vy) / L2
+    _, a = stops_at(stops, np.clip(t, 0, 1))
+    return a
+
+def jewel_case(n, pt, clip_alpha=0.44, clip_rib=3.2):
+    """The case, as its own RGBA layer over the tile. `pt` scales points."""
+    inset = 5 * pt
+    radius = 13 * pt
+    W = n - 2 * inset                      # the case's own box is inset by 5
+    lay = Image.new('RGBA', (n, n), (0, 0, 0, 0))
+
+    # ── the glass body: a white ramp across the case's own diagonal ──
+    yy, xx = np.mgrid[0:int(W), 0:int(W)].astype(float)
+    a = lin_alpha(xx, yy, W, (0, 0), (1, 1),
+                  [(0.0, (1, 1, 1), 0.16), (0.5, (1, 1, 1), 0.02), (1.0, (1, 1, 1), 0.10)])
+    body = np.dstack([np.ones_like(a), np.ones_like(a), np.ones_like(a), a])
+    body_im = Image.fromarray((body * 255).astype(np.uint8), 'RGBA')
+    m = Image.new('L', (int(W), int(W)), 0)
+    ImageDraw.Draw(m).rounded_rectangle([0, 0, int(W) - 1, int(W) - 1], radius=radius, fill=255)
+    body_im.putalpha(Image.fromarray((np.asarray(m).astype(float) / 255 * a * 255).astype(np.uint8)))
+    lay.paste(body_im, (int(inset), int(inset)), body_im)
+
+    d = ImageDraw.Draw(lay)
+    # outer stroke — marks the edge rather than drawing it
+    rrect(d, [inset, inset, n - inset, n - inset], radius, outline=(255, 255, 255, 36), width=pt)
+    # ── inner bevel: a dark line on the wall, a highlight just inside it ──
+    rrect(d, [inset + pt, inset + pt, n - inset - pt, n - inset - pt], radius - pt,
+          outline=(5, 7, 14, 66), width=pt)
+    rrect(d, [inset + 3 * pt, inset + 3 * pt, n - inset - 3 * pt, n - inset - 3 * pt],
+          radius - 3 * pt, outline=(255, 255, 255, 31), width=pt)
+
+    # ── the barrel hinge down the spine ──
+    sw = 12 * pt
+    sy0, sy1 = inset, n - inset
+    hh = int(sy1 - sy0)
+    yy, xx = np.mgrid[0:hh, 0:int(sw)].astype(float)
+    sa = lin_alpha(xx, yy, sw, (0, 0), (1, 0),
+                   [(0.0, (1, 1, 1), 0.16), (1.0, (1, 1, 1), 0.04)])
+    strip = Image.fromarray(np.dstack([np.ones_like(sa), np.ones_like(sa),
+                                       np.ones_like(sa), sa * 255]).astype(np.uint8), 'RGBA')
+    lay.paste(strip, (int(inset), int(sy0)), strip)
+    sd = ImageDraw.Draw(lay)
+    # the strip's trailing edge
+    sd.rectangle([inset + sw - pt, sy0, inset + sw, sy1], fill=(255, 255, 255, 51))
+    # the rule down the middle of the spine
+    sd.rectangle([inset + sw / 2 - pt / 2, sy0 + 18 * pt, inset + sw / 2 + pt / 2, sy1 - 18 * pt],
+                 fill=(255, 255, 255, 66))
+    # CRUISE FM, set on its side
+    txt = Image.new('RGBA', (int(70 * pt), int(8 * pt)), (0, 0, 0, 0))
+    td = ImageDraw.Draw(txt)
+    try:
+        from PIL import ImageFont
+        f = ImageFont.truetype('/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf',
+                               int(4.5 * pt))
+    except Exception:
+        f = None
+    td.text((0, 0), 'C R U I S E  F M', font=f, fill=(255, 255, 255, 71))
+    txt = txt.rotate(90, expand=True)
+    lay.alpha_composite(txt, (int(inset + sw / 2 - txt.width / 2), int(n / 2 - txt.height / 2)))
+    # two knuckles and their pins
+    kw, kh, gap = 9 * pt, 24 * pt, 20 * pt
+    top = n / 2 - (kh * 2 + gap) / 2
+    for i in range(2):
+        y0 = top + i * (kh + gap)
+        x0 = inset + sw / 2 - kw / 2
+        rrect(sd, [x0, y0, x0 + kw, y0 + kh], 4.5 * pt,
+              fill=(255, 255, 255, 36), outline=(255, 255, 255, 66), width=pt)
+        pr = 4.4 * pt / 2
+        pcx, pcy = x0 + kw / 2, y0 + kh / 2
+        sd.ellipse([pcx - pr, pcy - pr, pcx + pr, pcy + pr],
+                   fill=(10, 12, 18, 140), outline=(255, 255, 255, 87), width=max(1, int(0.7 * pt)))
+
+    # ── moulded corner clips ──
+    pad = 6 * pt
+    cl = 17 * pt
+    rib = clip_rib * pt
+    for cx0, cy0, sx, sy in ((inset + pad, inset + pad, 1, 1),
+                             (n - inset - pad, inset + pad, -1, 1),
+                             (inset + pad, n - inset - pad, 1, -1),
+                             (n - inset - pad, n - inset - pad, -1, -1)):
+        x0, x1 = sorted([cx0, cx0 + sx * cl])
+        y0, y1 = sorted([cy0, cy0 + sy * cl])
+        if sy > 0:
+            rrect(sd, [x0, y0, x1, y0 + rib], 1.6 * pt, fill=(255, 255, 255, int(255 * clip_alpha)))
+        else:
+            rrect(sd, [x0, y1 - rib, x1, y1], 1.6 * pt, fill=(255, 255, 255, int(255 * clip_alpha)))
+        if sx > 0:
+            rrect(sd, [x0, y0, x0 + rib, y1], 1.6 * pt, fill=(255, 255, 255, int(255 * clip_alpha)))
+        else:
+            rrect(sd, [x1 - rib, y0, x1, y1], 1.6 * pt, fill=(255, 255, 255, int(255 * clip_alpha)))
+
+    # ── the two sweeps of light on the plastic ──
+    yy, xx = np.mgrid[0:int(W), 0:int(W)].astype(float)
+    for p0, p1, st in (((0, 0), (1, 1), [(0.04, (1, 1, 1), 0.20), (0.26, (1, 1, 1), 0.0),
+                                         (0.74, (1, 1, 1), 0.0), (0.96, (1, 1, 1), 0.10)]),
+                       ((1, 0), (0, 1), [(0.0, (1, 1, 1), 0.10), (0.34, (1, 1, 1), 0.0)])):
+        a = lin_alpha(xx, yy, W, p0, p1, st)
+        sw_im = Image.fromarray(np.dstack([np.ones_like(a), np.ones_like(a),
+                                           np.ones_like(a), a]).astype(float).__mul__(255).astype(np.uint8), 'RGBA')
+        mm = np.asarray(m).astype(float) / 255
+        sw_im.putalpha(Image.fromarray((a * mm * 255).astype(np.uint8)))
+        lay.alpha_composite(sw_im, (int(inset), int(inset)))
+    return lay
+
+
+def tile(option='L_swift', accent='#9b5cff', halo=1.0, disc_size=132,
+         track_pitch=0.06, clear_margin=0.0, clip_alpha=0.44, clip_rib=3.2,
+         disc_alpha=0.74, silver=None, art=None, lit_hub=False, pt=SS):
+    n = 158 * pt
     y, x = np.mgrid[0:n, 0:n].astype(float)
     g = ((x / n) + (y / n)) / 2
     c0 = np.array(hexc('#1c1f26')); c1 = np.array(hexc('#080a0e'))
     bg = c0[None, None, :] * (1 - g[..., None]) + c1[None, None, :] * g[..., None]
-    base = Image.fromarray((np.clip(bg, 0, 1) * 255).astype(np.uint8))
+    base = Image.fromarray((np.clip(bg, 0, 1) * 255).astype(np.uint8)).convert('RGBA')
 
-    ov = Image.new('RGBA', (n, n), (0, 0, 0, 0))
-    d = ImageDraw.Draw(ov)
-    inset = 8 * SS; radius = 16 * SS
-    box = [inset, inset, n - inset, n - inset]
-    d.rounded_rectangle(box, radius=radius, fill=(255, 255, 255, 18), outline=(255, 255, 255, 41), width=SS)
-    # hinge spine
-    d.rectangle([inset, inset + radius // 2, inset + 12 * SS, n - inset - radius // 2], fill=(255, 255, 255, 26))
-    for k in range(3):
-        ty = n * (0.30 + k * 0.20)
-        d.rounded_rectangle([inset + 2 * SS, ty - 9.5 * SS, inset + 10 * SS, ty + 9.5 * SS],
-                            radius=2 * SS, fill=(255, 255, 255, 23), outline=(255, 255, 255, 36), width=SS)
-    # corner posts
-    p = 7 * SS; L = 15 * SS; w = int(1.8 * SS)
-    for ax, ay in ((inset + p, inset + p), (n - inset - p, inset + p),
-                   (inset + p, n - inset - p), (n - inset - p, n - inset - p)):
-        sx = 1 if ax < n / 2 else -1
-        sy = 1 if ay < n / 2 else -1
-        def rect(x0, y0, x1, y1):
-            d.rectangle([min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)],
-                        fill=(255, 255, 255, 56))
-        rect(ax, ay, ax + sx * L, ay + sy * w)
-        rect(ax, ay, ax + sx * w, ay + sy * L)
-    base = Image.alpha_composite(base.convert('RGBA'), ov)
+    case = jewel_case(n, pt, clip_alpha=clip_alpha, clip_rib=clip_rib)
+    base = Image.alpha_composite(base, case)
 
-    # accent glow behind the disc
-    glow = Image.new('RGBA', (n, n), (0, 0, 0, 0))
-    gd = ImageDraw.Draw(glow)
-    gr = 138 * SS / 2
-    gcx = n / 2 + 6 * SS
-    gd.ellipse([gcx - gr, n / 2 - gr, gcx + gr, n / 2 + gr], fill=(155, 92, 255, 82))
-    glow = glow.filter(ImageFilter.GaussianBlur(20 * SS))
-    base = Image.alpha_composite(base, glow)
+    # ── the accent glow behind the disc, drawn as falloff (14.09) ──
+    if halo > 0:
+        d = np.hypot(x - n / 2, y - n / 2) / (96 * pt)
+        acc = np.array(hexc(accent))
+        _, ga = stops_at([(0.00, (0, 0, 0), 0.32), (0.52, (0, 0, 0), 0.26),
+                          (0.80, (0, 0, 0), 0.10), (1.00, (0, 0, 0), 0.00)], np.clip(d, 0, 1))
+        ga = ga * halo
+        glow = np.dstack([np.full_like(ga, acc[0]), np.full_like(ga, acc[1]),
+                          np.full_like(ga, acc[2]), ga])
+        base = Image.alpha_composite(base, Image.fromarray((glow * 255).astype(np.uint8), 'RGBA'))
 
-    dsc = disc(option)
+    # ── the disc, with its contact shadow ──
+    ds = int(disc_size * pt)
+    if silver is not None:
+        SILVER['L_swift'] = silver
+    dsc = disc(option, size=ds, track_pitch=track_pitch, clear_margin=clear_margin,
+               art=art, lit_hub=lit_hub)
     sh = Image.new('RGBA', (n, n), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(sh)
-    dr_ = DISC / 2
-    sd.ellipse([gcx - dr_, n / 2 - dr_ + 5 * SS, gcx + dr_, n / 2 + dr_ + 5 * SS], fill=(0, 0, 0, 158))
-    sh = sh.filter(ImageFilter.GaussianBlur(9 * SS))
+    r_ = ds / 2
+    ImageDraw.Draw(sh).ellipse([n / 2 - r_, n / 2 - r_ + 5 * pt, n / 2 + r_, n / 2 + r_ + 5 * pt],
+                               fill=(0, 0, 0, int(255 * 0.62)))
+    sh = sh.filter(ImageFilter.GaussianBlur(9 * pt / 2))
     base = Image.alpha_composite(base, sh)
-    base.paste(dsc, (int(gcx - DISC / 2), int(n / 2 - DISC / 2)), dsc)
+    faded = dsc.copy()
+    faded.putalpha(Image.fromarray((np.asarray(dsc.split()[3]).astype(float) * disc_alpha).astype(np.uint8)))
+    base.alpha_composite(faded, (int(n / 2 - ds / 2), int(n / 2 - ds / 2)))
 
     mask = Image.new('L', (n, n), 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, n - 1, n - 1], radius=22 * SS, fill=255)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, n - 1, n - 1], radius=22 * pt, fill=255)
     base.putalpha(mask)
-    return base.resize((158 * 3, 158 * 3), Image.LANCZOS)
+    return base
+
+
+
+def measure(im, disc_size=132, pt=SS):
+    """What reads on the tile, in luminance levels out of 255."""
+    a = np.asarray(im.convert('RGB')).astype(float)
+    n = a.shape[0]
+    lum = a.mean(axis=2)
+    yy, xx = np.mgrid[0:n, 0:n]
+    r = np.hypot(xx - n / 2, yy - n / 2)
+    R = disc_size * pt / 2
+    disc_m = r <= R * 0.98
+    out = {}
+    out['disc_median'] = float(np.median(lum[disc_m]))
+    px = a[disc_m]
+    mx = px.max(axis=1); mn = px.min(axis=1)
+    sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1), 0)
+    out['tinted'] = float(100 * (sat > 0.18).mean())
+    # THE HINGE BAND, the thing the owner's own device screenshot measured as
+    # dead flat on 15.09: a column across the spine at the tile's mid-height.
+    row = int(n / 2)
+    band = [float(lum[row, int(v * pt)]) for v in range(2, 26, 2)]
+    out['hinge_profile'] = band
+    out['hinge_range'] = max(band) - min(band)
+    # how far the case's own edge steps against the tile background just
+    # outside it — a case you can find at all
+    edge_in = float(np.median(lum[row, int(6 * pt):int(9 * pt)]))
+    edge_out = float(np.median(lum[row, int(1 * pt):int(4 * pt)]))
+    out['case_edge_step'] = edge_in - edge_out
+    # HOW COUNTABLE THE TRACKS ARE, reported as the pitch in POINTS rather
+    # than by hunting peaks in a photograph — a peak counter run over an album
+    # cover measures the cover. A record's grooves are 1.7pt apart on the
+    # Record tile; below ~1.2pt neighbouring rings moire. So a CD wants to sit
+    # just above that floor and well under the record's, and the picture is
+    # what says whether it reads.
+    R = disc_size * pt / 2
+    # the rim: how far the last of the disc steps against the data area, i.e.
+    # whether the pressing has a visible edge or the art runs off it
+    inner = float(np.median(lum[row, int(n / 2 + R * 0.88):int(n / 2 + R * 0.93)]))
+    margin = float(np.median(lum[row, int(n / 2 + R * 0.955):int(n / 2 + R * 0.985)]))
+    out['rim_step'] = inner - margin
+    return out
+
 
 if __name__ == '__main__':
-    names = [('G_A',      'A  what ships now'),
-             ('L_swift',  'B  transparent disc, wider + stronger rainbow')]
+    os.chdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    NEW = dict(track_pitch=0.025, clear_margin=1.0, clip_alpha=0.26,
+               clip_rib=2.6, lit_hub=True)
+    DARK = 'targets/widgets/after-midnight.jpg'
+    BRIGHT = 'targets/widgets/daylight.jpg'
+    shots = [
+        ('A  ships, dark cover', dict(art=DARK)),
+        ('B  new, dark cover', dict(art=DARK, **NEW)),
+        ('C  ships, bright cover', dict(art=BRIGHT)),
+        ('D  new, bright cover', dict(art=BRIGHT, **NEW)),
+    ]
     W = 158 * 4
-    sheet = Image.new('RGB', (W * 2 + 60, W + 130), (14, 14, 17))
+    cols = len(shots)
+    sheet = Image.new('RGB', (W * cols + 20 * (cols + 1), W + 110), (14, 14, 17))
     dd = ImageDraw.Draw(sheet)
-    for i, (key, cap) in enumerate(names):
-        im = tile(key)
-        x = 20 + i * (W + 20)
-        sheet.paste(im, (x, 80), im)
-        dd.text((x, 40), cap, fill=(230, 230, 235))
-    sheet.save('/tmp/cd_widget_compare.png')
-    print('saved /tmp/cd_widget_compare.png')
-
-    # how much of the disc actually carries colour, per option
-    for key, cap in names:
-        im = tile(key).convert('RGB')
-        a = np.asarray(im).astype(float)
-        n = a.shape[0]
-        yy, xx = np.mgrid[0:n, 0:n]
-        cx = n / 2 + 6 * 3; cy = n / 2
-        m = np.hypot(xx - cx, yy - cy) <= (124 * 3 / 2) * 0.95
-        px = a[m]
-        mx = px.max(axis=1); mn = px.min(axis=1)
-        sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1), 0)
-        print(f'{key:12} tinted>0.18 {100*(sat>0.18).mean():5.1f}%   mean sat {sat.mean():.3f}   median lum {np.median(px.mean(axis=1)):5.1f}')
+    for i, (cap, kw) in enumerate(shots):
+        im = tile(**kw)
+        m = measure(im, disc_size=kw.get('disc_size', 132))
+        small = im.resize((W, W), Image.LANCZOS)
+        sheet.paste(small, (20 + i * (W + 20), 70), small)
+        dd.text((20 + i * (W + 20), 36), cap, fill=(230, 230, 235))
+        print(f"{cap:20} disc median {m['disc_median']:5.1f}  tinted {m['tinted']:5.1f}%  "
+              f"track pitch {kw.get('track_pitch', 0.06) * kw.get('disc_size', 132) / 2:.2f}pt  "
+              f"rim step {m['rim_step']:5.1f}")
+        SILVER['L_swift'] = 0.30
+    sheet.save('/tmp/cd_tile.png')
+    print('saved /tmp/cd_tile.png')

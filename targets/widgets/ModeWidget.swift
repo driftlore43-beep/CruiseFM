@@ -902,14 +902,21 @@ private struct JewelCase: View {
   /// A glossy moulded corner clip — two rounded ribs meeting at the corner,
   /// thicker and brighter than the old hairline L so it reads as a reinforced
   /// plastic corner (case option D).
+  ///
+  /// QUIETED 21.09. At 3.2pt of white 0.44 the four of them were the loudest
+  /// thing on the tile after the disc, and four bright right angles set in
+  /// from the corners of a square do not read as moulded plastic — they read
+  /// as crop marks, which is the "UI-like" note the disc's own rim collected
+  /// on 10.09 and the same instruction as "reduce the heavy outer frame". The
+  /// corner is still there; it is no longer competing with the pressing.
   private func clip(_ corner: Alignment) -> some View {
     let top = corner == .topLeading || corner == .topTrailing
     let leading = corner == .topLeading || corner == .bottomLeading
     return ZStack {
-      VStack { if !top { Spacer() }; RoundedRectangle(cornerRadius: 1.6 * k).frame(height: 3.2 * k); if top { Spacer() } }
-      HStack { if !leading { Spacer() }; RoundedRectangle(cornerRadius: 1.6 * k).frame(width: 3.2 * k); if leading { Spacer() } }
+      VStack { if !top { Spacer() }; RoundedRectangle(cornerRadius: 1.3 * k).frame(height: 2.6 * k); if top { Spacer() } }
+      HStack { if !leading { Spacer() }; RoundedRectangle(cornerRadius: 1.3 * k).frame(width: 2.6 * k); if leading { Spacer() } }
     }
-    .foregroundColor(.white.opacity(0.44))
+    .foregroundColor(.white.opacity(0.26))
     .frame(width: 17 * k, height: 17 * k)
   }
 }
@@ -1052,10 +1059,36 @@ fileprivate func pressedRingStops(_ opacity: Double) -> [Gradient.Stop] {
   while t < 1 {
     out.append(Gradient.Stop(color: .white.opacity(opacity), location: t))
     out.append(Gradient.Stop(color: .clear, location: min(1, t + 0.006)))
-    t += 0.06
+    t += TRACK_PITCH
   }
   return out
 }
+
+/// HOW FAR APART THE TRACKS SIT, as a share of the disc's radius.
+///
+/// 0.06 -> 0.025 (21.09), and it is a CORRECTION RATHER THAN A CHANGE OF
+/// TASTE. 10.09 widened the pitch 0.045 -> 0.07 on the owner's own note that
+/// "CDs aren't that textured", with the stated aim of turning individually
+/// countable rings into texture — and widening does the opposite of that. On
+/// a 132pt disc 0.06 puts a ring every 3.96pt, i.e. about ten of them between
+/// the hub and the rim, which is a RECORD'S groove count; a pressing's tracks
+/// are 1.6 microns apart and what a photograph of one shows is an
+/// unresolvable shimmer. Drawn out at the size a phone renders it
+/// (docs/design/cd_widget.py) the shipped pitch reads as broad concentric
+/// banding, and it now sits beside a Record tile that grew REAL grooves on
+/// 20.09 — so the two looks were converging on each other from both sides.
+///
+/// AND THE SHAPE IS A SAWTOOTH, WHICH IS WHY IT BANDS RATHER THAN HAIRLINES.
+/// The stops above run full at each ring, fall to clear over 0.006, and then
+/// ramp BACK UP across the whole remaining gap to the next one. At a 0.06
+/// pitch that ramp is 0.054 wide — most of the disc is a gradient climbing
+/// toward the next ring. At 0.025 the fall and the rise are 0.006 against
+/// 0.019, near enough symmetric, so the same code draws a fine ripple.
+///
+/// 1.65pt apart on a 132pt disc is deliberately just ABOVE the floor at which
+/// rings moire against the pixel grid (~1.2pt, measured on the record's own
+/// harness on 20.09); finer than this and the harness is flattering the code.
+fileprivate let TRACK_PITCH: CGFloat = 0.025
 
 /// A disc with the last cover printed on it, under the diffraction the plastic
 /// throws. The rainbow sits OVER the art rather than under it, because a CD's
@@ -1214,6 +1247,29 @@ struct CompactDisc: View {
       // app's own decks arrived at (04.09: at this size premium can only come
       // from how the object behaves in light).
 
+      // ── THE CLEAR POLYCARBONATE MARGIN (21.09) ────────────────────────
+      //
+      // A pressing's aluminium stops about 1.5mm short of the edge, so the
+      // last of a real disc is bare transparent plastic — which is why a CD
+      // held up to the light has a clear ring round it and a printed circle
+      // does not. It is the second feature, after the rainbow, that says
+      // "disc" on sight, and it was the one thing the face was missing: the
+      // cover ran off the edge, so the pressing had no edge of its own and
+      // the directional rim was the only thing separating it from the case.
+      //
+      // 1.5 of 60mm is 0.025 of the radius, which on a 132pt disc is 1.65pt —
+      // small, and it is the difference between art running off the rim and a
+      // disc that ends. Drawn as FALLOFF, never a stroke: a hard ring here is
+      // the stacking ring the owner had removed on 10.09 wearing a different
+      // hat, and this file has now talked four things out of exactly that.
+      Circle().fill(
+        RadialGradient(stops: [
+          .init(color: .clear, location: 0.000),
+          .init(color: .clear, location: 0.945),
+          .init(color: .black.opacity(0.55), location: 0.975),
+          .init(color: .black.opacity(0.30), location: 1.000),
+        ], center: .center, startRadius: 0, endRadius: size / 2))
+
       // THE DISC IS DOMED, so it falls away at the rim. A flat fill lit
       // evenly is exactly what "lacks dimension" describes.
       Circle().fill(
@@ -1237,8 +1293,23 @@ struct CompactDisc: View {
       Circle().stroke(.white.opacity(0.20), lineWidth: size * 0.035)
         .frame(width: size * 0.375, height: size * 0.375)
 
-      // hub ring and the four gripper holes the tray's spindle grips by
-      Circle().fill(Color(white: 0.88).opacity(0.60))
+      // hub ring and the four gripper holes the tray's spindle grips by.
+      //
+      // THE CLAMPING RING IS THE SAME METAL AS THE FACE (21.09). It was a flat
+      // pale fill, so the brightest thing on the tile was a grey plate with no
+      // light on it at all — a drawn circle, which is the fault the rim, the
+      // mirror ball's rim and the record's edge have each been talked out of.
+      // It takes an angular ramp on the RIM'S OWN BEARING, so the hub and the
+      // edge catch the same lamp; a second, differently-lit hub would read as
+      // a separate object sitting on the disc.
+      Circle().fill(
+        AngularGradient(stops: [
+          .init(color: Color(white: 0.92).opacity(0.72), location: 0.00),
+          .init(color: Color(white: 0.62).opacity(0.40), location: 0.30),
+          .init(color: Color(white: 0.88).opacity(0.64), location: 0.55),
+          .init(color: Color(white: 0.58).opacity(0.36), location: 0.82),
+          .init(color: Color(white: 0.92).opacity(0.72), location: 1.00),
+        ], center: .center, angle: .degrees(-125)))
         .frame(width: size * 0.31, height: size * 0.31)
         .overlay(Circle().stroke(.white.opacity(0.45), lineWidth: 1)
                    .frame(width: size * 0.31, height: size * 0.31))

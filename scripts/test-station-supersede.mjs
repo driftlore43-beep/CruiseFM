@@ -107,8 +107,14 @@ function mount({ platform = 'spotify' } = {}) {
     // Recorded rather than swallowed: what the app remembers is the value
     // five widgets and the home hero draw their station from, so it is worth
     // asserting on rather than stubbing into silence.
-    if (name === '@/utils/lastCruise') return {
-      saveLastCruise: async (c) => { remembered.push(c); },
+    // NOTE THE MODULE: saving the cruise and republishing the widget
+    // snapshot became ONE call on 21.09 (utils/rememberCruise), because five
+    // widgets draw their station from this value and the publish was the half
+    // that kept being forgotten. Stubbing the old module left this harness
+    // calling undefined — the standing trap that a harness loading a real
+    // module inherits that module's future imports.
+    if (name === '@/utils/rememberCruise') return {
+      rememberCruise: async (c) => { remembered.push(c); },
     };
     if (name === '@/utils/musicPlatform') return { getSavedPlatform: async () => platform };
     if (name === '@/utils/appleMusic') return {

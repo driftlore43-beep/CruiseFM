@@ -5,7 +5,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { isProMode } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { noteDriveMode, recordDriveEnd, type DriveEvent } from '@/utils/driveStats';
-import { saveLastCruise } from '@/utils/lastCruise';
+import { rememberCruise } from '@/utils/rememberCruise';
 import { getSavedPlatform, type PlatformId } from '@/utils/musicPlatform';
 import {
   appleMusicAvailable,
@@ -620,7 +620,7 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     // resume it, and FIVE widgets draw their station from this one value, so
     // they all sat on a station you had tuned away from hours ago. Owner,
     // 15.09: "most of them are stuck in that station".
-    saveLastCruise({ stationId, mode: current.mode }).catch(() => {});
+    rememberCruise({ stationId, mode: current.mode }).catch(() => {});
     // Retuning mid-drive (Tuner lock-on, Change Mood) switches the music too —
     // with a breath of silence between moods so it feels like retuning, not a
     // hard cut. A station with no playlist pauses the old one and asks for
@@ -641,7 +641,7 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     // is the one it finished in, not the one it opened with. The same is now
     // true of what the app offers to RESUME, and of what the widgets draw.
     noteDriveMode(mode).catch(() => {});
-    saveLastCruise({ stationId: current.stationId, mode }).catch(() => {});
+    rememberCruise({ stationId: current.stationId, mode }).catch(() => {});
   }, []);
 
   const clearJustFinished = useCallback(() => setJustFinished(null), []);

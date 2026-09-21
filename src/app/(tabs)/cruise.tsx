@@ -33,10 +33,10 @@ import type { Palette } from '@/utils/appearance';
 import { RECOMMENDED_IDS, STATIONS, type Station } from '@/constants/stations';
 import {
   loadLastCruise,
-  saveLastCruise,
   defaultStationForNow,
   type LastCruise,
 } from '@/utils/lastCruise';
+import { rememberCruise } from '@/utils/rememberCruise';
 import { recordDriveStart } from '@/utils/driveStats';
 import { useMusicPlayback } from '@/utils/useMusicPlayback';
 import { customToStation, loadCustomStations, resolveAnyStation, type CustomStation, isCustomStation } from '@/utils/customStations';
@@ -105,6 +105,10 @@ export default function CruiseScreen() {
   const [adopt, setAdopt] = useState<{ mode: string; station: string | null } | null>(null);
   const [askOffAir, setAskOffAir] = useState(false);
   const { isPro } = useEntitlements();
+  // Read inside the focus callback, which is built once and would otherwise
+  // hold whatever entitlement was true on first render.
+  const isProRef = useRef(isPro);
+  isProRef.current = isPro;
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   // One smart hero: it becomes your last cruise if you have one, otherwise
   // tonight's time-of-day pick. Scene, cue and button all track it.
@@ -140,7 +144,30 @@ export default function CruiseScreen() {
         // session — someone who reaches for that widget is telling the app
         // what kind of listener they are.
         if (wanted.kind) { setKind(wanted.kind); setSessionKind(wanted.kind); }
-        npRef.current.open(wanted.mode, wanted.stationId);
+        // A DRIVE STARTED FROM A WIDGET IS A DRIVE. This used to open the deck
+        // and nothing else — no remembered cruise, no logged session — so it
+        // was the ONE doorway into the app that left no trace, while all four
+        // others (the hero, the station page, the Modes tab, the dial) record
+        // both. Two things followed, and the second is what got reported:
+        // widget drives were missing from the streak and the week's count; and
+        // since five widgets draw their station from the remembered cruise,
+        // tapping one could never move them off it. Tap Sunset, get Sunset,
+        // and the tiles go on saying Sunset for ever. Owner, 21.09: "it
+        // doesn't change... every time I click on the mirror ball it just
+        // takes me to sunset station."
+        //
+        // The preview rule is `launchCruise`'s, for the same reason it exists
+        // there: a free user tasting a premium mode must not have it recorded
+        // as a drive or written down as where to pick up. `isPro` is read
+        // through a ref because this callback is built once.
+        const preview = !isProRef.current && isProMode(wanted.mode);
+        if (!preview) {
+          const cruise = { stationId: wanted.stationId, mode: wanted.mode };
+          rememberCruise(cruise);
+          setLastCruise(cruise);
+          recordDriveStart(wanted.stationId, wanted.kind, wanted.mode);
+        }
+        npRef.current.open(wanted.mode, wanted.stationId, { preview });
       }
       setTonightPick(stationById(defaultStationForNow()));
       setStatsKey((k) => k + 1);
@@ -167,7 +194,7 @@ export default function CruiseScreen() {
     // the preview clock either way; this keeps the stats honest too.)
     const preview = !isPro && isProMode(cruise.mode);
     if (!preview) {
-      await saveLastCruise(cruise);
+      await rememberCruise(cruise);
       setLastCruise(cruise);
       recordDriveStart(cruise.stationId, undefined, cruise.mode);
     }
@@ -375,7 +402,7 @@ export default function CruiseScreen() {
             if (!preview) {
               // A taste shouldn't overwrite the saved cruise or count as a drive.
               const cruise = { stationId: selectedStation.id, mode };
-              saveLastCruise(cruise);
+              rememberCruise(cruise);
               setLastCruise(cruise);
               recordDriveStart(selectedStation.id, undefined, mode);
             }

@@ -7,7 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ModeThumb, type ModeThumbId } from '@/components/ModeThumb';
 import { OffAirAsk } from '@/components/OffAirAsk';
 import { StationSheet } from '@/components/StationSheet';
-import { defaultStationForNow, loadLastCruise, saveLastCruise } from '@/utils/lastCruise';
+import { defaultStationForNow, loadLastCruise } from '@/utils/lastCruise';
+import { rememberCruise } from '@/utils/rememberCruise';
 import { recordDriveStart } from '@/utils/driveStats';
 import { needsOffAirAsk } from '@/constants/schedule';
 import { resolveAnyStation } from '@/utils/customStations';
@@ -295,7 +296,7 @@ export default function ModesScreen() {
     // the drive ended and there was nothing to print. A preview is still a
     // taste and still doesn't count.
     if (!locked) {
-      saveLastCruise({ stationId, mode });
+      rememberCruise({ stationId, mode });
       recordDriveStart(stationId, undefined, mode);
     }
     np.open(mode, stationId, { preview: locked });

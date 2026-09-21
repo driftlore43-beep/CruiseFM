@@ -19,7 +19,8 @@ import { clockLabel, isScheduled, onAirNow, upNext } from '@/constants/schedule'
 import { consumeCreateRequest, consumeEditRequest } from '@/utils/createStationRequest';
 import { stationImageSource } from '@/utils/stationImage';
 import { recordDriveStart } from '@/utils/driveStats';
-import { defaultStationForNow, saveLastCruise } from '@/utils/lastCruise';
+import { defaultStationForNow } from '@/utils/lastCruise';
+import { rememberCruise } from '@/utils/rememberCruise';
 import { usePalette, useStyles } from '@/context/AppearanceContext';
 import { readableOn, type Palette } from '@/utils/appearance';
 
@@ -571,7 +572,7 @@ export default function StationsScreen() {
           if (selectedStation) {
             if (!preview) {
               // A taste shouldn't overwrite the saved cruise or count as a drive.
-              saveLastCruise({ stationId: selectedStation.id, mode });
+              rememberCruise({ stationId: selectedStation.id, mode });
               recordDriveStart(selectedStation.id, undefined, mode);
             }
             np.open(mode, selectedStation.id, { preview });

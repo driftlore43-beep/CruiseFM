@@ -81,13 +81,17 @@ struct CruiseWidgets {
   }
 }
 
-/// iOS 17 and later: the three widgets whose look can be changed from
-/// Edit Widget, plus the two that never had a setting.
+/// iOS 17 and later: the four widgets that can be configured from Edit
+/// Widget, plus the two that cannot.
+///
+/// START DRIVE JOINED THEM ON 21.09. It has no Look — there is one design —
+/// but it can be pinned to a station like the other three, so it has a
+/// configurable half now and shares its `kind` with the plain one.
 @available(iOSApplicationExtension 17.0, *)
 struct ModernWidgets: WidgetBundle {
   @WidgetBundleBuilder
   var body: some Widget {
-    StartDriveWidget()
+    StartDriveConfigurableWidget()
     DeckConfigurableWidget()
     LastPlayedConfigurableWidget()
     OnAirWidget()

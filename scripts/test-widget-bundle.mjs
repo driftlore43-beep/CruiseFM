@@ -679,5 +679,76 @@ if (declared.length < 5 || Object.keys(kinds).length < 5) {
     'a second, differently-lit hub reads as a separate object sitting on the disc');
 }
 
+// ── PINNING A TILE TO A STATION ───────────────────────────────────────────
+// Four widgets can be pinned, and the five that name a station must all reach
+// it the same way. Before this, each wrote `lastDrive ?? currentOnAir()` for
+// itself — five copies of one expression, and every one of them now has a
+// pinned case to fall through first, which is exactly how five widgets end up
+// disagreeing about which station they are on.
+{
+  const pick = src['StationPick.swift'] ?? '';
+  check('the station picker exists', pick.length > 0);
+  check('it is an AppEntity, so the list can include stations made after the build',
+    /struct StationEntity: AppEntity/.test(pick),
+    'an AppEnum is written into the binary and could never carry a custom station');
+  check('and it is gated to iOS 17, like every other configuration here',
+    /@available\(iOSApplicationExtension 17\.0, \*\)\s*\nstruct StationEntity/.test(pick));
+  check('the picker is built from the snapshot, not a list in Swift',
+    /SnapshotStore\.load\(\)/.test(pick) && /pickableStations/.test(pick),
+    'suggestedEntities is asked while the app is not running');
+  check('there is a row meaning "my last station"',
+    /static let lastStation = StationEntity\(id: ""/.test(pick),
+    'an optional parameter alone gives no reliable way back to unpinned');
+
+  // THE PAYWALL IS NOT IN THE EXTENSION AND MUST NEVER BE. A widget reads a
+  // file out of shared storage, so a lock decided from it is a lock anyone
+  // can edit. `premium` and `isPro` mark a row in the picker; the real gate
+  // is NowPlayingContext.open, which reads the live entitlement.
+  const swiftFiles = Object.keys(src).filter((f) => f.endsWith('.swift'));
+  const gating = swiftFiles.filter((f) =>
+    f !== 'StationPick.swift' && f !== 'Snapshot.swift' &&
+    // COMMENTS STRIPPED FIRST. Both the CD and the record carry a note about
+    // what "premium" can mean at widget size — a quality of drawing, not a
+    // paywall — and a scan that reads those is the 02.09 trap exactly: the
+    // first `else` check in this file failed on the comment explaining why
+    // there must never be one.
+    /\b(isPro|premium)\b/.test(decomment(src[f])));
+  check('no widget decides a paywall for itself', gating.length === 0, gating.join(', '));
+  check('and the scan read the Swift', swiftFiles.length >= 8, `${swiftFiles.length} files`);
+
+  // One way in, for all five.
+  const snapSrc = src['Snapshot.swift'] ?? '';
+  check('there is one place that answers "which station does this tile draw?"',
+    /func station\(pinned id: String\?/.test(snapSrc));
+  check('and an empty id means unpinned, so the sentinel and nil agree',
+    /if let id, !id\.isEmpty/.test(snapSrc));
+
+  const drawers = ['StartDriveWidget.swift', 'VinylWidget.swift',
+                   'ModeWidget.swift', 'LastPlayedWidget.swift'];
+  for (const f of drawers) {
+    const t = src[f] ?? '';
+    check(`${f}: goes through station(pinned:)`, /snap\.station\(pinned:/.test(t));
+    check(`${f}: no longer picks the station for itself`,
+      !/lastDrive \?\? snap\.currentOnAir\(\)/.test(t),
+      'five copies of one expression is how five widgets start disagreeing');
+  }
+
+  // Every configurable intent must offer the setting, or that widget is the
+  // one that quietly cannot be pinned.
+  const intents = [
+    ['DeckLook.swift', 'DeckLookIntent'],
+    ['ModeWidget.swift', 'ModeLookIntent'],
+    ['LastPlayedWidget.swift', 'LastPlayedLookIntent'],
+    ['StartDriveWidget.swift', 'StartDriveStationIntent'],
+  ];
+  for (const [f, name] of intents) {
+    const body = new RegExp(`struct ${name}: WidgetConfigurationIntent \\{[\\s\\S]*?\\n\\}`)
+      .exec(src[f] ?? '')?.[0] ?? '';
+    check(`${name}: found it`, body.length > 60, `${body.length} chars`);
+    check(`${name}: offers the station setting`,
+      /@Parameter\(title: "Station"\)\s*\n\s*var station: StationEntity\?/.test(body));
+  }
+}
+
 console.log(fails ? `\n  ${fails} failure(s)\n` : '\n  the widget bundle hangs together\n');
 process.exit(fails ? 1 : 0);

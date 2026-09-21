@@ -29,6 +29,18 @@ const compile = (p) => ts.transpileModule(fs.readFileSync(p, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 }).outputText;
 
+const entitlementCache = (() => {
+  const src = fs.readFileSync(`${ROOT}/src/utils/entitlementCache.ts`, 'utf8');
+  const js = ts.transpileModule(src, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const m = { exports: {} };
+  new Function('module', 'exports', 'require', js)(m, m.exports, () => {
+    throw new Error('entitlementCache should import nothing');
+  });
+  return m.exports;
+})();
+
 const schedule = (() => {
   const js = compile(`${ROOT}/src/constants/schedule.ts`).replace(
     /require\("@\/constants\/stations"\)/g,
@@ -55,6 +67,9 @@ const W = (() => {
     if (name === '@/utils/customStations') return {
       resolveAnyStation: station, cachedCustomStations: () => [{ id: 'c' }], loadCustomStations: async () => [] };
     if (name === '@/utils/lastCruise') return { loadLastCruise: async () => ({ stationId: 'sunset', mode: 'vinyl' }) };
+    // The REAL module: it imports nothing, so loading it costs nothing, and a
+    // stub answering a fixed value would not exercise the field it feeds.
+    if (name === '@/utils/entitlementCache') return entitlementCache;
     if (name === '@/utils/driveStats') return { getDriveStats: async () => ({ streakDays: 3, drivesThisWeek: 2, listensThisWeek: 5, totalMinutes: 140 }) };
     if (name === '@/utils/sessionKind') return {
       cachedSessionKind: () => 'driving', loadSessionKind: async () => 'driving',

@@ -26,7 +26,7 @@ const schedule = (() => {
 })();
 
 const station = (id) => ({
-  id, name: `${id} FM`, tagline: `${id} tagline`, premium: false,
+  id, name: `${id} FM`, tagline: `${id} tagline`, premium: id === 'tunnel',
   cardGradient: ['#111111', '#227722', '#000000'], eqColors: ['#a', '#ACCENT', '#c'],
   iconName: 'music-note', icon: 'music-note',
 });
@@ -35,6 +35,15 @@ let stats = { streakDays: 3, drivesThisWeek: 2, listensThisWeek: 5, totalMinutes
 let lastCruise = { stationId: 'sunset', mode: 'vinyl' };
 let kind = 'driving';
 let lastPlayed = null;
+
+const entitlement = (() => {
+  const js = compile(`${ROOT}/src/utils/entitlementCache.ts`);
+  const m = { exports: {} };
+  new Function('module', 'exports', 'require', js)(m, m.exports, () => {
+    throw new Error('entitlementCache should import nothing');
+  });
+  return m.exports;
+})();
 
 const W = (() => {
   const js = compile(`${ROOT}/src/utils/widgetData.ts`);
@@ -63,6 +72,11 @@ const W = (() => {
     if (name === './lastPlayed') return { getLastPlayed: async () => lastPlayed };
     if (name === '@/utils/lastCruise') return { loadLastCruise: async () => lastCruise };
     if (name === '@/utils/driveStats') return { getDriveStats: async () => stats };
+    // THE REAL MODULE, not a stub. It has no imports of its own, so loading it
+    // costs nothing — and a stub answering a fixed `true` would never catch
+    // the padlock flag being wired to the wrong thing, which is the whole of
+    // what this field does.
+    if (name === '@/utils/entitlementCache') return entitlement;
     if (name === '@/utils/sessionKind') return {
       cachedSessionKind: () => kind,
       loadSessionKind: async () => kind,
@@ -210,6 +224,42 @@ console.log('\n  a built-in station carries its bundled backdrop, a custom one d
   check('a built-in station names its image by id', built.image === 'sunset', String(built.image));
   const custom = W.toWidgetStation('custom-1');
   check('a custom station has no bundled image', custom.image === null, String(custom.image));
+}
+
+console.log('\n  the picker is given every station someone could pin:');
+{
+  const snap = await W.buildWidgetSnapshot(new Date('2026-09-01T21:00:00Z'));
+  const ids = snap.stations.map((x) => x.id);
+  check('every built-in station is offered', IDS.every((id) => ids.includes(id)),
+    ids.join());
+  check("and so is the driver's own", ids.includes('custom-1'), ids.join());
+  check('built-ins come first, own stations after',
+    ids.indexOf('custom-1') === ids.length - 1, ids.join());
+  // A station named twice would give the picker two identical rows, and only
+  // one of them would be the one the widget matched on.
+  check('no station appears twice', new Set(ids).size === ids.length, ids.join());
+  // The whole reason the list is sent: a widget matches the pinned id against
+  // it, so every entry must be drawable on its own.
+  check('every entry carries what a tile needs to draw it',
+    snap.stations.every((x) => x.name && x.dial && Array.isArray(x.colors) && x.accent),
+    JSON.stringify(snap.stations[0]));
+
+  const fm = snap.stations.find((x) => x.id === 'tunnel');
+  const am = snap.stations.find((x) => x.id === 'sunset');
+  check('a premium station is marked', fm.premium === true, String(fm?.premium));
+  check('a free one is not', am.premium === false, String(am?.premium));
+  const own = snap.stations.find((x) => x.id === 'custom-1');
+  check('a station someone made themselves is never premium', own.premium === false,
+    String(own?.premium));
+
+  // PRESENTATION ONLY — it decides whether the picker marks the FM band and
+  // nothing else. It defaults to "no padlocks" so a paying customer never
+  // sees them flicker on during a cold start.
+  check('the entitlement travels with the snapshot', snap.isPro === true, String(snap.isPro));
+  entitlement.setCachedIsPro(false);
+  const free = await W.buildWidgetSnapshot(new Date('2026-09-01T21:00:00Z'));
+  check('and follows the real answer', free.isPro === false, String(free.isPro));
+  entitlement.setCachedIsPro(true);
 }
 
 console.log(fails ? `\n  ${fails} failure(s)\n` : '\n  the widgets will be told the truth\n');

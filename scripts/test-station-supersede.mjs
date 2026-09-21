@@ -99,7 +99,7 @@ function mount({ platform = 'spotify' } = {}) {
     if (name === 'expo-keep-awake') return {
       activateKeepAwakeAsync: async () => {}, deactivateKeepAwake: () => {},
     };
-    if (name === '@/constants/modeCatalog') return { isProMode: () => false };
+    if (name === '@/constants/modeCatalog') return { needsPreview: () => false };
     if (name === '@/context/EntitlementsContext') return { useEntitlements: () => ({ isPro: true }) };
     if (name === '@/utils/driveStats') return {
       noteDriveMode: async () => {}, recordDriveEnd: async () => null,

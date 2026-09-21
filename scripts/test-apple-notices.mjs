@@ -155,10 +155,18 @@ await (async () => {
         if (n === 'react-native') return { AppState: { addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'ios' } };
         if (n === 'react/jsx-runtime') return { jsx: () => null, jsxs: () => null };
         if (n === 'expo-keep-awake') return { activateKeepAwakeAsync: async () => {}, deactivateKeepAwake: () => {} };
-        if (n === '@/constants/modeCatalog') return { isProMode: () => false };
+        // needsPreview replaced the inline `!isPro && isProMode(mode)` on
+        // 21.09, when a premium STATION became reachable. Nothing is premium
+        // in this harness — the paywall rule has its own suite
+        // (test-preview-gate); this one is about what an Apple listener is
+        // TOLD when their music will not start.
+        if (n === '@/constants/modeCatalog') return { needsPreview: () => false };
         if (n === '@/context/EntitlementsContext') return { useEntitlements: () => ({ isPro: true }) };
         if (n === '@/utils/driveStats') return { noteDriveMode: async () => {}, recordDriveEnd: async () => null };
-        if (n === '@/utils/lastCruise') return { saveLastCruise: async () => {} };
+        // Saving the cruise and republishing the widget snapshot became one
+        // call on 21.09 — see utils/rememberCruise. A harness that loads a
+        // real module inherits that module's future imports.
+        if (n === '@/utils/rememberCruise') return { rememberCruise: async () => {} };
         if (n === '@/utils/spotifyHandoff') return { openInSpotify: async () => {} };
         if (n === '@/utils/musicPlatform') return { getSavedPlatform: async () => platform };
         if (n === '@/utils/appleMusic') return {

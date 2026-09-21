@@ -11,6 +11,7 @@ import { primaryOnAir, upNext, clockLabel } from '@/constants/schedule';
 import { resolveAnyStation, cachedCustomStations, loadCustomStations } from '@/utils/customStations';
 import { loadLastCruise } from '@/utils/lastCruise';
 import { getDriveStats } from '@/utils/driveStats';
+import { cachedIsPro } from '@/utils/entitlementCache';
 import { cachedSessionKind, loadSessionKind, words } from '@/utils/sessionKind';
 
 /**
@@ -98,6 +99,21 @@ export type WidgetStation = {
    * is the normal case for one made from colours alone.
    */
   image: string | null;
+  /**
+   * Whether this station sits behind the paywall — the FM band.
+   *
+   * PRESENTATION ONLY. It is here so the widget's station picker can mark a
+   * station rather than pretend everyone can have it, and so a tile drawn
+   * from a pinned premium station can say so. NOTHING IS GATED ON IT: the
+   * lock lives in `NowPlayingContext.open`, which reads the live entitlement
+   * and turns a premium pick into the app's usual taste-then-paywall. A
+   * widget deciding a paywall from a value in shared storage would be a
+   * paywall anyone could edit.
+   *
+   * Optional because it is a new field — an older widget binary being handed
+   * a newer snapshot simply ignores the key it does not know.
+   */
+  premium?: boolean;
 };
 
 /** One changeover on the broadcast timeline. */
@@ -115,6 +131,29 @@ export type WidgetSnapshot = {
   lastDrive: (WidgetStation & { mode: string }) | null;
   /** Now first, then every changeover for the next 24h. */
   onAir: WidgetOnAir[];
+  /**
+   * EVERY STATION SOMEONE CAN PIN A WIDGET TO — the ten built-ins and their
+   * own creations, in the order the Stations page lists them.
+   *
+   * The tiles that name a station have always drawn the LAST DRIVE, which is
+   * right as a default and is the only thing a widget could know before this
+   * existed. It is also the one thing a widget could never be told: a tile is
+   * long-pressed and configured, and a picker needs a LIST. Owner, 21.09,
+   * on three tiles that all sat on the same station: "how should this work
+   * when people made their own stations".
+   *
+   * WHY THE WHOLE LIST RATHER THAN JUST THE PINNED ONE: the extension builds
+   * the picker itself, from `suggestedEntities()`, and it is asked for that
+   * list while the app is not running. Sending only the current pick would
+   * give someone a picker containing exactly what they had already chosen.
+   */
+  stations: WidgetStation[];
+  /**
+   * Whether the reader has Premium. PRESENTATION ONLY — it decides whether
+   * the picker marks the FM band, and nothing else. See the note on
+   * `WidgetStation.premium`.
+   */
+  isPro: boolean;
   /** "UP NEXT · Sunset AM at 5pm", already worded. */
   upNextLine: string | null;
   /**
@@ -193,6 +232,8 @@ export function toWidgetStation(id: string): WidgetStation {
     // ramp, its mid gradient stop otherwise. Same rule as the app itself, so
     // a widget can never disagree with the screen it links into.
     accent: s.eqColors?.[1] ?? s.cardGradient[1],
+    // A station someone made themselves is never premium — the FM band is.
+    premium: known ? !!s.premium : false,
     // The mirror ball's real palette (see MirrorBall in ModeWidget.swift) —
     // in practice always present, since customToStation derives one even for
     // a colours-only custom station.
@@ -259,6 +300,13 @@ export async function buildWidgetSnapshot(now: Date = new Date()): Promise<Widge
     updatedAt: now.getTime(),
     lastDrive: last ? { ...toWidgetStation(last.stationId), mode: last.mode } : null,
     onAir: buildOnAirTimeline(now),
+    // Built-ins first in dial order, then their own — the Stations page's own
+    // reading order, so the picker and the page agree.
+    stations: [
+      ...STATIONS.map((x) => toWidgetStation(x.id)),
+      ...cachedCustomStations().map((x) => toWidgetStation(x.id)),
+    ],
+    isPro: cachedIsPro(),
     upNextLine: upNextLine(now),
     // Title and artist only. The COVER is not in here — it is a file in the
     // App Group, written by setArtwork, because a JPEG in shared UserDefaults

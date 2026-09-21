@@ -60,6 +60,12 @@ struct ModeLookIntent: WidgetConfigurationIntent {
   @Parameter(title: "Look", default: .mirrorBall)
   var look: ModeLook
 
+  /// Which station this tile follows. Nil (and the sentinel's empty id) mean
+  /// "my last station", which is what this widget did before pinning existed
+  /// — so an existing tile keeps behaving exactly as it did. See StationPick.
+  @Parameter(title: "Station")
+  var station: StationEntity?
+
   init() {}
   init(look: ModeLook) { self.look = look }
 }
@@ -74,17 +80,20 @@ struct ModeEntry: TimelineEntry {
   let style: ModeStyle
 }
 
-private func modeEntry(_ style: ModeStyle) -> ModeEntry {
+// The pinned station is passed as a bare id rather than a StationEntity, and
+// deliberately: the entity is iOS 17 only, and these two are shared with the
+// plain provider that serves every older phone. An id needs no availability.
+private func modeEntry(_ style: ModeStyle, pinned: String? = nil) -> ModeEntry {
   guard let snap = SnapshotStore.load() else {
     return ModeEntry(date: Date(), station: nil, lastPlayed: nil, ready: false, style: style)
   }
-  let station = snap.lastDrive ?? snap.currentOnAir()
-  return ModeEntry(date: Date(), station: station, lastPlayed: snap.lastPlayed,
-                   ready: true, style: style)
+  return ModeEntry(date: Date(), station: snap.station(pinned: pinned),
+                   lastPlayed: snap.lastPlayed, ready: true, style: style)
 }
 
-private func modeTimeline(_ style: ModeStyle) -> Timeline<ModeEntry> {
-  Timeline(entries: [modeEntry(style)], policy: .after(Date().addingTimeInterval(3600)))
+private func modeTimeline(_ style: ModeStyle, pinned: String? = nil) -> Timeline<ModeEntry> {
+  Timeline(entries: [modeEntry(style, pinned: pinned)],
+           policy: .after(Date().addingTimeInterval(3600)))
 }
 
 struct ModeProvider: TimelineProvider {
@@ -131,10 +140,10 @@ struct ModeIntentProvider: AppIntentTimelineProvider {
     modeEntry(.mirrorBall)
   }
   func snapshot(for configuration: ModeLookIntent, in c: Context) async -> ModeEntry {
-    modeEntry(style(configuration.look))
+    modeEntry(style(configuration.look), pinned: configuration.station?.id)
   }
   func timeline(for configuration: ModeLookIntent, in c: Context) async -> Timeline<ModeEntry> {
-    modeTimeline(style(configuration.look))
+    modeTimeline(style(configuration.look), pinned: configuration.station?.id)
   }
   private func style(_ look: ModeLook) -> ModeStyle {
     switch look {
@@ -1353,7 +1362,7 @@ struct ModeConfigurableWidget: Widget {
       ModeView(entry: entry).cruiseContainerBackground()
     }
     .configurationDisplayName("The Mode")
-    .description("Your mode as an object. Long-press to switch between the mirror ball and the CD.")
+    .description("Your mode as an object. Long-press to change the look, or pin it to a station.")
     .supportedFamilies([.systemSmall])
     .cruiseFullBleed()
   }

@@ -55,6 +55,13 @@ struct DeckLookIntent: WidgetConfigurationIntent {
   @Parameter(title: "Look", default: .road)
   var look: DeckLook
 
+  /// Which station this tile follows. Nil (and the sentinel's empty id) mean
+  /// "my last station" — what the Deck did before pinning existed, so a tile
+  /// already on someone's Home Screen behaves exactly as it did. See
+  /// StationPick.swift for why this is an entity rather than an enum.
+  @Parameter(title: "Station")
+  var station: StationEntity?
+
   init() {}
   init(look: DeckLook) { self.look = look }
 }

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { LAUNCH_FREE, OWNER_MODE } from '@/constants/config';
 import { claimEarlyAccessIfEligible } from '@/utils/earlyAccess';
 import { hasPremium, initPurchases, onPremiumChange } from '@/utils/purchases';
+import { setCachedIsPro } from '@/utils/entitlementCache';
 
 const DEV_FREE_KEY = 'cruise_dev_free_preview';
 
@@ -66,6 +67,10 @@ export function EntitlementsProvider({ children }: { children: ReactNode }) {
   // is a grant this phone holds in its own right, so it survives OWNER_MODE's
   // free preview being switched on exactly as a real purchase would.
   const isPro = hasSubscription || earlyAccess || (OWNER_MODE ? !devFreePreview : LAUNCH_FREE);
+  // The widget snapshot is built outside React (see utils/entitlementCache),
+  // and the station picker needs to know which stations to mark as premium.
+  // Presentation only — the real gate is NowPlayingContext.open.
+  setCachedIsPro(isPro);
 
   const value = useMemo(
     () => ({ isPro, hasSubscription, earlyAccess, refreshSubscription, devFreePreview, setDevFreePreview }),

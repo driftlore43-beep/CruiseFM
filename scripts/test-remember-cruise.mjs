@@ -130,8 +130,31 @@ const consumer = /consumeDriveRequest\(\)[\s\S]*?\n {6}\}/.exec(cruiseSrc)?.[0] 
 check('found the widget-tap handler', consumer.length > 200, `${consumer.length} chars`);
 check('a widget tap remembers where it went', /\brememberCruise\s*\(/.test(consumer));
 check('a widget tap counts as a session', /\brecordDriveStart\s*\(/.test(consumer));
-check('a free taste of a premium mode is not recorded as one',
-  /isProMode\s*\(/.test(consumer) && /if\s*\(!preview\)/.test(consumer));
+check('a free taste of premium is not recorded as a drive',
+  /needsPreview\s*\(/.test(consumer) && /if\s*\(!preview\)/.test(consumer));
+
+/* ── 4. every doorway judges a taste the same way ── */
+
+// `needsPreview` is one answer in one place because it is asked at every way
+// in, and a doorway that forgets half of it is a doorway through the paywall.
+// It used to be written inline as `!isPro && isProMode(mode)`, which was
+// complete while only MODES were premium — pinning a widget to an FM station
+// is the first way a free user can reach a premium STATION.
+{
+  const inline = [];
+  let sawNeeds = 0;
+  for (const f of files) {
+    const rel = path.relative(root, f).split(path.sep).join('/');
+    const src = fs.readFileSync(f, 'utf8');
+    if (/\bneedsPreview\s*\(/.test(src)) sawNeeds++;
+    if (rel === 'src/constants/modeCatalog.ts') continue;
+    // The comparison itself, not a mention: `isProMode` is still the right
+    // question for a MODE picker (ModeSheet dims a locked chip with it).
+    if (/!\s*isPro[A-Za-z.]*\s*&&\s*isProMode\s*\(/.test(src)) inline.push(rel);
+  }
+  check('no doorway decides a taste for itself', inline.length === 0, inline.join(', '));
+  check('and the scan found the doorways', sawNeeds >= 3, `${sawNeeds} files`);
+}
 
 console.log(`\n${failures === 0 ? 'ALL GOOD' : `${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);

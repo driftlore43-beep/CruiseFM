@@ -21,7 +21,7 @@ import { HeroCard } from '@/components/HeroCard';
 import { IPadHero } from '@/components/IPadHero';
 import { NewStationCard, ShelfCard, SHELF_CARD_W } from '@/components/ShelfCard';
 import { StationDetailModal } from '@/components/StationDetailModal';
-import { isProMode } from '@/constants/modeCatalog';
+import { needsPreview } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, PAGE_GUTTER, PAGE_MAX_W, TAB_SAFE_INSET, isWide, pageColumn } from '@/constants/theme';
@@ -160,7 +160,7 @@ export default function CruiseScreen() {
         // there: a free user tasting a premium mode must not have it recorded
         // as a drive or written down as where to pick up. `isPro` is read
         // through a ref because this callback is built once.
-        const preview = !isProRef.current && isProMode(wanted.mode);
+        const preview = needsPreview(isProRef.current, wanted.stationId, wanted.mode);
         if (!preview) {
           const cruise = { stationId: wanted.stationId, mode: wanted.mode };
           rememberCruise(cruise);
@@ -192,7 +192,7 @@ export default function CruiseScreen() {
     // A free user resuming a saved premium-mode drive only gets a taste — it
     // shouldn't count as a drive or re-save the cruise. (The player enforces
     // the preview clock either way; this keeps the stats honest too.)
-    const preview = !isPro && isProMode(cruise.mode);
+    const preview = needsPreview(isPro, cruise.stationId, cruise.mode);
     if (!preview) {
       await rememberCruise(cruise);
       setLastCruise(cruise);
@@ -399,14 +399,18 @@ export default function CruiseScreen() {
         onClose={() => setSelectedStation(null)}
         onStartDrive={(mode, preview) => {
           if (selectedStation) {
-            if (!preview) {
+            // The sheet judges the MODE; the station is judged here, so every
+            // doorway asks the same question. `open` gates it centrally
+            // either way — this is about not RECORDING a taste as a drive.
+            const taste = preview || needsPreview(isPro, selectedStation.id, mode);
+            if (!taste) {
               // A taste shouldn't overwrite the saved cruise or count as a drive.
               const cruise = { stationId: selectedStation.id, mode };
               rememberCruise(cruise);
               setLastCruise(cruise);
               recordDriveStart(selectedStation.id, undefined, mode);
             }
-            np.open(mode, selectedStation.id, { preview });
+            np.open(mode, selectedStation.id, { preview: taste });
           }
           setSelectedStation(null);
         }}

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState, Platform } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
-import { isProMode } from '@/constants/modeCatalog';
+import { needsPreview } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { noteDriveMode, recordDriveEnd, type DriveEvent } from '@/utils/driveStats';
 import { rememberCruise } from '@/utils/rememberCruise';
@@ -585,10 +585,12 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const open = useCallback((mode: string, stationId: string = 'night-run', opts?: { preview?: boolean; paused?: boolean; adopt?: boolean }) => {
     // iPod mode was retired — any old saved iPod cruise resumes in Equalizer.
     const m = mode === 'ipod' ? 'equalizer' : mode;
-    // The player itself is the lock: ANY doorway that opens a premium mode
-    // for a free user becomes a preview — Continue Drive included. Individual
-    // screens don't have to remember to check.
-    const preview = !!opts?.preview || (!isProRef.current && isProMode(m));
+    // The player itself is the lock: ANY doorway that opens a premium mode OR
+    // A PREMIUM STATION for a free user becomes a preview — Continue Drive
+    // included, and since 21.09 a widget pinned to an FM station, which is
+    // the first way to reach one from outside the app. Individual screens
+    // don't have to remember to check.
+    const preview = !!opts?.preview || needsPreview(isProRef.current, stationId, m);
     setSession({ mode: m, stationId, preview });
     setExpanded(true);
     // `adopt` means the music is ALREADY playing and the whole point is to
@@ -635,7 +637,7 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const setMode = useCallback((mode: string) => {
     const current = sessionRef.current;
     if (!current || current.mode === mode) return;
-    const preview = !isProRef.current && isProMode(mode);
+    const preview = needsPreview(isProRef.current, current.stationId, mode);
     setSession({ ...current, mode, preview });
     // The stub prints where you ENDED UP — the mode a drive is remembered as
     // is the one it finished in, not the one it opened with. The same is now

@@ -56,6 +56,16 @@ struct WidgetStation: Codable {
   let mode: String?
   /// Only on timeline entries: epoch MILLISECONDS this becomes current.
   let at: Double?
+  /// Whether this station sits behind the paywall — the FM band.
+  ///
+  /// PRESENTATION ONLY, and that is load-bearing: it marks a row in the
+  /// station picker and nothing else. THE LOCK IS NOT HERE AND MUST NOT BE.
+  /// A widget extension reads a file out of shared storage; a paywall decided
+  /// from that is a paywall anyone can edit. The app's own
+  /// `NowPlayingContext.open` reads the live entitlement and turns a premium
+  /// pick into the usual taste-then-paywall, which is why a pinned premium
+  /// station is safe to offer here.
+  let premium: Bool?
 }
 
 /**
@@ -95,6 +105,24 @@ struct Snapshot: Codable {
   /// stays true however stale this gets. Any view drawing it must say so.
   let lastPlayed: LastPlayedInfo?
   let stats: WidgetStats?
+  /**
+   * EVERY STATION SOMEONE CAN PIN A TILE TO — the built-in ten and their own.
+   *
+   * The tiles that name a station draw the LAST DRIVE by default, which is
+   * the only thing a widget can know on its own. Pinning is the other half:
+   * long-press, choose, and that tile stays there. The picker is built INSIDE
+   * this extension, by `StationQuery.suggestedEntities()`, and it is asked
+   * for that list while the app is not running — so the list has to be here,
+   * already drawn-ready, rather than fetched.
+   *
+   * OPTIONAL, like every field added after the first build: a binary is handed
+   * newer AND older snapshots (an app that has not yet applied its update
+   * still writes the old shape), and a required field either side of that
+   * would fail the whole decode and blank every tile at once.
+   */
+  let stations: [WidgetStation]?
+  /// Whether the reader has Premium. Marks the picker; gates nothing.
+  let isPro: Bool?
 
   /**
    * WHICH STATION IS ON AIR *NOW* — NOT `onAir.first`, WHICH IS WHOEVER WAS
@@ -125,6 +153,34 @@ struct Snapshot: Codable {
   /// The station on air now, or nil if the snapshot carries no timeline.
   func currentOnAir(at now: Date = Date()) -> WidgetStation? {
     onAir.isEmpty ? nil : onAir[currentOnAirIndex(at: now)]
+  }
+
+  /**
+   * WHICH STATION A TILE SHOULD DRAW: the pinned one, else the last drive,
+   * else whatever is on air.
+   *
+   * ONE FUNCTION, BECAUSE FIVE WIDGETS ASK THE SAME QUESTION. They each used
+   * to write `snap.lastDrive ?? snap.currentOnAir()` for themselves, which is
+   * exactly how the same expression ends up meaning five slightly different
+   * things — and every one of them now has a pinned case to fall through
+   * first.
+   *
+   * AN UNKNOWN ID FALLS BACK RATHER THAN BLANKING. A pinned station can be
+   * deleted, and a tile that goes empty because of it looks broken; the
+   * default behaviour is a perfectly good tile, so that is what it gives.
+   */
+  func station(pinned id: String?, at now: Date = Date()) -> WidgetStation? {
+    if let id, !id.isEmpty, let match = (stations ?? []).first(where: { $0.id == id }) {
+      return match
+    }
+    return lastDrive ?? currentOnAir(at: now)
+  }
+
+  /// Every station someone can pin, newest snapshot first and the last drive
+  /// as a fallback so the picker is never empty on an older snapshot.
+  var pickableStations: [WidgetStation] {
+    if let stations, !stations.isEmpty { return stations }
+    return [lastDrive, currentOnAir()].compactMap { $0 }
   }
 }
 

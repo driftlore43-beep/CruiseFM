@@ -4,6 +4,8 @@
  * can't be free in one doorway and premium in another.
  */
 
+import { STATIONS } from './stations';
+
 export type ModeInfo = { id: string; label: string; pro: boolean };
 
 export const MODE_CATALOG: ModeInfo[] = [
@@ -30,4 +32,39 @@ export function knownMode(mode: string | undefined | null): string {
 
 export function isProMode(mode: string): boolean {
   return MODE_CATALOG.some((m) => m.id === mode && m.pro);
+}
+
+/**
+ * Whether a station sits behind the paywall — the FM band.
+ *
+ * A station someone made themselves is never premium, and an unknown id is
+ * not either: `resolveAnyStation` falls back for one of those, and refusing a
+ * drive over an id we do not recognise would be the worst possible reason to
+ * refuse one.
+ */
+export function isProStation(stationId: string): boolean {
+  return STATIONS.some((s) => s.id === stationId && s.premium);
+}
+
+/**
+ * IS THIS DRIVE A TASTE RATHER THAN THE REAL THING?
+ *
+ * ONE ANSWER, IN ONE PLACE, because it is asked at every doorway — the home
+ * hero, the station page, a widget tap — and a doorway that forgets half of
+ * it is a doorway through the paywall. It used to be written inline as
+ * `!isPro && isProMode(mode)`, which was complete while only MODES were
+ * premium: a locked FM row is simply not tappable on the Stations page
+ * (`onPress={isPro ? … : undefined}`), so a free user had no way to reach a
+ * premium station at all.
+ *
+ * PINNING A WIDGET TO A STATION MADE ONE (21.09). The picker offers the FM
+ * band to everyone and marks it, which is the same shop-window rule the
+ * Stations page follows — a locked row is dimmed behind a padlock, never
+ * hidden — so the tap has to be gated here instead of at the tile. A taste
+ * then the paywall is what the app already does for a premium MODE; a tile
+ * that does nothing when pressed would be worse than one that shows what is
+ * behind the price.
+ */
+export function needsPreview(isPro: boolean, stationId: string, mode: string): boolean {
+  return !isPro && (isProMode(mode) || isProStation(stationId));
 }

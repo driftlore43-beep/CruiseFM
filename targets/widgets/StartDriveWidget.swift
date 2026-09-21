@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -40,21 +41,62 @@ struct StartDriveProvider: TimelineProvider {
   }
 
   func getSnapshot(in context: Context, completion: @escaping (StartDriveEntry) -> Void) {
-    completion(entry())
+    completion(startDriveEntry())
   }
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<StartDriveEntry>) -> Void) {
-    completion(Timeline(entries: [entry()], policy: .never))
+    completion(Timeline(entries: [startDriveEntry()], policy: .never))
   }
+}
 
-  private func entry() -> StartDriveEntry {
-    guard let snap = SnapshotStore.load() else {
-      return StartDriveEntry(date: Date(), station: nil, ready: false)
-    }
-    // Never driven yet? Offer whatever is on air rather than an empty tile —
-    // a first-time driver gets a real suggestion instead of a dead square.
-    let station = snap.lastDrive ?? snap.currentOnAir()
-    return StartDriveEntry(date: Date(), station: station, ready: true)
+// A FREE FUNCTION RATHER THAN THE PROVIDER'S OWN METHOD, so the configurable
+// provider below shares it and the two cannot drift into showing different
+// things. The pinned station arrives as a bare id, not a StationEntity: the
+// entity is iOS 17 only and this is also the older phones' path.
+func startDriveEntry(pinned: String? = nil) -> StartDriveEntry {
+  guard let snap = SnapshotStore.load() else {
+    return StartDriveEntry(date: Date(), station: nil, ready: false)
+  }
+  // Pinned, else the last drive, else whatever is on air — so a first-time
+  // driver gets a real suggestion instead of a dead square.
+  return StartDriveEntry(date: Date(), station: snap.station(pinned: pinned), ready: true)
+}
+
+/**
+ * The station this tile starts, and nothing else.
+ *
+ * NO LOOK SETTING HERE, deliberately: Start Drive has one design, and a
+ * configuration with a single parameter reads as "choose a station" rather
+ * than as a menu. The other three configurable widgets carry a Look as well,
+ * so this is the only intent in the target with one parameter.
+ */
+@available(iOSApplicationExtension 17.0, *)
+struct StartDriveStationIntent: WidgetConfigurationIntent {
+  static var title: LocalizedStringResource = "Start Drive"
+  static var description = IntentDescription("Choose which station this tile starts.")
+
+  /// Nil (and the sentinel's empty id) mean "my last station", which is what
+  /// this widget did before pinning existed — so a tile already on someone's
+  /// Home Screen keeps behaving exactly as it did. See StationPick.swift.
+  @Parameter(title: "Station")
+  var station: StationEntity?
+
+  init() {}
+}
+
+@available(iOSApplicationExtension 17.0, *)
+struct StartDriveIntentProvider: AppIntentTimelineProvider {
+  func placeholder(in context: Context) -> StartDriveEntry {
+    // A REAL ENTRY, NOT AN EMPTY ONE — WidgetKit draws `placeholder` redacted,
+    // so one built from nothing is a blank grey tile, which is what a widget
+    // that never received a timeline also looks like. See StartDriveProvider.
+    startDriveEntry()
+  }
+  func snapshot(for configuration: StartDriveStationIntent, in context: Context) async -> StartDriveEntry {
+    startDriveEntry(pinned: configuration.station?.id)
+  }
+  func timeline(for configuration: StartDriveStationIntent, in context: Context) async -> Timeline<StartDriveEntry> {
+    Timeline(entries: [startDriveEntry(pinned: configuration.station?.id)], policy: .never)
   }
 }
 
@@ -245,6 +287,27 @@ private func modeLabel(_ id: String?) -> String {
   case "orb":      return "Circular EQ"
   case "equalizer": return "Equalizer"
   default:         return "your last mode"
+  }
+}
+
+// ── the two configurations ─────────────────────────────────────────────────
+//
+// SAME `kind` ON BOTH, and it is load-bearing for the same reason it is on
+// the Deck: "CruiseStartDrive" has been on Home Screens since build 39, and a
+// changed kind makes a widget already sitting on one vanish. Only ever one of
+// the pair is registered — see CruiseWidgetBundle.
+
+@available(iOSApplicationExtension 17.0, *)
+struct StartDriveConfigurableWidget: Widget {
+  var body: some WidgetConfiguration {
+    AppIntentConfiguration(kind: "CruiseStartDrive", intent: StartDriveStationIntent.self,
+                           provider: StartDriveIntentProvider()) { entry in
+      StartDriveView(entry: entry).cruiseContainerBackground()
+    }
+    .configurationDisplayName("Start Drive")
+    .description("Your last station, one tap away. Long-press to pin it to a station.")
+    .supportedFamilies([.systemSmall, .systemMedium])
+    .cruiseFullBleed()
   }
 }
 

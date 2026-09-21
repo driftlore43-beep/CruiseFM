@@ -52,15 +52,17 @@ struct DeckEntry: TimelineEntry {
 
 /// Shared by both providers, so the two cannot drift into showing different
 /// things — only the look differs between them.
-private func deckEntry(_ style: DeckStyle) -> DeckEntry {
+// The pinned station arrives as a bare id, not a StationEntity: the entity is
+// iOS 17 only and this is shared with the plain provider that serves older
+// phones. An id needs no availability annotation.
+private func deckEntry(_ style: DeckStyle, pinned: String? = nil) -> DeckEntry {
   guard let snap = SnapshotStore.load() else {
     return DeckEntry(date: Date(), station: nil, lastPlayed: nil, ready: false, style: style)
   }
-  // Never driven? Show whatever is on air, so a first-time listener gets a
-  // real record rather than an empty square.
-  let station = snap.lastDrive ?? snap.currentOnAir()
-  return DeckEntry(date: Date(), station: station, lastPlayed: snap.lastPlayed,
-                   ready: true, style: style)
+  // Pinned, else the last drive, else whatever is on air — so a first-time
+  // listener gets a real record rather than an empty square.
+  return DeckEntry(date: Date(), station: snap.station(pinned: pinned),
+                   lastPlayed: snap.lastPlayed, ready: true, style: style)
 }
 
 /// ONE ENTRY, AND A REFRESH IN AN HOUR. Unlike the On Air widget this does not
@@ -68,8 +70,9 @@ private func deckEntry(_ style: DeckStyle) -> DeckEntry {
 /// only changes when you drive again — and the app republishes the snapshot
 /// every time it is backgrounded, a far better signal than any schedule
 /// guessed at here.
-private func deckTimeline(_ style: DeckStyle) -> Timeline<DeckEntry> {
-  Timeline(entries: [deckEntry(style)], policy: .after(Date().addingTimeInterval(60 * 60)))
+private func deckTimeline(_ style: DeckStyle, pinned: String? = nil) -> Timeline<DeckEntry> {
+  Timeline(entries: [deckEntry(style, pinned: pinned)],
+           policy: .after(Date().addingTimeInterval(60 * 60)))
 }
 
 // ── iOS 16 and older: no setting, the default look ─────────────────────────
@@ -120,10 +123,10 @@ struct DeckIntentProvider: AppIntentTimelineProvider {
     deckEntry(.road)
   }
   func snapshot(for configuration: DeckLookIntent, in context: Context) async -> DeckEntry {
-    deckEntry(style(configuration.look))
+    deckEntry(style(configuration.look), pinned: configuration.station?.id)
   }
   func timeline(for configuration: DeckLookIntent, in context: Context) async -> Timeline<DeckEntry> {
-    deckTimeline(style(configuration.look))
+    deckTimeline(style(configuration.look), pinned: configuration.station?.id)
   }
   private func style(_ look: DeckLook) -> DeckStyle {
     switch look {
@@ -456,7 +459,7 @@ struct DeckConfigurableWidget: Widget {
       DeckView(entry: entry).containerBackground(.clear, for: .widget)
     }
     .configurationDisplayName("On the Deck")
-    .description("Your station as a record, with the last song on it. Long-press to change the look.")
+    .description("Your station as a record, with the last song on it. Long-press to change the look, or pin it to a station.")
     .supportedFamilies([.systemMedium])
     .cruiseFullBleed()
   }

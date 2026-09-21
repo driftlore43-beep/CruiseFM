@@ -62,6 +62,14 @@ struct LastPlayedLookIntent: WidgetConfigurationIntent {
   @Parameter(title: "Look", default: .cdPlayer)
   var look: LastPlayedLook
 
+  /// Which station this tile follows. Nil (and the sentinel's empty id) mean
+  /// "my last station", which is what this widget did before pinning existed.
+  /// The SONG is always the last one the app heard — pinning a station does
+  /// not pin a song, because there is only ever one last song. See
+  /// StationPick.swift.
+  @Parameter(title: "Station")
+  var station: StationEntity?
+
   init() {}
   init(look: LastPlayedLook) { self.look = look }
 }
@@ -78,22 +86,24 @@ struct LastPlayedEntry: TimelineEntry {
   let style: LastPlayedStyle
 }
 
-private func lpEntry(_ style: LastPlayedStyle) -> LastPlayedEntry {
+// The pinned station arrives as a bare id, not a StationEntity: the entity is
+// iOS 17 only and this is shared with the plain provider older phones get.
+private func lpEntry(_ style: LastPlayedStyle, pinned: String? = nil) -> LastPlayedEntry {
   guard let snap = SnapshotStore.load() else {
     return LastPlayedEntry(date: Date(), station: nil, lastPlayed: nil, ready: false, style: style)
   }
-  // Never driven? Fall back to whatever is on air, so a first-time listener
-  // gets a real station rather than an empty frame.
-  let station = snap.lastDrive ?? snap.currentOnAir()
-  return LastPlayedEntry(date: Date(), station: station, lastPlayed: snap.lastPlayed,
-                         ready: true, style: style)
+  // Pinned, else the last drive, else whatever is on air — so a first-time
+  // listener gets a real station rather than an empty frame.
+  return LastPlayedEntry(date: Date(), station: snap.station(pinned: pinned),
+                         lastPlayed: snap.lastPlayed, ready: true, style: style)
 }
 
-private func lpTimeline(_ style: LastPlayedStyle) -> Timeline<LastPlayedEntry> {
+private func lpTimeline(_ style: LastPlayedStyle, pinned: String? = nil) -> Timeline<LastPlayedEntry> {
   // One entry, refreshed in an hour. The song only changes when the app plays
   // one, and the app republishes the snapshot whenever it is backgrounded —
   // a far better signal than any schedule guessed at here.
-  Timeline(entries: [lpEntry(style)], policy: .after(Date().addingTimeInterval(3600)))
+  Timeline(entries: [lpEntry(style, pinned: pinned)],
+           policy: .after(Date().addingTimeInterval(3600)))
 }
 
 struct LastPlayedProvider: TimelineProvider {
@@ -140,10 +150,10 @@ struct LastPlayedIntentProvider: AppIntentTimelineProvider {
     lpEntry(.cdPlayer)
   }
   func snapshot(for configuration: LastPlayedLookIntent, in c: Context) async -> LastPlayedEntry {
-    lpEntry(style(configuration.look))
+    lpEntry(style(configuration.look), pinned: configuration.station?.id)
   }
   func timeline(for configuration: LastPlayedLookIntent, in c: Context) async -> Timeline<LastPlayedEntry> {
-    lpTimeline(style(configuration.look))
+    lpTimeline(style(configuration.look), pinned: configuration.station?.id)
   }
   private func style(_ look: LastPlayedLook) -> LastPlayedStyle {
     switch look {
@@ -732,7 +742,7 @@ struct LastPlayedConfigurableWidget: Widget {
       LastPlayedView(entry: entry).cruiseContainerBackground()
     }
     .configurationDisplayName("Last Played")
-    .description("The last song you heard. Long-press to change the look — CD player, pocket player or ticket stub.")
+    .description("The last song you heard. Long-press to change the look, or pin it to a station.")
     .supportedFamilies([.systemMedium])
     .cruiseFullBleed()
   }

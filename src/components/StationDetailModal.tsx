@@ -232,7 +232,7 @@ export function StationDetailModal({ station, visible, onClose, onStartDrive, is
                   ? 'Tap to change'
                   : needsPlaylist
                     ? 'Give your station its sound'
-                    : 'Drop in your own Spotify playlist'}
+                    : 'Drop in your own playlist'}
               </Text>
             </View>
             <MaterialCommunityIcons name={linked ? 'pencil' : 'plus'} size={18} color={SPOTIFY_GREEN} />

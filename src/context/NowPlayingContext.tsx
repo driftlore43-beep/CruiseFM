@@ -1,24 +1,51 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { recordDriveEnd } from '@/utils/driveStats';
+import { getSavedPlatform, type PlatformId } from '@/utils/musicPlatform';
+import {
+  HANDOFF_APP_NAME, openPlaylist, platformOfUri, type HandoffPlatform,
+} from '@/utils/playlistHandoff';
 import { isRestrictedAccount, isSpotifyConnected, startPlayback, type StartResult } from '@/utils/spotify';
 import { openInSpotify } from '@/utils/spotifyHandoff';
 import { getStationPlaylist } from '@/utils/stationPlaylists';
 
+/** Start outcomes, plus the one that isn't Spotify's to report. */
+export type DriveStartResult = StartResult | 'link-needed';
+
+type StartOutcome = { result: DriveStartResult; platform: HandoffPlatform | null };
+
+/** Only these two can take a pasted playlist link today. */
+function handoffPlatformOf(id: PlatformId | null): HandoffPlatform | null {
+  return id === 'spotify' || id === 'appleMusic' ? id : null;
+}
+
 /**
  * Get this station's music going, by whichever path this user has:
  *
- * - Allowlisted + connected → full Web API control (today's experience).
- * - Not allowlisted (or not connected) but a playlist is linked → hand the
- *   playlist to the Spotify app via deep link; Cruise FM stays the visuals.
- * - Nothing linked and no API → demo mode, silently (nothing to explain).
+ * - Apple Music playlist linked → hand it to the Apple Music app. There is no
+ *   API path here at all, so none of the Spotify checks below apply.
+ * - Spotify, allowlisted + connected → full Web API control.
+ * - Spotify, not allowlisted (or not connected), playlist linked → hand the
+ *   playlist to the Spotify app; Cruise FM stays the visuals.
+ * - Nothing linked, but the user told us which service they use → say how to
+ *   link one, rather than playing nothing and explaining nothing.
+ * - Nothing linked and no preference → demo mode, silently.
  *
- * Returns the verdict so the UI can narrate; null means "didn't need to try".
+ * Returns the verdict (and who it's about) so the UI can narrate; null means
+ * "didn't need to try".
  */
-async function playStationMusic(stationId: string, opts?: { onlyIfLinked?: boolean }): Promise<StartResult | null> {
+async function playStationMusic(stationId: string, opts?: { onlyIfLinked?: boolean }): Promise<StartOutcome | null> {
   try {
     const linked = await getStationPlaylist(stationId);
     if (!linked && opts?.onlyIfLinked) return null;
+
+    const linkedPlatform = linked ? platformOfUri(linked.uri) : null;
+
+    // Anything that isn't Spotify is handoff-only — go straight there.
+    if (linked && linkedPlatform && linkedPlatform !== 'spotify') {
+      const ok = await openPlaylist(linked.uri);
+      return { result: ok ? 'handoff' : 'error', platform: linkedPlatform };
+    }
 
     const connected = await isSpotifyConnected();
     const restricted = connected && (await isRestrictedAccount());
@@ -28,27 +55,55 @@ async function playStationMusic(stationId: string, opts?: { onlyIfLinked?: boole
       // Allowlist rejection discovered mid-drive falls through to handoff —
       // and so does a dead/slow network ('error'): opening the playlist in
       // the Spotify app beats asking the user to retry.
-      if (r !== 'restricted' && !(r === 'error' && linked)) return r;
+      if (r !== 'restricted' && !(r === 'error' && linked)) return { result: r, platform: 'spotify' };
     }
 
-    if (linked) return (await openInSpotify(linked.uri)) ? 'handoff' : 'error';
+    if (linked) {
+      const ok = await openInSpotify(linked.uri);
+      return { result: ok ? 'handoff' : 'error', platform: 'spotify' };
+    }
     // Restricted with nothing linked: explain how to still get music.
-    if (connected) return 'restricted';
+    if (connected) return { result: 'restricted', platform: 'spotify' };
+
+    // No API and nothing linked. If they picked a service we can take links
+    // for, say so; if they skipped that question — or chose one we can't
+    // accept links for yet — stay quiet, because demo mode is a fair default
+    // and a notice we can't act on is just nagging.
+    const preferred = handoffPlatformOf(await getSavedPlatform());
+    if (preferred) return { result: 'link-needed', platform: preferred };
     return null;
   } catch {
     return null; // never let a playback hiccup break the drive
   }
 }
 
-/** Plain-words translation of a start attempt, shown over the player. */
-const START_NOTICES: Record<StartResult, string | null> = {
-  'playing': null,
-  'no-device': "Spotify isn't awake. Open Spotify, play any song for a second, then come back and press play.",
-  'premium-required': 'Spotify needs a Premium account to let Cruise FM control playback.',
-  'restricted': 'This Spotify account isn’t on the Cruise FM test list, so in-app control is off. Link a playlist to this station (paste a Spotify link) and drives will play through the Spotify app instead.',
-  'handoff': 'Playlist sent to Spotify — press play there, then come back. Your drive keeps rolling here.',
-  'error': "Spotify didn't respond. Check the Spotify app is open and logged in, then press play to retry.",
-};
+/**
+ * Plain-words translation of a start attempt, shown over the player.
+ *
+ * Anything a non-Spotify listener can actually hit is worded from their app's
+ * name; the rest are Spotify API states that only arise on the Spotify path.
+ */
+function noticeFor(result: DriveStartResult, platform: HandoffPlatform | null): string | null {
+  const app = HANDOFF_APP_NAME[platform ?? 'spotify'];
+  switch (result) {
+    case 'playing':
+      return null;
+    case 'handoff':
+      return `Playlist sent to ${app} — press play there, then come back. Your drive keeps rolling here.`;
+    case 'link-needed':
+      return `No playlist linked to this station yet. In ${app}: open a playlist → Share → Copy Link, then paste it here and Start Drive will open it for you.`;
+    case 'error':
+      return `${app} didn't respond. Check the ${app} app is open and logged in, then press play to retry.`;
+    case 'no-device':
+      return "Spotify isn't awake. Open Spotify, play any song for a second, then come back and press play.";
+    case 'premium-required':
+      return 'Spotify needs a Premium account to let Cruise FM control playback.';
+    case 'restricted':
+      return 'This Spotify account isn’t on the Cruise FM test list, so in-app control is off. Link a playlist to this station (paste a Spotify link) and drives will play through the Spotify app instead.';
+    default:
+      return null;
+  }
+}
 
 export type NowPlayingSession = { mode: string; stationId: string; preview?: boolean };
 
@@ -79,8 +134,9 @@ type NowPlayingCtx = {
   /** Why the last start attempt made no sound, in plain words (null = fine). */
   playbackNotice: string | null;
   clearPlaybackNotice: () => void;
-  /** Feed a fresh start attempt's outcome into the notice. */
-  reportStartResult: (result: StartResult) => void;
+  /** Feed a fresh start attempt's outcome into the notice. Platform decides
+   * which music app the wording names; omit it for the Spotify path. */
+  reportStartResult: (result: DriveStartResult, platform?: HandoffPlatform | null) => void;
 };
 
 const Ctx = createContext<NowPlayingCtx | null>(null);
@@ -93,8 +149,8 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const activityPing = useCallback(() => setActivityTick((t) => t + 1), []);
   const [playbackNotice, setPlaybackNotice] = useState<string | null>(null);
   const clearPlaybackNotice = useCallback(() => setPlaybackNotice(null), []);
-  const reportStartResult = useCallback((result: StartResult) => {
-    setPlaybackNotice(START_NOTICES[result] ?? null);
+  const reportStartResult = useCallback((result: DriveStartResult, platform: HandoffPlatform | null = null) => {
+    setPlaybackNotice(noticeFor(result, platform));
   }, []);
   // Every play/pause is also a sign of life for the drive check.
   const setPlaying = useCallback((p: boolean) => {
@@ -114,7 +170,7 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     // if it has one, otherwise resume whatever was playing. A paused open
     // leaves Spotify alone until the user presses play.
     if (!opts?.paused) {
-      playStationMusic(stationId).then((r) => { if (r) reportStartResult(r); });
+      playStationMusic(stationId).then((o) => { if (o) reportStartResult(o.result, o.platform); });
     }
   }, [reportStartResult]);
 
@@ -127,7 +183,7 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     setSession({ ...current, stationId });
     // Retuning mid-drive (Tuner lock-on, Change Mood) switches the music
     // too — but only when the new station actually has a linked playlist.
-    playStationMusic(stationId, { onlyIfLinked: true }).then((r) => { if (r) reportStartResult(r); });
+    playStationMusic(stationId, { onlyIfLinked: true }).then((o) => { if (o) reportStartResult(o.result, o.platform); });
   }, [reportStartResult]);
 
   const stop = useCallback(() => {
@@ -160,6 +216,6 @@ export function useActivityPing(): () => void {
 }
 
 /** Safe anywhere — lets the playback hook feed start outcomes to the notice. */
-export function useStartResultReporter(): (result: StartResult) => void {
+export function useStartResultReporter(): (result: DriveStartResult, platform?: HandoffPlatform | null) => void {
   return useContext(Ctx)?.reportStartResult ?? noopPing;
 }

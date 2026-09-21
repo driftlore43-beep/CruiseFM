@@ -3,25 +3,42 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { getSavedPlatform, PLATFORMS } from '@/utils/musicPlatform';
+import { HANDOFF_APP_NAME, parsePlaylistLink, type HandoffPlatform } from '@/utils/playlistHandoff';
 import { getUserPlaylists, isSpotifyConnected } from '@/utils/spotify';
-import { parseSpotifyPlaylistLink } from '@/utils/spotifyHandoff';
 import { type LinkedPlaylist } from '@/utils/stationPlaylists';
 
 const SPOTIFY_GREEN = '#1DB954';
 
+/** Accent per service, borrowed from the platform registry so there's one
+ *  source of truth for the brand colours. */
+const ACCENT: Record<HandoffPlatform, string> = {
+  spotify:    PLATFORMS.spotify.color,
+  appleMusic: PLATFORMS.appleMusic.color,
+};
+/** Readable text on top of each accent. */
+const ON_ACCENT: Record<HandoffPlatform, string> = {
+  spotify:    '#04220f',
+  appleMusic: '#ffffff',
+};
+
 /**
- * Paste-a-link fallback: works for everyone, including accounts that can't
- * browse their library through the API (not connected / not allowlisted).
- * In Spotify: playlist → ⋯ → Share → Copy link.
+ * Paste-a-link row: works for everyone, including accounts that can't browse
+ * their library through the API (not connected / not allowlisted) and Apple
+ * Music listeners, who have no API path at all.
+ *
+ * `platform` only decides the wording and the accent — a link from either
+ * service is accepted whichever one the user picked at onboarding.
  */
-function PasteLinkRow({ onPick }: { onPick: (pl: LinkedPlaylist) => void }) {
+function PasteLinkRow({ platform, onPick }: { platform: HandoffPlatform; onPick: (pl: LinkedPlaylist) => void }) {
   const [text, setText] = useState('');
   const [bad, setBad] = useState(false);
+  const app = HANDOFF_APP_NAME[platform];
 
   const link = () => {
-    const uri = parseSpotifyPlaylistLink(text);
-    if (!uri) { setBad(true); return; }
-    onPick({ uri, name: 'My Spotify playlist' });
+    const parsed = parsePlaylistLink(text);
+    if (!parsed) { setBad(true); return; }
+    onPick({ uri: parsed.uri, name: `My ${HANDOFF_APP_NAME[parsed.platform]} playlist` });
   };
 
   return (
@@ -30,20 +47,20 @@ function PasteLinkRow({ onPick }: { onPick: (pl: LinkedPlaylist) => void }) {
         <TextInput
           value={text}
           onChangeText={(t) => { setText(t); setBad(false); }}
-          placeholder="Paste a Spotify playlist link…"
+          placeholder={`Paste your ${app} playlist link…`}
           placeholderTextColor="rgba(255,255,255,0.35)"
           style={[ps.pasteInput, bad && ps.pasteInputBad]}
           autoCapitalize="none"
           autoCorrect={false}
         />
-        <Pressable style={ps.pasteBtn} onPress={link}>
-          <Text style={ps.pasteBtnText}>Link</Text>
+        <Pressable style={[ps.pasteBtn, { backgroundColor: ACCENT[platform] }]} onPress={link}>
+          <Text style={[ps.pasteBtnText, { color: ON_ACCENT[platform] }]}>Link</Text>
         </Pressable>
       </View>
       <Text style={ps.pasteHint}>
         {bad
-          ? "That doesn't look like a playlist link — in Spotify: playlist → Share → Copy link."
-          : 'In Spotify: open a playlist → ⋯ → Share → Copy link, then paste it here.'}
+          ? `That doesn't look like a playlist link — in ${app}: open a playlist → Share → Copy Link.`
+          : `In ${app}: open a playlist → ⋯ → Share → Copy Link, then paste it here.`}
       </Text>
     </View>
   );
@@ -68,6 +85,9 @@ export function PlaylistSheet({
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [playlists, setPlaylists] = useState<LinkedPlaylist[]>([]);
+  // Which service to speak in. Apple Music only when they chose it and
+  // there's no live Spotify session to contradict it.
+  const [platform, setPlatform] = useState<HandoffPlatform>('spotify');
 
   useEffect(() => {
     (async () => {
@@ -78,10 +98,14 @@ export function PlaylistSheet({
         const items: LinkedPlaylist[] =
           data?.items?.map((p: any) => ({ uri: p.uri, name: p.name })) ?? [];
         setPlaylists(items);
+      } else if ((await getSavedPlatform()) === 'appleMusic') {
+        setPlatform('appleMusic');
       }
       setLoading(false);
     })();
   }, []);
+
+  const app = HANDOFF_APP_NAME[platform];
 
   return (
     <View style={ps.backdrop}>
@@ -92,7 +116,7 @@ export function PlaylistSheet({
         <Text style={ps.sub}>for {stationName}</Text>
 
         {loading ? (
-          <ActivityIndicator color={SPOTIFY_GREEN} style={{ marginVertical: 32 }} />
+          <ActivityIndicator color={ACCENT[platform]} style={{ marginVertical: 32 }} />
         ) : (
           <>
             {connected && playlists.length > 0 && (
@@ -115,10 +139,10 @@ export function PlaylistSheet({
             )}
             {!connected && (
               <Text style={ps.empty}>
-                No Spotify login needed — link any playlist with its share link:
+                No {app} login needed — link any playlist with its share link:
               </Text>
             )}
-            <PasteLinkRow onPick={onPick} />
+            <PasteLinkRow platform={platform} onPick={onPick} />
           </>
         )}
       </View>

@@ -1,7 +1,18 @@
 // ── Dev / owner bypass ────────────────────────────────────────────────────────
-// Set to false before publishing to App Store.
 // When true: all premium locks are bypassed and a DEV badge appears on each card.
-export const OWNER_MODE = true;
+//
+// This is deliberately NOT a hand-flipped switch. Shipping a store build with
+// it on would hand Premium to every user for free and quietly kill the
+// subscription — and it would look like "nobody wanted to pay" rather than
+// "the flag was left on". So it's a property of the build itself:
+//
+//   local dev (`expo start`)        → ON  (via __DEV__)
+//   EAS development / preview       → ON  (EXPO_PUBLIC_OWNER_MODE=1 in eas.json)
+//   EAS production                  → OFF (eas.json sets it to 0; nothing to forget)
+//
+// To rehearse the real paywall on a preview build, flip that env var to "0"
+// in eas.json's preview profile and rebuild.
+export const OWNER_MODE = __DEV__ || process.env.EXPO_PUBLIC_OWNER_MODE === '1';
 
 // ── RevenueCat ────────────────────────────────────────────────────────────────
 // Public (publishable) SDK key — safe to ship in the app.

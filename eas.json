@@ -6,18 +6,25 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_OWNER_MODE": "1"
+      }
     },
     "preview": {
       "distribution": "internal",
       "channel": "preview",
       "env": {
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "EXPO_PUBLIC_OWNER_MODE": "1"
       }
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_OWNER_MODE": "0"
+      }
     }
   },
   "submit": {

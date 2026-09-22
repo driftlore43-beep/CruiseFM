@@ -585,10 +585,13 @@ struct MirrorBall: View {
 
   var body: some View {
     ZStack {
-      // The body warms with the lamps — the prototype's party ball sits on
-      // #332536, not the neutral #2a2c33 an unlit one does.
+      // THE BODY WARMS WITH THE STATION'S OWN LAMPS, not with a fixed purple.
+      // It was #332536 -> #150f1c — a purple sphere sitting behind 798
+      // mirrors and showing through the bevel gap around every one of them,
+      // which is a large part of why this ball read purple whatever was
+      // pinned to it. See `lit` below.
       Circle().fill(
-        RadialGradient(colors: [Color(hex: "#332536"), Color(hex: "#150f1c")],
+        RadialGradient(colors: [lit(eqTriple[1], 0.186, 0.55), lit(eqTriple[1], 0.084, 0.55)],
                        center: .init(x: 0.38, y: 0.30), startRadius: 0, endRadius: size * 0.62))
       ForEach(tiles, id: \.id) { t in
         Path { p in
@@ -611,16 +614,28 @@ struct MirrorBall: View {
       // lamps catching the silhouette rather than a UI border.
       Circle().strokeBorder(
         AngularGradient(stops: [
-          .init(color: Color(hex: "#b98cff").opacity(0.50), location: 0.00),
+          // THE TWO ARCS ARE THE STATION'S OWN LIGHT AND DEEP HUES, which
+          // REVERSES the fixed violet/blue pair this line was written with
+          // on 10.09 — knowingly, and on her own later instruction (13.09,
+          // that the ball should follow the mood station; 22.09, that it
+          // still does not). Her original ask was for two DIFFERENT lamps
+          // catching opposite sides rather than for those two particular
+          // colours, and eqColors[0] and eqColors[2] are two different
+          // lamps by construction, so the shape she approved survives.
+          .init(color: lit(eqTriple[0], 0.758, 0.18).opacity(0.50), location: 0.00),
           .init(color: .clear, location: 0.20),
           .init(color: .clear, location: 0.44),
-          .init(color: Color(hex: "#8fd8ff").opacity(0.46), location: 0.60),
+          .init(color: lit(eqTriple[2], 0.803, 0.18).opacity(0.46), location: 0.60),
           .init(color: .clear, location: 0.80),
-          .init(color: Color(hex: "#b98cff").opacity(0.50), location: 1.00),
+          .init(color: lit(eqTriple[0], 0.758, 0.18).opacity(0.50), location: 1.00),
         ], center: .center, angle: .degrees(-35)), lineWidth: 1.6)
     }
     .frame(width: size, height: size)
-    .shadow(color: Color(hex: "#e696e6").opacity(0.40), radius: 18)
+    // THE BLOOM THE SILHOUETTE THROWS, in the station's colour. A fixed
+    // #e696e6 at 0.40 is the tight pink ring hugging the ball in the owner's
+    // 22.09 screenshot, and it sits exactly where the eye goes — brightest
+    // right at the edge of the chrome.
+    .shadow(color: lit(eqTriple[1], 0.797, 0.15).opacity(0.40), radius: 18)
   }
 
   private struct Tile { let id: Int; let pts: [CGPoint]; let fill: Color; let opacity: Double }
@@ -661,6 +676,51 @@ struct MirrorBall: View {
     if let eq = eqColors, eq.count == 3 { return eq.map { rgbOf($0) } }
     let a = rgbOf(accent)
     return [mixRGB(a, (1, 1, 1), 0.30), a, mixRGB(a, rgbOf("#161617"), 0.34)]
+  }
+
+  /**
+   * ONE OF THE STATION'S HUES AT A CHOSEN BRIGHTNESS — the ball's own
+   * lighting, and the reason no fixed violet or pink survives on it.
+   *
+   * Owner, 22.09, straight after confirming that pinning a tile to a station
+   * works: "the different stations when pressing the mirror ball still
+   * remains pink". She is right, and it was three layers that never looked
+   * at the station at all — the ball's BODY (a purple sphere behind every
+   * mirror), the RIM (a fixed violet arc against a fixed icy blue) and the
+   * BLOOM around the silhouette (#e696e6). `tileHalo` was derived from the
+   * station on 13.09 and these were not, so the room behind the ball changed
+   * with the station while the ball standing in it did not.
+   *
+   * AND IT IS THE APP'S OWN RULE, BROKEN IN THIS TARGET. Round 22 (28.07)
+   * stripped every hue out of `MirrorBallFlipbook.tsx` after a "slightly
+   * cool silver" read as TEAL over Sunset's warm backdrop: nothing
+   * structural on this ball may carry a hue, and a tint that is wanted goes
+   * through the lighting. That file carries no colour literal at all today;
+   * this one had drifted back to three.
+   *
+   * THE ARITHMETIC IS `tileHalo`'S, deliberately, so the ball and the room
+   * behind it cannot disagree the next time either is tuned. Scale the
+   * station's own RGB to the target brightness but never past the point
+   * where its brightest channel clips — a clipped channel shifts the hue,
+   * which is the 10.09 "we manufactured a colour" fault — then pull it part
+   * of the way toward a neutral of the same brightness. `neutral` is how
+   * much of the round-22 rule each layer keeps: heavy on the BODY, which is
+   * material, and light on the rim and the bloom, which are light.
+   *
+   * EACH CALLER ASKS FOR THE BRIGHTNESS OF THE LITERAL IT REPLACES, so a
+   * violet station lands back on very nearly the purple that was hardcoded
+   * here and nothing she has already approved moves. A station with no
+   * colour in it at all (Mountain Pass is three whites) comes out plain
+   * silver on a near-black ball, which is her own 13.09 "if it isn't [the
+   * mood station] it should be just a black background" — reached by the
+   * rule rather than by a special case.
+   */
+  private func lit(_ src: (Double, Double, Double), _ target: Double, _ neutral: Double) -> Color {
+    let mean = max(0.02, (src.0 + src.1 + src.2) / 3)
+    let peak = max(0.02, max(src.0, max(src.1, src.2)))
+    let k = min(target / mean, 1 / peak)
+    func c(_ x: Double) -> Double { min(1, x * k) * (1 - neutral) + target * neutral }
+    return Color(red: c(src.0), green: c(src.1), blue: c(src.2))
   }
 
   /// A NINE-ENTRY PALETTE — each of the station's three hues at its own

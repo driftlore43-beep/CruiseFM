@@ -820,5 +820,49 @@ if (declared.length < 5 || Object.keys(kinds).length < 5) {
     unknown.length === 0, unknown.join(', '));
 }
 
+// ---------------------------------------------------------------------------
+// THE MIRROR BALL'S MATERIAL CARRIES NO HUE.
+//
+// Round 22 (28.07) stripped every colour literal out of the app's own
+// MirrorBallFlipbook.tsx after a "slightly cool silver" body read as TEAL
+// over Sunset's warm backdrop: on this object the material is neutral chrome
+// and the LIGHT carries the mood. The widget's copy drifted back to three
+// fixed hues anyway — a purple body, a violet/blue rim and a pink bloom —
+// which is what the owner reported on 22.09 as "the mirror ball still remains
+// pink" once pinning a tile to a station worked and nothing about the ball
+// changed with it.
+//
+// So the rule is checked rather than remembered. Every colour literal DRAWN
+// inside `struct MirrorBall` has to be neutral; a hue has to arrive through
+// the station, which means through `lit` or `eqTriple`. A literal that is a
+// DEFAULT VALUE (`= "#7B38E0"` on the accent property) is an input rather
+// than a drawn colour and is excused by the shape of the assignment.
+{
+  const mode = src['ModeWidget.swift'] || '';
+  const i = mode.indexOf('struct MirrorBall: View {');
+  let ball = '';
+  if (i >= 0) {
+    let depth = 0;
+    let j = i;
+    for (; j < mode.length; j += 1) {
+      if (mode[j] === '{') depth += 1;
+      else if (mode[j] === '}') { depth -= 1; if (depth === 0) break; }
+    }
+    ball = decomment(mode.slice(i, j + 1));
+  }
+  const hued = [];
+  for (const m of ball.matchAll(/(=\s*)?"(#[0-9a-fA-F]{6})"/g)) {
+    if (m[1]) continue;                      // a default value, not a drawn colour
+    const hex = m[2];
+    const ch = [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16));
+    if (Math.max(...ch) - Math.min(...ch) > 8) hued.push(hex);
+  }
+  check('mirror ball: it found the struct', ball.length > 2000, `${ball.length} chars`);
+  check('mirror ball: every drawn colour literal is neutral — hue comes from the station',
+    hued.length === 0, hued.join(', '));
+  check('mirror ball: the station reaches its lighting',
+    /\blit\s*\(\s*eqTriple\[/.test(ball), 'no lit(eqTriple[..]) call');
+}
+
 console.log(fails ? `\n  ${fails} failure(s)\n` : '\n  the widget bundle hangs together\n');
 process.exit(fails ? 1 : 0);

@@ -94,18 +94,25 @@ before **FREE TO START, PREMIUM IF YOU WANT MORE**:
 
 ```
 ON YOUR HOME SCREEN
-Seven widgets, in every size: the station that's on air right now, a
-one-tap Start Drive, the last song you played drawn as a CD player, an
-iPod, a ticket stub — and The Mode, which draws a mirror ball, a jewel
-case or a pressing in your station's own colours. Pin any of them to a
-mood you choose, or let them follow your last drive. There's a Lock
+Six widgets. The station that's on air right now, a one-tap Start Drive,
+the record you were last on, and the last song you played drawn as a CD
+player, a pocket player or a ticket stub. The Mode draws a mirror ball, a
+jewel case or a pressing in your station's own colours. Pin any of them to
+a mood you choose, or let them follow your last drive. There's a Lock
 Screen widget too.
 ```
 
 Every claim in that block was checked against `targets/widgets/` rather than
-written from memory: seven gallery rows, three Last Played looks, three Mode
-looks, a Lock Screen widget in three families, and pinning on all of them
-except On Air Now and the Lock Screen.
+written from memory — and the check corrected a stale number in this repo's own
+log, which still says **seven** gallery rows from 03.09. It is **six**: On Air
+Now, Start Drive, On the Deck, The Mode and Last Played on the Home Screen,
+plus On Air on the Lock Screen. The streak widget was deleted on 09.09 and the
+Deck's three looks collapsed into one row. Three Last Played looks (CD player,
+pocket player, ticket stub), three Mode looks (mirror ball, CD, record), and
+pinning on all of them except On Air Now and the Lock Screen.
+
+"In every size" was in the first draft and is **false**: Last Played, On the
+Deck and The Mode are one size each. Do not put it back.
 
 Nothing else in the description needs to move for this version.
 

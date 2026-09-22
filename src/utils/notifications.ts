@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 import { BADGE_COPY, BADGE_NEARLY, EARLY_ACCESS, ON_AIR, WHATS_NEW, recapCopy, type Nudge } from '@/constants/notificationCopy';
+import { binaryAtLeast } from '@/utils/appVersion';
 import { hasEarlyAccess } from '@/utils/earlyAccess';
 import { isOnAir } from '@/constants/schedule';
 import { cachedSessionKind } from '@/utils/sessionKind';
@@ -496,11 +497,29 @@ export async function scheduleRecapIfDue(): Promise<void> {
  * Deliberately outside the weekly budget: this is a fact about the app rather
  * than an attempt to win somebody back, and it can only happen when they have
  * just installed an update. Still silent in the quiet hours.
+ *
+ * AND A LINE MAY DECLARE WHAT THE PHONE HAS TO BE ABLE TO DO (`needsBinary`),
+ * which is what lets this list carry a native release at all — see the gate
+ * below, and the note on WHATS_NEW itself.
  */
 export async function announceReleaseIfNew(version: string): Promise<void> {
   if (!Notifications || !version) return;
   const s = await getState();
   if (s.announcedVersion === version) return;
+  const copy = WHATS_NEW[version];
+
+  // THE CAPABILITY GATE, AND IT SITS BEFORE THE VERSION IS WRITTEN DOWN.
+  //
+  // `version` is the bundle's, which an over-the-air update carries onto
+  // whatever binary is already on the phone — so this is the one place that
+  // has to ask the BUILD instead. A line about something native waits until a
+  // build carrying it is actually installed.
+  //
+  // Nothing is recorded in this branch, deliberately: a phone that cannot do
+  // the thing has not been told about it, so the line is still waiting when
+  // the App Store update lands. (utils/whatsNew.ts's card holds its own note
+  // back the same way, for the same reason.)
+  if (copy?.needsBinary && !binaryAtLeast(copy.needsBinary)) return;
 
   const first = !s.announcedVersion;
   await updateState((x) => ({ ...x, announcedVersion: version }));
@@ -509,7 +528,6 @@ export async function announceReleaseIfNew(version: string): Promise<void> {
   const prefs = await getNotifPrefs();
   if (!prefs.newStations) return;
   if (!(await hasPermission())) return;
-  const copy = WHATS_NEW[version];
   if (!copy) return;
   if (inQuietHours(new Date())) return;
 

@@ -82,6 +82,17 @@ const copy = run(`${ROOT}/constants/notificationCopy.ts`, (m) => {
   throw new Error('unstubbed ' + m);
 });
 
+// THE BINARY THIS PHONE IS PRETENDING TO BE, which a release note about
+// anything native has to ask about instead of the bundle's own number. The
+// REAL utils/appVersion is loaded rather than a faked boolean, so the gate is
+// exercised through the same comparison the app ships.
+let binaryVersion = '9.9.9';
+const appVersionMod = run(`${ROOT}/utils/appVersion.ts`, (m) => {
+  if (m === 'expo-constants') return { __esModule: true, default: { expoConfig: { version: '1.0.0' } } };
+  if (m === 'expo-application') return { get nativeApplicationVersion() { return binaryVersion; } };
+  throw new Error('unstubbed ' + m);
+});
+
 const earlyAccess = run(`${ROOT}/utils/earlyAccess.ts`, (m) => {
   if (m === '@react-native-async-storage/async-storage') return asyncStorage;
   if (m === '@/constants/config') return { LAUNCH_FREE: false };
@@ -118,6 +129,7 @@ function loadEngine() {
     // reach a phone that genuinely qualified, and a stub that always says
     // yes would never catch it going out to everyone.
     if (s === '@/utils/earlyAccess') return earlyAccess;
+    if (s === '@/utils/appVersion') return appVersionMod;
     throw new Error('unstubbed ' + s);
   });
 }
@@ -133,6 +145,7 @@ const WEEK = 7 * DAY;
 async function reset(installedDaysAgo = 30, state = {}, prefs = null) {
   store = {};
   scheduled = [];
+  binaryVersion = '9.9.9';
   driveLog = [];
   const N = loadEngine();
   if (prefs) store.cruisefm_notification_prefs = JSON.stringify(prefs);
@@ -316,6 +329,59 @@ async function reset(installedDaysAgo = 30, state = {}, prefs = null) {
   await N.announceReleaseIfNew('1.2.0');
   await N.announceReleaseIfNew('9.9.9');
   ok(scheduled.length === 0, 'announced a version that has no line written for it');
+}
+
+// 16. A NATIVE RELEASE ANNOUNCES ONLY TO A PHONE THAT HAS THE BUILD.
+//
+//     `1.4.2` is the widget-pinning line and declares needsBinary. The case
+//     that matters is the middle one: an over-the-air update puts the 1.4.2
+//     BUNDLE on a 1.4.0 phone, so the version handed in is honestly 1.4.2
+//     while the tiles it talks about are not there. Reading the bundle — which
+//     is all this did before — would announce it to every one of them.
+{
+  const quiet = (() => { const h = new Date().getHours() + new Date().getMinutes() / 60; return h >= 22.5 || h < 6.5; })();
+
+  // The binary genuinely carries it.
+  const N = await reset();
+  binaryVersion = '1.4.2';
+  await N.announceReleaseIfNew('1.4.1');          // an upgrade to announce FROM
+  await N.announceReleaseIfNew('1.4.2');
+  ok(quiet || scheduled.length === 1, `a phone with the 1.4.2 build should be told once, sent ${scheduled.length}`);
+
+  // Same bundle, older binary: silence.
+  const N2 = await reset();
+  binaryVersion = '1.4.0';
+  await N2.announceReleaseIfNew('1.4.1');
+  await N2.announceReleaseIfNew('1.4.2');
+  ok(scheduled.length === 0, 'announced a widget release to a phone whose build has no widget picker');
+
+  // AND IT IS STILL WAITING. Nothing may be written down in that branch, or
+  // the App Store update lands and the line is silently already "told".
+  binaryVersion = '1.4.2';
+  await N2.announceReleaseIfNew('1.4.2');
+  ok(quiet || scheduled.length === 1,
+    `the line should still be waiting when the build arrives, sent ${scheduled.length}`);
+
+  // The binary version being unreadable is not a yes.
+  const N3 = await reset();
+  binaryVersion = null;
+  await N3.announceReleaseIfNew('1.4.1');
+  await N3.announceReleaseIfNew('1.4.2');
+  ok(scheduled.length === 0, 'announced a native release with no idea what build this is');
+
+  console.log("  what's new: native line held back for an old build, delivered once the build lands");
+}
+
+// 17. THE GATE IS NOT A BLANKET MUTE — a line with no needsBinary still goes
+//     out whatever the build is, or adding the check would quietly have
+//     switched this whole surface off.
+{
+  const N = await reset();
+  binaryVersion = '1.0.0';
+  await N.announceReleaseIfNew('1.2.0');
+  await N.announceReleaseIfNew('1.3.0');
+  const quiet = (() => { const h = new Date().getHours() + new Date().getMinutes() / 60; return h >= 22.5 || h < 6.5; })();
+  ok(quiet || scheduled.length === 1, `a JS release should announce on any build, sent ${scheduled.length}`);
 }
 
 console.log(fails === 0 ? '  ALL PASS' : `  ${fails} FAILED`);

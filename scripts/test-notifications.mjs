@@ -100,13 +100,47 @@ for (const n of C.ON_AIR) {
 }
 
 // 5. Nothing guilt-shaped, ever. These are the shapes the doc bans outright.
+//    EVERY line the app can send, not just the on-air ones — a release note
+//    and the early-access line are read in the same place by the same person.
 const BANNED = [/miss(ed)? you/i, /come back/i, /don'?t lose/i, /waiting for you/i, /streak.*lose/i];
-for (const n of [...C.ON_AIR, ...Object.values(C.BADGE_COPY), ...Object.values(C.BADGE_NEARLY)]) {
+const EVERY_LINE = [
+  ...C.ON_AIR,
+  ...Object.values(C.BADGE_COPY),
+  ...Object.values(C.BADGE_NEARLY),
+  ...Object.values(C.WHATS_NEW),
+  C.EARLY_ACCESS,
+];
+for (const n of EVERY_LINE) {
   for (const re of BANNED) {
     if (re.test(n.title) || re.test(n.body)) fail(`banned phrasing in "${n.title}": ${re}`);
   }
 }
 
-console.log(`  ${C.ON_AIR.length} on-air lines checked`);
+// 6. A RELEASE NOTE ABOUT SOMETHING NATIVE MUST SAY SO.
+//
+//    WHATS_NEW is keyed on the BUNDLE version, and a bundle rides over the air
+//    onto whatever binary is already installed — so a 1.4.0 phone reports
+//    itself as 1.4.2 the moment it pulls a 1.4.2 update. Without `needsBinary`
+//    the engine would announce widgets to a build that has none, which is the
+//    one thing a notification may never do: send somebody to look at something
+//    that is not there.
+//
+//    Checked by word rather than by judgement, because the failure is silent
+//    and the person adding the line six months from now will not be thinking
+//    about bundles. Anything naming a thing only a BUILD can provide has to
+//    carry the flag; if a genuinely over-the-air feature ever trips this,
+//    declaring the release it shipped in is the correct answer anyway.
+const NATIVE_WORDS = [/widget/i, /home screen/i, /lock screen/i, /\btile\b/i, /dynamic island/i];
+for (const [version, n] of Object.entries(C.WHATS_NEW)) {
+  const hit = NATIVE_WORDS.find((re) => re.test(n.title) || re.test(n.body));
+  if (hit && !n.needsBinary) {
+    fail(`${version} "${n.title}" names something only a build can provide (${hit}) but has no needsBinary`);
+  }
+  if (n.needsBinary && !/^\d+(\.\d+)*$/.test(n.needsBinary)) {
+    fail(`${version} needsBinary "${n.needsBinary}" is not a version number`);
+  }
+}
+
+console.log(`  ${C.ON_AIR.length} on-air lines and ${Object.keys(C.WHATS_NEW).length} release notes checked`);
 console.log(fails === 0 ? '  ALL PASS' : `  ${fails} FAILED`);
 process.exit(fails === 0 ? 0 : 1);

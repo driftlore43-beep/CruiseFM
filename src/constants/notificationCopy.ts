@@ -114,11 +114,44 @@ export const BADGE_NEARLY: Record<string, { title: string; body: string }> = {
  * NOTHING — which is the right default, since most releases have nothing worth
  * interrupting anyone for. Add a line only when a version genuinely adds
  * something to see.
+ *
+ * `needsBinary` IS WHAT MAKES A NATIVE RELEASE SAFE TO ANNOUNCE HERE, and
+ * without it this list could only ever carry JS features. The key is the
+ * version in the BUNDLE, and a bundle travels over the air onto a binary that
+ * is already installed — so a phone still running the 1.4.0 build reports
+ * itself as 1.4.2 the moment it pulls a 1.4.2 update, while 1.4.2's native
+ * code is not on it. Announcing widgets to that phone tells somebody to go
+ * and look at a tile they do not have, which is the one thing a notification
+ * may never do.
+ *
+ * So: set `needsBinary` to the release whose BINARY first carried the thing,
+ * and the engine checks the phone's own build rather than the bundle's
+ * number. The version stays unannounced until a build that has it arrives, so
+ * the line is still waiting when they update from the App Store.
+ *
+ * The home-page card in utils/whatsNew.ts answers the same question its own
+ * way (`needsWidgets`, checked against the native bridge). Two surfaces, two
+ * bars — that one waits to be looked at, this one interrupts — so they stay
+ * two lists rather than one.
  */
-export const WHATS_NEW: Record<string, { title: string; body: string; stationId?: string }> = {
+export const WHATS_NEW: Record<string, {
+  title: string;
+  body: string;
+  stationId?: string;
+  /** Minimum version of the INSTALLED BINARY, for anything native. */
+  needsBinary?: string;
+}> = {
   '1.3.0': {
     title: 'Your own photo, behind your own station',
     body: 'Make a station, give it a picture from your camera roll, and put it on.',
+  },
+  // Widgets themselves shipped in the 1.4.0 binary and pinning in 1.4.2, so
+  // this needs 1.4.2 — a 1.4.0 phone has tiles and no station picker, and
+  // "pin a widget" would be an errand it cannot run.
+  '1.4.2': {
+    title: 'Pin a widget to a mood',
+    body: 'Press and hold a Cruise FM tile and pick the station you want it to show.',
+    needsBinary: '1.4.2',
   },
 };
 

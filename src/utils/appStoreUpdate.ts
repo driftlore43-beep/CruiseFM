@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { appVersion } from '@/utils/appVersion';
+import { appVersion, isNewer } from '@/utils/appVersion';
 
 /**
  * "Some apps require you to go to the App Store and update from there" —
@@ -35,18 +35,6 @@ const CHECK_EVERY_MS = 12 * 60 * 60 * 1000; // twice a day is plenty for a versi
 const TIMEOUT_MS = 6000;
 
 type Cache = { checkedAt: number; storeVersion: string | null };
-
-/** "1.3.10" > "1.3.9" — a plain string compare gets that backwards, so each
- *  segment is compared as a number. Missing segments count as 0. */
-export function isNewer(store: string, installed: string): boolean {
-  const a = store.split('.').map((n) => parseInt(n, 10) || 0);
-  const b = installed.split('.').map((n) => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const x = a[i] ?? 0, y = b[i] ?? 0;
-    if (x !== y) return x > y;
-  }
-  return false;
-}
 
 async function fetchStoreVersion(): Promise<string | null> {
   const ctrl = new AbortController();

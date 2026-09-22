@@ -65,16 +65,45 @@ cover, and the CD and record tiles are drawn in far more detail.
 
 ---
 
-## Promotional text
+## Promotional text — **change it**, and this is the one field that costs nothing
 
-The one field editable at any time with no review. What is live was written
-for 1.4.1 and leads with the free trial, which is still true — so this is
-**optional**. If it is changed, this is the version that matches:
+170 characters, editable at any time with **no review**, so it is the cheapest
+thing on the page to get right and the only one that can be fixed after the
+fact.
+
+What is live was written for 1.4.1:
+
+```
+Ten mood stations, eight full-screen modes. Try Premium free for 7 days —
+and if you were here first, it's yours already.
+```
+
+**Its second half is addressed to people who cannot read it.** "If you were
+here first, it's yours already" is the early-access grant, and the grant is
+decided on a phone that already had the app — so the only person it is true of
+is someone who is not on the App Store page looking at promotional text. To a
+stranger it reads either as noise or, worse, as an offer being made to them.
+It was exactly right on release day and it has expired.
+
+Use this (118 of 170):
 
 ```
 Ten mood stations, eight full-screen modes, and widgets you can pin to the
 mood you want. Try Premium free for 7 days.
 ```
+
+It keeps the two numbers that do the work, spends the freed half on the thing
+this version is actually about, and keeps the trial, which is the reason to
+tap. If the widgets should lead instead (132 of 170):
+
+```
+New: pin a widget to the mood you want. Ten mood stations, eight
+full-screen modes, and your own music. Try Premium free for 7 days.
+```
+
+Leading with "New:" is worth more the week of a release and worth less a month
+later, which is fine — this field can be changed back whenever, with no review
+and no build.
 
 ---
 

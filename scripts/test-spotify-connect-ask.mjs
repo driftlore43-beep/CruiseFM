@@ -75,7 +75,27 @@ const askAt = ctx.indexOf('spotifyConnectAsked()');
 const handoffAt = ctx.indexOf('if (await openInSpotify(linked.uri)) return \'handoff\';');
 check('it is checked BEFORE the hand-off', askAt > 0 && handoffAt > 0 && askAt < handoffAt,
   'asking after the app has already opened Spotify would be pointless');
-check('it only applies to Spotify listeners', /getSavedPlatform\(\)\) === 'spotify'/.test(ctx));
+// ASSERTED AS A PROPERTY, NOT AS A SPELLING. This read the literal text
+// `getSavedPlatform()) === 'spotify'` until 24.09, when the call was hoisted
+// into a `platform` const so the HAND-OFF below could share the same answer
+// (a companion listener was being thrown into Spotify by the branch that
+// finds a playlist). The rule was untouched and the test failed anyway —
+// which is a check measuring how something is written rather than what it
+// does. So: whatever the ask's condition is spelled like, it has to turn on
+// the chosen platform being Spotify.
+{
+  const at = ctx.indexOf('spotifyConnectAsked()');
+  const cond = ctx.slice(Math.max(0, at - 260), at);
+  const start = cond.lastIndexOf('if (');
+  check('it only applies to Spotify listeners',
+    start >= 0 && /=== 'spotify'/.test(cond.slice(start)),
+    cond.slice(start).replace(/\s+/g, ' '));
+}
+// AND THE HAND-OFF IS GATED THE SAME WAY, which is the other half of the same
+// rule and the bug reported on 24.09. Proven by behaviour in
+// scripts/test-companion-handoff.mjs; named here so the two cannot drift.
+check('the hand-off is Spotify-only too',
+  /!connected && platform !== 'spotify'/.test(ctx));
 check('a connected listener is never asked', /!connected && !restricted/.test(ctx));
 check('the ask is spent when it is shown, not when it is checked',
   /await markSpotifyConnectAsked\(\);\s*\n\s*return 'not-connected';/.test(ctx));

@@ -190,8 +190,24 @@ for (const [f, s2] of Object.entries(src)) {
     .filter((m) => /\bsize:/.test(m[2]));
   check('the three heroes are found at all', heroes.length >= 3,
     heroes.map((m) => m[1]).join(', '));
+  // A SIZE MAY BE HANDED OVER THROUGH A LOCAL, and following one is the
+  // difference between checking the PROPERTY and checking the SPELLING.
+  // The record takes `let d = (arm ? 108 : 139) * k` so its size, its
+  // shadow and its tonearm cannot disagree — three copies of one expression
+  // is how they would. A check that only accepted the literal `* k` at the
+  // call site would fail on that refactor while the rule it guards was
+  // untouched, which is the exact fault the 24.09 sweep found in
+  // test-spotify-connect-ask. So: a bare identifier is resolved to its own
+  // `let`, and anything that still carries no `k` is a bare constant.
+  const sizeOf = (expr) => {
+    if (/\bk\b/.test(expr)) return expr;
+    const id = expr.match(/^[A-Za-z_]\w*$/)?.[0];
+    if (!id) return expr;
+    const decl = mode.match(new RegExp(`\\blet ${id}\\s*=\\s*([^\n]+)`))?.[1];
+    return decl ? `${expr} = ${decl}` : expr;
+  };
   for (const m of heroes) {
-    const size = m[2].match(/size:\s*([^,)]+)/)?.[1]?.trim() ?? '';
+    const size = sizeOf(m[2].match(/size:\s*([^,)]+)/)?.[1]?.trim() ?? '');
     check(`${m[1]} sizes off the tile, not a constant`, /\bk\b/.test(size), `size: ${size}`);
   }
   // ...AND THE CD'S CASE IS A HERO'S FRAME, so it has to scale with the tile

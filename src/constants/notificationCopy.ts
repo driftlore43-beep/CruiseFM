@@ -153,6 +153,15 @@ export const WHATS_NEW: Record<string, {
     body: 'Press and hold a Cruise FM tile and pick the station you want it to show.',
     needsBinary: '1.4.2',
   },
+  // The large family is compiled into the extension, so a phone still on the
+  // 1.4.2 binary has no big tile to add however new its bundle is — which is
+  // exactly what needsBinary is for, and what an OTA reporting itself as
+  // 1.4.3 would otherwise get wrong.
+  '1.4.3': {
+    title: 'Widgets come in a big size now',
+    body: 'Add a large Last Played or Mode tile — the player stands up, and the record gets its arm.',
+    needsBinary: '1.4.3',
+  },
 };
 
 /**

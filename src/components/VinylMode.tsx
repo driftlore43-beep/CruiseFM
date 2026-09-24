@@ -1631,7 +1631,25 @@ export function VinylFullscreen({ visible, onClose, stationId }: { visible: bool
     // the record goes 594 -> 674, and the binding term becomes the honest one.
     // A phone never reaches WIDE_MIN, so its disc is byte-identical.
     : Math.min(
-        winW * 0.9,
+        // 0.95 SINCE 24.09, AND THE WIDTH IS THE TERM THAT BINDS ON A PHONE —
+        // so this number, and only this number, decides how big the record is
+        // on the device almost everybody uses. The owner asked whether it had
+        // shrunk (it had not: 333pt measured off her own screenshot, exactly
+        // what 0.9 gives on a 428pt screen), then chose the larger of the two
+        // renders. 333 -> 352, i.e. +5.6%.
+        //
+        // 0.95 IS THE CEILING RATHER THAN A PREFERENCE, and the tonearm is
+        // what sets it: the arm overhangs its own box at the top right, and
+        // its counterweight goes from 22pt of clearance to the screen edge
+        // down to 11pt. Measured, not estimated — scripts/harness/hero-size.mjs
+        // reads the object's own box, because four separate pixel methods each
+        // mistook the arm, the label, the backdrop or the song title for the
+        // record. Anything past 0.95 puts the counterweight on the edge.
+        //
+        // A SHORT PHONE IS UNTOUCHED: on an SE the height term (winH * 0.46 =
+        // 307) already binds, so it stays exactly where it was. Tablets too —
+        // heroCeil caps them well below either.
+        winW * 0.95,
         isWide(winW) ? winH - DECK_CHROME_H : winH * 0.46,
         heroCeil(430, winW),
       );

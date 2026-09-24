@@ -65,7 +65,12 @@ cover, and the CD and record tiles are drawn in far more detail.
 
 ---
 
-## Promotional text — **change it**, and this is the one field that costs nothing
+## Promotional text — **APPLIED 2026-09-24** (owner: "ive saved the promotional text")
+
+Recorded on her word; App Store Connect is the only witness to what is on the
+page (the 21.08 rule). The reasoning below is kept as the record of why.
+
+### Why it changed, and this is the one field that costs nothing
 
 170 characters, editable at any time with **no review**, so it is the cheapest
 thing on the page to get right and the only one that can be fixed after the

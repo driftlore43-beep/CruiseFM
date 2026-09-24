@@ -50,6 +50,23 @@ const schedule = (() => {
   return m.exports;
 })();
 
+// The real mode labels, with only the stations import stubbed — see the note
+// at its use below for why this one is not a stub.
+const modeCatalog = (() => {
+  const src = fs.readFileSync('/home/user/CruiseFM/src/constants/modeCatalog.ts', 'utf8');
+  const js = ts.transpileModule(src, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const m = { exports: {} };
+  // It imports './stations' RELATIVELY, not through the @ alias — that cost a
+  // round. Only isProStation reads it, which nothing here calls.
+  new Function('module', 'exports', 'require', js)(m, m.exports, (n) => {
+    if (n === './stations') return { STATIONS: [] };
+    throw new Error('modeCatalog wanted ' + n);
+  });
+  return m.exports;
+})();
+
 const station = (id) => ({
   id, name: `${id} FM`, tagline: 't', premium: false,
   cardGradient: ['#111111', '#227722', '#000000'], eqColors: ['#a', '#b', '#c'],
@@ -80,6 +97,12 @@ const W = (() => {
     if (name === './lastPlayed') return {
       getLastPlayed: async () => ({ title: 'Zero', artist: 'Pumpkins', artUrl: null, at: 1 }),
     };
+    // THE REAL LABELS, not a stub — see the note in test-widget-data.mjs.
+    // modeCatalog is the ONE place a mode's name lives, and the whole reason
+    // `modeName` travels in the snapshot is that a second copy of that table
+    // would drift silently, so a stub returning a made-up label would be
+    // testing the stub against itself.
+    if (name === '@/constants/modeCatalog') return modeCatalog;
     throw new Error('unstubbed: ' + name);
   };
   new Function('module', 'exports', 'require', compile(`${ROOT}/src/utils/widgetData.ts`))(m, m.exports, req);

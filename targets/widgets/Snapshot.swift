@@ -54,6 +54,20 @@ struct WidgetStation: Codable {
   let eqColors: [String]?
   /// Only on lastDrive: which deck to reopen.
   let mode: String?
+  /// Only on lastDrive: that deck's name, as the app itself writes it.
+  ///
+  /// SENT RATHER THAN MAPPED HERE, which is `iconChar`'s own rule one field
+  /// along. `mode` is a bare id — `disco`, `radio`, `orb` — and the labels
+  /// those carry ("Mirror Ball", "Tuner", "Circular EQ") live in the app's
+  /// modeCatalog. A copy of that table in Swift is a second thing that can
+  /// drift, and it would drift silently: a mode renamed in the app would go
+  /// on printing its old name on a Home Screen with nothing to catch it.
+  ///
+  /// Optional because it is a new field, so an older widget binary reading a
+  /// newer snapshot simply ignores a key it does not know — and a newer
+  /// binary reading an older snapshot gets nil and prints the same dash the
+  /// other fields use when they have nothing.
+  let modeName: String?
   /// Only on timeline entries: epoch MILLISECONDS this becomes current.
   let at: Double?
   /// Whether this station sits behind the paywall — the FM band.

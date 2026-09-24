@@ -30,6 +30,23 @@ export function knownMode(mode: string | undefined | null): string {
   return MODE_CATALOG.some((m) => m.id === mode) ? (mode as string) : FALLBACK_MODE;
 }
 
+/**
+ * A mode's own name, as the app prints it.
+ *
+ * Exists so the WIDGET snapshot can carry the label instead of the widget
+ * target keeping a second copy of this table. A copy there would drift
+ * silently — a mode renamed here would go on printing its old name on a
+ * Home Screen with nothing to catch it — which is the same reasoning that
+ * has `iconChar` resolved in JS rather than in Swift.
+ *
+ * An unknown id falls back the way `knownMode` does, so a saved cruise
+ * naming a retired mode prints a real name rather than a raw id.
+ */
+export function modeLabel(mode: string | undefined | null): string {
+  const id = knownMode(mode);
+  return MODE_CATALOG.find((m) => m.id === id)?.label ?? id;
+}
+
 export function isProMode(mode: string): boolean {
   return MODE_CATALOG.some((m) => m.id === mode && m.pro);
 }

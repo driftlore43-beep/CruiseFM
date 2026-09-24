@@ -6,6 +6,7 @@ import GLYPHS from '@expo/vector-icons/build/vendor/react-native-vector-icons/gl
 import { getLastPlayed } from './lastPlayed';
 import { backfillStationImagesOnce } from './widgetArtwork';
 
+import { modeLabel } from '@/constants/modeCatalog';
 import { STATIONS, stationDial } from '@/constants/stations';
 import { primaryOnAir, upNext, clockLabel } from '@/constants/schedule';
 import { resolveAnyStation, cachedCustomStations, loadCustomStations } from '@/utils/customStations';
@@ -127,8 +128,12 @@ export type WidgetSnapshot = {
    *  snapshot can decline rather than misdraw. */
   version: number;
   updatedAt: number;
-  /** Where "Start Drive" goes. Null until they have driven once. */
-  lastDrive: (WidgetStation & { mode: string }) | null;
+  /** Where "Start Drive" goes. Null until they have driven once.
+   *
+   *  `modeName` is the deck's own label from MODE_CATALOG — the widget draws
+   *  it in a field and must not carry a second copy of that table, for the
+   *  same reason `iconChar` is resolved here rather than in Swift. */
+  lastDrive: (WidgetStation & { mode: string; modeName: string }) | null;
   /** Now first, then every changeover for the next 24h. */
   onAir: WidgetOnAir[];
   /**
@@ -298,7 +303,7 @@ export async function buildWidgetSnapshot(now: Date = new Date()): Promise<Widge
   return {
     version: WIDGET_SNAPSHOT_VERSION,
     updatedAt: now.getTime(),
-    lastDrive: last ? { ...toWidgetStation(last.stationId), mode: last.mode } : null,
+    lastDrive: last ? { ...toWidgetStation(last.stationId), mode: last.mode, modeName: modeLabel(last.mode) } : null,
     onAir: buildOnAirTimeline(now),
     // Built-ins first in dial order, then their own — the Stations page's own
     // reading order, so the picker and the page agree.

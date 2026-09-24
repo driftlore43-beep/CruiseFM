@@ -192,9 +192,10 @@ for (const [f, s2] of Object.entries(src)) {
     heroes.map((m) => m[1]).join(', '));
   // A SIZE MAY BE HANDED OVER THROUGH A LOCAL, and following one is the
   // difference between checking the PROPERTY and checking the SPELLING.
-  // The record takes `let d = (arm ? 108 : 139) * k` so its size, its
-  // shadow and its tonearm cannot disagree — three copies of one expression
-  // is how they would. A check that only accepted the literal `* k` at the
+  // The record takes `let d = (large ? 150 : 139) * k` so its size and its
+  // own contact shadow cannot disagree — two copies of one expression is how
+  // they would. (It read `(arm ? 108 : 139)` until 24.09, when the tonearm
+  // came off and the big tile's record grew into the room the arm was using.) A check that only accepted the literal `* k` at the
   // call site would fail on that refactor while the rule it guards was
   // untouched, which is the exact fault the 24.09 sweep found in
   // test-spotify-connect-ask. So: a bare identifier is resolved to its own

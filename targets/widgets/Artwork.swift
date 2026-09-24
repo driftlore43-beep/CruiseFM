@@ -154,6 +154,27 @@ enum Art {
  *
  * The pitch is held at ~1.7pt because below about 1.2 neighbouring rings
  * moire against the pixel grid, which is its own drawn-looking artefact.
+ *
+ * "MORE DEFINED" IS THE THREE OPACITIES, NOT THE PITCH (owner, 24.09, off a
+ * photograph of the large tile). Widening the pitch is the obvious lever and
+ * it is the wrong one twice over: it would put a SMALL record and a LARGE one
+ * on the same Home Screen with visibly different grooves, which is the whole
+ * reason the pitch is in points rather than a ring count; and it is the exact
+ * move that turned the CD's face into a record on 21.09, so the two tiles
+ * would converge from both sides. What moved instead is the CUT and the LIGHT
+ * ON ITS WALL — trough 0.55 -> 0.70, wall 0.055 -> 0.105, band wall 0.10 ->
+ * 0.17 — which is more contrast at the same spacing.
+ *
+ * MEASURED ON docs/design/record_widget.py rather than eyeballed, as the
+ * spread between the light and the dark inside the groove area (a flat black
+ * disc scores near zero whatever its median is): 35.00 -> 43.00, about a
+ * quarter more, at every size this is drawn at. A harder setting was rendered
+ * too (0.80 / 0.15 / 0.22, spread 51.00) and REJECTED: the between-track
+ * bands start reading as countable rings, which is the "target printed on a
+ * black disc" fault the 03.09 round existed to remove. Note the harness draws
+ * at 2px per point and a phone draws the large tile at 3, so anything that
+ * looks right there is already a little stronger on the glass — which is the
+ * reason to take the conservative of two settings, not the bolder one.
  */
 struct RecordView: View {
   /// The station's accent — the record's rim takes it, exactly as the app's
@@ -210,14 +231,14 @@ struct RecordView: View {
             .stroke(Color(white: 0.058), lineWidth: pitch * 1.9)
             .frame(width: d, height: d)
           Circle()
-            .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
+            .stroke(Color.white.opacity(0.17), lineWidth: 0.5)
             .frame(width: d + pitch * 1.1, height: d + pitch * 1.1)
         } else {
           Circle()
-            .stroke(Color.black.opacity(0.55), lineWidth: pitch * 0.62)
+            .stroke(Color.black.opacity(0.70), lineWidth: pitch * 0.62)
             .frame(width: d, height: d)
           Circle()
-            .stroke(Color.white.opacity(0.055), lineWidth: 0.5)
+            .stroke(Color.white.opacity(0.105), lineWidth: 0.5)
             .frame(width: d + pitch * 0.66, height: d + pitch * 0.66)
         }
       }

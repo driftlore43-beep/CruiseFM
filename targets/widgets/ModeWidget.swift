@@ -218,7 +218,7 @@ struct ModeView: View {
           switch entry.style {
           case .mirrorBall: ball(s, k: k)
           case .cd:         disc(s, k: k)
-          case .record:     record(s, k: k, arm: family == .systemLarge)
+          case .record:     record(s, k: k, large: family == .systemLarge)
           }
         }
         .frame(width: geo.size.width, height: geo.size.height)
@@ -424,15 +424,37 @@ struct ModeView: View {
    * is the only thing naming the station, and the label is the one place on a
    * record where type belongs.
    */
-  private func record(_ s: WidgetStation, k: CGFloat, arm: Bool) -> some View {
-    // THE ARM COSTS THE RECORD SOME SIZE, and that is the trade rather than
-    // an oversight: the bearing sits at 1.10 of the record's own radius out
-    // to the right and the counterweight rides past it, so at 139 * k on a
-    // 338pt tile the weight would hang off the edge. 108 * k lands the
-    // record at 231 across with the counterweight 18pt clear of the tile,
-    // measured rather than guessed. Without an arm the record keeps every
-    // point it has, which is what the small tile ships today.
-    let d = (arm ? 108 : 139) * k
+  private func record(_ s: WidgetStation, k: CGFloat, large: Bool) -> some View {
+    // THE BIG TILE'S RECORD FILLS IT, and getting there took deleting the
+    // thing that was in its way. Owner, 24.09, off a photograph of the
+    // shipped large tile: "the vinyl should be larger (fill the space) and
+    // more defined. try to remove the tonearm stick."
+    //
+    // THE ARM WAS COSTING THE RECORD A QUARTER OF ITS WIDTH. Its bearing sat
+    // at 1.10 of the record's own radius out to the right with the
+    // counterweight riding past that, so the disc had to come down to 108 * k
+    // — 231pt across a 338pt tile — to keep the weight on the tile at all.
+    // With the arm gone that constraint goes with it.
+    //
+    // 150, NOT 139, AND ONLY HERE. 139 is what every other size draws and it
+    // is right for them: a small tile shares a row with other small tiles, so
+    // a little air is what lets it read as an object among them rather than
+    // as a square that has been filled in. A large tile carries ONE object
+    // and nothing else — no caption, no second row — so that air is doing no
+    // work. 150 * k lands at 321 of 338, i.e. 8.5pt each side, which is a
+    // record that fills its frame without touching it. It is deliberately
+    // not pushed further: the accent hairline round the rim is the station's
+    // colour on this tile, and on the very edge it would read as a line
+    // drawn on the tile rather than on the record.
+    //
+    // NOTE WHAT IT COSTS, since it is a real trade rather than a free win:
+    // the halo is squeezed into the corners and the contact shadow is mostly
+    // clipped, so the station's colour arrives almost entirely through the
+    // rim and the label. Measured on docs/design/record_widget.py the edge
+    // step actually RISES (10.00 -> 10.33), because the room that is left is
+    // darker — the record has less to stand against but stands against it
+    // better.
+    let d = (large ? 150 : 139) * k
     return ZStack {
       // THE STATION'S OWN GLOW, THE SAME ONE THE BALL STANDS IN (20.09). This
       // was a fixed grey radial — #1a1a1f to #08080a — and it was why the
@@ -474,11 +496,6 @@ struct ModeView: View {
       // air than before; the record's own shadow needs somewhere to fall,
       // which is what stops it going wider again.
       RecordView(accent: s.accentColor, label: nil, size: d, plainLabel: true)
-      // ETHAN'S OWN PICTURE, 23.09 ("if you could make the CD Widget have a
-      // bigger option"), which on inspection is a RECORD with a tonearm
-      // rather than the Winamp CD player — so it belongs to this look. The
-      // arm is the only genuinely new object in this target.
-      if arm { Tonearm(r: d / 2) }
     }
     .widgetURL(s.url(mode: "vinyl"))
   }
@@ -509,123 +526,14 @@ private struct BeamField: View {
 
 // BELOW BeamField ON PURPOSE: test-widget-bundle reads everything between
 // `struct ModeView` and `private struct BeamField` as ModeView's own hero
-// placement and refuses an `.offset` there. BOTH of the things that follow
-// carry offsets legitimately — the tonearm places its own parts against the
-// record, the shadow places itself under an object — rather than moving an
+// placement and refuses an `.offset` there. The shadow that follows carries
+// one legitimately — it places itself UNDER an object rather than moving an
 // object within a tile, which is exactly the exclusion that check documents.
-// So they belong on this side of that line and must not be moved back.
-
-/**
- * THE TONEARM — the one genuinely new object in this target.
- *
- * Ethan, 23.09, asked for a bigger CD tile and drew a record with an arm on
- * it. The app's own Vinyl deck has had one since July; the widgets never
- * have, so this is drawn from scratch to the deck's own rules (03.08).
- *
- * THREE NUMBERS ARE LOAD-BEARING AND ALL THREE ARE THE APP'S. The stylus
- * lands at 0.80 of the record's radius — any further in and the needle is
- * sitting on the label, which is the one place a needle never is. The rod is
- * STRAIGHT, because the deck's arm was rebuilt three times and finished as a
- * plain straight rod on the owner's own instruction, so a curved one here
- * would make two different objects out of one. And the counterweight rides a
- * SHORT stub: set further back it reads as a lollipop, which is exactly what
- * the first render of this one did.
- *
- * EVERY NUMBER IS A SHARE OF `r`, so the arm and the record can never drift
- * out of register on a tile of some other size.
- *
- * AND THE TRIGONOMETRY IS SOLVED HERE RATHER THAN AT DRAW TIME. With the
- * bearing at (1.10r, -0.90r) and the stylus at 0.80r five degrees below the
- * horizontal, the rod's length and bearing are fixed multiples of r:
- *
- *     dx = 0.80·cos(-5°) - 1.10 = -0.303048
- *     dy = 0.80·sin(-5°) + 0.90 =  0.830272
- *     length = 0.883851·r        angle = 110.057°
- *
- * so nothing here calls a trig function at all, and the constants can be
- * checked against that arithmetic rather than trusted.
- *
- * NOTE THE SIGNS: y grows DOWNWARD in SwiftUI as it does in the prototype's
- * CSS, so the bearing's negative y puts it above the record and the whole
- * derivation carries over unchanged from `docs/design/big_tiles.py`.
- */
-private struct Tonearm: View {
-  /// The record's radius, in points.
-  let r: CGFloat
-
-  private var pivotX: CGFloat { r * 1.100000 }
-  private var pivotY: CGFloat { -r * 0.900000 }
-  private var stylusX: CGFloat { r * 0.796952 }
-  private var stylusY: CGFloat { -r * 0.069728 }
-  private var rodAngle: Double { 110.057 }
-
-  var body: some View {
-    ZStack {
-      Color.clear
-      // THE ROD IS A TUBE, NOT A BAR: light along its top, shadow beneath.
-      // One flat stroke is a drawn stripe, which is the note the app's own
-      // arm collected twice before it was rebuilt this way.
-      RoundedRectangle(cornerRadius: r * 0.018)
-        .fill(LinearGradient(colors: [Color(white: 1.00), Color(white: 0.88),
-                                      Color(white: 0.61), Color(white: 0.44)],
-                             startPoint: .top, endPoint: .bottom))
-        .frame(width: r * 0.883851, height: r * 0.035)
-        .shadow(color: .black.opacity(0.55), radius: r * 0.035, x: 0, y: r * 0.020)
-        .rotationEffect(.degrees(rodAngle))
-        .offset(x: r * 0.948476, y: -r * 0.484864)
-      // the stub the counterweight rides
-      RoundedRectangle(cornerRadius: r * 0.015)
-        .fill(LinearGradient(colors: [Color(white: 0.91), Color(white: 0.53)],
-                             startPoint: .top, endPoint: .bottom))
-        .frame(width: r * 0.356, height: r * 0.030)
-        .rotationEffect(.degrees(rodAngle))
-        .offset(x: r * 1.161036, y: -r * 1.067210)
-      // the counterweight
-      RoundedRectangle(cornerRadius: r * 0.035)
-        .fill(LinearGradient(colors: [Color(white: 0.88), Color(white: 0.52),
-                                      Color(white: 0.37)],
-                             startPoint: .top, endPoint: .bottom))
-        .frame(width: r * 0.148, height: r * 0.130)
-        .shadow(color: .black.opacity(0.50), radius: r * 0.030, x: 0, y: r * 0.016)
-        .rotationEffect(.degrees(rodAngle))
-        .offset(x: r * 1.209728, y: -r * 1.200602)
-      // THE BEARING IS A LOW CYLINDER, NOT A SPHERE. Rendered as a ball it
-      // read as a second object sitting beside the counterweight.
-      Circle()
-        .fill(RadialGradient(colors: [Color(white: 0.94), Color(white: 0.68),
-                                      Color(white: 0.47)],
-                             center: .init(x: 0.36, y: 0.28),
-                             startRadius: 0, endRadius: r * 0.16))
-        .frame(width: r * 0.200, height: r * 0.200)
-        .shadow(color: .black.opacity(0.55), radius: r * 0.040, x: 0, y: r * 0.022)
-        .offset(x: pivotX, y: pivotY)
-      Circle()
-        .fill(RadialGradient(colors: [Color(white: 0.95), Color(white: 0.44)],
-                             center: .init(x: 0.40, y: 0.32),
-                             startRadius: 0, endRadius: r * 0.05))
-        .frame(width: r * 0.070, height: r * 0.070)
-        .offset(x: pivotX, y: pivotY)
-      // the headshell: a wedge at the far end, the cartridge under it
-      RoundedRectangle(cornerRadius: r * 0.022)
-        .fill(LinearGradient(colors: [Color(white: 0.96), Color(white: 0.71),
-                                      Color(white: 0.53)],
-                             startPoint: .top, endPoint: .bottom))
-        .frame(width: r * 0.226, height: r * 0.105)
-        .shadow(color: .black.opacity(0.58), radius: r * 0.035, x: 0, y: r * 0.020)
-        .rotationEffect(.degrees(rodAngle))
-        .offset(x: r * 0.835700, y: -r * 0.175878)
-      // the stylus, where the arm meets the grooves
-      Circle().fill(Color(hex: "#23262c"))
-        .frame(width: r * 0.040, height: r * 0.040)
-        .offset(x: stylusX, y: stylusY)
-    }
-    // AN EXPLICIT SQUARE, so the offsets above are measured from the record's
-    // own centre. Without it the stack sizes to its children and its centre
-    // lands wherever the largest of them happens to be — the same fault that
-    // dropped the ball and the disc down their tiles on 15.09.
-    .frame(width: r * 2.6, height: r * 2.6)
-  }
-}
+// So it belongs on this side of that line and must not be moved back.
+//
+// The tonearm used to live here too, for the same reason. It is gone: the
+// owner saw it on a phone and asked for it off (24.09), and an unused
+// drawing that looks like working machinery is its own trap.
 
 /**
  * THE RECORD'S CONTACT WITH WHAT IT IS LYING ON.

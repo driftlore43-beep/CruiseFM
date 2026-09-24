@@ -103,8 +103,14 @@ def angular(theta, stops, angle_deg):
 
 
 def draw_tile(*, halo=0.0, shadow=False, flecks=0, tracks=False,
-              accent='#6E8CFF', eq=('#C6ECFF', '#2E7DFF', '#1340E6')):
-    S = SIZE * SS
+              accent='#6E8CFF', eq=('#C6ECFF', '#2E7DFF', '#1340E6'),
+              size=None, trough=0.55, wall=0.055, band_wall=0.10):
+    """`size` is RecordView's size at k = 1, i.e. its share of the 158pt
+    reference tile — so 139 is what ships and 150 is a record that very
+    nearly fills the tile. `trough`, `wall` and `band_wall` are the three
+    numbers that decide how DEFINED the grooves read: the cut, the light on
+    its outer wall, and the light on a between-tracks band."""
+    S = (size if size is not None else SIZE) * SS
     R = S / 2
     cx = cy = N / 2
     x, y = grid()
@@ -158,10 +164,10 @@ def draw_tile(*, halo=0.0, shadow=False, flecks=0, tracks=False,
         d = S * 0.99 - i * pitch * 2
         if i in bands:
             img = over(img, (255 * 0.058,) * 3, ring(r, d / 2, pitch * 1.9))
-            img = over(img, (255, 255, 255), 0.10 * ring(r, (d + pitch * 1.1) / 2, 0.5 * SS))
+            img = over(img, (255, 255, 255), band_wall * ring(r, (d + pitch * 1.1) / 2, 0.5 * SS))
             continue
-        img = over(img, (0, 0, 0), 0.55 * ring(r, d / 2, pitch * 0.62))
-        img = over(img, (255, 255, 255), 0.055 * ring(r, (d + pitch * 0.66) / 2, 0.5 * SS))
+        img = over(img, (0, 0, 0), trough * ring(r, d / 2, pitch * 0.62))
+        img = over(img, (255, 255, 255), wall * ring(r, (d + pitch * 0.66) / 2, 0.5 * SS))
 
     # ── the two smooth bands: OPAQUE greys, so they cover the grooves ──
     img = over(img, (255 * 0.055,) * 3, ring(r, S * 0.968 / 2, S * 0.030))
@@ -228,12 +234,12 @@ def draw_tile(*, halo=0.0, shadow=False, flecks=0, tracks=False,
     return im.resize((N // 2, N // 2), Image.LANCZOS)
 
 
-def measure(im, label):
+def measure(im, label, size=None):
     a = np.asarray(im).astype(float)
     n = a.shape[0]
     yy, xx = np.mgrid[0:n, 0:n]
     r = np.hypot(xx - n / 2, yy - n / 2)
-    Rp = SIZE * (SS // 2) / 2
+    Rp = (size if size is not None else SIZE) * (SS // 2) / 2
     disc = r <= Rp * 0.99
     room = r > Rp * 1.03
     dl = a[disc].mean(axis=1)
@@ -244,8 +250,16 @@ def measure(im, label):
     # how strongly the record's own edge separates from what is behind it
     band_in = (r > Rp * 0.90) & (r <= Rp * 0.99)
     band_out = (r > Rp * 1.01) & (r <= Rp * 1.10)
+    # HOW DEFINED THE GROOVES ARE, as a number rather than an impression:
+    # the spread between the light and the dark inside the groove area. A
+    # flat black disc scores near zero whatever its median is.
+    gr = (r > Rp * 0.50) & (r < Rp * 0.94)
+    gl = a[gr].mean(axis=1)
+    groove = float(np.percentile(gl, 90) - np.percentile(gl, 10))
     print(f'{label:34} disc {np.median(dl):6.2f}  room {np.median(rl):6.2f}  '
-          f'room colour {sat.mean():.3f}  edge step {np.median(a[band_in].mean(axis=1)) - np.median(a[band_out].mean(axis=1)):6.2f}')
+          f'room colour {sat.mean():.3f}  '
+          f'edge step {np.median(a[band_in].mean(axis=1)) - np.median(a[band_out].mean(axis=1)):6.2f}  '
+          f'groove spread {groove:5.2f}')
 
 
 if __name__ == '__main__':
@@ -254,17 +268,33 @@ if __name__ == '__main__':
     # size a phone draws this they are a handful of pale specks that read as
     # marks on a screen rather than as an owned record. Pass flecks=14 to see
     # it again before anyone proposes it a second time.
+    # THE 20.09 ROUND'S OWN QUESTION was how strong the station halo should
+    # be, and it was settled at 0.70 — pass halo=1.0/0.50/0.35 to see that
+    # comparison again. The shots below are the 24.09 one: the owner, off a
+    # photograph of the large tile, asked for the record "larger (fill the
+    # space) and more defined", with the tonearm off.
+    #
+    # `size` is the record's share of the 158pt reference tile, so the same
+    # numbers describe the small tile and the large one.
+    STATION = dict(halo=0.70, shadow=True, tracks=True, accent='#E0483A',
+                   eq=('#FF9A8A', '#E0483A', '#8E1F16'))
+    DEFINED = dict(trough=0.70, wall=0.105, band_wall=0.17)
     shots = [
-        ('before  (what ships today)', dict()),
-        ('halo 1.00', dict(halo=1.0, shadow=True, tracks=True)),
-        ('halo 0.70', dict(halo=0.70, shadow=True, tracks=True)),
-        ('halo 0.50', dict(halo=0.50, shadow=True, tracks=True)),
-        ('halo 0.35', dict(halo=0.35, shadow=True, tracks=True)),
+        ('large: 108, with the arm',  dict(size=108)),
+        ('large: 150, no arm',        dict(size=150)),
+        ('large: 150 + defined',      dict(size=150, **DEFINED)),
+        # REJECTED, and drawn so nobody proposes it twice: at this contrast
+        # the between-track bands read as countable rings, which is the
+        # "target printed on a black disc" fault 03.09 removed.
+        ('large: too far (rejected)', dict(size=150, trough=0.80, wall=0.150,
+                                           band_wall=0.22)),
+        ('small: 139 + defined',      dict(size=139, **DEFINED)),
     ]
     ims = []
     for cap, kw in shots:
-        im = draw_tile(**kw)
-        measure(im, cap)
+        k = dict(STATION); k.update(kw)
+        im = draw_tile(**k)
+        measure(im, cap, size=kw.get('size'))
         ims.append((cap, im))
     W = ims[0][1].size[0]
     pad = 24

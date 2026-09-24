@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
 import { usePalette, useStyles } from '@/context/AppearanceContext';
+import { useEntitlements } from '@/context/EntitlementsContext';
 import type { Palette } from '@/utils/appearance';
 import { hasSeenIntro } from '@/utils/intro';
 import { markNoteSeen, noteToShow, type ReleaseNote } from '@/utils/whatsNew';
@@ -33,6 +34,7 @@ import { widgetsAvailable } from '@/utils/widgetData';
 export function WhatsNewCard() {
   const wn = useStyles(make_wn);
   const pal = usePalette();
+  const { isPro } = useEntitlements();
   const [note, setNote] = useState<ReleaseNote | null>(null);
 
   useFocusEffect(
@@ -58,7 +60,14 @@ export function WhatsNewCard() {
         <Ionicons name="sparkles" size={18} color={pal.ink(0.82)} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={wn.eyebrow}>WHAT&apos;S NEW</Text>
+        {/* A MEMBER IS TOLD WHICH OF THESE THEY ARE PAYING FOR, and nobody
+            else is — see `premium` in whatsNew.ts for why that split is the
+            point rather than a nicety. Read at RENDER, not baked into the
+            note, so the early-access grant and a real subscription reach the
+            same line by the same route. */}
+        <Text style={wn.eyebrow}>
+          {note.premium && isPro ? 'NEW IN PREMIUM' : 'WHAT\u2019S NEW'}
+        </Text>
         <Text style={wn.title}>{note.title}</Text>
         <Text style={wn.sub}>{note.body}</Text>
       </View>

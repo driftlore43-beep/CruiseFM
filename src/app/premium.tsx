@@ -13,7 +13,7 @@ import { MODE_CATALOG } from '@/constants/modeCatalog';
 import { STATIONS } from '@/constants/stations';
 import { Cruise } from '@/constants/theme';
 import { useEntitlements } from '@/context/EntitlementsContext';
-import { getPlans, purchasePremium, restorePremium, type Plan } from '@/utils/purchases';
+import { getPlans, preferredPlan, purchasePremium, restorePremium, type Plan } from '@/utils/purchases';
 
 /**
  * The photograph behind the full-bleed hero.
@@ -112,7 +112,7 @@ const COMPARISON: { label: string; free: boolean; premium: boolean }[] = [
   { label: `FM band — ${PREMIUM_STATIONS} stations`,   free: false, premium: true },
   { label: 'All premium mood themes',                  free: false, premium: true },
   { label: 'Unlimited custom stations',                free: false, premium: true },
-  { label: 'Future premium modes',                     free: false, premium: true },
+  { label: 'Everything added later',                   free: false, premium: true },
 ];
 
 // Alert.alert is a no-op in the browser — fall back to the native web dialog
@@ -226,8 +226,9 @@ export default function PremiumScreen() {
     setPlans(undefined);
     const found = await getPlans();
     setPlans(found);
-    // Default to the entry price — getPlans() already sorts monthly first.
-    setChosen(found?.[0]?.id ?? null);
+    // Yearly where there is one — see preferredPlan's own note for why the
+    // LISTED order and the SELECTED row deliberately disagree.
+    setChosen(preferredPlan(found)?.id ?? null);
   }, []);
 
 
@@ -345,7 +346,7 @@ export default function PremiumScreen() {
               />
               <View style={styles.heroText}>
                 <Text style={styles.title}>Cruise FM Premium</Text>
-                <Text style={styles.subtitle}>Unlock the full atmosphere.</Text>
+                <Text style={styles.subtitle}>Everything here, and everything added next.</Text>
               </View>
             </View>
 

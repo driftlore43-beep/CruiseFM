@@ -187,6 +187,38 @@ export async function getPlans(): Promise<Plan[] | null> {
   }
 }
 
+/**
+ * Which plan the paywall should open with SELECTED.
+ *
+ * THE ORDER AND THE DEFAULT ARE TWO DIFFERENT DECISIONS, and getPlans()
+ * above owns the first one: monthly is listed FIRST so the entry price is
+ * the number a reader sees without hunting for it, because burying the
+ * figure most people are deciding against is the one thing a paywall may
+ * not do. This decides which row arrives already ticked, which is a
+ * separate question and has the opposite answer.
+ *
+ * ANNUAL, WHERE ONE EXISTS. A fixed library converts badly by the month —
+ * the charge arrives every thirty days and asks "am I still using this?"
+ * while the app has, by design, nothing new to show that month. It is also
+ * genuinely the cheaper of the two per year (£17.99 against £23.88 at the
+ * shipped prices), so preselecting it is not a tax on the reader; both
+ * numbers stay on screen, the picker is one tap either way, and the line
+ * under the button always names the real price and term for whatever is
+ * actually selected.
+ *
+ * NEVER LIFETIME WHILE ANYTHING ELSE IS ON SALE. It is the largest single
+ * charge on the page and nobody should meet it already agreed to. getPlans()
+ * sorts it last, so in practice falling through to `plans[0]` would already
+ * miss it — but this is exported and pure, so it defends the rule itself
+ * rather than relying on a sort order in another function.
+ */
+export function preferredPlan(plans: Plan[] | null | undefined): Plan | null {
+  if (!plans || plans.length === 0) return null;
+  return plans.find((p) => p.kind === 'annual')
+    ?? plans.find((p) => p.kind !== 'lifetime')
+    ?? plans[0];
+}
+
 export type PurchaseOutcome = 'purchased' | 'cancelled' | 'unavailable' | 'error';
 
 /**

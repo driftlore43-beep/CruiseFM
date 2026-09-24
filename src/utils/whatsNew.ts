@@ -62,6 +62,32 @@ export type ReleaseNote = {
    * never used an earlier version.
    */
   alsoForNewInstalls?: boolean;
+  /**
+   * The thing this note announces is PART OF PREMIUM.
+   *
+   * WHY IT MATTERS AND WHY IT IS ONLY A LABEL. Premium here is a
+   * subscription against a library that does not, by itself, grow: the five
+   * premium modes and the seven FM stations are the same five and seven in
+   * month two as in month one. What the paywall promises in exchange for
+   * the second payment is everything added LATER — and until now nothing in
+   * the app ever pointed at a new thing and said that is what you are
+   * paying for. A member who is never told has bought a one-off unlock and
+   * is being charged monthly for it, which is the whole churn risk.
+   *
+   * THE CARD IS STILL SHOWN TO EVERYONE, and that is deliberate rather than
+   * an oversight: the app's standing rule is the shop window (a locked FM
+   * row is DIMMED behind a padlock, never removed), so someone without
+   * Premium should see what landed too. Only the eyebrow differs — a member
+   * reads "NEW IN PREMIUM", everybody else reads the usual "WHAT'S NEW",
+   * because telling a non-member that something is new in a thing they do
+   * not have is an advertisement, and this card is not the paywall.
+   *
+   * NOT MIRRORED INTO `WHATS_NEW` in notificationCopy.ts, on purpose. That
+   * surface INTERRUPTS someone, and it is held to a banned-phrasing sweep
+   * precisely to keep marketing out of a notification. A quiet line on a
+   * page you chose to open is a different bar from a buzz in a pocket.
+   */
+  premium?: boolean;
 };
 
 /** What the phone can actually do, for a note that depends on it. */

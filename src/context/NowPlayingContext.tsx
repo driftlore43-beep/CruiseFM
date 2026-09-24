@@ -226,11 +226,37 @@ async function playStationMusic(stationId: string, opts?: { resumeAny?: boolean 
     // app genuinely cannot tell who could connect — and for the people who
     // cannot, the hand-off is not a failure, it is the product. So the first
     // Start explains what is missing and the next one hands off as before.
-    if (!connected && !restricted && (await getSavedPlatform()) === 'spotify'
+    const platform = await getSavedPlatform();
+    if (!connected && !restricted && platform === 'spotify'
         && !(await spotifyConnectAsked())) {
       await markSpotifyConnectAsked();
       return 'not-connected';
     }
+
+    // THE HAND-OFF IS SPOTIFY'S, SO IT BELONGS TO SPOTIFY'S LISTENERS ONLY.
+    //
+    // Owner, 24.09: "spotify is disconnect and unselected and when i click on
+    // afterhours FM station it still opens spotify - can this be removed?"
+    // It could. The `!linked` branch above already states this rule and
+    // returns null for everyone else — "other listeners run their music in
+    // their own app, Cruise FM is the visual companion, silently" — and the
+    // branch that DOES find a playlist never had the same test.
+    //
+    // AND A COMPANION LISTENER REALLY DOES FIND ONE, which is what made this
+    // reachable at all: `currentPlatform()` in stationPlaylists answers
+    // 'spotify' for anything that is not 'appleMusic', so somebody who pressed
+    // "Skip for now" still reads the SPOTIFY slot. That is deliberate — it is
+    // what lets a pasted Spotify link work for a listener who never chose a
+    // service — so any station linked while they were on Spotify keeps handing
+    // back a spotify: uri long after they have left.
+    //
+    // NOT REPORTED IN ONE MODE ONLY, though it was noticed in Horizon: nothing
+    // here is mode-aware, and the test drives every companion platform.
+    //
+    // CONNECTED STILL COUNTS, deliberately. Somebody signed in to Spotify
+    // plainly uses Spotify whatever the saved platform says, and their
+    // snoozing device is exactly what the deep link exists to wake (08.08).
+    if (!connected && platform !== 'spotify') return null;
 
     // If even the hand-off fails there is nothing left to try, and the honest
     // reason matters: offline is not Spotify being unresponsive.

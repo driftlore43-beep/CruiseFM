@@ -251,7 +251,12 @@ STREAKS = {
 STREAK_PARAMS = {'S_streaks': (10, 2.2), 'S_dense': (14, 2.7), 'S_wide': (9, 2.4)}
 
 def disc(option, size=DISC, track_pitch=0.06, clear_margin=0.0,
-         art=None, lit_hub=False):
+         art=None, lit_hub=False, art_inner=0.0, art_turn=0.0, art_lift=0.0):
+    """`art_inner` is where the cover STOPS, as a fraction of the radius — 0
+    fills the face, which is what the widget ships, and 0.34 leaves the middle
+    as clear glass, which is what the app's own deck draws. `art_turn` turns
+    the cover, the way a disc that has been spinning presents it. `art_lift`
+    takes the darkening off, toward the app's own near-full-strength cover."""
     n = size
     y, x = np.mgrid[0:n, 0:n].astype(float)
     cx = cy = (n - 1) / 2.0
@@ -266,6 +271,14 @@ def disc(option, size=DISC, track_pitch=0.06, clear_margin=0.0,
     s = min(im.size)
     im = im.crop(((im.width - s) // 2, (im.height - s) // 2,
                   (im.width - s) // 2 + s, (im.height - s) // 2 + s)).resize((n, n), Image.LANCZOS)
+    if art_turn:
+        # A disc that has been turning does not present its cover upright, and
+        # that is most of what stops it reading as a square photograph cropped
+        # to a circle. Expanded first so the corners cannot come into frame.
+        big = im.resize((int(n * 1.5), int(n * 1.5)), Image.LANCZOS)
+        big = big.rotate(art_turn, resample=Image.BICUBIC)
+        o = (big.width - n) // 2
+        im = big.crop((o, o, o + n, o + n))
     img = np.asarray(im).astype(float) / 255.0
     if option == 'A_build45':
         img = np.clip(img - 0.22, 0, 1)
@@ -275,9 +288,20 @@ def disc(option, size=DISC, track_pitch=0.06, clear_margin=0.0,
         # -0.10 / 0.92 — the art is only a faint tint under the mirror now
         # that a clear-silver lift sits over it (below). Darkening it hard
         # was what made a clear disc read as a dark print.
-        img = np.clip(img - 0.10, 0, 1)
+        img = np.clip(img - 0.10 * (1 - art_lift), 0, 1)
         grey = img.mean(axis=2, keepdims=True)
-        img = np.clip(grey + (img - grey) * 0.92, 0, 1)
+        img = np.clip(grey + (img - grey) * (0.92 + 0.08 * art_lift), 0, 1)
+
+    if art_inner > 0:
+        # THE APP DRAWS THE COVER AS A RING, NOT A FILLED CIRCLE, and its own
+        # comment in CDMode.tsx says why: "anything filled across the centre
+        # reads as a big dark circle against a dark scene, which is exactly
+        # what the printed-label version got wrong". Inside the ring the disc
+        # is clear polycarbonate, so the hub and the diffraction sit in GLASS
+        # rather than on a photograph — which is most of what stops the cover
+        # reading as pasted on.
+        edge = np.clip((d - art_inner * R) / (0.035 * R), 0, 1)[..., None]
+        img = img * edge + np.full_like(img, 0.08) * (1 - edge)
 
     fans = OPTIONS.get(option)
     if option in STREAKS:
@@ -480,10 +504,24 @@ def lin_alpha(x, y, n, p0, p1, stops):
     _, a = stops_at(stops, np.clip(t, 0, 1))
     return a
 
-def jewel_case(n, pt, clip_alpha=0.44, clip_rib=3.2):
-    """The case, as its own RGBA layer over the tile. `pt` scales points."""
-    inset = 5 * pt
-    radius = 13 * pt
+def jewel_case(n, pt, clip_alpha=0.44, clip_rib=3.2, k=1.0, furn=None):
+    """The case, as its own RGBA layer over the tile. `pt` scales points.
+
+    `k` is the tile's own scale against the 158pt reference — 2.139 on a large
+    tile — and the case's BOX must take it, or the case stops filling the tile.
+
+    `furn` is what the moulded DETAIL is scaled by, and it is a separate
+    number for a reason the shipped Swift misses: a corner clip and a hinge
+    knuckle are small FEATURES of the object, not shares of the tile. At k = 1
+    they are 2.6pt ribs and 9x24pt knuckles, which is moulded plastic; at
+    k = 2.139 they are 5.6pt ribs and 19x51pt knuckles, which is furniture
+    drawn at twice life size — the owner's "rough on the edges". It defaults
+    to `k`, i.e. what ships, so a comparison is against the real thing.
+    """
+    if furn is None:
+        furn = k
+    inset = 5 * k * pt
+    radius = 13 * k * pt
     W = n - 2 * inset                      # the case's own box is inset by 5
     lay = Image.new('RGBA', (n, n), (0, 0, 0, 0))
 
@@ -508,7 +546,8 @@ def jewel_case(n, pt, clip_alpha=0.44, clip_rib=3.2):
           radius - 3 * pt, outline=(255, 255, 255, 31), width=pt)
 
     # ── the barrel hinge down the spine ──
-    sw = 12 * pt
+    fpt = furn * pt                        # points, at the furniture's scale
+    sw = 12 * fpt
     sy0, sy1 = inset, n - inset
     hh = int(sy1 - sy0)
     yy, xx = np.mgrid[0:hh, 0:int(sw)].astype(float)
@@ -519,39 +558,39 @@ def jewel_case(n, pt, clip_alpha=0.44, clip_rib=3.2):
     lay.paste(strip, (int(inset), int(sy0)), strip)
     sd = ImageDraw.Draw(lay)
     # the strip's trailing edge
-    sd.rectangle([inset + sw - pt, sy0, inset + sw, sy1], fill=(255, 255, 255, 51))
+    sd.rectangle([inset + sw - fpt, sy0, inset + sw, sy1], fill=(255, 255, 255, 51))
     # the rule down the middle of the spine
-    sd.rectangle([inset + sw / 2 - pt / 2, sy0 + 18 * pt, inset + sw / 2 + pt / 2, sy1 - 18 * pt],
+    sd.rectangle([inset + sw / 2 - fpt / 2, sy0 + 18 * fpt, inset + sw / 2 + fpt / 2, sy1 - 18 * fpt],
                  fill=(255, 255, 255, 66))
     # CRUISE FM, set on its side
-    txt = Image.new('RGBA', (int(70 * pt), int(8 * pt)), (0, 0, 0, 0))
+    txt = Image.new('RGBA', (int(70 * fpt), int(8 * fpt)), (0, 0, 0, 0))
     td = ImageDraw.Draw(txt)
     try:
         from PIL import ImageFont
         f = ImageFont.truetype('/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf',
-                               int(4.5 * pt))
+                               int(4.5 * fpt))
     except Exception:
         f = None
     td.text((0, 0), 'C R U I S E  F M', font=f, fill=(255, 255, 255, 71))
     txt = txt.rotate(90, expand=True)
     lay.alpha_composite(txt, (int(inset + sw / 2 - txt.width / 2), int(n / 2 - txt.height / 2)))
     # two knuckles and their pins
-    kw, kh, gap = 9 * pt, 24 * pt, 20 * pt
+    kw, kh, gap = 9 * fpt, 24 * fpt, 20 * fpt
     top = n / 2 - (kh * 2 + gap) / 2
     for i in range(2):
         y0 = top + i * (kh + gap)
         x0 = inset + sw / 2 - kw / 2
-        rrect(sd, [x0, y0, x0 + kw, y0 + kh], 4.5 * pt,
+        rrect(sd, [x0, y0, x0 + kw, y0 + kh], 4.5 * fpt,
               fill=(255, 255, 255, 36), outline=(255, 255, 255, 66), width=pt)
-        pr = 4.4 * pt / 2
+        pr = 4.4 * fpt / 2
         pcx, pcy = x0 + kw / 2, y0 + kh / 2
         sd.ellipse([pcx - pr, pcy - pr, pcx + pr, pcy + pr],
                    fill=(10, 12, 18, 140), outline=(255, 255, 255, 87), width=max(1, int(0.7 * pt)))
 
     # ── moulded corner clips ──
-    pad = 6 * pt
-    cl = 17 * pt
-    rib = clip_rib * pt
+    pad = 6 * fpt
+    cl = 17 * fpt
+    rib = clip_rib * fpt
     for cx0, cy0, sx, sy in ((inset + pad, inset + pad, 1, 1),
                              (n - inset - pad, inset + pad, -1, 1),
                              (inset + pad, n - inset - pad, 1, -1),
@@ -559,13 +598,13 @@ def jewel_case(n, pt, clip_alpha=0.44, clip_rib=3.2):
         x0, x1 = sorted([cx0, cx0 + sx * cl])
         y0, y1 = sorted([cy0, cy0 + sy * cl])
         if sy > 0:
-            rrect(sd, [x0, y0, x1, y0 + rib], 1.6 * pt, fill=(255, 255, 255, int(255 * clip_alpha)))
+            rrect(sd, [x0, y0, x1, y0 + rib], 1.6 * fpt, fill=(255, 255, 255, int(255 * clip_alpha)))
         else:
-            rrect(sd, [x0, y1 - rib, x1, y1], 1.6 * pt, fill=(255, 255, 255, int(255 * clip_alpha)))
+            rrect(sd, [x0, y1 - rib, x1, y1], 1.6 * fpt, fill=(255, 255, 255, int(255 * clip_alpha)))
         if sx > 0:
-            rrect(sd, [x0, y0, x0 + rib, y1], 1.6 * pt, fill=(255, 255, 255, int(255 * clip_alpha)))
+            rrect(sd, [x0, y0, x0 + rib, y1], 1.6 * fpt, fill=(255, 255, 255, int(255 * clip_alpha)))
         else:
-            rrect(sd, [x1 - rib, y0, x1, y1], 1.6 * pt, fill=(255, 255, 255, int(255 * clip_alpha)))
+            rrect(sd, [x1 - rib, y0, x1, y1], 1.6 * fpt, fill=(255, 255, 255, int(255 * clip_alpha)))
 
     # ── the two sweeps of light on the plastic ──
     yy, xx = np.mgrid[0:int(W), 0:int(W)].astype(float)
@@ -583,20 +622,27 @@ def jewel_case(n, pt, clip_alpha=0.44, clip_rib=3.2):
 
 def tile(option='L_swift', accent='#9b5cff', halo=1.0, disc_size=132,
          track_pitch=0.06, clear_margin=0.0, clip_alpha=0.44, clip_rib=3.2,
-         disc_alpha=0.74, silver=None, art=None, lit_hub=False, pt=SS):
-    n = 158 * pt
+         disc_alpha=0.74, silver=None, art=None, lit_hub=False, pt=SS,
+         k=1.0, furn=None, art_inner=0.0, art_turn=0.0, art_lift=0.0):
+    """`k` is the tile's scale against the 158pt reference: 1 for a small
+    tile, 338/158 = 2.139 for a large one. Everything that is a share of the
+    tile takes it; `furn` is what the case's moulded DETAIL takes, and
+    defaults to `k`, which is what ships."""
+    if furn is None:
+        furn = k
+    n = int(158 * k * pt)
     y, x = np.mgrid[0:n, 0:n].astype(float)
     g = ((x / n) + (y / n)) / 2
     c0 = np.array(hexc('#1c1f26')); c1 = np.array(hexc('#080a0e'))
     bg = c0[None, None, :] * (1 - g[..., None]) + c1[None, None, :] * g[..., None]
     base = Image.fromarray((np.clip(bg, 0, 1) * 255).astype(np.uint8)).convert('RGBA')
 
-    case = jewel_case(n, pt, clip_alpha=clip_alpha, clip_rib=clip_rib)
+    case = jewel_case(n, pt, clip_alpha=clip_alpha, clip_rib=clip_rib, k=k, furn=furn)
     base = Image.alpha_composite(base, case)
 
     # ── the accent glow behind the disc, drawn as falloff (14.09) ──
     if halo > 0:
-        d = np.hypot(x - n / 2, y - n / 2) / (96 * pt)
+        d = np.hypot(x - n / 2, y - n / 2) / (96 * k * pt)
         acc = np.array(hexc(accent))
         _, ga = stops_at([(0.00, (0, 0, 0), 0.32), (0.52, (0, 0, 0), 0.26),
                           (0.80, (0, 0, 0), 0.10), (1.00, (0, 0, 0), 0.00)], np.clip(d, 0, 1))
@@ -606,36 +652,37 @@ def tile(option='L_swift', accent='#9b5cff', halo=1.0, disc_size=132,
         base = Image.alpha_composite(base, Image.fromarray((glow * 255).astype(np.uint8), 'RGBA'))
 
     # ── the disc, with its contact shadow ──
-    ds = int(disc_size * pt)
+    ds = int(disc_size * k * pt)
     if silver is not None:
         SILVER['L_swift'] = silver
     dsc = disc(option, size=ds, track_pitch=track_pitch, clear_margin=clear_margin,
-               art=art, lit_hub=lit_hub)
+               art=art, lit_hub=lit_hub, art_inner=art_inner, art_turn=art_turn,
+               art_lift=art_lift)
     sh = Image.new('RGBA', (n, n), (0, 0, 0, 0))
     r_ = ds / 2
-    ImageDraw.Draw(sh).ellipse([n / 2 - r_, n / 2 - r_ + 5 * pt, n / 2 + r_, n / 2 + r_ + 5 * pt],
+    ImageDraw.Draw(sh).ellipse([n / 2 - r_, n / 2 - r_ + 5 * k * pt, n / 2 + r_, n / 2 + r_ + 5 * k * pt],
                                fill=(0, 0, 0, int(255 * 0.62)))
-    sh = sh.filter(ImageFilter.GaussianBlur(9 * pt / 2))
+    sh = sh.filter(ImageFilter.GaussianBlur(9 * k * pt / 2))
     base = Image.alpha_composite(base, sh)
     faded = dsc.copy()
     faded.putalpha(Image.fromarray((np.asarray(dsc.split()[3]).astype(float) * disc_alpha).astype(np.uint8)))
     base.alpha_composite(faded, (int(n / 2 - ds / 2), int(n / 2 - ds / 2)))
 
     mask = Image.new('L', (n, n), 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, n - 1, n - 1], radius=22 * pt, fill=255)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, n - 1, n - 1], radius=22 * k * pt, fill=255)
     base.putalpha(mask)
     return base
 
 
 
-def measure(im, disc_size=132, pt=SS):
+def measure(im, disc_size=132, pt=SS, k=1.0):
     """What reads on the tile, in luminance levels out of 255."""
     a = np.asarray(im.convert('RGB')).astype(float)
     n = a.shape[0]
     lum = a.mean(axis=2)
     yy, xx = np.mgrid[0:n, 0:n]
     r = np.hypot(xx - n / 2, yy - n / 2)
-    R = disc_size * pt / 2
+    R = disc_size * k * pt / 2
     disc_m = r <= R * 0.98
     out = {}
     out['disc_median'] = float(np.median(lum[disc_m]))
@@ -660,7 +707,7 @@ def measure(im, disc_size=132, pt=SS):
     # Record tile; below ~1.2pt neighbouring rings moire. So a CD wants to sit
     # just above that floor and well under the record's, and the picture is
     # what says whether it reads.
-    R = disc_size * pt / 2
+    R = disc_size * k * pt / 2
     # the rim: how far the last of the disc steps against the data area, i.e.
     # whether the pressing has a visible edge or the art runs off it
     inner = float(np.median(lum[row, int(n / 2 + R * 0.88):int(n / 2 + R * 0.93)]))
@@ -671,29 +718,82 @@ def measure(im, disc_size=132, pt=SS):
 
 if __name__ == '__main__':
     os.chdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    NEW = dict(track_pitch=0.025, clear_margin=1.0, clip_alpha=0.26,
-               clip_rib=2.6, lit_hub=True)
-    DARK = 'targets/widgets/after-midnight.jpg'
-    BRIGHT = 'targets/widgets/daylight.jpg'
-    shots = [
-        ('A  ships, dark cover', dict(art=DARK)),
-        ('B  new, dark cover', dict(art=DARK, **NEW)),
-        ('C  ships, bright cover', dict(art=BRIGHT)),
-        ('D  new, bright cover', dict(art=BRIGHT, **NEW)),
+
+    # ── THE 25.09 QUESTION ────────────────────────────────────────────────
+    # Owner, with the large CD tile on her Home Screen beside the app's own CD
+    # deck: "is there a way to get the widget have the same graphics as what's
+    # in the app? the widget currently looks a bit rough on the edges and the
+    # album cover sort of looks pasted on."
+    #
+    # TWO SEPARATE FAULTS, and each is one named change below.
+    #
+    #   ROUGH ON THE EDGES is the case's moulded DETAIL being multiplied by
+    #   `k`. A corner clip and a hinge knuckle are small features of the
+    #   object, not shares of the tile: at k = 1 they are 2.6pt ribs and
+    #   9x24pt knuckles; on a large tile they are 5.6pt and 19x51pt, i.e.
+    #   furniture at twice life size. The file already holds this rule for
+    #   hairlines and the spine's type ("a 1pt stroke is a 1pt stroke at
+    #   every size") and simply never applied it here.
+    #
+    #   PASTED ON is the cover filling the whole face, upright, under a
+    #   silver screen. The app draws it as a RING with the middle left as
+    #   clear glass, at near full strength, and turned — and its own comment
+    #   says why: "anything filled across the centre reads as a big dark
+    #   circle against a dark scene, which is exactly what the printed-label
+    #   version got wrong."
+    #
+    # E RAISES THE DISC'S OPACITY, which is the one thing the 21.09 round
+    # deliberately left to the owner: 0.74 lets the station's halo bleed
+    # through the pressing, and roughly a quarter of what reads as colour on
+    # the face is the halo rather than the disc. Raising it buys presence and
+    # costs that. Her call, and this is the render to make it on.
+    K = 338 / 158
+    RING = dict(furn=1.0, art_inner=0.34, art_turn=-28)
+    STEPS = [
+        ('A  what ships today', dict()),
+        ('B  + case detail at true size', dict(furn=1.0)),
+        ('C  + cover as a ring, glass centre', dict(furn=1.0, art_inner=0.34)),
+        ('D  + cover turned', dict(**RING)),
+        ('E  + disc opaque, less silver', dict(**RING, art_lift=1.0,
+                                               silver=0.10, disc_alpha=0.97)),
     ]
-    W = 158 * 4
-    cols = len(shots)
-    sheet = Image.new('RGB', (W * cols + 20 * (cols + 1), W + 110), (14, 14, 17))
+    # TWO COVERS, ALWAYS — see the note at the top of this file.
+    COVERS = [('bright cover', 'targets/widgets/daylight.jpg'),
+              ('dark cover', 'targets/widgets/after-midnight.jpg')]
+
+    from PIL import ImageFont
+    try:
+        f = ImageFont.truetype('/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf', 20)
+        fs = ImageFont.truetype('/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf', 17)
+    except Exception:
+        f = fs = None
+
+    rows = []
+    for cname, cpath in COVERS:
+        row = []
+        for cap, kw in STEPS:
+            k2 = dict(art=cpath, k=K, pt=2, accent='#7FA6C9'); k2.update(kw)
+            im = tile(**k2)
+            m = measure(im, disc_size=132, pt=2, k=K)
+            print(f"{cname:14} {cap:36} disc median {m['disc_median']:6.1f}  "
+                  f"tinted {m['tinted']:5.2f}%")
+            row.append(im)
+            SILVER['L_swift'] = 0.30
+        rows.append((cname, row))
+
+    W = rows[0][1][0].size[0]
+    pad, head = 22, 46
+    sheet = Image.new('RGB', (W * len(STEPS) + pad * (len(STEPS) + 1),
+                              (W + head) * len(rows) + pad * (len(rows) + 1)), (14, 14, 17))
     dd = ImageDraw.Draw(sheet)
-    for i, (cap, kw) in enumerate(shots):
-        im = tile(**kw)
-        m = measure(im, disc_size=kw.get('disc_size', 132))
-        small = im.resize((W, W), Image.LANCZOS)
-        sheet.paste(small, (20 + i * (W + 20), 70), small)
-        dd.text((20 + i * (W + 20), 36), cap, fill=(230, 230, 235))
-        print(f"{cap:20} disc median {m['disc_median']:5.1f}  tinted {m['tinted']:5.1f}%  "
-              f"track pitch {kw.get('track_pitch', 0.06) * kw.get('disc_size', 132) / 2:.2f}pt  "
-              f"rim step {m['rim_step']:5.1f}")
-        SILVER['L_swift'] = 0.30
-    sheet.save('/tmp/cd_tile.png')
-    print('saved /tmp/cd_tile.png')
+    for r, (cname, row) in enumerate(rows):
+        y = pad + r * (W + head + pad)
+        for i, im in enumerate(row):
+            x = pad + i * (W + pad)
+            cap = STEPS[i][0] + ('' if r else '')
+            dd.text((x, y + 6), cap, fill=(232, 232, 238), font=f)
+            dd.text((x, y + 26), cname, fill=(150, 152, 162), font=fs)
+            sheet.paste(im, (x, y + head), im)
+    out = os.environ.get('OUT', '/tmp/cd_tile.png')
+    sheet.save(out)
+    print('saved', out)

@@ -167,56 +167,173 @@ def transport():
     return f'<div style="display:flex;gap:12px;justify-content:center;">{btns}</div>'
 
 
-# ══════════════ A — what ships today (build 68) ════════════════════════════
-SHIPPED = BT.CDPLAYER_TALL
+# ── this round's extra parts ───────────────────────────────────────────────
+
+def cd_glyph(d=64):
+    return f"""
+      <div style="width:{d}px;height:{d}px;border-radius:50%;position:relative;flex:none;
+          background:conic-gradient(from 20deg,#bfe8ff,#d9c6ff,#ffd0e6,#ffe9c2,#c9ffe2,#bfe8ff);
+          box-shadow:0 2px 5px rgba(0,0,0,.35);">
+        <div style="position:absolute;inset:0;border-radius:50%;background:
+            linear-gradient(125deg,rgba(255,255,255,.75) 6%,transparent 34%,
+            transparent 66%,rgba(255,255,255,.45) 94%);"></div>
+        <div style="position:absolute;inset:{int(d*0.34)}px;border-radius:50%;
+            background:#e6eaf0;box-shadow:inset 0 0 0 2px rgba(255,255,255,.7);"></div>
+        <div style="position:absolute;inset:{int(d*0.43)}px;border-radius:50%;background:#2b2f37;"></div>
+      </div>"""
 
 
-# ══════════════ B — the window, the whole tile ═════════════════════════════
-PROPOSED = BT.slot(
-    'LAST PLAYED &middot; large', 'CD player &mdash; the full window', f"""
-  <div style="position:absolute;inset:0;background:
-      linear-gradient(180deg,#1b1f28,#0a0c11);"></div>
-  <!-- The lamp stays, but low and behind the window's foot: the room is what
-       stops a grey dialog reading as a screenshot of one. -->
+def deck_glyph(w=96, h=58):
+    """The share card's little tape deck. Pure decoration, and honest as
+    decoration — unlike a volume slider it asserts no value."""
+    return f"""
+      <div class=up style="width:{w}px;height:{h}px;position:relative;flex:none;">
+        <div style="position:absolute;left:8px;top:9px;width:9px;height:9px;background:#c0392b;"></div>
+        <div class=dn style="position:absolute;left:24px;right:8px;top:8px;height:22px;
+            display:flex;align-items:center;justify-content:space-around;">
+          <div style="width:9px;height:9px;border-radius:50%;background:#7d848e;"></div>
+          <div style="width:9px;height:9px;border-radius:50%;background:#7d848e;"></div>
+        </div>
+        <div style="position:absolute;left:8px;right:8px;bottom:8px;height:12px;display:flex;gap:2px;">
+          {''.join('<div class=up style="flex:1;"></div>' for _ in range(9))}
+        </div>
+      </div>"""
+
+
+def keys(glyphs, w=58, h=44, fs=18):
+    btns = ''.join(
+        f'<div class=up style="width:{w}px;height:{h}px;display:flex;align-items:center;'
+        f'justify-content:center;flex:none;"><span style="font-size:{fs}px;color:#1b1d22;">{g}</span></div>'
+        for g in glyphs)
+    return f'<div style="display:flex;gap:9px;">{btns}</div>'
+
+
+def timerow(kind):
+    """THE ROW THE SHARE CARD SPENDS ON A SCRUB BAR.
+
+    A widget is redrawn a handful of times a day and CANNOT know where a song
+    is up to — which is the whole reason this tile says LAST PLAYED. The
+    snapshot carries no duration either, so neither number on the card's row
+    is available. Three honest ways to use the same row:
+
+      'when'   the one fact we do have. `LastPlayed.at` is a timestamp the
+               app already stores; it is a statement about the PAST, which is
+               what this tile trades in.
+      'trough' the Winamp trough with NO handle and NO numbers: window
+               furniture, asserting nothing.
+      'none'   leave it out and give the height back.
+    """
+    if kind == 'none':
+        return ''
+    if kind == 'trough':
+        return """
+      <div style="display:flex;align-items:center;gap:12px;height:34px;">
+        <div class=dn style="flex:1;height:26px;"></div>
+      </div>"""
+    return """
+      <div style="display:flex;align-items:center;justify-content:space-between;height:34px;">
+        <span class=px style="color:#1b1d22;font-size:13px;opacity:.62;">LAST PLAYED</span>
+        <span class=px style="color:#1b1d22;font-size:15px;">1:04 pm</span>
+      </div>"""
+
+
+def window(*, fill, top, cover, rows, dev, time_kind, gap=14, pad=22):
+    """One drawing, four switches, so the prototypes cannot drift apart.
+
+    `fill`  the window runs to the tile's own edge rather than sitting on a
+            border of room (owner, 25.09: "could we make the Winamp take up
+            the black border surroundings?").
+    `top`   the title bar is pinned to the top rather than floating in a
+            centred stack (owner: "make sure the top bar sits at the very top
+            not just as a strip"). That one is not a taste: the stack is
+            SHORTER than the tile, so it centres, which is a strip of window
+            above the title bar AND the empty space below the last field —
+            the owner's two complaints from one cause.
+    """
+    inset = 0 if fill else 26
+    justify = 'flex-start' if top else 'center'
+    right = ''
+    if dev == 'cd':
+        right = f'<div style="display:flex;align-items:center;justify-content:center;">{cd_glyph(64)}</div>'
+    elif dev == 'both':
+        right = (f'<div style="display:flex;align-items:center;justify-content:space-between;">'
+                 f'{cd_glyph(58)}{deck_glyph()}</div>')
+    keyrows = {
+        # PLAIN GEOMETRIC GLYPHS ONLY. The first draft used the media-control
+        # codepoints (U+23EA and friends) and two of them came back as ORANGE
+        # EMOJI — which is exactly the class of thing the widget itself avoids
+        # by drawing its own Triangle rather than asking for a character.
+        3: keys(('&#9664;&#9664;', '&#9654;', '&#9654;&#9654;'), w=70, h=50, fs=17),
+        5: (keys(('&#10073;&#10073;', '&#9654;&#9612;', '&#8635;'), w=58, h=44, fs=15) +
+            '<div style="height:9px;"></div>' +
+            keys(('&#9612;&#9664;', '&#9664;&#9664;', '&#9654;&#9654;', '&#9654;&#9612;'),
+                 w=42, h=40, fs=12)),
+    }[rows]
+    fields = ''.join(
+        field(c, v) + f'<div style="height:{gap}px;"></div>'
+        for c, v in (('Artist:', 'Oasis'), ('Track:', 'Champagne Supernova'),
+                     ('Station:', 'Calm &middot; 940 AM'), ('Mode:', 'CD')))
+    return f"""
+  <div style="position:absolute;inset:0;background:linear-gradient(180deg,#1b1f28,#0a0c11);"></div>
   <div style="position:absolute;inset:0;background:
       radial-gradient(circle at 50% 88%,rgba(106,208,255,.26),transparent 64%);"></div>
-
-  <div class=up style="position:absolute;inset:26px;padding:0;overflow:hidden;">
+  <div class=up style="position:absolute;inset:{inset}px;padding:0;overflow:hidden;
+      display:flex;flex-direction:column;justify-content:{justify};">
     {titlebar()}
-    <div style="padding:20px 24px 24px;">
-      <div style="display:flex;gap:22px;">
-        <div class=dn style="width:240px;height:240px;flex:none;padding:6px;">
+    <div style="padding:{pad}px {pad+2}px {pad}px;flex:1;display:flex;
+        flex-direction:column;">
+      <div style="display:flex;gap:20px;">
+        <div class=dn style="width:{cover}px;height:{cover}px;flex:none;padding:6px;">
           <img src="data:image/jpeg;base64,{ART}"
               style="width:100%;height:100%;object-fit:cover;display:block;">
         </div>
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;
             justify-content:space-between;">
-          {device('cd')}
-          {transport()}
+          {right}
+          {keyrows}
         </div>
       </div>
-      <div style="height:24px;"></div>
-      {field('Artist:', 'Foo Fighters')}
-      <div style="height:14px;"></div>
-      {field('Track:', 'Everlong')}
-      <div style="height:14px;"></div>
-      {field('Station:', 'Coastal FM &middot; 101.3')}
-      <div style="height:14px;"></div>
-      {field('Mode:', 'CD')}
+      <div style="height:{gap+6}px;"></div>
+      {fields}
+      <div style="flex:1;min-height:0;"></div>
+      {timerow(time_kind)}
     </div>
-  </div>""", 'l',
-    note='Four full-width fields is the room a tall tile has and a wide one never will.')
+  </div>"""
+
+
+A = BT.slot('LAST PLAYED &middot; large', 'A &mdash; build 69, what you have',
+            window(fill=False, top=False, cover=240, rows=3, dev='cd', time_kind='none'),
+            'l', note='The window floats on a border, and the stack is centred &mdash; '
+                      'which is the strip above the title bar AND the gap at the foot.')
+
+B = BT.slot('LAST PLAYED &middot; large', 'B &mdash; the two layout fixes only',
+            window(fill=True, top=True, cover=240, rows=3, dev='cd', time_kind='none'),
+            'l', note='Window to the tile&rsquo;s own edge, title bar pinned to the top. '
+                      'Nothing added yet.')
+
+C = BT.slot('LAST PLAYED &middot; large', 'C &mdash; + the share card&rsquo;s furniture',
+            window(fill=True, top=True, cover=228, rows=5, dev='both', time_kind='when'),
+            'l', note='CD and tape deck, seven keys, and the scrub row spent on the one '
+                      'thing a widget really knows &mdash; WHEN it played.')
+
+D = BT.slot('LAST PLAYED &middot; large', 'D &mdash; + an empty trough instead',
+            window(fill=True, top=True, cover=228, rows=5, dev='both', time_kind='trough'),
+            'l', note='The Winamp trough with no handle and no numbers: furniture, '
+                      'claiming nothing. Closest to the share card to look at.')
 
 
 html = (f"<html><head><meta charset=utf-8><style>{CSS}</style></head><body>"
-        + BT.head('The big CD player &mdash; two ways to spend the height',
-                  'Left: what build 68 ships &mdash; the window, then the disc in the room it makes. '
-                  'Right: the share card&rsquo;s arrangement &mdash; cover and controls share the top, '
-                  'four labelled fields run the full width underneath. '
-                  'The scrub bar, the volume and the shuffle/repeat/heart cannot come across: '
-                  'a widget does not know where a song is up to, how loud it is, or what any of '
-                  'those three are set to.')
-        + f'<div class=row>{SHIPPED}{PROPOSED}</div>'
+        + BT.head('The big CD player &mdash; filling it',
+                  'Owner, 25.09: "could we make the Winamp take up the black border '
+                  'surroundings? ... the widget has too much empty space. Add in the '
+                  'progress bar if possible. Make sure the top bar sits at the very top '
+                  'not just as a strip." <br>'
+                  'The strip above the title bar and the gap at the foot are ONE fault: '
+                  'the stack is shorter than the tile, so it centres. B is that fixed and '
+                  'nothing else. C and D then spend the room two different ways &mdash; '
+                  'and neither can carry a real progress bar, because a widget is redrawn '
+                  'a handful of times a day and the snapshot holds no duration.')
+        + f'<div class=row>{A}{B}{C}{D}</div>'
         + "</body></html>")
 pathlib.Path(_want).write_text(html)
 print(f"wrote {_want}")

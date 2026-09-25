@@ -24,6 +24,25 @@ import WidgetKit
 struct LastPlayedInfo: Codable {
   let title: String
   let artist: String
+  /**
+   * WHEN IT PLAYED, ALREADY IN WORDS — "1:04pm", "yesterday", "Tuesday".
+   *
+   * THE ONE FACT THIS TILE GENUINELY HAS, and the thing it is named after.
+   * A widget is redrawn a handful of times a day, so it can never say what
+   * is playing NOW — but the past does not go stale, which is the whole
+   * reason the look says LAST PLAYED. The app already records the moment
+   * (`LastPlayed.at`); this is that moment put into words.
+   *
+   * FORMATTED IN JS AND SENT AS A STRING, like `modeName` and the schedule's
+   * own labels, so the extension never owns a second copy of a wording rule
+   * that could drift from the app's.
+   *
+   * OPTIONAL, like every field added after the first build: a binary already
+   * on a phone is handed newer snapshots by an app that updates over the
+   * air, and Swift's decoding is all-or-nothing — one missing required
+   * property blanks every tile at once.
+   */
+  let playedAt: String?
 }
 
 struct WidgetStation: Codable {

@@ -702,6 +702,68 @@ if (declared.length < 5 || Object.keys(kinds).length < 5) {
     'a second, differently-lit hub reads as a separate object sitting on the disc');
 }
 
+// ── THE WINDOW IS THE TILE, AND ITS STACK SITS AT THE TOP ────────────────
+//
+// Owner, 25.09, off the large CD tile: "could we make the Winamp take up the
+// black border surroundings? ... Make sure the top bar sits at the very top
+// not just as a strip." Those are the same fault seen twice.
+//
+//   THE BORDER was a `.padding(13)` on the tall window that the MEDIUM window
+//   has never had — "make sure that this is gone and that the card is the
+//   shape of the widget itself", said twice on 09.09. So two sizes of one
+//   look disagreed about the most visible thing about them.
+//
+//   THE STRIP ABOVE THE TITLE BAR is the same stack being SHORTER than the
+//   tile: a VStack inside a greedy ZStack is centred, which puts a band of
+//   window above the bar and an equal band below the last field. That second
+//   band is most of the "too much empty space" in the same message.
+//
+// Checked as a property of every CD-player drawing rather than by name, so a
+// third size would be covered without anybody remembering.
+{
+  const body = (name, s) => {
+    const i = s.indexOf(`private func ${name}(`);
+    if (i < 0) return null;
+    let j = s.indexOf('{', i), depth = 0, k = j;
+    for (; k < s.length; k++) {
+      if (s[k] === '{') depth += 1;
+      else if (s[k] === '}') { depth -= 1; if (!depth) break; }
+    }
+    return decomment(s.slice(j, k));
+  };
+  const lp = src_['LastPlayedWidget.swift'] ?? '';
+  let found = 0;
+  for (const fn of ['cdPlayer', 'cdPlayerTall']) {
+    const b = body(fn, lp);
+    check(`${fn} exists to be checked`, !!b);
+    if (!b) continue;
+    found += 1;
+    // A padding applied to the WHOLE window — i.e. at the drawing's own
+    // outermost indent, which in this file is four spaces.
+    const pad = b.match(/^ {4}\.padding\(\d/m);
+    check(`${fn}: the window runs to the tile's own edge`, !pad, pad ? pad[0].trim() : '');
+  }
+  const tall = body('cdPlayerTall', lp) ?? '';
+  check('cdPlayerTall pins its stack to the top rather than letting it centre',
+    /\.frame\(maxHeight: \.infinity, alignment: \.top\)/.test(tall),
+    'a VStack shorter than a greedy ZStack is centred — that is the strip AND the gap');
+  check('and it found both drawings', found === 2, `${found} found`);
+
+  // EVERY KEY ON THAT WINDOW DRAWS A SHAPE, NEVER A CHARACTER. This target
+  // cannot be compiled or rendered where it is written, so a codepoint the
+  // system font happens not to cover ships as a hollow box with nothing
+  // logged anywhere — which is exactly what the station icons did in build
+  // 39, and why `field` draws its dropdown tip as a turned-over Triangle.
+  const kb = body('winKey', lp);
+  check('winKey exists to be checked', !!kb);
+  check('every key glyph is a shape, not a character',
+    !!kb && !/\bText\(/.test(kb),
+    'a Text( in here is a codepoint bet nothing in this repo can settle');
+  for (const g of ['ShuffleGlyph', 'RepeatGlyph', 'HeartGlyph']) {
+    check(`${g} is declared`, new RegExp(`struct ${g}: Shape`).test(all));
+  }
+}
+
 // ── PINNING A TILE TO A STATION ───────────────────────────────────────────
 // Four widgets can be pinned, and the five that name a station must all reach
 // it the same way. Before this, each wrote `lastDrive ?? currentOnAir()` for

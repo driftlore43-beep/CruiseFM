@@ -224,18 +224,61 @@ console.log('\n  the last-played song, which is the only track claim a widget ma
   // wrong most of the time anyone reads it. "Last played" is a claim about the
   // past — it cannot go stale. These two cases pin that the field crosses at
   // all, and that absent means absent rather than a stale leftover.
-  lastPlayed = { title: 'Zero', artist: 'The Smashing Pumpkins', artUrl: null, at: 1 };
+  const noon = new Date('2026-09-01T12:34:00');
+  lastPlayed = {
+    title: 'Zero', artist: 'The Smashing Pumpkins', artUrl: null, at: noon.getTime(),
+  };
   let snap = await W.buildWidgetSnapshot(new Date('2026-09-01T21:00:00Z'));
   check('a remembered song reaches the snapshot',
     snap.lastPlayed?.title === 'Zero' && snap.lastPlayed?.artist === 'The Smashing Pumpkins',
     JSON.stringify(snap.lastPlayed));
-  // Check the KEYS, not a substring of the JSON — "artist" contains "art",
+  // A JPEG MUST NEVER TRAVEL IN THE SNAPSHOT: it lives in shared UserDefaults,
+  // which is re-read whole on every widget draw, so a cover in here is read
+  // hundreds of times for nothing.
+  //
+  // CHECK THE KEYS, NOT A SUBSTRING OF THE JSON — "artist" contains "art",
   // which is how the first version of this assertion failed against correct
-  // code. A JPEG must never travel in the snapshot: it lives in shared
-  // UserDefaults, which is re-read whole on every widget draw.
-  check('the cover itself is NOT in the snapshot — it is a file in the App Group',
-    Object.keys(snap.lastPlayed).sort().join() === 'artist,title',
+  // code. AND CHECK THE PROPERTY, NOT AN EXACT KEY SET: this was pinned to
+  // `artist,title` and duly failed the day a legitimate small field was
+  // added beside them (`playedAt`, 25.09), which is a check measuring what
+  // the code is rather than what it must not do. The rule is that every key
+  // is one of a named few AND no value is big enough to be a picture.
+  const ALLOWED = ['artist', 'playedAt', 'title'];
+  check('every key on lastPlayed is one this snapshot is allowed to carry',
+    Object.keys(snap.lastPlayed).every((k) => ALLOWED.includes(k)),
     Object.keys(snap.lastPlayed).join());
+  check('the cover itself is NOT in the snapshot — it is a file in the App Group',
+    Object.values(snap.lastPlayed).every(
+      (v) => typeof v === 'string' && v.length < 200 && !/^(data:|https?:|file:)/.test(v)),
+    JSON.stringify(snap.lastPlayed).slice(0, 120));
+
+  // WHEN it played, which is the one fact a tile named LAST PLAYED has.
+  check('the snapshot says when, in words the extension never has to format',
+    snap.lastPlayed.playedAt === '12:34pm', snap.lastPlayed.playedAt);
+
+  // The wording rule itself. A TIME IS ONLY EVER PRINTED FOR TODAY — read at
+  // a glance on a Home Screen, "1:04pm" against something played last
+  // Tuesday would be taken for today, which is the exact class of quiet
+  // wrongness this look's whole name exists to avoid.
+  const at = (iso) => new Date(iso).getTime();
+  const ref = new Date('2026-09-01T15:00:00');   // a Tuesday
+  const cases = [
+    ['this morning is a time', at('2026-09-01T09:05:00'), '9:05am'],
+    ['midnight this morning is a time', at('2026-09-01T00:07:00'), '12:07am'],
+    ['noon is pm, not am', at('2026-09-01T12:00:00'), '12:00pm'],
+    ['yesterday is named, never clocked', at('2026-08-31T23:59:00'), 'yesterday'],
+    ['earlier in the week is a weekday', at('2026-08-28T10:00:00'), 'Friday'],
+  ];
+  for (const [name, t, want] of cases) {
+    check(name, W.playedLabel(t, ref) === want, `${W.playedLabel(t, ref)} (wanted ${want})`);
+  }
+  check('past a week it gives the date rather than a weekday that has come round again',
+    /\d/.test(W.playedLabel(at('2026-08-01T10:00:00'), ref))
+      && !/day$/.test(W.playedLabel(at('2026-08-01T10:00:00'), ref)),
+    W.playedLabel(at('2026-08-01T10:00:00'), ref));
+  check('a missing or nonsense moment says nothing rather than 1 Jan 1970',
+    W.playedLabel(0, ref) === '' && W.playedLabel(NaN, ref) === '',
+    `${W.playedLabel(0, ref)}|${W.playedLabel(NaN, ref)}`);
 
   lastPlayed = null;
   snap = await W.buildWidgetSnapshot(new Date('2026-09-01T21:00:00Z'));

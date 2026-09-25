@@ -169,7 +169,7 @@ export type WidgetSnapshot = {
    * wrong most of the time anyone reads it. "Last played" is a claim about
    * the past and stays true however stale the widget gets. See lastPlayed.ts.
    */
-  lastPlayed: { title: string; artist: string } | null;
+  lastPlayed: { title: string; artist: string; playedAt: string } | null;
   stats: {
     streakDays: number;
     sessionsThisWeek: number;
@@ -180,6 +180,41 @@ export type WidgetSnapshot = {
     timeLabel: string;
   };
 };
+
+/**
+ * WHEN THE LAST SONG PLAYED, IN WORDS — "1:04pm", "yesterday", "Tuesday".
+ *
+ * THE WORDING IS DECIDED HERE AND NOT IN SWIFT, the same rule `countLabel`
+ * and `upNextLine` already follow: a second copy of a formatting rule inside
+ * the extension is a second thing that can disagree with the app.
+ *
+ * AND IT STOPS BEING A CLOCK ONCE A CLOCK WOULD MISLEAD. "1:04pm" is exactly
+ * right for something played this afternoon and quietly wrong for something
+ * played last Tuesday — read at a glance on a Home Screen it would be taken
+ * for today. So a time is only ever printed for TODAY; after that it names
+ * the day, and past a week it gives the date. The tile is read and believed,
+ * which is the whole reason it says "last played" rather than "now playing".
+ *
+ * `hour12` and the weekday name come from the phone's own locale rather than
+ * a table here; the lowercase am/pm matches `clockLabel`'s own convention.
+ */
+export function playedLabel(at: number, now: Date = new Date()): string {
+  const then = new Date(at);
+  if (!Number.isFinite(at) || at <= 0) return '';
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const DAY = 86400000;
+  if (then.getTime() >= startOfToday) {
+    const h = then.getHours();
+    const m = `${then.getMinutes()}`.padStart(2, '0');
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12}:${m}${h < 12 ? 'am' : 'pm'}`;
+  }
+  if (then.getTime() >= startOfToday - DAY) return 'yesterday';
+  if (then.getTime() >= startOfToday - DAY * 6) {
+    return then.toLocaleDateString(undefined, { weekday: 'long' });
+  }
+  return then.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
 
 export const WIDGET_SNAPSHOT_VERSION = 1;
 
@@ -316,7 +351,9 @@ export async function buildWidgetSnapshot(now: Date = new Date()): Promise<Widge
     // Title and artist only. The COVER is not in here — it is a file in the
     // App Group, written by setArtwork, because a JPEG in shared UserDefaults
     // would be re-read on every widget draw.
-    lastPlayed: played ? { title: played.title, artist: played.artist } : null,
+    lastPlayed: played
+      ? { title: played.title, artist: played.artist, playedAt: playedLabel(played.at, now) }
+      : null,
     stats: {
       streakDays: stats?.streakDays ?? 0,
       // Their own kind, so a desk listener is never shown a drive count of

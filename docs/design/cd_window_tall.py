@@ -207,14 +207,16 @@ def volume(w_pt, h_pt):
     minus = (f'<div class=up style="width:{{w}}px;height:{{h}}px;display:flex;align-items:center;'
              f'justify-content:center;flex:none;">'
              f'<div style="width:{P(11)}px;height:{P(2)}px;background:#1b1d22;"></div></div>')
-    well = ('<div class=dn style="flex:1;min-width:0;min-height:0;background:#a9adb3;'
-            'box-shadow:inset 2px 2px 0 #5f666e, inset -2px -2px 0 #dfe3e6;"></div>')
+    # A 12pt well, which is the share card's own proportion (its trough is 32
+    # of a 128-wide volume group) and the number the Swift ships.
+    well = (f'<div class=dn style="width:{P(12)}px;min-height:0;background:#a9adb3;'
+            f'box-shadow:inset 2px 2px 0 #5f666e, inset -2px -2px 0 #dfe3e6;"></div>')
     if wide:
         kw, kh = P((h_pt) * 1.28), P(h_pt)
         keys_ = plus.format(w=kw, h=kh) + minus.format(w=kw, h=kh)
         return (f'<div style="display:flex;gap:{P(4)}px;width:{P(w_pt)}px;height:{P(h_pt)}px;'
                 f'flex:none;">{keys_}{well}</div>')
-    kw, kh = P(w_pt - 12), P((h_pt - 4) / 2)
+    kw, kh = P(w_pt - 16), P((h_pt - 4) / 2)
     return (f'<div style="display:flex;gap:{P(4)}px;width:{P(w_pt)}px;height:{P(h_pt)}px;flex:none;">'
             f'<div style="display:flex;flex-direction:column;gap:{P(4)}px;">'
             f'{plus.format(w=kw, h=kh)}{minus.format(w=kw, h=kh)}</div>{well}</div>')
@@ -292,7 +294,7 @@ def cluster(kind):
                 f'{cd_glyph(23)}{keyrow(("prev","play","next"),(21,21,21),15,3)}</div>')
     if kind == 'wide':
         top = (f'<div style="display:flex;gap:{P(7)}px;align-items:center;height:{P(44)}px;">'
-               f'{cd_glyph(40)}{deck_glyph(85, 40)}{volume(41, 40)}</div>')
+               f'{cd_glyph(40)}{deck_glyph(80, 40)}{volume(46, 40)}</div>')
         rows = [top,
                 keyrow(('pause', 'shuffle', 'repeat'), (88, 41, 41), 30, 5),
                 keyrow(('prev', 'rew', 'ff', 'next', 'heart'), (32,) * 5, 32, 5)]

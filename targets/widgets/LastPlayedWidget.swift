@@ -277,25 +277,40 @@ struct LastPlayedView: View {
   /// window, so its bar has to be the same bar — drawn twice it is two
   /// things that can drift, which is how a look ends up with two versions
   /// of itself in one gallery row.
-  private func cdTitleBar(_ s: WidgetStation) -> some View {
-    HStack(spacing: 8) {
-      discGlyph(size: 18)
+  ///
+  /// `big` IS THE LARGE TILE'S OWN SIZE, AND IT EXISTS BECAUSE NOT HAVING IT
+  /// WAS A FAULT. Owner, 25.09: "the texts needs to scale larger — they're
+  /// currently really small compared to how much empty space there is." She
+  /// is right, and it is the mirror image of the case-furniture fault found
+  /// the day before: that one multiplied moulded detail by `k` when it should
+  /// not have been scaled at all, and this one scaled NOTHING — the bar and
+  /// the fields are shared with the medium window, so they set at 15/11/12pt
+  /// on a tile whose value boxes are nearly twice as wide and which carries
+  /// four rows instead of two. The box grew and the type did not.
+  ///
+  /// MEASURED AGAINST THE APP'S OWN Y2K SHARE CARD, which is what she is
+  /// comparing it to: its field box is 64 tall with 34px type (0.53 of the
+  /// row) and its title bar 66 with 38px (0.58). The widget's were 26 with
+  /// 12pt (0.46) and 32 with 15pt (0.47).
+  private func cdTitleBar(_ s: WidgetStation, big: Bool = false) -> some View {
+    HStack(spacing: big ? 8 : 8) {
+      discGlyph(size: big ? 20 : 18)
       // NOT hardcoded white: the bar is the station's own colour now, so
       // a cream station gets near-black lettering and a navy one white.
       // See titleBarInk in Snapshot.swift for why that is measured.
-      Text("Cruise FM").font(pixelFont(15)).foregroundColor(s.titleBarInk)
+      Text("Cruise FM").font(pixelFont(big ? 19 : 15)).foregroundColor(s.titleBarInk)
       Spacer(minLength: 4)
       ForEach(["_", "[]", "X"], id: \.self) { c in
         ZStack {
           face
           bevel(raised: true, width: 2)
-          Text(c).font(pixelFont(10)).foregroundColor(paperInk)
+          Text(c).font(pixelFont(big ? 11 : 10)).foregroundColor(paperInk)
         }
-        .frame(width: 20, height: 17)
+        .frame(width: big ? 22 : 20, height: big ? 19 : 17)
       }
     }
     .padding(.horizontal, 10)
-    .frame(height: 32)
+    .frame(height: big ? 36 : 32)
     // THE STATION'S OWN COLOUR (owner, 09.09: "im not sure where that
     // yellow top banner is coming from — change it to the colour of the
     // chosen station"). It replaces the prototype's fixed gold.
@@ -359,7 +374,9 @@ struct LastPlayedView: View {
   /// `arrow` draws the dropdown tip a period dialog puts on a combo box. It
   /// is window furniture and claims nothing — unlike a slider or a state
   /// toggle, a tip does not assert a value we would have to know.
-  private func field(_ caption: String, _ value: String, arrow: Bool = false) -> some View {
+  private func field(_ caption: String, _ value: String, arrow: Bool = false,
+                     h: CGFloat = 26, cap: CGFloat = 11, val: CGFloat = 12,
+                     capW: CGFloat = 52) -> some View {
     HStack(spacing: 7) {
       // 52, AND IT WAS MEASURED OFF THE ttf's OWN hmtx RATHER THAN GUESSED,
       // twice now. At 11pt in DotGothic16: "Artist:" 38.50, "Track:" 33.00,
@@ -369,13 +386,13 @@ struct LastPlayedView: View {
       // truncating it to "Arti···". `fixedSize` on top of that: this is a
       // static label, so it must never be the thing that gives way — if
       // anything has to shrink it is the value beside it, which is free to.
-      Text(caption).font(pixelFont(11)).foregroundColor(paperInk)
-        .fixedSize().frame(width: 52, alignment: .leading)
+      Text(caption).font(pixelFont(cap)).foregroundColor(paperInk)
+        .fixedSize().frame(width: capW, alignment: .leading)
       ZStack {
         Color.white
         bevel(raised: false, width: 2)
         HStack(spacing: 0) {
-          Text(value).font(pixelFont(12)).foregroundColor(.black)
+          Text(value).font(pixelFont(val)).foregroundColor(.black)
             .lineLimit(1).padding(.horizontal, 7)
             .frame(maxWidth: .infinity, alignment: .leading)
           if arrow {
@@ -389,12 +406,12 @@ struct LastPlayedView: View {
               Triangle().fill(paperInk).frame(width: 7, height: 5)
                 .rotationEffect(.degrees(180))
             }
-            .frame(width: 18, height: 20)
+            .frame(width: h - 8, height: h - 6)
             .padding(.trailing, 3)
           }
         }
       }
-      .frame(height: 26)
+      .frame(height: h)
     }
   }
 
@@ -787,106 +804,111 @@ struct LastPlayedView: View {
   // ── THE TALL ARRANGEMENTS ──────────────────────────────────────────────
 
   /**
-   * THE CD PLAYER, TALL — the window, then the disc in the room it makes.
+   * THE CD PLAYER, TALL — the window IS the tile, and it carries the share
+   * card's own right-hand cluster.
    *
-   * NOT THE WINDOW STRETCHED, which is the whole design decision here. A
-   * Winamp window is a wide, short thing: its title bar, its cover and its
-   * two fields all have a natural height, and pulling them down a 354pt tile
-   * leaves a dialog with a dead band inside it. So the window keeps very
-   * nearly the proportions it has on the medium tile and the height that is
-   * left over is spent on the disc itself, sitting on a shelf underneath.
+   * THIS IS THE THIRD ROUND ON THIS LOOK AND EACH ONE REVERSED THE LAST ON
+   * THE OWNER'S OWN EVIDENCE, so the reasoning is worth keeping in order.
+   * 24.09 argued a Winamp window is a wide, short thing, so the honest tall
+   * version is the window plus a record shelf under it — and it spent about
+   * 60% of the tile on a disc in a lit room. 25.09 she put that on a phone
+   * beside the app's Y2K SHARE CARD and the card plainly reads more like a
+   * player: it fills its frame with WINDOW. That round made it a window and
+   * left three faults, which she named in one message:
    *
-   * The room takes the station's own light, the same derivation the record
-   * and the mirror ball stand in (`tileHalo`'s arithmetic, 22.09), rather
-   * than a fixed colour — a dark tile with a coloured pool under the disc.
+   *   "Leave the progress bar out then and keep 'last played'. I want to
+   *    have these contents on the right hand side. The designs are still
+   *    missing a lot of details — there's too much empty space. Lastly the
+   *    texts needs to scale larger."
+   *
+   * THE STRIP ABOVE THE TITLE BAR AND THE GAP AT THE FOOT WERE ONE FAULT.
+   * The VStack was shorter than the tile, so SwiftUI centred it — which put
+   * a band of window above the bar and an empty band below the last field.
+   * It is pinned with `.frame(maxHeight: .infinity, alignment: .top)` and
+   * the body's own Spacer, so the bar sits on the tile's top edge.
+   *
+   * AND THE WINDOW RUNS TO THE TILE'S OWN EDGE, which is what the MEDIUM
+   * window has always done — "make sure that this is gone and that the card
+   * is the shape of the widget itself", said twice. The tall one had drifted
+   * to a 13pt border of room, so the two sizes of one look disagreed about
+   * the most visible thing about them. The room gradients that border used
+   * to show are gone with it rather than left underneath: a layer nothing
+   * can reveal is a layer that will be tuned by somebody one day.
    */
   private func cdPlayerTall(_ s: WidgetStation) -> some View {
-    ZStack {
-      LinearGradient(colors: [Color(hex: "#1b1f28"), Color(hex: "#0a0c11")],
+    ZStack(alignment: .topLeading) {
+      // The same face as the medium window, for the same reason: lit at the
+      // top because a moulded panel is lit from above, and NOT darkened at
+      // the foot (the vignette came off on 14.09).
+      LinearGradient(colors: [faceLit.opacity(0.55), face, face, face],
                      startPoint: .top, endPoint: .bottom)
-      // THE LAMP SITS LOW AND BEHIND THE WINDOW'S FOOT. It used to light a
-      // disc on a shelf; with the window taking the tile there is no shelf,
-      // and a glow behind a grey dialog only greys it. What is left of the
-      // room is what stops the tile reading as a screenshot of a dialog
-      // rather than a dialog standing in one. Falloff, never a blur — a blur
-      // is the one thing in this target that forces an offscreen buffer.
-      RadialGradient(stops: [
-        .init(color: s.accentColor.opacity(0.26), location: 0.00),
-        .init(color: s.accentColor.opacity(0.11), location: 0.58),
-        .init(color: s.accentColor.opacity(0.00), location: 1.00),
-      ], center: .init(x: 0.5, y: 0.90), startRadius: 0, endRadius: 210)
-
-      ZStack {
-        LinearGradient(colors: [faceLit.opacity(0.55), face, face, face],
-                       startPoint: .top, endPoint: .bottom)
-        VStack(spacing: 0) {
-          cdTitleBar(s)
-          cdBodyTall(s)
-        }
-        WindowShading()
+      VStack(spacing: 0) {
+        cdTitleBar(s, big: true)
+        cdBodyTall(s)
       }
-      .clipShape(RoundedRectangle(cornerRadius: 3))
-      .padding(13)
+      .frame(maxHeight: .infinity, alignment: .top)
+      WindowShading()
     }
     .widgetURL(s.url(mode: s.mode))
   }
 
   /**
-   * THE TALL WINDOW'S CONTENTS — cover and controls across the top, four
-   * labelled fields the full width beneath.
+   * THE TALL WINDOW'S CONTENTS — cover and the full control cluster across
+   * the top, four labelled fields the width of the window beneath, and the
+   * one row the share card spends on a scrub bar spent on LAST PLAYED.
    *
-   * THIS REVERSED A DECISION MADE THE DAY BEFORE, on the owner's own
-   * evidence. 24.09 argued a Winamp window is a wide, short thing, so the
-   * honest tall version is the window with a record shelf under it rather
-   * than the window stretched — and it spent about 60% of the tile on a disc
-   * in a lit room. She then put the shipped tile beside the app's own Y2K
-   * SHARE CARD ("can we change the CD player to a larger Winamp like the
-   * share cards the app delivers") and the card plainly reads more like a
-   * player: it fills its frame with WINDOW.
+   * WHAT COMES ACROSS FROM HER CARD, AND WHAT CANNOT. Every exclusion here
+   * is this app's own honesty rule rather than a drawing problem, and the
+   * list is SHORTER than the one written on 24.09 — that note said shuffle
+   * and repeat "cannot come across", which was narrower than it needed to
+   * be and is corrected below.
    *
-   * THE OLD ARGUMENT'S FAULT WAS OFFERING ONE WAY TO SPEND HEIGHT. A window
-   * does not have to STRETCH its existing rows to grow; it can carry MORE
-   * ROWS, which is what the share card does. That is a genuinely taller
-   * dialog rather than a short one pulled out of shape.
+   *   THE SCRUB BAR: no, and she dropped it herself once the reason was
+   *   plain. A widget is redrawn a handful of times a day and the snapshot
+   *   carries no duration, so NEITHER number on that row is available. The
+   *   Y2K card had its own decorative bar taken to zero on 12.08 for the
+   *   same reason: "a bar sitting 42% along beside them says two different
+   *   things at once."
    *
-   * THREE THINGS ON THAT CARD CANNOT COME ACROSS, and each is this app's own
-   * honesty rule rather than a drawing problem.
+   *   THE VOLUME: the + and − keys and the WELL come across; the green
+   *   LEVEL inside it does not. We do not know the volume, and a bar drawn
+   *   at a guessed height is an invented readout — exactly the rule she had
+   *   just applied to the progress bar. An empty trough is furniture.
    *
-   *   THE SCRUB BAR. A widget is redrawn a handful of times a day, so it
-   *   cannot know where a song is up to — which is exactly why this tile
-   *   says LAST PLAYED and never NOW PLAYING. The Y2K card itself had its
-   *   own decorative bar taken to zero on 12.08 for the same reason: "the
-   *   times either side read 0:00 and a bar sitting 42% along beside them
-   *   says two different things at once."
+   *   SHUFFLE, REPEAT AND THE HEART: drawn as plain unlit keys. The app
+   *   does track shuffle and repeat, and since this tile is about the song
+   *   LAST played, a past-tense readout would be honest if the snapshot
+   *   carried them — it does not today, and her own card draws them unlit
+   *   too. The heart stays unlit for good: nothing in this app has ever
+   *   stored a liked song.
    *
-   *   THE VOLUME. We do not know it, and a level bar drawn at a guessed
-   *   height is an invented readout.
+   *   LAST PLAYED · <time>: the one fact this tile genuinely has, and the
+   *   thing it is named after. `LastPlayed.at` is already stored by the app;
+   *   the WORDING is decided in JS and sent as a string, the way `modeName`
+   *   and the schedule's own labels are, so the extension never owns a
+   *   second copy of a formatting rule.
    *
-   *   SHUFFLE, REPEAT AND THE HEART. All three are STATE. The app knows two
-   *   of them during a drive; the snapshot carries none, and a value from
-   *   the last time the app ran would be stale by the time anyone looked.
+   * COUNTED RATHER THAN EYEBALLED, at 338x354 with the window filling it:
    *
-   * THE FOUR FIELDS ARE WHAT DOES COME ACROSS, and they are the best part of
-   * her card: artist, track, station and mode are all real, all already in
-   * the snapshot, and four full-width rows are the one thing a tall tile has
-   * room for and a wide one never will.
+   *   title bar        36    (title 19pt, was 15)
+   *   body top pad      8
+   *   top row         124    (cover 124 square | cluster 180 wide)
+   *   air              10
+   *   four fields     138    (4 x 30, 3 x 6 between; caption 14, value 16)
+   *   Spacer            8
+   *   LAST PLAYED      20
+   *   body bottom pad  10
+   *   ─────────────────────
+   *                   354 exactly, with the slack held in ONE Spacer above
+   *                   the foot row rather than spread through the stack.
    *
-   * THE TRANSPORT IS THREE BUTTONS, NOT HER CARD'S ELEVEN, and stays
-   * ornament — the settled rule for this target: the wide window already
-   * draws a play button that does nothing, and the Pocket Player's wheel is
-   * deliberately plain "so it does not read as a control that is broken".
-   * Eleven at this size is a row of grey smudges, and a wall of dead
-   * controls is the exact thing that rule exists to avoid.
-   *
-   * COUNTED RATHER THAN EYEBALLED, at 338x354 with 13 of padding, so the
-   * window has 312x328: title bar 32, air 10, cover row 120, air 12, four
-   * fields 125 (4 x 26, 3 x 7 between), bottom padding 12 — 311 of 328, so
-   * nothing is compressed to fit. The cluster beside the cover gets
-   * 288 - 120 - 11 = 157, which takes three 42pt buttons with 6 between.
+   * Content width 314 = cover 124 + 10 + cluster 180, and the cluster's own
+   * three rows each come to 180: CD 40 + deck 80 + volume 46 with 7 between;
+   * pause 88 | shuffle 41 | repeat 41 with 5; five 32pt keys with 5.
    */
   private func cdBodyTall(_ s: WidgetStation) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
-      HStack(alignment: .top, spacing: 11) {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(alignment: .top, spacing: 10) {
         ZStack {
           Color.white
           bevel(raised: false, width: 2)
@@ -898,63 +920,196 @@ struct LastPlayedView: View {
             s.gradient.padding(3)
           }
         }
-        .frame(width: 120, height: 120)
+        .frame(width: 124, height: 124)
         .clipped()
 
-        VStack(spacing: 0) {
-          // The window's own disc, not a mode indicator: this look IS the CD
-          // player, and the Mode field below says in words what is playing.
-          // Her card carries a CD and a tape deck as decoration; one object
-          // that belongs to the window beats two that belong to neither.
-          discGlyph(size: 46)
-          Spacer(minLength: 6)
-          HStack(spacing: 6) {
-            transportKey(.back)
-            transportKey(.play)
-            transportKey(.forward)
-          }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 120)
+        cdCluster()
       }
 
-      VStack(spacing: 7) {
-        field("Artist:", entry.lastPlayed?.artist ?? "—", arrow: true)
-        field("Track:", entry.lastPlayed?.title ?? "—", arrow: true)
-        field("Station:", "\(s.name) · \(s.dial)", arrow: true)
+      VStack(spacing: 6) {
+        field("Artist:", entry.lastPlayed?.artist ?? "—", arrow: true, h: 30, cap: 14, val: 16, capW: 64)
+        field("Track:", entry.lastPlayed?.title ?? "—", arrow: true, h: 30, cap: 14, val: 16, capW: 64)
+        field("Station:", "\(s.name) · \(s.dial)", arrow: true, h: 30, cap: 14, val: 16, capW: 64)
         // The app's own label for the deck, sent in the snapshot rather than
         // mapped here — see `modeName` in Snapshot.swift for why.
-        field("Mode:", s.modeName ?? "—", arrow: true)
+        field("Mode:", s.modeName ?? "—", arrow: true, h: 30, cap: 14, val: 16, capW: 64)
       }
+      .padding(.top, 10)
+
+      Spacer(minLength: 0)
+
+      HStack(spacing: 6) {
+        Text("LAST PLAYED").font(pixelFont(12)).foregroundColor(paperInk.opacity(0.66))
+        Spacer(minLength: 4)
+        // Absent on a phone whose app has not run since this field was added,
+        // and on one that has never played anything — the caption alone is
+        // still true, so there is nothing to hide.
+        if let when = entry.lastPlayed?.playedAt {
+          Text(when).font(pixelFont(15)).foregroundColor(paperInk)
+        }
+      }
+      .frame(height: 20)
     }
     .padding(.horizontal, 12)
-    .padding(.top, 10)
-    .padding(.bottom, 12)
+    .padding(.top, 8)
+    .padding(.bottom, 10)
   }
 
-  private enum TransportKey { case back, play, forward }
+  /**
+   * THE SHARE CARD'S RIGHT-HAND BLOCK, 180 x 124 — owner, 25.09: "I want to
+   * have these contents on the right hand side."
+   *
+   * IT TAKES NOTHING FROM THE SNAPSHOT ON PURPOSE. Every part of it is
+   * either window furniture (the keys, the trough) or decoration (the CD,
+   * the tape deck), so there is nothing here that can be stale, and nothing
+   * that reads as a control that is broken — which is the settled rule for
+   * this target (03.09, the Pocket Player's deliberately unlabelled wheel).
+   * The three keys this replaces left most of a 180 x 124 block empty, which
+   * is the "too much empty space" she named.
+   */
+  private func cdCluster() -> some View {
+    VStack(spacing: 9) {
+      HStack(spacing: 7) {
+        discGlyph(size: 40)
+        deckGlyph(width: 80, height: 40)
+        volumeBlock(width: 46, height: 40)
+      }
+      .frame(height: 44)
 
-  /// One of the three. ORNAMENT, and drawn quiet on purpose — see the note
-  /// on `cdBodyTall`. A period key is a raised face with a dark glyph on it;
-  /// nothing here is a control and nothing here claims to be.
-  private func transportKey(_ kind: TransportKey) -> some View {
+      HStack(spacing: 5) {
+        winKey(.pause, width: 88, height: 30)
+        winKey(.shuffle, width: 41, height: 30)
+        winKey(.repeatAll, width: 41, height: 30)
+      }
+
+      HStack(spacing: 5) {
+        winKey(.prev, width: 32, height: 32)
+        winKey(.rewind, width: 32, height: 32)
+        winKey(.forward, width: 32, height: 32)
+        winKey(.next, width: 32, height: 32)
+        winKey(.heart, width: 32, height: 32)
+      }
+    }
+    .frame(width: 180, height: 124)
+  }
+
+  /// The little rack tape deck off the share card, seen slightly from above.
+  /// PURE DECORATION, AND HONEST AS DECORATION — unlike a level bar it
+  /// asserts no value, so it cannot go stale.
+  private func deckGlyph(width: CGFloat, height: CGFloat) -> some View {
     ZStack {
+      face
+      bevel(raised: true, width: 2)
+      VStack(spacing: 0) {
+        HStack(spacing: 4) {
+          // the power lamp
+          Rectangle().fill(Color(hex: "#e5433c"))
+            .frame(width: 5, height: 4)
+            .overlay(Rectangle().stroke(Color(hex: "#7c1f1c"), lineWidth: 1))
+          // the cassette window, sunken and dark, with both hubs showing
+          ZStack {
+            Color(hex: "#3b4046")
+            bevel(raised: false, width: 1.5)
+            HStack(spacing: 0) {
+              Spacer(minLength: 0)
+              Circle().fill(Color(hex: "#8a9097")).frame(width: 4, height: 4)
+              Spacer(minLength: 0)
+              Circle().fill(Color(hex: "#8a9097")).frame(width: 4, height: 4)
+              Spacer(minLength: 0)
+            }
+          }
+          .frame(height: 13)
+        }
+        Spacer(minLength: 2)
+        // the row of little keys along the foot
+        HStack(spacing: 1) {
+          ForEach(0..<8, id: \.self) { _ in
+            ZStack { face; bevel(raised: true, width: 1) }
+          }
+        }
+        .frame(height: 7)
+      }
+      .padding(4)
+    }
+    .frame(width: width, height: height)
+  }
+
+  /// + and − over an EMPTY well. The well is the point: it is the shape the
+  /// share card draws, with nothing in it, because the volume is not
+  /// something this extension can know. See the note on `cdBodyTall`.
+  private func volumeBlock(width: CGFloat, height: CGFloat) -> some View {
+    let keyW = width - 16, keyH = (height - 4) / 2
+    return HStack(spacing: 4) {
+      VStack(spacing: 4) {
+        winKey(.plus, width: keyW, height: keyH)
+        winKey(.minus, width: keyW, height: keyH)
+      }
+      ZStack {
+        Color(hex: "#a9adb3")
+        bevel(raised: false, width: 2)
+      }
+      .frame(width: 12)
+    }
+    .frame(width: width, height: height)
+  }
+
+  private enum WinKey {
+    case play, pause, prev, next, rewind, forward
+    case shuffle, repeatAll, heart, plus, minus
+  }
+
+  /// One key. ORNAMENT, and drawn quiet on purpose — a period key is a
+  /// raised face with a dark glyph on it, and nothing here claims to be a
+  /// control. Every glyph is a SHAPE rather than a character: this extension
+  /// cannot be compiled or rendered here, so a codepoint the system font
+  /// happens not to cover would ship as a hollow box with nothing logged
+  /// anywhere. It is also what the medium window's own play key already does.
+  private func winKey(_ kind: WinKey, width: CGFloat, height: CGFloat) -> some View {
+    let g = min(width, height)
+    return ZStack {
       face
       bevel(raised: true, width: 2)
       switch kind {
       case .play:
         Triangle().fill(paperInk).frame(width: 10, height: 12).offset(x: 1)
-      case .back, .forward:
+      case .pause:
+        HStack(spacing: 3) {
+          Rectangle().fill(paperInk).frame(width: 3, height: 11)
+          Rectangle().fill(paperInk).frame(width: 3, height: 11)
+        }
+      case .prev, .next:
         HStack(spacing: 1.5) {
+          if kind == .prev { Rectangle().fill(paperInk).frame(width: 2, height: 10) }
+          Triangle().fill(paperInk).frame(width: 7, height: 9)
+            .rotationEffect(.degrees(kind == .prev ? 180 : 0))
+          if kind == .next { Rectangle().fill(paperInk).frame(width: 2, height: 10) }
+        }
+      case .rewind, .forward:
+        HStack(spacing: 1) {
           Triangle().fill(paperInk).frame(width: 7, height: 9)
           Triangle().fill(paperInk).frame(width: 7, height: 9)
         }
-        // A back key is the forward key turned round, which is how the glyph
-        // is built everywhere else in this app rather than a second drawing.
-        .rotationEffect(.degrees(kind == .back ? 180 : 0))
+        // A rewind key is the forward key turned round, which is how every
+        // mirrored glyph in this app is built rather than a second drawing.
+        .rotationEffect(.degrees(kind == .rewind ? 180 : 0))
+      case .shuffle:
+        ShuffleGlyph().stroke(paperInk, style: StrokeStyle(lineWidth: g * 0.10,
+                                                           lineCap: .round, lineJoin: .round))
+          .frame(width: g * 0.56, height: g * 0.56)
+      case .repeatAll:
+        RepeatGlyph().stroke(paperInk, style: StrokeStyle(lineWidth: g * 0.10,
+                                                          lineCap: .round, lineJoin: .round))
+          .frame(width: g * 0.56, height: g * 0.56)
+      case .heart:
+        HeartGlyph().fill(paperInk).frame(width: g * 0.50, height: g * 0.50)
+      case .plus, .minus:
+        ZStack {
+          Rectangle().fill(paperInk).frame(width: 11, height: 2)
+          if kind == .plus { Rectangle().fill(paperInk).frame(width: 2, height: 11) }
+        }
       }
     }
-    .frame(width: 42, height: 30)
+    .frame(width: width, height: height)
   }
 
   /**
@@ -1152,6 +1307,79 @@ struct Triangle: Shape {
     p.addLine(to: CGPoint(x: r.minX, y: r.maxY))
     p.closeSubpath()
     return p
+  }
+}
+
+/**
+ * THE THREE GLYPHS THE WINDOW'S KEYS NEED THAT A TRIANGLE CANNOT DRAW.
+ *
+ * ALL STRAIGHT LINES AND CURVES IN A 24-UNIT BOX, NEVER A CHARACTER. This
+ * extension cannot be compiled or rendered in the environment it is written
+ * in, so a codepoint the system font happens not to cover would ship as a
+ * hollow box with nothing logged anywhere — which is exactly what happened
+ * to the station icons in build 39, and why `field` draws its dropdown tip
+ * as a turned-over Triangle rather than asking for "\u{25BC}".
+ *
+ * AND THE LOOP IS SQUARE-CORNERED ON PURPOSE, not merely to avoid an arc:
+ * `Triangle`'s own note already establishes the house style here as "the
+ * blunt, square-cornered look of the rest of the window chrome". An arc
+ * would also have to be trusted sight-unseen, since SwiftUI's `clockwise`
+ * is expressed in a flipped coordinate system and a wrong one draws the
+ * long way round.
+ */
+
+/// Two crossing runs, each ending in a chevron — never a close-box X, which
+/// is the shape sitting in the title bar three rows above it.
+struct ShuffleGlyph: Shape {
+  func path(in r: CGRect) -> Path {
+    let s = min(r.width, r.height) / 24
+    let ox = r.midX - 12 * s, oy = r.midY - 12 * s
+    func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * s, y: oy + y * s) }
+    var path = Path()
+    path.move(to: p(2, 6));  path.addLine(to: p(7, 6))
+    path.addLine(to: p(17, 18)); path.addLine(to: p(21, 18))
+    path.move(to: p(18, 15)); path.addLine(to: p(21, 18)); path.addLine(to: p(18, 21))
+    path.move(to: p(2, 18)); path.addLine(to: p(7, 18))
+    path.addLine(to: p(17, 6)); path.addLine(to: p(21, 6))
+    path.move(to: p(18, 3)); path.addLine(to: p(21, 6)); path.addLine(to: p(18, 9))
+    return path
+  }
+}
+
+/// A loop with a gap in each side and an arrow at the end of each run, so it
+/// reads as travel rather than as a rectangle.
+struct RepeatGlyph: Shape {
+  func path(in r: CGRect) -> Path {
+    let s = min(r.width, r.height) / 24
+    let ox = r.midX - 12 * s, oy = r.midY - 12 * s
+    func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * s, y: oy + y * s) }
+    var path = Path()
+    // up the left, across the top, part-way down the right
+    path.move(to: p(5, 13)); path.addLine(to: p(5, 5))
+    path.addLine(to: p(19, 5)); path.addLine(to: p(19, 10))
+    path.move(to: p(16, 7)); path.addLine(to: p(19, 10)); path.addLine(to: p(22, 7))
+    // down the right, across the foot, part-way up the left
+    path.move(to: p(19, 11)); path.addLine(to: p(19, 19))
+    path.addLine(to: p(5, 19)); path.addLine(to: p(5, 14))
+    path.move(to: p(2, 17)); path.addLine(to: p(5, 14)); path.addLine(to: p(8, 17))
+    return path
+  }
+}
+
+/// PORTED FROM THE APP'S OWN SHARE CARD rather than drawn again — the same
+/// two curves, its 68-unit geometry scaled to 24 — so the widget's heart and
+/// the card's are one shape at two sizes.
+struct HeartGlyph: Shape {
+  func path(in r: CGRect) -> Path {
+    let s = min(r.width, r.height) / 24
+    let ox = r.midX - 12 * s, oy = r.midY - 12 * s
+    func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * s, y: oy + y * s) }
+    var path = Path()
+    path.move(to: p(12, 17.6))
+    path.addCurve(to: p(12, 9.2), control1: p(2.5, 11.3), control2: p(6.4, 3.9))
+    path.addCurve(to: p(12, 17.6), control1: p(17.6, 3.9), control2: p(21.5, 11.3))
+    path.closeSubpath()
+    return path
   }
 }
 

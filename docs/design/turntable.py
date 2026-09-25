@@ -1,5 +1,13 @@
 """
-THE RECORD BECOMES A TURNTABLE.
+THE RECORD BECOMES A TURNTABLE  (ROUND 1 — SUPERSEDED, SHE DID NOT PICK).
+
+See `turntable_one.py`. She replied to this sheet with an MD Vinyl
+screenshot and named the raised control strip specifically ("instead of the
+rectangle border at the bottom the buttons should just sit at the bottom"),
+so the strip, the knobs, the pitch fader, the speed keys and the arm rest
+are all gone in round 2. THE ONE FINDING WORTH CARRYING FORWARD is in the
+note below about the arm setting the record’s size: it is true, and it is
+why round 2 redrew the arm rather than reusing the app’s own.
 
 Owner, 2026-09-26, with a photograph of the large Record tile on her phone:
 

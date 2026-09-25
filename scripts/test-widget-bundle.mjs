@@ -827,6 +827,75 @@ if (declared.length < 5 || Object.keys(kinds).length < 5) {
     'two widths and two heights are a real barcode\u2019s own proportions');
 }
 
+
+// ── THE DECK'S KEYS ARE FURNITURE, AND ITS ARM IS SIZED OFF ITS RECORD ────
+//
+// Owner, 26.09, with an MD Vinyl screenshot: "instead of the rectangle border
+// at the bottom the buttons should just sit at the bottom -- these buttons
+// can be pill shaped and make them look 3d and do them silver... no text,
+// keep only the playback, forward play/pause buttons."
+//
+//   A KEY ON A WIDGET CANNOT DO ANYTHING, because a widget extension is its
+//   own process and cannot reach a music service (19.09). So these three are
+//   part of the OBJECT, like the Pocket Player's unlabelled wheel and the CD
+//   window's key cluster — and the way that stops being true is somebody
+//   wiring one to the snapshot, at which point it can go stale and read as a
+//   control that is broken.
+//
+//   THE MIDDLE KEY CARRIES A TRIANGLE *AND* TWO BARS, which is the printed
+//   label on a real combined key. Drawn as one or the other it is claiming a
+//   state this row of tiles says LAST PLAYED precisely because it lacks.
+//
+//   AND THE ARM IS SIZED OFF THE RECORD, not off the tile. Its whole geometry
+//   is fractions of the disc's radius — the stylus at 0.80r, the weight's far
+//   edge at 1.169r — so an arm given its own number is an arm that lands on
+//   the label or hangs off the corner the day the record moves.
+{
+  // MATCHED WITH A WORD BOUNDARY, and the first cut was not: `indexOf`
+  // on "private struct TransportKey" finds "TransportKeys" instead, because
+  // one name is a PREFIX of the other. Both existence checks passed while
+  // reading the same struct twice — the vacuous-pass fault in a new place,
+  // caught only because the rule that needed the real body then failed. The
+  // container is named TransportRow now as well, so the hazard is gone
+  // whichever way this is read.
+  const structBody = (name, s) => {
+    const i = s.search(new RegExp(`private struct ${name}\\b`));
+    if (i < 0) return null;
+    let j = s.indexOf('{', i), depth = 0, k = j;
+    for (; k < s.length; k++) {
+      if (s[k] === '{') depth += 1;
+      else if (s[k] === '}') { depth -= 1; if (!depth) break; }
+    }
+    return decomment(s.slice(j, k));
+  };
+  const mw = src_['ModeWidget.swift'] ?? '';
+  for (const n of ['Turntable', 'Tonearm', 'TransportRow', 'TransportKey']) {
+    check(`${n} exists to be checked`, !!structBody(n, mw),
+      'a rename must fail here loudly rather than pass against nothing');
+  }
+
+  const key = (structBody('TransportKey', mw) ?? '') + (structBody('TransportRow', mw) ?? '');
+  check('the keys read nothing from the snapshot, so nothing on them can go stale',
+    !!key && !/\b(entry|station|WidgetStation|Art\.|lastPlayed)\b/.test(key),
+    'a widget cannot reach a music service, so a key that looked live would be broken');
+  check('every key glyph is a shape, not a character',
+    !!key && !/\bText\(/.test(key),
+    'a Text( here is a codepoint bet nothing in this repo can settle');
+  const play = key.match(/case \.play:[\s\S]*?(?=\n\s*\})/);
+  check('the play key was found', !!play);
+  check('and it carries a triangle AND bars together',
+    !!play && /Triangle\(/.test(play[0]) && /RoundedRectangle\(/.test(play[0]),
+    'one or the other is a claim about what the song is doing');
+
+  const deck = structBody('Turntable', mw) ?? '';
+  const armed = deck.match(/Tonearm\(r: (\w+) \/ 2\)/);
+  check('the arm takes the record’s own radius', !!armed,
+    'its geometry is fractions of the disc — the stylus at 0.80r, the weight at 1.169r');
+  check('and it is the same record the tile draws',
+    !!armed && new RegExp(`size: ${armed[1]}\\b`).test(deck),
+    'two numbers for one disc is how an arm ends up on the label');
+}
+
 // ── PINNING A TILE TO A STATION ───────────────────────────────────────────
 // Four widgets can be pinned, and the five that name a station must all reach
 // it the same way. Before this, each wrote `lastDrive ?? currentOnAir()` for

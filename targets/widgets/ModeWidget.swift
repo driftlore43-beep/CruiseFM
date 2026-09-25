@@ -427,77 +427,64 @@ struct ModeView: View {
    * record where type belongs.
    */
   private func record(_ s: WidgetStation, k: CGFloat, large: Bool) -> some View {
-    // THE BIG TILE'S RECORD FILLS IT, and getting there took deleting the
-    // thing that was in its way. Owner, 24.09, off a photograph of the
-    // shipped large tile: "the vinyl should be larger (fill the space) and
-    // more defined. try to remove the tonearm stick."
+    // THE BIG TILE BECOMES A DECK, AND THE SMALL ONE STAYS A RECORD.
     //
-    // THE ARM WAS COSTING THE RECORD A QUARTER OF ITS WIDTH. Its bearing sat
-    // at 1.10 of the record's own radius out to the right with the
-    // counterweight riding past that, so the disc had to come down to 108 * k
-    // — 231pt across a 338pt tile — to keep the weight on the tile at all.
-    // With the arm gone that constraint goes with it.
+    // Owner, 26.09, with a screenshot of MD Vinyl's widgets: "create a better
+    // tonearm design. Instead of the rectangle border at the bottom the
+    // buttons should just sit at the bottom -- these buttons can be pill
+    // shaped and make them look 3d and do them silver... if there was a way
+    // to fit them in one widget without squashing the vinyl that would be
+    // great. I'd suggest no text, keep only the playback, forward play/pause
+    // buttons." She picked C off the sheet: the cover on the label, the red
+    // pressing behind it as the fallback.
     //
-    // 150, NOT 139, AND ONLY HERE. 139 is what every other size draws and it
-    // is right for them: a small tile shares a row with other small tiles, so
-    // a little air is what lets it read as an object among them rather than
-    // as a square that has been filled in. A large tile carries ONE object
-    // and nothing else — no caption, no second row — so that air is doing no
-    // work. 150 * k lands at 321 of 338, i.e. 8.5pt each side, which is a
-    // record that fills its frame without touching it. It is deliberately
-    // not pushed further: the accent hairline round the rim is the station's
-    // colour on this tile, and on the very edge it would read as a line
-    // drawn on the tile rather than on the record.
+    // THIS REVERSES 24.09 KNOWINGLY, AND SHE IS THE ONE REVERSING IT. That
+    // round DELETED the tonearm on her own instruction ("the vinyl should be
+    // larger (fill the space) and more defined. try to remove the tonearm
+    // stick"), and the big record grew from 108 * k to 150 * k precisely
+    // because the arm was no longer in its way. The arm is being asked back
+    // as part of a DIFFERENT object: not a record with a stick beside it,
+    // but a deck. So the record gives some of those points back, and this
+    // time they buy furniture rather than nothing.
     //
-    // NOTE WHAT IT COSTS, since it is a real trade rather than a free win:
-    // the halo is squeezed into the corners and the contact shadow is mostly
-    // clipped, so the station's colour arrives almost entirely through the
-    // rim and the label. Measured on docs/design/record_widget.py the edge
-    // step actually RISES (10.00 -> 10.33), because the room that is left is
-    // darker — the record has less to stand against but stands against it
-    // better.
-    let d = (large ? 150 : 139) * k
+    // THE SMALL AND MEDIUM TILES ARE UNTOUCHED AT 139 * k, and that is the
+    // point of the split rather than an omission: a deck needs room for an
+    // arm and a row of keys, and on a 158pt tile there is none -- the keys
+    // would set under 5pt tall, which is the size everything on this target
+    // turns into a grey smudge at. A tile that carries ONE object and a tile
+    // that carries a machine are two different drawings.
+    let d = 139 * k
     return ZStack {
-      // THE STATION'S OWN GLOW, THE SAME ONE THE BALL STANDS IN (20.09). This
-      // was a fixed grey radial — #1a1a1f to #08080a — and it was why the
-      // record was the one square of the three carrying no trace of the
-      // station it is tuned to: a Home Screen with all of The Mode's looks on
-      // it had a coloured ball, a coloured disc and a monochrome record.
-      //
-      // `tileHalo` is derived from the accent and is hue-safe, so a station
-      // with no colour in it still arrives at the plain near-black the old
-      // literal gave. The whole derivation is on it in Snapshot.swift.
-      //
-      // EASED TO 0.70 FOR THIS TILE, at the owner's own suggestion (20.09),
-      // and it is not merely taste: the record is 139 of a 158pt tile against
-      // the ball's 126, so there is far less room here for a glow to live in,
-      // and every level of it is a level the black disc has to stand against.
-      // Measured on docs/design/record_widget.py the record's edge steps 5.67
-      // against its surround at full strength and 10.00 at 0.70 — a station
-      // that is still plainly named by its colour, on a record that reads.
-      s.tileHalo(k, strength: 0.70)
-      // AND THE SHADOW IS NOT OPTIONAL ONCE THE HALO IS THERE, which the
-      // prototype measured rather than assumed: the halo ALONE made the record
-      // read LESS separate than before, because a black disc on a lit ground
-      // has less to stand against than a black disc on a black one. Measured
-      // on docs/design/record_widget.py, the record's own edge steps 1.67
-      // levels against its surround today, 0.33 with the halo alone, and 3.67
-      // with both. They are one change, not two.
-      RecordShadow(size: d)
-      // NOT ONE WORD ON IT, AND AS BIG AS THE TILE ALLOWS (owner, 09.09:
-      // "increase the size of the vinyl too, remove the station's text so
-      // it's just the vinyl"). It carried the frequency on its label; a
-      // record on its own is the whole idea of this look, and the station
-      // still names itself on every other row in the gallery.
-      //
-      // 139 OF THE TILE, WHATEVER THE TILE IS — see the note on `body`. It
-      // was a flat 144, which leaves 7pt each side on an iPhone and is WIDER
-      // THAN THE WHOLE TILE on a 141pt iPad, where the owner found it
-      // "currently just touching the edges" (14.09). 144 -> 139 is also the
-      // fraction off she asked for, so even at k = 1 there is a little more
-      // air than before; the record's own shadow needs somewhere to fall,
-      // which is what stops it going wider again.
-      RecordView(accent: s.accentColor, label: nil, size: d, plainLabel: true)
+      if large {
+        Turntable(station: s, k: k)
+      } else {
+        // THE STATION'S OWN GLOW, THE SAME ONE THE BALL STANDS IN (20.09).
+        // This was a fixed grey radial -- #1a1a1f to #08080a -- and it was
+        // why the record was the one square of the three carrying no trace
+        // of the station it is tuned to. `tileHalo` is derived from the
+        // accent and is hue-safe, so a station with no colour in it still
+        // arrives at the plain near-black the old literal gave.
+        //
+        // EASED TO 0.70 FOR THIS TILE, at the owner's own suggestion (20.09):
+        // the record is 139 of a 158pt tile against the ball's 126, so there
+        // is far less room here for a glow to live in, and every level of it
+        // is a level the black disc has to stand against. Measured on
+        // docs/design/record_widget.py the record's edge steps 5.67 against
+        // its surround at full strength and 10.00 at 0.70.
+        s.tileHalo(k, strength: 0.70)
+        // AND THE SHADOW IS NOT OPTIONAL ONCE THE HALO IS THERE, which the
+        // prototype measured rather than assumed: the halo ALONE made the
+        // record read LESS separate than before, because a black disc on a
+        // lit ground has less to stand against than a black disc on a black
+        // one. 1.67 levels today, 0.33 with the halo alone, 3.67 with both.
+        RecordShadow(size: d)
+        // NOT ONE WORD ON IT (owner, 09.09: "remove the station's text so
+        // it's just the vinyl"), and 139 OF THE TILE WHATEVER THE TILE IS --
+        // a flat 144 leaves 7pt each side on an iPhone and is WIDER THAN THE
+        // WHOLE TILE on a 141pt iPad, where she found it "currently just
+        // touching the edges" (14.09).
+        RecordView(accent: s.accentColor, label: nil, size: d, plainLabel: true)
+      }
     }
     .widgetURL(s.url(mode: "vinyl"))
   }
@@ -533,9 +520,12 @@ private struct BeamField: View {
 // object within a tile, which is exactly the exclusion that check documents.
 // So it belongs on this side of that line and must not be moved back.
 //
-// The tonearm used to live here too, for the same reason. It is gone: the
-// owner saw it on a phone and asked for it off (24.09), and an unused
-// drawing that looks like working machinery is its own trap.
+// The tonearm lives on this side of that line for exactly the same reason,
+// and it is BACK after being deleted on 24.09 -- the owner asked for it off
+// then and asked for it on again on 26.09, as part of a deck rather than as a
+// stick beside a record. Every part of it is placed with an `.offset` against
+// the record's own centre, which is placing a PART within a hero and not a
+// hero within a tile. The same is true of the keys.
 
 /**
  * THE RECORD'S CONTACT WITH WHAT IT IS LYING ON.
@@ -569,6 +559,306 @@ private struct RecordShadow: View {
       center: .center, startRadius: 0, endRadius: size * 0.63)
       .frame(width: size * 1.26, height: size * 1.26)
       .offset(y: size * 0.048)
+  }
+}
+
+/**
+ * ═══ THE BIG TILE'S DECK ═══════════════════════════════════════════════════
+ *
+ * The record, its arm and three keys, on the station's own glow. Only the
+ * LARGE family draws it; see the note in `record`.
+ *
+ * WHY THIS IS A STRUCT RATHER THAN A FEW MORE LINES IN `record`: every part of
+ * it is placed with an `.offset` against the record's centre, and
+ * `test-widget-bundle` refuses a line starting with `.offset(` anywhere
+ * between `struct ModeView` and `BeamField` — correctly, because there such a
+ * line is nudging the whole hero off the tile's centre, which is what dropped
+ * the ball and the disc down their tiles on 15.09. Here the hero IS the deck,
+ * it is centred, and the offsets place parts within it. That is the exclusion
+ * the check documents, and `RecordShadow` above is the same case.
+ *
+ * ── HOW BIG THE RECORD CAN BE, WHICH IS THE ONLY REAL DECISION HERE ───────
+ *
+ * The arm decides it, and that is why the arm was redrawn rather than reused.
+ * The app's own arm (`e92197e`, restored to the prototype sheet as round one)
+ * hangs its counterweight off a STUB out past the bearing, so its far edge
+ * lands at 1.284 of the record's own radius and the disc has to come down to
+ * 231pt across a 338pt tile to keep the weight on it — a third smaller than
+ * what shipped in build 69, which is exactly the squashing she asked to
+ * avoid. Folding the weight INTO the pivot housing, which is how a slim arm
+ * is really built and is what the reference shows, brings that to 1.169r.
+ *
+ *   build 69, no arm         321 across
+ *   the app's own arm        231 across   (-28%)
+ *   this one                 284 across   (-12%)
+ *
+ * COUNTED, NOT EYEBALLED, in the 338x354pt the large tile actually is.
+ * Across: r + 1.169r = 2.169r, 307pt, leaving 15 either side. Down: 1.023r
+ * above the record's centre (the weight sits above the disc) and r below,
+ * from 16 of top air to the record's foot at 303, which leaves 14 of air, a
+ * 21pt key and 16 of bottom margin.
+ *
+ * AND THE TOP-RIGHT CORNER IS WHAT ACTUALLY BINDS, which the first render
+ * missed: a widget clips to a rounded rectangle of about 22pt, so the weight
+ * has to clear the CURVE and not the edges. The first pass put the pivot at
+ * 1.06r / -0.86r with a longer barrel, which measures 1.140r above the centre
+ * and lands the weight's far corner INSIDE that curve — the render shows it
+ * sliced. As drawn the corner sits at (323, 16), 94 against the corner
+ * circle's 484. RULE: near a corner of this tile, check against the curve.
+ *
+ * ── WHAT THE KEYS MAY AND MAY NOT CLAIM ──────────────────────────────────
+ *
+ * THEY ARE FURNITURE. They are part of the object whether or not anything is
+ * playing, exactly like the Pocket Player's deliberately unlabelled wheel
+ * (03.09) and the CD window's key cluster (25.09) — so nothing in them can go
+ * stale and nothing reads as a control that is broken. A widget cannot reach
+ * a music service from its own process (19.09), so a key that looked live
+ * would BE broken.
+ *
+ * THE MIDDLE KEY CARRIES A TRIANGLE *AND* TWO BARS TOGETHER, which is the
+ * printed label on a real combined key. Drawn as one or the other it would be
+ * claiming a state, and this row of tiles says LAST PLAYED precisely because
+ * it does not know one.
+ *
+ * NO TEXT ANYWHERE ON IT, as asked — and as 09.09 already asked of this look
+ * ("remove the station's text so it's just the vinyl").
+ */
+private struct Turntable: View {
+  let station: WidgetStation
+  /// The tile's size against the 158pt reference — see the note on ModeView's
+  /// body. Everything here is a share of it.
+  let k: CGFloat
+
+  var body: some View {
+    // 133 * k = 284pt on an iPhone's large tile. The record, its shadow and
+    // its arm all read this, so they cannot disagree about where its edge is
+    // — two copies of one expression is how they would.
+    let vinyl = 133 * k
+    // WHERE THE RECORD SITS, AND IT IS NOT THE TILE'S CENTRE. The arm lives
+    // to the RIGHT of the disc and above it, so a centred record puts the
+    // counterweight through the corner. -5.6k across and -7.4k up is what
+    // balances the whole object in the tile: 15pt of margin on the left
+    // against 15 to the right of the weight, and 16 above it.
+    let dx = -5.6 * k
+    let dy = -7.4 * k
+    return ZStack {
+      station.tileHalo(k, strength: 0.70)
+      RecordShadow(size: vinyl)
+        .offset(x: dx, y: dy)
+      // THE COVER ON THE LABEL (owner, 26.09, picking C off the sheet), with
+      // the red pressing behind it. `songCover` is the song's own cover first
+      // and the station's photograph second, so a companion-mode listener who
+      // has no cover still gets a real picture; `plainLabel` is the last
+      // fallback, for a custom station with neither, and it is why the centre
+      // can never be a hole.
+      // ON ONE LINE ON PURPOSE: the hero-size check reads the rest of the
+      // line a hero's name sits on, so a `size:` wrapped to the next line is
+      // silently not checked — and `station.image` rather than `station.id`
+      // is what every other call site in this target passes, because that
+      // field is nil for a station with no picture at all.
+      RecordView(accent: station.accentColor, label: Art.songCover(station: station.image), size: vinyl, plainLabel: true)
+        .offset(x: dx, y: dy)
+      Tonearm(r: vinyl / 2)
+        .offset(x: dx, y: dy)
+      // THE KEYS SIT ON THE GROUND THE RECORD DOES — no strip, no panel, no
+      // divider (owner: "instead of the rectangle border at the bottom the
+      // buttons should just sit at the bottom"). +70.4k puts their middle
+      // 327pt down a 354pt tile: 14 clear of the record's foot above them and
+      // 16 of margin below.
+      TransportRow(k: k)
+        .offset(y: 70.4 * k)
+    }
+  }
+}
+
+/**
+ * THE ARM, REBUILT SLIM.
+ *
+ * THREE RULES ARE THE APP'S OWN (03.08) AND DO NOT MOVE. The stylus lands at
+ * 0.80 of the record's radius, because any further in is the LABEL and that
+ * is the one place a needle never is. The rod is STRAIGHT, because the app's
+ * own deck arm was rebuilt three times and finished as a plain straight rod
+ * on the owner's instruction, so a curved one here would make two different
+ * objects out of one. And it comes down onto the outer grooves at about three
+ * o'clock.
+ *
+ * WHAT CHANGED IS THE BACK END, and it is the whole reason the record can be
+ * 284 instead of 231: the app's arm hangs its weight off a stub behind the
+ * bearing, this one folds it into the pivot housing. See `Turntable`.
+ *
+ * THE TRIGONOMETRY IS SOLVED IN THIS COMMENT RATHER THAN CALLED AT DRAW TIME,
+ * so every constant below can be CHECKED against the arithmetic instead of
+ * trusted. With the pivot at (1.045r, -0.80r) and the stylus at 0.80r five
+ * degrees below the horizontal:
+ *
+ *   stylus     ( 0.796956r, -0.069725r)
+ *   dx, dy     (-0.248044r, +0.730275r)
+ *   rod        0.771251r long at 108.760 degrees
+ *   rod centre ( 0.920978r, -0.434862r)   = pivot + (len/2)(cos, sin)
+ *   weight     ( 1.075875r, -0.890900r)   = pivot + 0.096r along the back
+ *   headshell  ( 0.832333r, -0.173880r)   = stylus + 0.11r along the back
+ *
+ * y GROWS DOWNWARD in SwiftUI exactly as it does in CSS, so the signs carry
+ * over from `docs/design/turntable_one.py` unchanged.
+ *
+ * NOTHING HERE CALLS A TRIG FUNCTION, AND NOTHING IS PLACED FROM AN END. A
+ * rotated rectangle is positioned by its own centre, which is why every
+ * constant above is a centre — the first version of the app's own arm was
+ * placed from an end with a percentage transform-origin and hung the
+ * counterweight off the tile's corner.
+ */
+private struct Tonearm: View {
+  /// The record's radius. Every number here is a fraction of it, so the arm
+  /// cannot drift out of step with the disc it is sitting on.
+  let r: CGFloat
+
+  private var angle: Double { 108.760 }
+
+  var body: some View {
+    ZStack {
+      // The rod, drawn as a TUBE: light along its top, shadow under it. One
+      // flat bar is a drawn stripe, which is the note the app's own arm
+      // collected twice.
+      RoundedRectangle(cornerRadius: r * 0.015)
+        .fill(LinearGradient(
+          colors: [Color(hex: "#ffffff"), Color(hex: "#e2e6ea"),
+                   Color(hex: "#9aa0a9"), Color(hex: "#6b717a")],
+          startPoint: .top, endPoint: .bottom))
+        .frame(width: r * 0.771251, height: r * 0.030)
+        .rotationEffect(.degrees(angle))
+        .offset(x: r * 0.920978, y: -r * 0.434862)
+        .shadow(color: .black.opacity(0.55), radius: r * 0.018, y: r * 0.008)
+      // The counterweight: a barrel ON the pivot rather than out past it.
+      RoundedRectangle(cornerRadius: r * 0.0575)
+        .fill(LinearGradient(
+          colors: [Color(hex: "#eef1f5"), Color(hex: "#b3b9c1"),
+                   Color(hex: "#71777f"), Color(hex: "#565c64")],
+          startPoint: .top, endPoint: .bottom))
+        .frame(width: r * 0.24, height: r * 0.115)
+        .rotationEffect(.degrees(angle))
+        .offset(x: r * 1.075875, y: -r * 0.890900)
+        .shadow(color: .black.opacity(0.55), radius: r * 0.020, y: r * 0.009)
+      // The bearing: a low cylinder, not a sphere. Rendered as a ball it read
+      // as a second object sitting beside the weight.
+      Circle()
+        .fill(RadialGradient(
+          colors: [Color(hex: "#f1f4f7"), Color(hex: "#adb3bb"), Color(hex: "#767c85")],
+          center: .init(x: 0.36, y: 0.28), startRadius: 0, endRadius: r * 0.11))
+        .frame(width: r * 0.185, height: r * 0.185)
+        .offset(x: r * 1.045, y: -r * 0.80)
+        .shadow(color: .black.opacity(0.55), radius: r * 0.025, y: r * 0.011)
+      Circle()
+        .fill(RadialGradient(
+          colors: [Color(hex: "#f6f8fa"), Color(hex: "#6b6f78")],
+          center: .init(x: 0.40, y: 0.32), startRadius: 0, endRadius: r * 0.032))
+        .frame(width: r * 0.063, height: r * 0.063)
+        .offset(x: r * 1.045, y: -r * 0.80)
+      // The headshell, and the cartridge under it.
+      RoundedRectangle(cornerRadius: r * 0.014)
+        .fill(LinearGradient(
+          colors: [Color(hex: "#f5f7fa"), Color(hex: "#b7bcc4"), Color(hex: "#868c95")],
+          startPoint: .top, endPoint: .bottom))
+        .frame(width: r * 0.22, height: r * 0.095)
+        .rotationEffect(.degrees(angle))
+        .offset(x: r * 0.832333, y: -r * 0.173880)
+        .shadow(color: .black.opacity(0.60), radius: r * 0.020, y: r * 0.008)
+      Circle()
+        .fill(Color(hex: "#23262c"))
+        .frame(width: r * 0.040, height: r * 0.040)
+        .offset(x: r * 0.796956, y: -r * 0.069725)
+    }
+    .allowsHitTesting(false)
+  }
+}
+
+/// The three keys, centred. Sizes are shares of the 158pt reference; on an
+/// iPhone's large tile that is 44 / 56 / 44 by 21, with 12 between them.
+private struct TransportRow: View {
+  let k: CGFloat
+  var body: some View {
+    HStack(spacing: 5.6 * k) {
+      TransportKey(k: k, w: 20.6 * k, glyph: .prev)
+      TransportKey(k: k, w: 26.2 * k, glyph: .play)
+      TransportKey(k: k, w: 20.6 * k, glyph: .next)
+    }
+  }
+}
+
+/**
+ * A SILVER KEY, PILL SHAPED AND LIT FROM ABOVE.
+ *
+ * FOUR THINGS MAKE IT READ AS METAL RATHER THAN AS A COLOURED SHAPE, AND NONE
+ * OF THEM IS A PLAIN STROKE: a vertical ramp that is bright at the crown and
+ * turns out of the light at the waist, a HAIRLINE CATCH along the very top
+ * edge, a shade under the bottom edge where the cap rolls away, and a drop
+ * shadow on the ground so it sits above the tile rather than in it. A flat
+ * border round it would read as a sticker — the note this target has now
+ * collected on the mirror ball's rim, the vinyl's light wedges and the CD's
+ * corner clips.
+ *
+ * THE MARKS ARE SHAPES, NEVER CHARACTERS. This extension cannot be compiled
+ * or rendered in the environment it is written in, so a codepoint the system
+ * font happens not to cover would ship as a hollow box with nothing logged
+ * anywhere — build 39's station icons. `Triangle` is the CD window's own,
+ * reused rather than drawn a second time.
+ */
+private struct TransportKey: View {
+  enum Glyph { case prev, play, next }
+  let k: CGFloat
+  let w: CGFloat
+  let glyph: Glyph
+
+  /// 21pt on an iPhone's large tile. Taking the height off `k` rather than
+  /// off `w` is what makes the wide middle key the SAME key as the two beside
+  /// it rather than a bigger one.
+  private var h: CGFloat { 9.82 * k }
+  /// The mark's own height, so all three keys carry marks of one size
+  /// whatever their pills measure.
+  private var g: CGFloat { h * 0.44 }
+
+  var body: some View {
+    ZStack {
+      Capsule()
+        .fill(LinearGradient(
+          stops: [
+            .init(color: Color(hex: "#fbfcfd"), location: 0.00),
+            .init(color: Color(hex: "#dde1e6"), location: 0.34),
+            .init(color: Color(hex: "#aeb4bc"), location: 0.56),
+            .init(color: Color(hex: "#8b9199"), location: 0.78),
+            .init(color: Color(hex: "#c2c7cd"), location: 1.00),
+          ],
+          startPoint: .top, endPoint: .bottom))
+      // The crown's catch and the roll-off under it, in ONE stroke: white at
+      // the top, nothing through the middle, shade at the foot.
+      Capsule()
+        .stroke(LinearGradient(colors: [.white.opacity(0.95), .clear, .black.opacity(0.34)],
+                               startPoint: .top, endPoint: .bottom),
+                lineWidth: max(0.8, 0.9 * k))
+      marks
+    }
+    .frame(width: w, height: h)
+    .shadow(color: .black.opacity(0.58), radius: 2.4 * k, y: 1.2 * k)
+  }
+
+  @ViewBuilder private var marks: some View {
+    let ink = Color(hex: "#2b2f36")
+    HStack(spacing: g * 0.13) {
+      switch glyph {
+      case .prev:
+        Triangle().fill(ink).frame(width: g * 0.52, height: g).rotationEffect(.degrees(180))
+        Triangle().fill(ink).frame(width: g * 0.52, height: g).rotationEffect(.degrees(180))
+      case .next:
+        Triangle().fill(ink).frame(width: g * 0.52, height: g)
+        Triangle().fill(ink).frame(width: g * 0.52, height: g)
+      case .play:
+        // A TRIANGLE AND TWO BARS TOGETHER — the printed label on a real
+        // combined key, not a claim about what the song is doing.
+        Triangle().fill(ink).frame(width: g * 0.56, height: g)
+        Spacer().frame(width: g * 0.30)
+        RoundedRectangle(cornerRadius: g * 0.06).fill(ink).frame(width: g * 0.20, height: g)
+        RoundedRectangle(cornerRadius: g * 0.06).fill(ink).frame(width: g * 0.20, height: g)
+      }
+    }
   }
 }
 

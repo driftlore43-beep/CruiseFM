@@ -392,20 +392,22 @@ struct ModeView: View {
       // the eye centres against. The same call the drag classifier made on
       // 03.08 — intent over physics.
       //
-      // The disc is 0.74 opaque, so where it now crosses the spine's inner
-      // ~4pt the hinge reads THROUGH the pressing, which is what a CD sitting
-      // in its tray beside the hinge actually looks like.
       CompactDisc(cover: Art.songCover(station: s.image), accent: s.accentColor, size: 132 * k)
-        // A CLEAR PRESSING, NOT A SOLID PUCK (owner, 14.09: "add some
-        // transparency to the CD widget"). The app's own CD deck has drawn a
-        // translucent disc since 25.07 — the drive shows through it, which is
-        // most of what makes it read as an object — and this one was fully
-        // opaque. 0.74 lets the case's hinge and clips show through the
-        // pressing the way the prototype does; the honest cost is brightness
-        // (median luminance 91 -> 73 on the prototype), which is what
-        // transparency over a dark case means, and the stronger rainbow
-        // above is what keeps it from reading merely dimmer.
-        .opacity(0.74)
+        // 0.97, AND IT REVERSES 14.09 ON THE OWNER'S OWN CALL — which is the
+        // outcome 21.09 said this number was waiting for. It was 0.74, a
+        // clear pressing you could see the case's hinge through ("add some
+        // transparency to the CD widget"), and 21.09 measured what that
+        // costs: roughly a QUARTER of what reads as colour on the face was
+        // the station's halo bleeding through the disc rather than the disc
+        // itself, and the cover underneath was correspondingly ghosted. That
+        // entry declined to change it — "a TRADE the owner has already made
+        // twice in this look, so it is hers to make a third time rather than
+        // mine" — and on 25.09, shown the render, she made it: "E".
+        //
+        // NOT 1.00. A hairline of the case still reads through the rim,
+        // which is the one thing the transparency was really buying; what it
+        // no longer does is ghost the album cover.
+        .opacity(0.97)
     }
     .widgetURL(s.url(mode: "cd"))
   }
@@ -920,6 +922,28 @@ private struct JewelCase: View {
   /// HAIRLINES AND THE SPINE'S TYPE ARE DELIBERATELY NOT SCALED: a 1pt stroke
   /// is a 1pt stroke at every size, and 4.5pt is already the floor at which
   /// CRUISE FM can be read at all.
+  ///
+  /// AND NEITHER IS THE MOULDED DETAIL, FROM 25.09 — which is that same rule
+  /// finally applied to the rest of the case. Owner, with the large tile on
+  /// her Home Screen: "the widget currently looks a bit rough on the edges",
+  /// then "make sure the corners aren't overtaking the actual CD case."
+  ///
+  /// A CORNER CLIP AND A HINGE KNUCKLE ARE SMALL FEATURES OF THE OBJECT, not
+  /// shares of the tile. Measured off her own screenshot — the tile spans
+  /// 1114px for 338pt, i.e. 3.30 px/pt — the ribs and knuckles land exactly
+  /// where `k = 2.139` puts them: 5.6pt ribs and 19x51pt knuckles, against
+  /// the 2.6pt and 9x24pt they were drawn at. That is furniture at twice
+  /// life size, and it is the whole of "rough on the edges". It never bit
+  /// before because until the large family shipped on 24.09 there was no
+  /// tile big enough for it to.
+  ///
+  /// WHAT STILL TAKES `k` IS THE BOX — inset, corner radius, and WHERE the
+  /// clips sit. Her second sentence is that distinction: the clip's PADDING
+  /// was scaled with the detail rather than with the box, so on a large tile
+  /// its corner landed 16.7pt from the tile edge against a case arc centred
+  /// 38.5pt in with a 27.8pt radius — 30.8 from that centre, i.e. plainly
+  /// OUTSIDE the curve, which is a bracket sitting on the corner instead of
+  /// inside the case. At `6 * k` it lands 23.5pt in, 21.2 from the centre.
   let k: CGFloat
 
   var body: some View {
@@ -947,7 +971,7 @@ private struct JewelCase: View {
       HStack(spacing: 0) {
         LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.04)],
                        startPoint: .leading, endPoint: .trailing)
-          .frame(width: 12 * k)
+          .frame(width: 12)
           .overlay(HStack { Spacer(); Rectangle().fill(.white.opacity(0.20)).frame(width: 1) })
           .overlay(
             Text("CRUISE FM")
@@ -956,17 +980,17 @@ private struct JewelCase: View {
               .foregroundColor(.white.opacity(0.28))
               .fixedSize()
               .rotationEffect(.degrees(-90)))
-          .overlay(Rectangle().fill(.white.opacity(0.26)).frame(width: 1).padding(.vertical, 18 * k))
+          .overlay(Rectangle().fill(.white.opacity(0.26)).frame(width: 1).padding(.vertical, 18))
           .overlay(
-            VStack(spacing: 20 * k) {
+            VStack(spacing: 20) {
               ForEach(0..<2, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: 4.5 * k)
+                RoundedRectangle(cornerRadius: 4.5)
                   .fill(.white.opacity(0.14))
-                  .overlay(RoundedRectangle(cornerRadius: 4.5 * k).stroke(.white.opacity(0.26), lineWidth: 1))
-                  .frame(width: 9 * k, height: 24 * k)
+                  .overlay(RoundedRectangle(cornerRadius: 4.5).stroke(.white.opacity(0.26), lineWidth: 1))
+                  .frame(width: 9, height: 24)
                   .overlay(
                     Circle().fill(Color(hex: "#0a0c12").opacity(0.55))
-                      .frame(width: 4.4 * k, height: 4.4 * k)
+                      .frame(width: 4.4, height: 4.4)
                       .overlay(Circle().stroke(.white.opacity(0.34), lineWidth: 0.7)))
               }
             })
@@ -979,6 +1003,9 @@ private struct JewelCase: View {
         Spacer()
         HStack { clip(.bottomLeading); Spacer(); clip(.bottomTrailing) }
       }
+      // The PADDING follows the box (see the note on `k` above) while the
+      // clip's own size does not — that split is what keeps a bracket inside
+      // the case's rounded corner instead of sitting on it.
       .padding(6 * k)
 
       // ── DUAL sweep of light on the plastic + a crisp top-edge glass
@@ -1024,186 +1051,24 @@ private struct JewelCase: View {
     let top = corner == .topLeading || corner == .topTrailing
     let leading = corner == .topLeading || corner == .bottomLeading
     return ZStack {
-      VStack { if !top { Spacer() }; RoundedRectangle(cornerRadius: 1.3 * k).frame(height: 2.6 * k); if top { Spacer() } }
-      HStack { if !leading { Spacer() }; RoundedRectangle(cornerRadius: 1.3 * k).frame(width: 2.6 * k); if leading { Spacer() } }
+      VStack { if !top { Spacer() }; RoundedRectangle(cornerRadius: 1.3).frame(height: 2.6); if top { Spacer() } }
+      HStack { if !leading { Spacer() }; RoundedRectangle(cornerRadius: 1.3).frame(width: 2.6); if leading { Spacer() } }
     }
     .foregroundColor(.white.opacity(0.26))
-    .frame(width: 17 * k, height: 17 * k)
+    .frame(width: 17, height: 17)
   }
 }
 
-/**
- * ONE SPECTRAL FAN OFF A DISC.
- *
- * The colour comes from a RADIAL gradient — violet at the inner tracks out to
- * red at the rim, which is the direction a grating actually spreads a
- * spectrum — and an ANGULAR gradient is used only as a MASK, so the fan
- * exists over one arc and is absent everywhere else.
- *
- * BOTH GRADIENTS FADE TO NOTHING AT THEIR OWN EDGES, which is this target's
- * standing rule for anything that is light: the spectrum fades before the hub
- * and before the rim, and the wedge fades to clear on both flanks. A hard
- * boundary on a light reads as a sticker, and this file has already talked the
- * CD's rim, the mirror ball's rim and the ball's glints out of exactly that.
- *
- * `bearing` is where the fan points, in degrees clockwise from straight up.
- * `spread` is how much of the disc it covers, in degrees.
- */
-private struct DiffractionFan: View {
-  let size: CGFloat
-  let bearing: Double
-  let spread: Double
-  let strength: Double
-  // Each beam carries its OWN spectrum so the two sides of the disc are not
-  // identical (owner 11.09, below). Defaults to the pink/purple `warm` set.
-  var spectrum: [Gradient.Stop] = DiffractionFan.warmStops
-
-  // LIGHT, ASYMMETRIC SPECTRA 11.09 (owner: "keep [the smooth gradient] — but
-  // add in a faint of orange, make sure the colours aren't exactly the same on
-  // the disc... one side has orange, the other side doesn't but has turquoise.
-  // Keeping shades of pink and purple the main colours. Keep the colours light,
-  // not heavily saturated.") Pink and purple lead every beam; the WARM beam
-  // adds a faint orange at its inner edge, the COOL beam a soft turquoise at
-  // its outer edge, the faint middle beam neither. Every stop is a pastel at
-  // reduced opacity so the face stays light rather than a saturated rainbow.
-  static let warmStops: [Gradient.Stop] = [
-    .init(color: .clear, location: 0.00),
-    .init(color: Color(hex: "#ffbc8a").opacity(0.48), location: 0.12),  // faint orange, locked to B
-    .init(color: Color(hex: "#ff9fd4").opacity(0.72), location: 0.30),  // light pink
-    .init(color: Color(hex: "#ff88cc").opacity(0.80), location: 0.55),  // pink
-    .init(color: Color(hex: "#c3a8ff").opacity(0.76), location: 0.80),  // lavender
-    .init(color: Color(hex: "#d6c6ff").opacity(0.42), location: 0.94),  // pale lavender
-    .init(color: .clear, location: 1.00),
-  ]
-  static let coolStops: [Gradient.Stop] = [
-    .init(color: .clear, location: 0.00),
-    .init(color: Color(hex: "#ff9fd4").opacity(0.70), location: 0.12),  // light pink
-    .init(color: Color(hex: "#ff88cc").opacity(0.80), location: 0.34),  // pink
-    .init(color: Color(hex: "#c3a8ff").opacity(0.76), location: 0.58),  // lavender
-    .init(color: Color(hex: "#a3e6dc").opacity(0.58), location: 0.80),  // soft turquoise
-    .init(color: Color(hex: "#c6efe8").opacity(0.32), location: 0.94),  // pale turquoise
-    .init(color: .clear, location: 1.00),
-  ]
-  static let pinkStops: [Gradient.Stop] = [   // faint middle beam, no accent
-    .init(color: .clear, location: 0.00),
-    .init(color: Color(hex: "#ff9fd4").opacity(0.66), location: 0.15),
-    .init(color: Color(hex: "#ff88cc").opacity(0.76), location: 0.50),
-    .init(color: Color(hex: "#c3a8ff").opacity(0.64), location: 0.82),
-    .init(color: .clear, location: 1.00),
-  ]
-
-  var body: some View {
-    ZStack {
-      Circle()
-        .fill(RadialGradient(stops: spectrum, center: .center,
-                             startRadius: size * 0.13, endRadius: size * 0.52))
-      // THE TRACKS CATCH THE FAN'S LIGHT (owner, 11.09: "make them more
-      // visible near the reflected area on the rainbow"). The SAME pitch and
-      // phase as the disc's base tracks (pressedRingStops), so this reads as
-      // those tracks lit rather than a second set beating against them.
-      // Screened over the spectrum inside this group, so the colour is broken
-      // into the fine concentric lines a real pressing shows most where it
-      // throws a rainbow. The hub graphic covers the inner turns.
-      Circle()
-        .fill(RadialGradient(stops: pressedRingStops(0.60), center: .center,
-                             startRadius: 0, endRadius: size / 2))
-        .blendMode(.screen)
-    }
-    // Flatten the spectrum + tracks before the wedge mask and the outer
-    // screen apply, so the inner `.screen` composites against the spectrum
-    // rather than against the disc behind the whole fan.
-    .compositingGroup()
-    // The trailing-closure `mask(alignment:content:)`, not the older
-    // `mask(_:)` that takes a view — that one has been deprecated since
-    // iOS 15, and a deprecation warning in a build log is one more line
-    // to read past when something real goes wrong.
-    .mask {
-      // The wedge is built with its peak at location 0.5 and the whole
-      // gradient then TURNED so that 0.5 lands on the bearing — an
-      // AngularGradient's location 0 sits at its own `angle`, so half a
-      // turn back is what puts the peak where it was asked for. Writing
-      // the wedge across the 0/1 seam instead would need two stop runs and
-      // is the kind of thing that is invisibly wrong without a compiler to
-      // argue with.
-      Circle().fill(
-        AngularGradient(stops: wedgeStops(), center: .center,
-                        angle: .degrees(bearing - 180)))
-    }
-    .blendMode(.screen)
-    .opacity(strength)
-  }
-
-  private func wedgeStops() -> [Gradient.Stop] {
-    let half = CGFloat(spread) / 720
-    return [
-      .init(color: .clear, location: 0),
-      .init(color: .clear, location: max(0, 0.5 - half)),
-      .init(color: .white.opacity(0.35), location: max(0, 0.5 - half * 0.55)),
-      .init(color: .white, location: 0.5),
-      .init(color: .white.opacity(0.35), location: min(1, 0.5 + half * 0.55)),
-      .init(color: .clear, location: min(1, 0.5 + half)),
-      .init(color: .clear, location: 1),
-    ]
-  }
-}
-
-/// The pressed CD's fine concentric tracks, as gradient stops. A real disc's
-/// data pitch is a few hundred nanometres — far below anything a screen can
-/// resolve — so what a photo shows is a soft shimmer, not rings you could
-/// count. HAIRLINES 11.09 (owner: "reduce the groove thickness significantly —
-/// make them hairline thickness"): a tighter 0.06 pitch with the lit band only
-/// 0.006 wide, roughly a single pixel per groove.
+/// A disc with the last cover printed on it.
 ///
-/// Shared by two callers at the SAME pitch and phase so they align instead of
-/// beating: the disc's faint base layer everywhere (low opacity), and each
-/// DiffractionFan's brighter tracks inside its own wedge (owner: "make them
-/// more visible near the reflected area on the rainbow") — a real pressing
-/// shows its tracks most where the rainbow lands.
-///
-/// A free function rather than inline so the locations are unambiguously
-/// CGFloat — an implicit Double bridge is the kind of thing that compiles
-/// locally and costs a build cycle when it does not, and Swift cannot be
-/// compiled in the environment this is written in.
-fileprivate func pressedRingStops(_ opacity: Double) -> [Gradient.Stop] {
-  var out: [Gradient.Stop] = []
-  var t: CGFloat = 0
-  while t < 1 {
-    out.append(Gradient.Stop(color: .white.opacity(opacity), location: t))
-    out.append(Gradient.Stop(color: .clear, location: min(1, t + 0.006)))
-    t += TRACK_PITCH
-  }
-  return out
-}
-
-/// HOW FAR APART THE TRACKS SIT, as a share of the disc's radius.
-///
-/// 0.06 -> 0.025 (21.09), and it is a CORRECTION RATHER THAN A CHANGE OF
-/// TASTE. 10.09 widened the pitch 0.045 -> 0.07 on the owner's own note that
-/// "CDs aren't that textured", with the stated aim of turning individually
-/// countable rings into texture — and widening does the opposite of that. On
-/// a 132pt disc 0.06 puts a ring every 3.96pt, i.e. about ten of them between
-/// the hub and the rim, which is a RECORD'S groove count; a pressing's tracks
-/// are 1.6 microns apart and what a photograph of one shows is an
-/// unresolvable shimmer. Drawn out at the size a phone renders it
-/// (docs/design/cd_widget.py) the shipped pitch reads as broad concentric
-/// banding, and it now sits beside a Record tile that grew REAL grooves on
-/// 20.09 — so the two looks were converging on each other from both sides.
-///
-/// AND THE SHAPE IS A SAWTOOTH, WHICH IS WHY IT BANDS RATHER THAN HAIRLINES.
-/// The stops above run full at each ring, fall to clear over 0.006, and then
-/// ramp BACK UP across the whole remaining gap to the next one. At a 0.06
-/// pitch that ramp is 0.054 wide — most of the disc is a gradient climbing
-/// toward the next ring. At 0.025 the fall and the rise are 0.006 against
-/// 0.019, near enough symmetric, so the same code draws a fine ripple.
-///
-/// 1.65pt apart on a 132pt disc is deliberately just ABOVE the floor at which
-/// rings moire against the pixel grid (~1.2pt, measured on the record's own
-/// harness on 20.09); finer than this and the harness is flattering the code.
-fileprivate let TRACK_PITCH: CGFloat = 0.025
-
-/// A disc with the last cover printed on it, under the diffraction the plastic
-/// throws. The rainbow sits OVER the art rather than under it, because a CD's
-/// sheen is on its surface — the app's own CD deck settled this on 03.08.
+/// IT NO LONGER THROWS A RAINBOW, and the whole reasoning for that — what
+/// went, what stayed, and what it cost measured on the prototype — is on the
+/// face itself below rather than repeated here. `DiffractionFan`,
+/// `pressedRingStops` and `TRACK_PITCH` went with it: an unused drawing that
+/// looks like working machinery is its own trap, and in a target with no
+/// compiler in this environment it is a trap nothing here could see spring.
+/// Both are still switchable in docs/design/cd_widget.py (`fans`, `tracks`),
+/// which is where they should be put back from if they ever are.
 struct CompactDisc: View {
   let cover: Image?
   let accent: Color
@@ -1214,81 +1079,80 @@ struct CompactDisc: View {
     ZStack {
       Circle().fill(Color(white: 0.08))
       if let cover {
-        // NOT AS DARK AS THE OLD OVERLAY-BLEND VERSION NEEDED, because that
-        // reasoning no longer applies. The rainbow used to be a full-circle
-        // OVERLAY wash covering the whole face, which mutes against a bright
-        // ground — hence pushing the art down first. It is confined to a
-        // couple of narrow SCREEN-blend fans now (10.09, the diffraction
-        // rebuild), which only ever brighten, so darkening the art ahead of
-        // it just cost the cover: measured on the prototype
-        // (docs/design/cd_widget.py), the old -0.30/0.80 pair put the disc's
-        // median luminance at 45 against the pre-rebuild look's 102 — the
-        // photo was closer to lost than "personal". -0.14/0.95 lands at 96,
-        // matching the old look, while the fans still read clearly because
-        // they no longer have a wash to fight.
+        // ── THE COVER IS A RING, TURNED, AND AT ITS OWN STRENGTH ────────
+        //
+        // Owner, 25.09, with this tile beside the app's own CD deck: "the
+        // album cover sort of looks pasted on."
+        //
+        // THREE THINGS WERE DOING THAT, AND THE APP GETS ALL THREE RIGHT.
+        //
+        //   IT FILLED THE WHOLE FACE. The app draws the cover as a RING and
+        //   leaves the middle as clear glass — CDMode.tsx's own note says
+        //   why: "anything filled across the centre reads as a big dark
+        //   circle against a dark scene, which is exactly what the
+        //   printed-label version got wrong." Filled, the hub sits ON a
+        //   photograph; as a ring it sits IN the disc.
+        //
+        //   IT SAT UPRIGHT, so it read as a square photograph cropped to a
+        //   circle rather than as something printed on a disc that turns.
+        //
+        //   IT WAS DARKENED AND DESATURATED to sit under a silver screen
+        //   that is now nearly gone, so the correction goes with it.
+        //
+        // NO SCALE-UP IS NEEDED FOR THE TURN, and that is geometry rather
+        // than luck: a square's INSCRIBED CIRCLE is invariant under rotation
+        // about its own centre, so an image filling a size x size box still
+        // covers the circle of diameter `size` at any angle. Scaling up
+        // "to be safe" would only crop the cover for nothing.
         cover.resizable().aspectRatio(contentMode: .fill)
           .frame(width: size, height: size)
+          .rotationEffect(.degrees(-28))
+          .frame(width: size, height: size)
           .clipShape(Circle())
-          // ONLY A FAINT TINT UNDER THE MIRROR now that a clear-silver lift
-          // sits over the whole face (below, 11.09). Darkening the art hard
-          // was what made a clear disc read as a dark print; -0.10/0.92
-          // leaves the cover just legible under the silver rather than
-          // carrying the disc's brightness itself.
-          .brightness(-0.10).saturation(0.92)
+          // 0.34 of the radius is the app's own ART_IN. Drawn as a gradient
+          // mask rather than an even-odd path: the inner edge wants a
+          // feather, and a hard ring there is the stacking ring this file
+          // has already talked four things out of.
+          .mask(
+            Circle().fill(
+              RadialGradient(stops: [
+                .init(color: .clear, location: 0.000),
+                .init(color: .clear, location: 0.340),
+                .init(color: .white, location: 0.375),
+                .init(color: .white, location: 1.000),
+              ], center: .center, startRadius: 0, endRadius: size / 2)))
       } else {
         Circle().fill(accent.opacity(0.55))
       }
-      // ── THE RAINBOW IS DIFFRACTION, NOT A COLOUR WHEEL ────────────────
+      // ── NO RAINBOW, AND NO PRESSED RINGS ──────────────────────────────
       //
-      // Owner, 10.09: "the rainbow light effect is currently just painted on
-      // where in reality it should look like the last image", with a
-      // photograph of a real disc beside it.
+      // Owner, 25.09, picking the redrawn face: "E but remove the CD indents
+      // and the rainbow effect."
       //
-      // SHE IS DESCRIBING A GEOMETRY MISTAKE RATHER THAN A COLOUR ONE, and
-      // that is why no amount of tuning the old version fixed it. What shipped
-      // was TWO FULL-CIRCLE AngularGradients — six hues wrapped evenly all the
-      // way round the face. That is a colour wheel, and a colour wheel is a
-      // pattern printed on a disc.
+      // THREE DiffractionFans AND THE PRESSED TRACKS ARE GONE. They were the
+      // two features that most said "compact disc" — the rainbow is a real
+      // diffraction grating rebuilt from her own reference photograph on
+      // 10.09, and the tracks are the texture it lit — so this is a genuine
+      // trade rather than a tidy-up, and it was made on a render of both
+      // together rather than described.
       //
-      // A CD's tracks are concentric, so the disc is a circular DIFFRACTION
-      // GRATING, and a grating does two things an angular wheel does neither
-      // of:
+      // WHAT STILL SAYS DISC WITHOUT THEM, and it is more than it sounds:
+      // the clear polycarbonate margin at the rim, the mirror land outside
+      // the hub, the clamping ring with its gripper holes, the dome, and the
+      // specular sweep. The neutral metal sheen below stays too — it is the
+      // material, not the rainbow, and taking it as well would leave a flat
+      // photograph in a circle.
       //
-      //   THE SPECTRUM RUNS ALONG THE RADIUS. The angle a wavelength leaves at
-      //   depends on the track spacing, so violet through red spreads OUTWARD
-      //   from the hub — never around it.
+      // THE COST IS BRIGHTNESS, MEASURED RATHER THAN GUESSED: the fans were
+      // screen-blended, so they were lifting the face as well as colouring
+      // it. On docs/design/cd_widget.py the disc's median luminance goes
+      // 112.0 -> 87.3 on a bright cover and 67.3 -> 46.0 on a dark one. What
+      // rises is the share of the face that is the COVER rather than the
+      // disc's own light, which is the point of the round.
       //
-      //   IT IS LOCALISED IN ANGLE. Only the arc of the disc oriented right
-      //   for the lamp throws colour at the eye at all; everywhere else is
-      //   plain mirror. That is why the reference photograph is a couple of
-      //   bright fans on silver rather than an even ring of colour.
-      //
-      // So the RADIAL gradient carries the spectrum and an ANGULAR gradient is
-      // used as a MASK to confine it to a fan, which is the exact inversion of
-      // what was here before.
-      // The two main beams are NO LONGER IDENTICAL (owner 11.09): the warm
-      // beam carries the faint orange, the cool beam the turquoise, both
-      // pink/purple-led and lighter than before so the face stays soft.
-      //
-      // WIDER AND AT FULL STRENGTH (owner, 14.09: "the rainbow reflective
-      // effect is also missing, or it's not as visible"). Prototyped first in
-      // docs/design/cd_widget.py, with the numbers written as SwiftUI will
-      // draw them — `strength` lands as `.opacity`, which clamps at 1, so a
-      // mockup leaning on a multiplier past that would be showing something
-      // the widget cannot do. Measured on the prototype: the share of the
-      // disc carrying real colour goes 19.7% -> 42.4% and mean saturation
-      // 0.108 -> 0.170, most of it from the silver wash below coming down
-      // rather than from the fans themselves, which were already near full.
-      DiffractionFan(size: size, bearing: 34, spread: 104, strength: 1.00,
-                     spectrum: DiffractionFan.warmStops)
-      DiffractionFan(size: size, bearing: 214, spread: 92, strength: 1.00,
-                     spectrum: DiffractionFan.coolStops)
-      // A third, much fainter fan — a real disc catches a weaker second source
-      // (a window, a wall) as well as the main one, and one lone fan reads as
-      // a mistake rather than as light. Pink/purple only, no accent.
-      DiffractionFan(size: size, bearing: 128, spread: 56, strength: 0.39,
-                     spectrum: DiffractionFan.pinkStops)
-
+      // BOTH ARE STILL SWITCHABLE IN THE HARNESS (`fans`, `tracks`) rather
+      // than deleted from it, so either can be put back beside the other
+      // without rebuilding them.
       // AND THE FACE BETWEEN THE FANS HAS TO READ AS METAL, or the fans are
       // simply sitting on a photograph. Neutral on purpose — no hue anywhere
       // in it, which is the same rule the app's mirror ball settled on (28.07:
@@ -1326,17 +1190,15 @@ struct CompactDisc: View {
       // it is the real dial for "the rainbow is not as visible" — the fans
       // above were already close to full. Dropped rather than removed: at
       // 0.30 the disc still reads as silver where no fan lands.
+      // 0.30 -> 0.10. This wash exists to lift a dark cover toward metal,
+      // and with the cover now drawn at its own strength and the disc nearly
+      // solid there is far less to lift — at 0.30 it was simply fogging the
+      // photograph, which is the "pasted on" complaint's third cause. Kept
+      // rather than removed: it is what stops a very dark cover reading as a
+      // hole in the case.
       Circle().fill(Color(white: 0.62))
         .blendMode(.screen)
-        .opacity(0.30)
-
-      // The base pressed tracks, faint everywhere on the silver (opacity
-      // 0.015, thinned). The DiffractionFans lift these SAME tracks where the
-      // rainbow lands, so what reads as "grooves in the rainbow" is the base
-      // shimmer lit rather than a second set of lines.
-      Circle().fill(
-        RadialGradient(stops: pressedRingStops(0.015), center: .center,
-                       startRadius: 0, endRadius: size / 2))
+        .opacity(0.10)
       // THE SPECULAR SWEEP, TIGHTENED for a crisper gloss rather than a broad
       // soft wash — a narrower, brighter streak is what a genuine reflective
       // sheen looks like, against a wide dim one that reads as a general

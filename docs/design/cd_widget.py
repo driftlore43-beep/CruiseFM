@@ -251,12 +251,19 @@ STREAKS = {
 STREAK_PARAMS = {'S_streaks': (10, 2.2), 'S_dense': (14, 2.7), 'S_wide': (9, 2.4)}
 
 def disc(option, size=DISC, track_pitch=0.06, clear_margin=0.0,
-         art=None, lit_hub=False, art_inner=0.0, art_turn=0.0, art_lift=0.0):
+         art=None, lit_hub=False, art_inner=0.0, art_turn=0.0, art_lift=0.0,
+         fans=True, tracks=True):
     """`art_inner` is where the cover STOPS, as a fraction of the radius — 0
     fills the face, which is what the widget ships, and 0.34 leaves the middle
     as clear glass, which is what the app's own deck draws. `art_turn` turns
     the cover, the way a disc that has been spinning presents it. `art_lift`
-    takes the darkening off, toward the app's own near-full-strength cover."""
+    takes the darkening off, toward the app's own near-full-strength cover.
+
+    `fans` is the diffraction rainbow and `tracks` the pressed rings — the
+    two things the owner asked to see the disc WITHOUT on 25.09. Both remain
+    switchable rather than deleted from the harness, because they are the two
+    features that most say 'compact disc' and it is worth being able to put
+    either back beside the other."""
     n = size
     y, x = np.mgrid[0:n, 0:n].astype(float)
     cx = cy = (n - 1) / 2.0
@@ -303,7 +310,7 @@ def disc(option, size=DISC, track_pitch=0.06, clear_margin=0.0,
         edge = np.clip((d - art_inner * R) / (0.035 * R), 0, 1)[..., None]
         img = img * edge + np.full_like(img, 0.08) * (1 - edge)
 
-    fans = OPTIONS.get(option)
+    beams = OPTIONS.get(option) if fans else []
     if option in STREAKS:
         # Side-by-side single-colour rays, screen-blended so overlaps add
         # into new hues (owner 11.09: streaks that "overlap like the image").
@@ -355,8 +362,8 @@ def disc(option, size=DISC, track_pitch=0.06, clear_margin=0.0,
         # of that pitch, so each groove is roughly a single pixel wide. Made
         # to CATCH THE LIGHT in the fans ("more visible near the reflected
         # area"). Same pitch as the base rings below so the two align.
-        track = ring_wave(d / R, track_pitch)
-        for beam in fans:
+        track = ring_wave(d / R, track_pitch) if tracks else np.zeros_like(d)
+        for beam in (beams or []):
             bearing, spread, strength = beam[0], beam[1], beam[2]
             # each beam may name its own spectrum (warm/cool/pink) so the two
             # sides of the disc are NOT identical (owner 11.09).
@@ -389,7 +396,8 @@ def disc(option, size=DISC, track_pitch=0.06, clear_margin=0.0,
     # opacity 0.015. On plain metal they are a barely-there shimmer; the fan
     # loop above lifts the SAME tracks where the rainbow lands, which is where
     # a real disc shows them most.
-    img = over(img, np.ones_like(img), ring_wave(d / R, track_pitch) * 0.015)
+    if tracks:
+        img = over(img, np.ones_like(img), ring_wave(d / R, track_pitch) * 0.015)
 
     # specular sweep, topLeading -> bottomTrailing
     sw = np.clip(((x / n) + (y / n)) / 2.0, 0, 1)
@@ -588,7 +596,16 @@ def jewel_case(n, pt, clip_alpha=0.44, clip_rib=3.2, k=1.0, furn=None):
                    fill=(10, 12, 18, 140), outline=(255, 255, 255, 87), width=max(1, int(0.7 * pt)))
 
     # ── moulded corner clips ──
-    pad = 6 * fpt
+    # WHERE A CLIP SITS AND HOW BIG IT IS ARE TWO DIFFERENT NUMBERS, and
+    # conflating them is what put the brackets outside the case (owner,
+    # 25.09: "make sure the corners aren't overtaking the actual CD case").
+    # The PADDING is a share of the box, so it has to take `k` — the case's
+    # own corner radius does, and at furniture scale the clip's corner lands
+    # 16.7pt from the tile edge against an arc centred 38.5pt in with a
+    # 27.8pt radius, i.e. 30.8 from that centre and demonstrably OUTSIDE the
+    # curve. At `6 * k` it lands 23.5pt in, 21.2 from the centre, inside it.
+    # The clip's own SIZE stays furniture, which is the whole point.
+    pad = 6 * k * pt
     cl = 17 * fpt
     rib = clip_rib * fpt
     for cx0, cy0, sx, sy in ((inset + pad, inset + pad, 1, 1),
@@ -623,7 +640,8 @@ def jewel_case(n, pt, clip_alpha=0.44, clip_rib=3.2, k=1.0, furn=None):
 def tile(option='L_swift', accent='#9b5cff', halo=1.0, disc_size=132,
          track_pitch=0.06, clear_margin=0.0, clip_alpha=0.44, clip_rib=3.2,
          disc_alpha=0.74, silver=None, art=None, lit_hub=False, pt=SS,
-         k=1.0, furn=None, art_inner=0.0, art_turn=0.0, art_lift=0.0):
+         k=1.0, furn=None, art_inner=0.0, art_turn=0.0, art_lift=0.0,
+         fans=True, tracks=True):
     """`k` is the tile's scale against the 158pt reference: 1 for a small
     tile, 338/158 = 2.139 for a large one. Everything that is a share of the
     tile takes it; `furn` is what the case's moulded DETAIL takes, and
@@ -657,7 +675,7 @@ def tile(option='L_swift', accent='#9b5cff', halo=1.0, disc_size=132,
         SILVER['L_swift'] = silver
     dsc = disc(option, size=ds, track_pitch=track_pitch, clear_margin=clear_margin,
                art=art, lit_hub=lit_hub, art_inner=art_inner, art_turn=art_turn,
-               art_lift=art_lift)
+               art_lift=art_lift, fans=fans, tracks=tracks)
     sh = Image.new('RGBA', (n, n), (0, 0, 0, 0))
     r_ = ds / 2
     ImageDraw.Draw(sh).ellipse([n / 2 - r_, n / 2 - r_ + 5 * k * pt, n / 2 + r_, n / 2 + r_ + 5 * k * pt],
@@ -749,13 +767,19 @@ if __name__ == '__main__':
     # costs that. Her call, and this is the render to make it on.
     K = 338 / 158
     RING = dict(furn=1.0, art_inner=0.34, art_turn=-28)
+    # SHIPPED 25.09: the owner picked E off the five-step sheet, then took two
+    # more things off it — "E but remove the CD indents and the rainbow
+    # effect. make sure the corners aren't overtaking the actual CD case."
+    SHIPPED = dict(**RING, art_lift=1.0, silver=0.10, disc_alpha=0.97,
+                   fans=False, tracks=False)
     STEPS = [
-        ('A  what ships today', dict()),
+        ('A  what shipped before', dict()),
         ('B  + case detail at true size', dict(furn=1.0)),
         ('C  + cover as a ring, glass centre', dict(furn=1.0, art_inner=0.34)),
         ('D  + cover turned', dict(**RING)),
         ('E  + disc opaque, less silver', dict(**RING, art_lift=1.0,
                                                silver=0.10, disc_alpha=0.97)),
+        ('F  SHIPPED: no rainbow, no rings', dict(**SHIPPED)),
     ]
     # TWO COVERS, ALWAYS — see the note at the top of this file.
     COVERS = [('bright cover', 'targets/widgets/daylight.jpg'),

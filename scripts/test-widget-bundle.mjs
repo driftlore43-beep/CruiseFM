@@ -638,32 +638,38 @@ if (declared.length < 5 || Object.keys(kinds).length < 5) {
 }
 
 
-// ── THE CD'S TRACKS MAY NOT DRIFT BACK INTO A RECORD'S GROOVES ────────────
+// ── THE CD DRAWS NO TRACKS AND NO RAINBOW, AND THE RECORD STILL DOES ─────
 //
-// The two tiles sit in the same Look picker and one of them is a pressed disc
-// whose tracks are a shimmer while the other is a record whose grooves are
-// cut. They converged on each other from both sides: 10.09 widened the CD's
-// pitch to 0.07 of the radius in the name of "CDs aren't that textured"
-// (which is the opposite of what widening does) and 20.09 gave the record
-// real grooves. So the relationship is pinned rather than each number alone,
-// and BOTH sides are parsed out of the source — a constant copied into a test
-// is a constant that goes stale silently.
+// The rule this replaces pinned the RELATIONSHIP between the CD's track pitch
+// and the record's groove pitch, because the two tiles sit in the same Look
+// picker and had converged on each other from both sides: 10.09 widened the
+// CD's pitch in the name of "CDs aren't that textured" (the opposite of what
+// widening does) and 20.09 gave the record real grooves.
+//
+// On 25.09 the owner took the CD's tracks and its rainbow off entirely ("E
+// but remove the CD indents and the rainbow effect"), so there is no pitch
+// left to compare. THE PROPERTY THE OLD RULE WAS REALLY PROTECTING SURVIVES
+// AND IS PINNED HERE INSTEAD: the two tiles must stay plainly different
+// objects. A CD with concentric rings on it is the drift that rule existed to
+// catch, whatever the pitch, and the record keeping its grooves is the other
+// half of the same claim.
 {
-  const cd = /fileprivate let TRACK_PITCH:\s*CGFloat\s*=\s*([\d.]+)/.exec(src['ModeWidget.swift'] ?? '');
-  const discSize = /CompactDisc\(cover:[\s\S]*?size:\s*([\d.]+)\s*\*\s*k\)/.exec(src['ModeWidget.swift'] ?? '');
+  const m = src['ModeWidget.swift'] ?? '';
+  const noComments = m.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  check('the CD draws no pressed tracks', !/pressedRingStops|TRACK_PITCH/.test(noComments),
+    'a ringed CD is the drift toward the record this rule exists to catch');
+  check('and no diffraction fans', !/DiffractionFan\s*\(/.test(noComments),
+    'removed 25.09 on the owner\'s own call');
+  // ...AND THE RECORD KEEPS ITS OWN. Deleting the CD's is only half a
+  // distinction; if the record ever lost its grooves the two would converge
+  // again from the other side, and nothing else would say so.
   const rec = /private var pitch:\s*CGFloat\s*\{\s*([\d.]+)\s*\}/.exec(src['Artwork.swift'] ?? '');
-  check('the CD and the record both state their pitch', !!cd && !!discSize && !!rec,
-    `TRACK_PITCH ${cd?.[1]} · disc ${discSize?.[1]} · record ${rec?.[1]}`);
-  if (cd && discSize && rec) {
-    const cdPt = Number(cd[1]) * Number(discSize[1]) / 2;
-    check('the CD\'s tracks are no coarser than the record\'s grooves',
-      cdPt <= Number(rec[1]) + 0.001,
-      `${cdPt.toFixed(2)}pt against the record's ${rec[1]}pt — a CD's tracks are microns apart, a record's are not`);
-    // Below about 1.2pt neighbouring rings moire against the pixel grid, which
-    // is the record's own measured floor (20.09). Finer than that and the
-    // harness is flattering the code.
-    check('and not so fine that they moire', cdPt >= 1.2,
-      `${cdPt.toFixed(2)}pt`);
+  check('the record still states its groove pitch', !!rec, `record ${rec?.[1]}`);
+  if (rec) {
+    // Below about 1.2pt neighbouring rings moire against the pixel grid,
+    // which is the record's own measured floor (20.09).
+    check('and it is cut rather than drawn', Number(rec[1]) >= 1.2 && Number(rec[1]) <= 3.0,
+      `${rec[1]}pt`);
   }
 }
 

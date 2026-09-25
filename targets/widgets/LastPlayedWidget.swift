@@ -1145,11 +1145,26 @@ struct LastPlayedView: View {
         .frame(height: 38)
         .background(paperInk)
 
-        // 110, NOT 118, AND IT WAS COUNTED RATHER THAN EYEBALLED: with a
-        // two-line song title the stack came to 356 of a 354pt tile and
-        // something would have had to give. Banner 38, picture 110 + 14 of
-        // air, the song block 107, the tear 13, the counterfoil 58 and 8
-        // between them is 348, so nothing is compressed to fit.
+        // 168, AND THE 58 IT GAINED CAME OUT OF A GAP NOBODY MEANT TO LEAVE
+        // (owner, 26.09: "is there any way to enlarge the album cover").
+        // Every block in this stack is a fixed height except the Spacer below
+        // the song, so ALL the tile's leftover room landed there: banner 38 +
+        // air 14 + picture 110 + air 14 + song 64 + tear 13 + counterfoil 56
+        // is 309 of 354, i.e. a 45pt dead band sitting between the artist line
+        // and the tear. Closing it answers her other ask in the same move —
+        // "drag the song title and artist name closer to the dotted line" —
+        // because the two are one fault, not two.
+        //
+        // AND THE TITLE HAD TO DROP TO ONE LINE FOR THE PICTURE TO GROW AT
+        // ALL. At lineLimit(2) a long song costs another 29pt, which caps the
+        // picture at 126 before the counterfoil is pushed off the tile. The
+        // MEDIUM stub already sets lineLimit(1) with minimumScaleFactor(0.6),
+        // so a long title shrinks rather than wraps; taking the same rule here
+        // is what buys these 58 points.
+        //
+        // COUNTED, NOT EYEBALLED: banner 38 + air 12 + picture 168 + air 11 +
+        // song 57 + tear 13 + counterfoil 52 is 351 of 354, and the 3 left
+        // over is the Spacer's, so nothing is compressed to fit.
         ZStack {
           if let art = Art.songCover(station: s.image) {
             art.cruiseBackdrop()
@@ -1159,31 +1174,39 @@ struct LastPlayedView: View {
             s.gradient
           }
         }
-        .frame(height: 110)
+        .frame(height: 168)
         .clipped()
-        .padding(.horizontal, 14)
-        .padding(.top, 14)
+        .padding(.horizontal, 12)
+        .padding(.top, 12)
 
         VStack(alignment: .leading, spacing: 0) {
-          Text("LAST PLAYED").font(.system(size: 8.5, design: .monospaced)).tracking(1.6)
+          Text("LAST PLAYED").font(.system(size: 8, design: .monospaced)).tracking(1.6)
             .foregroundColor(paperInk.opacity(0.45))
           if let lp = entry.lastPlayed {
-            Text(lp.title).font(.system(size: 24, weight: .heavy))
-              .foregroundColor(paperInk).lineLimit(2).minimumScaleFactor(0.6)
-              .padding(.top, 3)
-            Text(lp.artist).font(.system(size: 15))
+            // ONE LINE, SHRINKING RATHER THAN WRAPPING — see the note above
+            // the picture. This is the medium stub's own rule.
+            Text(lp.title).font(.system(size: 22, weight: .heavy))
+              .foregroundColor(paperInk).lineLimit(1).minimumScaleFactor(0.6)
+              .padding(.top, 2)
+            Text(lp.artist).font(.system(size: 14))
               .foregroundColor(paperInk.opacity(0.62)).lineLimit(1).minimumScaleFactor(0.7)
-              .padding(.top, 3)
+              .padding(.top, 2)
           } else {
-            Text(s.tagline).font(.system(size: 15))
-              .foregroundColor(paperInk.opacity(0.55)).lineLimit(3).padding(.top, 3)
+            // The fallback is capped at two lines for the same reason: a
+            // third would eat the slack the Spacer below needs.
+            Text(s.tagline).font(.system(size: 14))
+              .foregroundColor(paperInk.opacity(0.55)).lineLimit(2).padding(.top, 2)
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 15)
-        .padding(.top, 14)
+        .padding(.top, 11)
 
-        Spacer(minLength: 8)
+        // minLength 0, NOT 8. This spacer is the one flexible thing in the
+        // stack, so whatever 8 it was given became a floor under the dead
+        // band — and it is also the only give a slightly taller line of type
+        // has to take, so it must be allowed to close completely.
+        Spacer(minLength: 0)
 
         tearAcross
 
@@ -1191,15 +1214,15 @@ struct LastPlayedView: View {
           VStack(alignment: .leading, spacing: 2) {
             Text("STATION").font(.system(size: 8, design: .monospaced)).tracking(1.6)
               .foregroundColor(paperInk.opacity(0.45))
-            Text(s.name).font(.system(size: 17, weight: .heavy))
+            Text(s.name).font(.system(size: 16, weight: .heavy))
               .foregroundColor(paperInk).lineLimit(1).minimumScaleFactor(0.7)
           }
           Spacer(minLength: 8)
-          barcodeAcross
+          codeLines
         }
         .padding(.horizontal, 15)
-        .padding(.top, 12)
-        .padding(.bottom, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 11)
       }
     }
     .widgetURL(s.url(mode: s.mode))
@@ -1227,17 +1250,32 @@ struct LastPlayedView: View {
     .frame(height: 13)
   }
 
-  /// The barcode lies down too, beside the station's name. Flexible spacers
-  /// between the bars let it fill whatever width it is handed.
-  private var barcodeAcross: some View {
-    HStack(alignment: .bottom, spacing: 0) {
-      ForEach(0..<26, id: \.self) { i in
-        Rectangle().fill(paperInk)
-          .frame(width: i % 3 == 0 ? 3 : 2, height: i % 4 == 0 ? 22 : 30)
-        if i < 25 { Spacer(minLength: 0.5) }
+  /// NOT A BARCODE — a rule of hairlines, and the distinction is the whole
+  /// point of it (owner, 26.09: "shorten the barcode? The barcode lines
+  /// should also compress — it must look like lines rather than a barcode").
+  ///
+  /// THE OLD ONE WAS LONG BECAUSE IT WAS TOLD TO FILL. Its bars sat in an
+  /// HStack of FLEXIBLE spacers next to a `Spacer(minLength: 8)`, so it took
+  /// whatever width the station's name left it — about 180pt — and 26 bars at
+  /// two widths and two heights are a real code's own proportions, which is
+  /// exactly why it read as one.
+  ///
+  /// AND A BARCODE CANNOT BE SHORTENED INTO SOMETHING ELSE, which is the same
+  /// finding the medium ticket produced from the other end on 10.09: it took
+  /// 46 bars before it read as printed at all, fewer being an ICON of a
+  /// barcode. So this stops trying: 28 hairlines, one width, one height, a
+  /// FIXED 1pt gap rather than a flexible one so nothing can stretch it, and
+  /// 55pt wide however much room is going.
+  ///
+  /// It is the last thing in a `.bottom`-aligned row, so it lands in the
+  /// tile's own bottom-right corner, which is where she asked for it.
+  private var codeLines: some View {
+    HStack(spacing: 1) {
+      ForEach(0..<28, id: \.self) { _ in
+        Rectangle().fill(paperInk).frame(width: 1, height: 15)
       }
     }
-    .frame(height: 30)
+    .frame(height: 15)
   }
 }
 

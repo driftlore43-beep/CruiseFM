@@ -225,7 +225,7 @@ B_ = BT.slot('TICKET STUB &middot; large', 'B &mdash; the slack goes to the cove
                        'goes to the picture (110 &rarr; 150). Code fixed at 20 hairlines, one '
                        'height, in the corner. Nothing else moves.')
 
-C_ = BT.slot('TICKET STUB &middot; large', 'C &mdash; bigger picture, tighter foot',
+C_ = BT.slot('TICKET STUB &middot; large', 'C 'C &mdash; bigger picture, tighter foot'mdash; bigger picture, tighter foot (CHOSEN, shipped 26.09)',
              ticket(cover_pt=168, cover_side_pt=12, cover_top_pt=12,
                     song_top_pt=11, title_pt=22, artist_pt=14, eb_pt=8,
                     gap_pt=2, slack_pt=0, cf_top_pt=10, cf_bot_pt=11,

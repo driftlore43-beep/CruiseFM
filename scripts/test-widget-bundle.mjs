@@ -764,6 +764,69 @@ if (declared.length < 5 || Object.keys(kinds).length < 5) {
   }
 }
 
+// ── THE TALL STUB'S TITLE MUST NOT WRAP, AND ITS CODE MUST NOT FILL ───────
+//
+// Owner, 26.09, off the large ticket: "is there any way to enlarge the album
+// cover. Drag the song title and artist name closer to the dotted line. And
+// shorten the barcode? The barcode lines should also compress -- it must look
+// like lines rather than a barcode."
+//
+//   THE LINE LIMIT IS THE ONE WITH TEETH. Every block in that stack is a
+//   fixed height, so the picture at 168 leaves 3pt of slack: banner 38 + air
+//   12 + picture 168 + air 11 + song 57 + tear 13 + counterfoil 52 = 351 of
+//   354. A title allowed a SECOND line costs 29 more and pushes the
+//   counterfoil off the bottom of the tile -- silently, since nothing in this
+//   repo can render a widget. One line with minimumScaleFactor is the medium
+//   stub's own rule and is what buys the picture its 58 points.
+//
+//   THE CODE'S FIXED GAP is the other half. The old bars sat in an HStack of
+//   FLEXIBLE spacers beside a `Spacer(minLength: 8)`, so it stretched to
+//   whatever the station's name left it -- which is why it was long. A
+//   flexible spacer back in there puts that straight back.
+{
+  const body = (name, s) => {
+    const i = s.indexOf(`private func ${name}(`);
+    if (i < 0) return null;
+    let j = s.indexOf('{', i), depth = 0, k = j;
+    for (; k < s.length; k++) {
+      if (s[k] === '{') depth += 1;
+      else if (s[k] === '}') { depth -= 1; if (!depth) break; }
+    }
+    return decomment(s.slice(j, k));
+  };
+  const lp = src_['LastPlayedWidget.swift'] ?? '';
+  const st = body('stubTall', lp);
+  check('stubTall exists to be checked', !!st);
+  if (st) {
+    const title = st.match(/Text\(lp\.title\)[\s\S]{0,220}?\.lineLimit\((\d)\)/);
+    check('the tall stub found its own song title', !!title);
+    check('the tall stub sets its title on ONE line',
+      !!title && title[1] === '1',
+      'a second line costs 29pt and the tile has 3 spare');
+  }
+
+  // Resolved by NAME on purpose: a rename breaks this loudly rather than
+  // letting it pass against nothing, which is what the existence check below
+  // is for. The look is a decision she has now made twice in two rounds.
+  const cl = (() => {
+    const i = lp.indexOf('private var codeLines: some View');
+    if (i < 0) return null;
+    let j = lp.indexOf('{', i), depth = 0, k = j;
+    for (; k < lp.length; k++) {
+      if (lp[k] === '{') depth += 1;
+      else if (lp[k] === '}') { depth -= 1; if (!depth) break; }
+    }
+    return decomment(lp.slice(j, k));
+  })();
+  check('codeLines exists to be checked', !!cl);
+  check('the code cannot stretch to fill its row',
+    !!cl && !/Spacer\(/.test(cl),
+    'a flexible spacer between the bars is what made it fill');
+  check('and it draws one width and one height, so it reads as lines',
+    !!cl && !/\.frame\([^)]*\?/.test(cl),
+    'two widths and two heights are a real barcode\u2019s own proportions');
+}
+
 // ── PINNING A TILE TO A STATION ───────────────────────────────────────────
 // Four widgets can be pinned, and the five that name a station must all reach
 // it the same way. Before this, each wrote `lastDrive ?? currentOnAir()` for

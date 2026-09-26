@@ -66,10 +66,21 @@ from assets import A                        # noqa: E402
 
 # The notes are long, and a slot with no width cap stretches to fit them —
 # which pushed the four tiles onto four rows and made the comparison useless.
+# WIDGETKIT HANDS A LARGE TILE A DIFFERENT BOX ON EVERY SCREEN, and this
+# harness drew only 338x354 — the one size where the shipped arithmetic comes
+# out exact. A harness that cannot draw the size being asked about will answer
+# confidently and be wrong, which is the fault this file's own header warns
+# about and which it then committed anyway.
+TILES = {
+    'S': (329, 345),   # 375x812  — SE 3rd gen, 13 mini
+    'M': (338, 354),   # 390x844 / 393x852 — the size the Swift was drawn for
+    'B': (364, 382),   # 428x926 / 430x932 — Pro Max, and hers
+}
 CSS = BT.CSS + """
-.slot { max-width: 676px; }
-.note { max-width: 676px; }
-"""
+.slot { max-width: 760px; }
+.note { max-width: 760px; }
+""" + ''.join(
+    f'.l{n} {{ width:{w * 2}px; height:{h * 2}px; }}' for n, (w, h) in TILES.items())
 ART = A['coastal']
 
 # The ticket's own palette, read straight out of LastPlayedWidget.swift.
@@ -201,64 +212,102 @@ def ticket(*, cover_pt, cover_side_pt, cover_top_pt, song_top_pt, title_pt,
 
 
 # ── the codes ──────────────────────────────────────────────────────────────
-TODAY_CODE = barcode(bars=26, w_pt=2, gap_pt=0.5, h_pt=30, two_heights=True)
-LINES_B    = barcode(bars=20, w_pt=1.5, gap_pt=1.5, h_pt=18, two_heights=False)
+# SHIPPED 26.09: 28 hairlines, one width, one height, a fixed 1pt gap. 55x15.
 LINES_C    = barcode(bars=28, w_pt=1, gap_pt=1, h_pt=15, two_heights=False)
-LINES_D    = barcode(bars=16, w_pt=2, gap_pt=2, h_pt=20, two_heights=False)
+# "a bit small, try to make it more bigger but not huge" (owner, 26.09). A
+# UNIFORM 1.5x of what she approved: same 28 marks, same 1:1 bar-to-gap, so
+# the character she picked is untouched and only the size moves. 82.5x22.
+LINES_BIG  = barcode(bars=28, w_pt=1.5, gap_pt=1.5, h_pt=22, two_heights=False)
+# Drawn to show where "huge" starts: 2x, and it begins to own the foot.
+LINES_2X   = barcode(bars=28, w_pt=2, gap_pt=2, h_pt=30, two_heights=False)
 
 
-A_ = BT.slot('TICKET STUB &middot; large', 'A &mdash; build 69, what you have',
-             ticket(cover_pt=110, cover_side_pt=14, cover_top_pt=14,
-                    song_top_pt=14, title_pt=24, artist_pt=15, eb_pt=8.5,
-                    gap_pt=3, slack_pt=45, cf_top_pt=12, cf_bot_pt=14,
-                    name_pt=17, code=TODAY_CODE),
-             'l', note='The 45pt of nothing between the artist line and the tear is a '
-                       'Spacer &mdash; every other block is a fixed height, so all the tile&rsquo;s '
-                       'leftover room lands there. The code is 26 bars told to FILL the row.')
+# ── the arithmetic, stated rather than eyeballed ───────────────────────────
+# Every block but the cover is a fixed height, and they add to FIXED. So on a
+# tile TALLER than 354 the leftover has to land somewhere, and today it lands
+# in the Spacer between the artist line and the tear — which is the one place
+# it is most visible and the one place she is pointing at.
+FIXED = 38 + 12 + 11 + 57 + 13 + (10 + 31 + 11)   # = 183
+SHIPPED_COVER = 168
 
-B_ = BT.slot('TICKET STUB &middot; large', 'B &mdash; the slack goes to the cover',
-             ticket(cover_pt=150, cover_side_pt=14, cover_top_pt=14,
-                    song_top_pt=14, title_pt=24, artist_pt=15, eb_pt=8.5,
-                    gap_pt=3, slack_pt=0, cf_top_pt=12, cf_bot_pt=12,
-                    name_pt=17, code=LINES_B),
-             'l', note='Spacer closed, so the song sits straight on the tear, and the 40pt '
-                       'goes to the picture (110 &rarr; 150). Code fixed at 20 hairlines, one '
-                       'height, in the corner. Nothing else moves.')
 
-C_ = BT.slot('TICKET STUB &middot; large', 'C 'C &mdash; bigger picture, tighter foot'mdash; bigger picture, tighter foot (CHOSEN, shipped 26.09)',
-             ticket(cover_pt=168, cover_side_pt=12, cover_top_pt=12,
-                    song_top_pt=11, title_pt=22, artist_pt=14, eb_pt=8,
-                    gap_pt=2, slack_pt=0, cf_top_pt=10, cf_bot_pt=11,
-                    name_pt=16, code=LINES_C),
-             'l', note='The song block and the counterfoil each give up a few points too, so '
-                       'the picture reaches 168 &mdash; half the tile. The code is 28 finer '
-                       'lines at one height, which is as far from a barcode as it goes.')
+def sums(tile, cover_pt):
+    w, h = tile
+    used = FIXED + cover_pt
+    return used, h - used
 
-D_ = BT.slot('TICKET STUB &middot; large', 'D &mdash; the picture runs to the edges',
-             ticket(cover_pt=166, cover_side_pt=0, cover_top_pt=0,
-                    song_top_pt=14, title_pt=24, artist_pt=15, eb_pt=8.5,
-                    gap_pt=3, slack_pt=0, cf_top_pt=12, cf_bot_pt=12,
-                    name_pt=17, code=LINES_D),
-             'l', note='No border round the picture at all &mdash; it runs edge to edge under '
-                       'the banner, the way the CD window now runs to its own tile. Same song '
-                       'block and foot as B; 16 wider lines in the corner.')
+
+def label(tile, cover_pt, *, slack_goes):
+    used, left = sums(tile, cover_pt)
+    return (f'{tile[0]}x{tile[1]}pt &middot; cover {cover_pt} &middot; '
+            f'{used} of {tile[1]} used &middot; {left}pt {slack_goes}')
+
+
+# ══════════════ ROW 1 — what she is looking at, at three sizes ═════════════
+row1 = ''.join(
+    BT.slot('TICKET STUB &middot; large', f'TODAY &mdash; {n} ({w}x{h})',
+            ticket(cover_pt=SHIPPED_COVER, cover_side_pt=12, cover_top_pt=12,
+                   song_top_pt=11, title_pt=22, artist_pt=14, eb_pt=8,
+                   gap_pt=2, slack_pt=max(0, h - FIXED - SHIPPED_COVER),
+                   cf_top_pt=10, cf_bot_pt=11, name_pt=16, code=LINES_C),
+            f'l{n}',
+            note=label((w, h), SHIPPED_COVER, slack_goes='into the Spacer'))
+    for n, (w, h) in TILES.items())
+
+# ══════════════ ROW 2 — the cover takes the slack instead ══════════════════
+# The Spacer goes and the COVER becomes the flexible block, so the song sits a
+# fixed 10pt above the tear at every size and the picture absorbs whatever the
+# tile has spare. On the small tile that runs the other way and the picture
+# gives 6pt back, which is the block that should compress.
+row2 = ''.join(
+    BT.slot('TICKET STUB &middot; large', f'FIX &mdash; {n} ({w}x{h})',
+            ticket(cover_pt=h - FIXED, cover_side_pt=12, cover_top_pt=12,
+                   song_top_pt=11, title_pt=22, artist_pt=14, eb_pt=8,
+                   gap_pt=2, slack_pt=10, cf_top_pt=10, cf_bot_pt=11,
+                   name_pt=16, code=LINES_BIG),
+            f'l{n}',
+            note=label((w, h), h - FIXED, slack_goes='left over'))
+    for n, (w, h) in TILES.items())
+
+# ══════════════ ROW 3 — how big the code should be ═════════════════════════
+def code_slot(name, code, note):
+    return BT.slot('COUNTERFOIL &middot; detail', name,
+                   f'<div style="position:absolute;inset:0;display:flex;'
+                   f'flex-direction:column;justify-content:flex-end;'
+                   f'background:linear-gradient(180deg,{PAPER},{PAPER_DEEP});">'
+                   f'{tear()}'
+                   f'{counterfoil(top_pt=10, bot_pt=11, name_pt=16, code=code, align="corner")}'
+                   f'</div>', 'lS', note=note)
+
+
+row3 = (code_slot('CODE &mdash; 55x15, shipped', LINES_C,
+                  '28 hairlines at 1pt with a 1pt gap. What you have.')
+        + code_slot('CODE &mdash; 82x22, proposed', LINES_BIG,
+                    'The same 28 marks and the same 1:1 bar-to-gap, drawn 1.5x. '
+                    'Half again as wide and half again as tall; still one width and '
+                    'one height, so it still reads as a rule of lines.')
+        + code_slot('CODE &mdash; 110x30, too far', LINES_2X,
+                    '2x. It starts to own the foot of the ticket and crowd the '
+                    'station&rsquo;s name, which is what &ldquo;huge&rdquo; would look like.'))
 
 
 html = (f"<html><head><meta charset=utf-8><style>{CSS}</style></head><body>"
-        + BT.head('The big ticket stub &mdash; a bigger cover, and lines instead of a barcode',
-                  'Owner, 26.09: "Is there any way to enlarge the album cover. Drag the song '
-                  'title and artist name closer to the dotted line. And shorten the barcode? '
-                  'The barcode lines should also compress &mdash; it must look like lines '
-                  'rather than a barcode. Also, make the barcode sit to the right bottom '
-                  'corner." <br>'
-                  'The first two asks are the same fault: a Spacer between the artist line and '
-                  'the tear is where all 45 spare points of the tile end up, so closing it '
-                  'pulls the song down AND hands the room to the picture. The title also drops '
-                  'to one line (shrinking rather than wrapping, as the medium stub already '
-                  'does) &mdash; without that a long song name would push the counterfoil off '
-                  'the tile and the cover could not grow past 126. B, C and D spend the '
-                  'reclaimed room three different ways.')
-        + f'<div class=row>{A_}{B_}{C_}{D_}</div>'
+        + BT.head('The big ticket stub &mdash; the song against the tear, a bigger cover, '
+                  'and a bigger code',
+                  'Owner, 26.09: "The ticket stub text needs the text to move closer to the '
+                  'bottom so there&rsquo;s more space for the album cover. The barcode is '
+                  'looking a bit small, try to make it more bigger but not huge." <br>'
+                  'ROW 1 is what ships, drawn at the three sizes WidgetKit actually hands a '
+                  'large tile. Every block but the cover is a fixed number of points and they '
+                  'add to 183, so at 338x354 the stack is 351 of 354 and looks right &mdash; '
+                  'but her phone&rsquo;s tile is 364x382, where 31 spare points all land in '
+                  'the one flexible gap, which sits between the artist line and the tear. '
+                  'ROW 2 makes the COVER the flexible block instead: the song then sits a '
+                  'fixed 10pt above the tear at every size and the picture takes the room. '
+                  'ROW 3 sizes the code.')
+        + f'<div class=row>{row1}</div>'
+        + f'<div class=row>{row2}</div>'
+        + f'<div class=row>{row3}</div>'
         + "</body></html>")
 pathlib.Path(_want).write_text(html)
 print(f"wrote {_want}")

@@ -1239,15 +1239,33 @@ struct LastPlayedView: View {
         .frame(height: 38)
         .background(paperInk)
 
-        // 168, AND THE 58 IT GAINED CAME OUT OF A GAP NOBODY MEANT TO LEAVE
-        // (owner, 26.09: "is there any way to enlarge the album cover").
-        // Every block in this stack is a fixed height except the Spacer below
-        // the song, so ALL the tile's leftover room landed there: banner 38 +
-        // air 14 + picture 110 + air 14 + song 64 + tear 13 + counterfoil 56
-        // is 309 of 354, i.e. a 45pt dead band sitting between the artist line
-        // and the tear. Closing it answers her other ask in the same move —
-        // "drag the song title and artist name closer to the dotted line" —
-        // because the two are one fault, not two.
+        // THE PICTURE IS THE FLEXIBLE BLOCK, AND THAT IS THE WHOLE FIX
+        // (owner, 26.09, off the large tile on her own phone: "the text needs
+        // to move closer to the bottom so there's more space for the album
+        // cover"). Both halves of that sentence are ONE fault, and it is the
+        // CD window's fault of the same day in a second file.
+        //
+        // EVERY BLOCK HERE WAS A FIXED NUMBER OF POINTS, and they add to 351
+        // of a 354pt tile — which is exact on a 393-wide iPhone and on
+        // nothing else. WidgetKit hands a large widget a DIFFERENT BOX ON
+        // EVERY SCREEN: 329x345 (SE, 13 mini), 338x354, 360x379, and
+        // 364x382 on a Pro Max, which is hers. So 31 spare points had to go
+        // somewhere, and they went into the one flexible thing in the stack —
+        // a Spacer sitting BETWEEN THE ARTIST LINE AND THE TEAR, i.e. the
+        // most visible gap on the ticket and the one she is pointing at.
+        //
+        // So the Spacer is gone and the PICTURE is greedy instead. The song
+        // then sits a fixed 10pt above the tear at every size, and whatever
+        // the tile has spare becomes cover: 171 at 338x354 (the 3pt the old
+        // Spacer held), 196 at 360x379, 199 on hers. ON THE SMALLEST TILE IT
+        // RUNS THE OTHER WAY and the picture gives 6pt back, which is the
+        // right block to compress — today that 6pt overflows in silence.
+        //
+        // NO ARITHMETIC AND NO GeometryReader: the stack's own layout does
+        // the distribution, so a block whose type measures taller than anyone
+        // assumed simply takes its room out of the picture instead of pushing
+        // the counterfoil off the bottom of the tile. `minHeight` is the floor
+        // that stops the picture collapsing if that ever goes far enough.
         //
         // AND THE TITLE HAD TO DROP TO ONE LINE FOR THE PICTURE TO GROW AT
         // ALL. At lineLimit(2) a long song costs another 29pt, which caps the
@@ -1256,9 +1274,9 @@ struct LastPlayedView: View {
         // so a long title shrinks rather than wraps; taking the same rule here
         // is what buys these 58 points.
         //
-        // COUNTED, NOT EYEBALLED: banner 38 + air 12 + picture 168 + air 11 +
-        // song 57 + tear 13 + counterfoil 52 is 351 of 354, and the 3 left
-        // over is the Spacer's, so nothing is compressed to fit.
+        // COUNTED, NOT EYEBALLED: banner 38 + air 12 + air 11 + song 57 +
+        // air 10 + tear 13 + counterfoil 52 is 193 whatever the tile, so the
+        // picture is simply the rest of it.
         ZStack {
           if let art = Art.songCover(station: s.image) {
             art.cruiseBackdrop()
@@ -1268,7 +1286,7 @@ struct LastPlayedView: View {
             s.gradient
           }
         }
-        .frame(height: 168)
+        .frame(minHeight: 140, maxHeight: .infinity)
         .clipped()
         .padding(.horizontal, 12)
         .padding(.top, 12)
@@ -1295,12 +1313,12 @@ struct LastPlayedView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 15)
         .padding(.top, 11)
-
-        // minLength 0, NOT 8. This spacer is the one flexible thing in the
-        // stack, so whatever 8 it was given became a floor under the dead
-        // band — and it is also the only give a slightly taller line of type
-        // has to take, so it must be allowed to close completely.
-        Spacer(minLength: 0)
+        // 10pt, AND FIXED, which is what "closer to the bottom" means here.
+        // There is deliberately no Spacer under this block any more: a Spacer
+        // is what collected the tile's whole surplus and opened the dead band
+        // she photographed. The picture above is the flexible block now, so
+        // this gap is the same 10pt on every phone.
+        .padding(.bottom, 10)
 
         tearAcross
 
@@ -1357,19 +1375,30 @@ struct LastPlayedView: View {
   /// AND A BARCODE CANNOT BE SHORTENED INTO SOMETHING ELSE, which is the same
   /// finding the medium ticket produced from the other end on 10.09: it took
   /// 46 bars before it read as printed at all, fewer being an ICON of a
-  /// barcode. So this stops trying: 28 hairlines, one width, one height, a
-  /// FIXED 1pt gap rather than a flexible one so nothing can stretch it, and
-  /// 55pt wide however much room is going.
+  /// barcode. So this stops trying: 28 marks, one width, one height, a FIXED
+  /// gap rather than a flexible one so nothing can stretch it.
+  ///
+  /// 1.5x OF WHAT SHE APPROVED, AND UNIFORMLY (owner, 26.09: "the barcode is
+  /// looking a bit small, try to make it more bigger but not huge"). It was
+  /// 55x15; it is 82.5x22. The mark COUNT and the 1:1 bar-to-gap are both
+  /// untouched, so the only thing that changed is the size — which is what
+  /// keeps this a rule of lines rather than quietly walking it back toward
+  /// the barcode she had removed a few hours earlier. 2x was drawn too and is
+  /// where "huge" starts: at 110x30 it owns the foot and crowds the station.
+  ///
+  /// IT COSTS THE ROW NOTHING. The counterfoil's height is set by the STATION
+  /// block beside it (an 8pt eyebrow over a 16pt name, about 31pt), so this
+  /// can grow to 31 before the foot of the ticket moves at all.
   ///
   /// It is the last thing in a `.bottom`-aligned row, so it lands in the
   /// tile's own bottom-right corner, which is where she asked for it.
   private var codeLines: some View {
-    HStack(spacing: 1) {
+    HStack(spacing: 1.5) {
       ForEach(0..<28, id: \.self) { _ in
-        Rectangle().fill(paperInk).frame(width: 1, height: 15)
+        Rectangle().fill(paperInk).frame(width: 1.5, height: 22)
       }
     }
-    .frame(height: 15)
+    .frame(height: 22)
   }
 }
 

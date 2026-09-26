@@ -825,6 +825,58 @@ if (declared.length < 5 || Object.keys(kinds).length < 5) {
   check('and it draws one width and one height, so it reads as lines',
     !!cl && !/\.frame\([^)]*\?/.test(cl),
     'two widths and two heights are a real barcode\u2019s own proportions');
+
+  // ── AND THE PICTURE IS THE ONLY FLEXIBLE BLOCK IN THAT STACK ────────────
+  //
+  // Owner, 26.09, off the large stub on her own phone: "the text needs to
+  // move closer to the bottom so there's more space for the album cover."
+  //
+  //   ONE FAULT, NOT TWO, and it is the CD window's fault of the same day in
+  //   a second file. Every block here was a fixed number of points adding to
+  //   351 of a 354pt tile -- exact on a 393-wide iPhone and on nothing else.
+  //   WidgetKit hands a large tile a different box on every screen, so on her
+  //   Pro Max (364x382) 31 spare points landed in the one flexible thing in
+  //   the stack: a Spacer BETWEEN THE ARTIST LINE AND THE TEAR.
+  //
+  //   THE WAY IT COMES BACK is somebody putting a Spacer back under the song
+  //   "so the layout breathes", or pinning the picture to a number again --
+  //   both of which look perfectly right on a 393-wide phone and open the
+  //   band on every larger one. So both are refused by name.
+  if (st) {
+    const songToTear = st.slice(
+      Math.max(0, st.indexOf('Text("LAST PLAYED")')), st.indexOf('tearAcross'));
+    check('the tall stub found its song block', songToTear.length > 40);
+    check('nothing flexible sits between the song and the tear',
+      !/Spacer\(/.test(songToTear),
+      'a Spacer there is where the tile\u2019s whole surplus went');
+    check('the song block is held a fixed distance off the tear',
+      /\.padding\(\.bottom,\s*\d/.test(songToTear),
+      'with the Spacer gone the artist would otherwise sit on the dashes');
+    check('the picture takes the tile\u2019s surplus instead',
+      /\.frame\(minHeight:[^)]*maxHeight:\s*\.infinity\)/.test(st),
+      'a fixed picture height puts the dead band straight back');
+    check('and it keeps a floor so it cannot collapse',
+      /\.frame\(minHeight:\s*\d/.test(st));
+  }
+
+  // The code is 1.5x what she approved on 26.09 and must stay a rule of
+  // lines: same mark count, same 1:1 bar-to-gap. Growing the gap alone, or
+  // adding marks, walks it back toward the barcode she had removed.
+  if (cl) {
+    const w = cl.match(/\.frame\(width:\s*([\d.]+),\s*height:\s*([\d.]+)\)/);
+    const gap = cl.match(/HStack\(spacing:\s*([\d.]+)\)/);
+    const bars = cl.match(/0\.\.<(\d+)/);
+    check('the code states its bar, gap and count', !!w && !!gap && !!bars);
+    if (w && gap && bars) {
+      check('its gap is exactly its bar width, as she approved',
+        Number(gap[1]) === Number(w[1]),
+        'a gap wider than the mark reads as hatching, narrower as a barcode');
+      check('it is 28 marks, the count she picked', bars[1] === '28');
+      check('and it is bigger than it was without being huge',
+        Number(w[1]) > 1 && Number(w[2]) > 15 && Number(w[2]) <= 26,
+        '"more bigger but not huge" -- 2x owns the foot of the ticket');
+    }
+  }
 }
 
 

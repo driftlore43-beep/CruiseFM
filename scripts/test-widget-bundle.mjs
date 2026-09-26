@@ -828,6 +828,90 @@ if (declared.length < 5 || Object.keys(kinds).length < 5) {
 }
 
 
+// ── THE BIG CD WINDOW IS A SHARE OF ITS TILE, NOT A FIXED DRAWING ─────────
+//
+// Owner, 26.09, with the large tile on her Home Screen: "it's looking a bit
+// compressed at the top leaving an awkward gap at the bottom."
+//
+//   IT WAS ONE FAULT AND IT WAS COUNTABLE. Every size in that window was a
+//   fixed number of points adding to 346 x 338 -- the large tile on a
+//   393-wide iPhone, exactly. WidgetKit hands a large widget a different box
+//   on every screen, so on a Pro Max the same content left 36pt dead at the
+//   foot and 26pt dead down the right, and on the smallest phone it was 1pt
+//   OVER. None of that is visible on the one tile the old sheet drew, which
+//   is why the harness had to be fixed before the window could be.
+//
+//   THE WAY IT COMES BACK is somebody adding a part to this window with a
+//   plain number in it, which will look perfectly right on their own phone
+//   and be wrong on every other. So the cluster is scanned for bare sizes.
+{
+  const decomment = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const body = (name, s) => {
+    const i = s.indexOf(name);
+    if (i < 0) return null;
+    let j = s.indexOf('{', i), depth = 0, k = j;
+    for (; k < s.length; k++) {
+      if (s[k] === '{') depth += 1;
+      else if (s[k] === '}') { depth -= 1; if (!depth) break; }
+    }
+    return decomment(s.slice(j, k));
+  };
+  const lp = src_['LastPlayedWidget.swift'] ?? '';
+
+  // 1. THE SCALE ITSELF, and the cap is what makes it the owner's D rather
+  //    than C: without it the window simply fills the tile and the gaps stay
+  //    as tight as they are today.
+  const sc = body('private func cdTallScale', lp);
+  check('the tall CD window has a scale to be checked', !!sc);
+  check('the tall CD window scales off the tile it was drawn for',
+    !!sc && /size\.width \/ 338/.test(sc) && /size\.height \/ 354/.test(sc),
+    '338 x 354 is the box these fixed numbers were chosen against');
+  check('and it caps the growth, which is what leaves room for air',
+    !!sc && /min\([^)]*1\.04\)/.test(sc),
+    'uncapped this is option C -- it fills the tile and the gaps stay tight');
+
+  // 2. A GeometryReader ALIGNS TOP-LEADING. The face behind this window is
+  //    greedy, so without an explicit frame the ZStack sizes to its largest
+  //    child and hangs off two edges -- the fault that moved two Mode tiles
+  //    on 15.09, in a second file.
+  const pt = body('private func cdPlayerTall', lp);
+  check('the tall CD window measures its tile', !!pt && /GeometryReader \{ geo in/.test(pt));
+  check('and frames itself to what it measured',
+    !!pt && /\.frame\(width: geo\.size\.width, height: geo\.size\.height\)/.test(pt),
+    'GeometryReader aligns top-leading -- without this it hangs off two edges');
+
+  // 3. THE SPARE POINTS ARE SHARED, NOT DUMPED. One Spacer at the foot is
+  //    fine at 8pt and is a visible dead band at 36. `air` has to reach at
+  //    least two seams; the third is the Spacer, which takes what is left.
+  const bt = body('private func cdBodyTall', lp);
+  check('cdBodyTall exists to be checked', !!bt);
+  check('the tall CD window works out its own spare room',
+    !!bt && /let air = /.test(bt),
+    'it cannot share what it has not measured');
+  check('and shares it between the seams rather than dumping it at the foot',
+    !!bt && (bt.match(/\+ air\b/g) ?? []).length >= 2,
+    'all of it in one Spacer is the gap she photographed');
+
+  // 4. THE TOP ROW SPREADS. A fixed gap between the cover and the keys left
+  //    a dead column beside the cluster on any tile wider than 338, while
+  //    the fields below ran the window's full width.
+  check('the cover and the cluster spread to the window\u2019s own width',
+    !!bt && /HStack\(alignment: \.top, spacing: 0\)/.test(bt) && /Spacer\(minLength: 0\)/.test(bt),
+    'a fixed gap leaves a dead column on a wider tile');
+
+  // 5. AND NOTHING IN THE CLUSTER MAY CARRY A BARE SIZE. This is the check
+  //    that stops the fault coming back: a plain number here looks right on
+  //    one phone and is wrong on every other.
+  const cc = body('private func cdCluster', lp);
+  check('cdCluster exists to be checked', !!cc);
+  const bare = (cc ?? '').split('\n').filter((l) =>
+    /\b(width|height|spacing|size):\s*-?\d/.test(l) && !/\* k/.test(l));
+  check('every size in the cluster is a share of the tile',
+    !!cc && bare.length === 0,
+    bare.map((l) => l.trim()).join(' | '));
+}
+
+
 // ── THE DECK'S KEYS ARE FURNITURE, AND ITS ARM IS SIZED OFF ITS RECORD ────
 //
 // Owner, 26.09, with an MD Vinyl screenshot: "instead of the rectangle border

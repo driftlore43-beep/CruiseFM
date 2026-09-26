@@ -292,25 +292,29 @@ struct LastPlayedView: View {
   /// comparing it to: its field box is 64 tall with 34px type (0.53 of the
   /// row) and its title bar 66 with 38px (0.58). The widget's were 26 with
   /// 12pt (0.46) and 32 with 15pt (0.47).
-  private func cdTitleBar(_ s: WidgetStation, big: Bool = false) -> some View {
-    HStack(spacing: big ? 8 : 8) {
-      discGlyph(size: big ? 20 : 18)
+  private func cdTitleBar(_ s: WidgetStation, big: Bool = false,
+                         k: CGFloat = 1) -> some View {
+    // `k` DEFAULTS TO 1, so the medium window is provably unchanged rather
+    // than trusted — the same rule the 25.09 round used when the two sizes
+    // started sharing this bar.
+    HStack(spacing: 8 * k) {
+      discGlyph(size: (big ? 20 : 18) * k)
       // NOT hardcoded white: the bar is the station's own colour now, so
       // a cream station gets near-black lettering and a navy one white.
       // See titleBarInk in Snapshot.swift for why that is measured.
-      Text("Cruise FM").font(pixelFont(big ? 19 : 15)).foregroundColor(s.titleBarInk)
-      Spacer(minLength: 4)
+      Text("Cruise FM").font(pixelFont((big ? 19 : 15) * k)).foregroundColor(s.titleBarInk)
+      Spacer(minLength: 4 * k)
       ForEach(["_", "[]", "X"], id: \.self) { c in
         ZStack {
           face
           bevel(raised: true, width: 2)
-          Text(c).font(pixelFont(big ? 11 : 10)).foregroundColor(paperInk)
+          Text(c).font(pixelFont((big ? 11 : 10) * k)).foregroundColor(paperInk)
         }
-        .frame(width: big ? 22 : 20, height: big ? 19 : 17)
+        .frame(width: (big ? 22 : 20) * k, height: (big ? 19 : 17) * k)
       }
     }
-    .padding(.horizontal, 10)
-    .frame(height: big ? 36 : 32)
+    .padding(.horizontal, 10 * k)
+    .frame(height: (big ? 36 : 32) * k)
     // THE STATION'S OWN COLOUR (owner, 09.09: "im not sure where that
     // yellow top banner is coming from — change it to the colour of the
     // chosen station"). It replaces the prototype's fixed gold.
@@ -376,8 +380,10 @@ struct LastPlayedView: View {
   /// toggle, a tip does not assert a value we would have to know.
   private func field(_ caption: String, _ value: String, arrow: Bool = false,
                      h: CGFloat = 26, cap: CGFloat = 11, val: CGFloat = 12,
-                     capW: CGFloat = 52) -> some View {
-    HStack(spacing: 7) {
+                     capW: CGFloat = 52, k: CGFloat = 1) -> some View {
+    // `k` defaults to 1, so the medium window's two fields are byte-identical
+    // arithmetic — the sizes it passes are already explicit.
+    HStack(spacing: 7 * k) {
       // 52, AND IT WAS MEASURED OFF THE ttf's OWN hmtx RATHER THAN GUESSED,
       // twice now. At 11pt in DotGothic16: "Artist:" 38.50, "Track:" 33.00,
       // "Mode:" 27.50 and — the one that moved this number — "Station:"
@@ -393,7 +399,7 @@ struct LastPlayedView: View {
         bevel(raised: false, width: 2)
         HStack(spacing: 0) {
           Text(value).font(pixelFont(val)).foregroundColor(.black)
-            .lineLimit(1).padding(.horizontal, 7)
+            .lineLimit(1).padding(.horizontal, 7 * k)
             .frame(maxWidth: .infinity, alignment: .leading)
           if arrow {
             ZStack {
@@ -403,11 +409,11 @@ struct LastPlayedView: View {
               // depend on the system font covering it, and this extension
               // cannot be compiled or rendered here to find out it does not —
               // a triangle turned over cannot fail that way.
-              Triangle().fill(paperInk).frame(width: 7, height: 5)
+              Triangle().fill(paperInk).frame(width: 7 * k, height: 5 * k)
                 .rotationEffect(.degrees(180))
             }
-            .frame(width: h - 8, height: h - 6)
-            .padding(.trailing, 3)
+            .frame(width: h - 8 * k, height: h - 6 * k)
+            .padding(.trailing, 3 * k)
           }
         }
       }
@@ -836,20 +842,68 @@ struct LastPlayedView: View {
    * can reveal is a layer that will be tuned by somebody one day.
    */
   private func cdPlayerTall(_ s: WidgetStation) -> some View {
-    ZStack(alignment: .topLeading) {
-      // The same face as the medium window, for the same reason: lit at the
-      // top because a moulded panel is lit from above, and NOT darkened at
-      // the foot (the vignette came off on 14.09).
-      LinearGradient(colors: [faceLit.opacity(0.55), face, face, face],
-                     startPoint: .top, endPoint: .bottom)
-      VStack(spacing: 0) {
-        cdTitleBar(s, big: true)
-        cdBodyTall(s)
+    GeometryReader { geo in
+      let k = cdTallScale(geo.size)
+      ZStack(alignment: .topLeading) {
+        // The same face as the medium window, for the same reason: lit at
+        // the top because a moulded panel is lit from above, and NOT
+        // darkened at the foot (the vignette came off on 14.09).
+        LinearGradient(colors: [faceLit.opacity(0.55), face, face, face],
+                       startPoint: .top, endPoint: .bottom)
+        VStack(spacing: 0) {
+          cdTitleBar(s, big: true, k: k)
+          cdBodyTall(s, k: k, tileH: geo.size.height)
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+        WindowShading()
       }
-      .frame(maxHeight: .infinity, alignment: .top)
-      WindowShading()
+      // A GeometryReader ALIGNS ITS CONTENT TOP-LEADING, not centre, and the
+      // face behind this window is greedy — without an explicit frame the
+      // whole ZStack sizes to its largest child and hangs off two edges.
+      // That is the fault that moved two Mode tiles on 15.09.
+      .frame(width: geo.size.width, height: geo.size.height)
     }
     .widgetURL(s.url(mode: s.mode))
+  }
+
+  /**
+   * HOW BIG THIS WINDOW IS DRAWN — owner, 26.09, with the large tile on her
+   * Home Screen: "it's looking a bit compressed at the top leaving an awkward
+   * gap at the bottom. Can we space them out."
+   *
+   * SHE WAS LOOKING AT ONE FAULT WITH ONE CAUSE, AND IT WAS COUNTABLE BEFORE
+   * ANYTHING WAS DRAWN. Every size in this window was a FIXED number of
+   * points, and they added to 346 tall by 338 wide — which is the large tile
+   * on a 393-wide iPhone, exactly. WidgetKit hands a large widget a different
+   * box on every screen:
+   *
+   *   329 x 345  (SE, 13 mini)   346pt of content is 1pt OVER the tile
+   *   338 x 354  (14/15/16)      exact, both axes — the one it was drawn for
+   *   360 x 379  (Plus, XS Max)  33pt dead at the foot, 22pt dead at the right
+   *   364 x 382  (Pro Max)       36pt dead at the foot, 26pt dead at the right
+   *
+   * It all collected at the FOOT because the stack is pinned with
+   * `.frame(maxHeight: .infinity, alignment: .top)` — which is how 25.09
+   * removed a strip ABOVE the title bar. So re-centring would simply have put
+   * that strip back; the room has to be redistributed instead.
+   *
+   * SO THE CHOICE WAS ONE NUMBER, and she picked D off a four-way sheet
+   * (`docs/design/cd_window_tall.py`): of the 36 spare points, how many go to
+   * making things BIGGER and how many to putting AIR between them. B spent
+   * them all on air, C all on size, D splits it — grow 4% and keep 22pt as
+   * air, about 7pt at each of the three seams.
+   *
+   * THE CAP IS WHAT MAKES IT D RATHER THAN C. Without it this is the Mode
+   * tile's own rule (14.09, `k = min(width, height) / 158`) and the window
+   * simply fills the tile, leaving the gaps as tight as they are today. 1.04
+   * is the share of the growth she chose to spend; the rest stays as air.
+   *
+   * AND IT SCALES DOWN AS WELL AS UP, which is the half no amount of air
+   * could have fixed: on the smallest phone `fit` is 0.973, so the window
+   * comes down to meet a tile its fixed sizes were 1pt too tall for.
+   */
+  private func cdTallScale(_ size: CGSize) -> CGFloat {
+    min(size.width / 338, size.height / 354, 1.04)
   }
 
   /**
@@ -888,71 +942,102 @@ struct LastPlayedView: View {
    *   and the schedule's own labels are, so the extension never owns a
    *   second copy of a formatting rule.
    *
-   * COUNTED RATHER THAN EYEBALLED, at 338x354 with the window filling it:
+   * COUNTED RATHER THAN EYEBALLED. At k = 1, i.e. on the 338x354 tile these
+   * numbers were chosen for and signed off on 25.09:
    *
    *   title bar        36    (title 19pt, was 15)
    *   body top pad      8
    *   top row         124    (cover 124 square | cluster 180 wide)
    *   air              10
    *   four fields     138    (4 x 30, 3 x 6 between; caption 14, value 16)
-   *   Spacer            8
    *   LAST PLAYED      20
    *   body bottom pad  10
    *   ─────────────────────
-   *                   354 exactly, with the slack held in ONE Spacer above
-   *                   the foot row rather than spread through the stack.
+   *                   346, and the tile is 354, so 8 points are spare.
    *
-   * Content width 314 = cover 124 + 10 + cluster 180, and the cluster's own
-   * three rows each come to 180: CD 40 + deck 80 + volume 46 with 7 between;
-   * pause 88 | shuffle 41 | repeat 41 with 5; five 32pt keys with 5.
+   * EVERY ONE OF THOSE IS NOW `x k`, AND THE SPARE POINTS ARE SHARED RATHER
+   * THAN DUMPED. They used to sit in one Spacer above the foot row, which is
+   * fine at 8 and is a visible dead band at 36 — see `cdTallScale` for why
+   * the number differs by phone. The leftover is split three ways: under the
+   * title bar, under the picture, and above LAST PLAYED. The third share is
+   * the Spacer, which is deliberately NOT given an explicit height — it takes
+   * whatever the other two leave, so a rounding error lands there instead of
+   * overflowing the window, which would clip in silence.
+   *
+   * AND THE TOP ROW IS SPREAD RATHER THAN GAPPED. The cover and the cluster
+   * used to sit 10pt apart; on a tile wider than 338 that left a dead column
+   * beside the keys while the fields below ran the window's full width. A
+   * Spacer between them puts the cluster's right edge on the fields' right
+   * edge at any width — AND REPRODUCES THE SHIPPED GAP EXACTLY where it was
+   * drawn: 338 - 24 of padding is 314, less cover 124 and cluster 180 is 10.
+   *
+   * The cluster's own three rows each come to 180: CD 40 + deck 80 + volume
+   * 46 with 7 between; pause 88 | shuffle 41 | repeat 41 with 5; five 32pt
+   * keys with 5.
    */
-  private func cdBodyTall(_ s: WidgetStation) -> some View {
-    VStack(alignment: .leading, spacing: 0) {
-      HStack(alignment: .top, spacing: 10) {
+  private func cdBodyTall(_ s: WidgetStation, k: CGFloat, tileH: CGFloat) -> some View {
+    let cover = 124 * k
+    let fieldH = 30 * k, fieldGap = 6 * k
+    let topPad = 8 * k, gap1 = 10 * k, botPad = 10 * k
+    let used = 36 * k + topPad + cover + gap1
+             + (4 * fieldH + 3 * fieldGap) + 20 * k + botPad
+    // A third each to the three seams. `max(0,...)` because on the smallest
+    // phone there is nothing to share, and a negative here would pull the
+    // stack up rather than leaving the Spacer to absorb it.
+    let air = max(0, (tileH - used) / 3)
+
+    return VStack(alignment: .leading, spacing: 0) {
+      HStack(alignment: .top, spacing: 0) {
         ZStack {
           Color.white
           bevel(raised: false, width: 2)
           if let art = Art.songCover(station: s.image) {
-            art.resizable().aspectRatio(contentMode: .fill).padding(3)
+            art.resizable().aspectRatio(contentMode: .fill).padding(3 * k)
           } else {
             // Neither a cover nor a photograph: a custom station with no
             // picture. Its own colour, not a grey slab.
-            s.gradient.padding(3)
+            s.gradient.padding(3 * k)
           }
         }
-        .frame(width: 124, height: 124)
+        .frame(width: cover, height: cover)
         .clipped()
 
-        cdCluster()
+        Spacer(minLength: 0)
+        cdCluster(k: k)
       }
 
-      VStack(spacing: 6) {
-        field("Artist:", entry.lastPlayed?.artist ?? "—", arrow: true, h: 30, cap: 14, val: 16, capW: 64)
-        field("Track:", entry.lastPlayed?.title ?? "—", arrow: true, h: 30, cap: 14, val: 16, capW: 64)
-        field("Station:", "\(s.name) · \(s.dial)", arrow: true, h: 30, cap: 14, val: 16, capW: 64)
+      VStack(spacing: fieldGap) {
+        field("Artist:", entry.lastPlayed?.artist ?? "—", arrow: true,
+              h: fieldH, cap: 14 * k, val: 16 * k, capW: 64 * k, k: k)
+        field("Track:", entry.lastPlayed?.title ?? "—", arrow: true,
+              h: fieldH, cap: 14 * k, val: 16 * k, capW: 64 * k, k: k)
+        field("Station:", "\(s.name) · \(s.dial)", arrow: true,
+              h: fieldH, cap: 14 * k, val: 16 * k, capW: 64 * k, k: k)
         // The app's own label for the deck, sent in the snapshot rather than
         // mapped here — see `modeName` in Snapshot.swift for why.
-        field("Mode:", s.modeName ?? "—", arrow: true, h: 30, cap: 14, val: 16, capW: 64)
+        field("Mode:", s.modeName ?? "—", arrow: true,
+              h: fieldH, cap: 14 * k, val: 16 * k, capW: 64 * k, k: k)
       }
-      .padding(.top, 10)
+      .padding(.top, gap1 + air)
 
+      // The third share of the air. Left to take what the other two leave.
       Spacer(minLength: 0)
 
-      HStack(spacing: 6) {
-        Text("LAST PLAYED").font(pixelFont(12)).foregroundColor(paperInk.opacity(0.66))
-        Spacer(minLength: 4)
+      HStack(spacing: 6 * k) {
+        Text("LAST PLAYED").font(pixelFont(12 * k)).foregroundColor(paperInk.opacity(0.66))
+        Spacer(minLength: 4 * k)
         // Absent on a phone whose app has not run since this field was added,
         // and on one that has never played anything — the caption alone is
         // still true, so there is nothing to hide.
         if let when = entry.lastPlayed?.playedAt {
-          Text(when).font(pixelFont(15)).foregroundColor(paperInk)
+          Text(when).font(pixelFont(15 * k)).foregroundColor(paperInk)
         }
       }
-      .frame(height: 20)
+      .frame(height: 20 * k)
     }
-    .padding(.horizontal, 12)
-    .padding(.top, 8)
-    .padding(.bottom, 10)
+    .padding(.horizontal, 12 * k)
+    .padding(.top, topPad + air)
+    .padding(.bottom, botPad)
   }
 
   /**
@@ -967,44 +1052,50 @@ struct LastPlayedView: View {
    * The three keys this replaces left most of a 180 x 124 block empty, which
    * is the "too much empty space" she named.
    */
-  private func cdCluster() -> some View {
-    VStack(spacing: 9) {
-      HStack(spacing: 7) {
-        discGlyph(size: 40)
-        deckGlyph(width: 80, height: 40)
-        volumeBlock(width: 46, height: 40)
+  private func cdCluster(k: CGFloat) -> some View {
+    VStack(spacing: 9 * k) {
+      HStack(spacing: 7 * k) {
+        discGlyph(size: 40 * k)
+        deckGlyph(width: 80 * k, height: 40 * k, k: k)
+        volumeBlock(width: 46 * k, height: 40 * k, k: k)
       }
-      .frame(height: 44)
+      .frame(height: 44 * k)
 
-      HStack(spacing: 5) {
-        winKey(.pause, width: 88, height: 30)
-        winKey(.shuffle, width: 41, height: 30)
-        winKey(.repeatAll, width: 41, height: 30)
+      HStack(spacing: 5 * k) {
+        winKey(.pause, width: 88 * k, height: 30 * k, k: k)
+        winKey(.shuffle, width: 41 * k, height: 30 * k, k: k)
+        winKey(.repeatAll, width: 41 * k, height: 30 * k, k: k)
       }
 
-      HStack(spacing: 5) {
-        winKey(.prev, width: 32, height: 32)
-        winKey(.rewind, width: 32, height: 32)
-        winKey(.forward, width: 32, height: 32)
-        winKey(.next, width: 32, height: 32)
-        winKey(.heart, width: 32, height: 32)
+      HStack(spacing: 5 * k) {
+        winKey(.prev, width: 32 * k, height: 32 * k, k: k)
+        winKey(.rewind, width: 32 * k, height: 32 * k, k: k)
+        winKey(.forward, width: 32 * k, height: 32 * k, k: k)
+        winKey(.next, width: 32 * k, height: 32 * k, k: k)
+        winKey(.heart, width: 32 * k, height: 32 * k, k: k)
       }
     }
-    .frame(width: 180, height: 124)
+    // THE CLUSTER IS NEVER STRETCHED TO MATCH A TALLER PICTURE, and that was
+    // drawn before it was believed (26.09 sheet): pulled taller, its three
+    // key rows spread and read as scattered. It keeps the height three rows
+    // of keys need, which is why the picture can only grow by scaling.
+    .frame(width: 180 * k, height: 124 * k)
   }
 
   /// The little rack tape deck off the share card, seen slightly from above.
   /// PURE DECORATION, AND HONEST AS DECORATION — unlike a level bar it
   /// asserts no value, so it cannot go stale.
-  private func deckGlyph(width: CGFloat, height: CGFloat) -> some View {
+  private func deckGlyph(width: CGFloat, height: CGFloat, k: CGFloat = 1) -> some View {
+    // HAIRLINES ARE NOT SCALED, which is the 20.09 rule: a 1pt stroke is a
+    // 1pt stroke at every size, and every bevel here stays as it is.
     ZStack {
       face
       bevel(raised: true, width: 2)
       VStack(spacing: 0) {
-        HStack(spacing: 4) {
+        HStack(spacing: 4 * k) {
           // the power lamp
           Rectangle().fill(Color(hex: "#e5433c"))
-            .frame(width: 5, height: 4)
+            .frame(width: 5 * k, height: 4 * k)
             .overlay(Rectangle().stroke(Color(hex: "#7c1f1c"), lineWidth: 1))
           // the cassette window, sunken and dark, with both hubs showing
           ZStack {
@@ -1012,24 +1103,24 @@ struct LastPlayedView: View {
             bevel(raised: false, width: 1.5)
             HStack(spacing: 0) {
               Spacer(minLength: 0)
-              Circle().fill(Color(hex: "#8a9097")).frame(width: 4, height: 4)
+              Circle().fill(Color(hex: "#8a9097")).frame(width: 4 * k, height: 4 * k)
               Spacer(minLength: 0)
-              Circle().fill(Color(hex: "#8a9097")).frame(width: 4, height: 4)
+              Circle().fill(Color(hex: "#8a9097")).frame(width: 4 * k, height: 4 * k)
               Spacer(minLength: 0)
             }
           }
-          .frame(height: 13)
+          .frame(height: 13 * k)
         }
-        Spacer(minLength: 2)
+        Spacer(minLength: 2 * k)
         // the row of little keys along the foot
         HStack(spacing: 1) {
           ForEach(0..<8, id: \.self) { _ in
             ZStack { face; bevel(raised: true, width: 1) }
           }
         }
-        .frame(height: 7)
+        .frame(height: 7 * k)
       }
-      .padding(4)
+      .padding(4 * k)
     }
     .frame(width: width, height: height)
   }
@@ -1037,18 +1128,18 @@ struct LastPlayedView: View {
   /// + and − over an EMPTY well. The well is the point: it is the shape the
   /// share card draws, with nothing in it, because the volume is not
   /// something this extension can know. See the note on `cdBodyTall`.
-  private func volumeBlock(width: CGFloat, height: CGFloat) -> some View {
-    let keyW = width - 16, keyH = (height - 4) / 2
-    return HStack(spacing: 4) {
-      VStack(spacing: 4) {
-        winKey(.plus, width: keyW, height: keyH)
-        winKey(.minus, width: keyW, height: keyH)
+  private func volumeBlock(width: CGFloat, height: CGFloat, k: CGFloat = 1) -> some View {
+    let keyW = width - 16 * k, keyH = (height - 4 * k) / 2
+    return HStack(spacing: 4 * k) {
+      VStack(spacing: 4 * k) {
+        winKey(.plus, width: keyW, height: keyH, k: k)
+        winKey(.minus, width: keyW, height: keyH, k: k)
       }
       ZStack {
         Color(hex: "#a9adb3")
         bevel(raised: false, width: 2)
       }
-      .frame(width: 12)
+      .frame(width: 12 * k)
     }
     .frame(width: width, height: height)
   }
@@ -1064,30 +1155,33 @@ struct LastPlayedView: View {
   /// cannot be compiled or rendered here, so a codepoint the system font
   /// happens not to cover would ship as a hollow box with nothing logged
   /// anywhere. It is also what the medium window's own play key already does.
-  private func winKey(_ kind: WinKey, width: CGFloat, height: CGFloat) -> some View {
+  private func winKey(_ kind: WinKey, width: CGFloat, height: CGFloat,
+                      k: CGFloat = 1) -> some View {
+    // `g` scales for free, because the frame it is taken from is already
+    // scaled — which is why shuffle, repeat and the heart need nothing here.
     let g = min(width, height)
     return ZStack {
       face
       bevel(raised: true, width: 2)
       switch kind {
       case .play:
-        Triangle().fill(paperInk).frame(width: 10, height: 12).offset(x: 1)
+        Triangle().fill(paperInk).frame(width: 10 * k, height: 12 * k).offset(x: 1 * k)
       case .pause:
-        HStack(spacing: 3) {
-          Rectangle().fill(paperInk).frame(width: 3, height: 11)
-          Rectangle().fill(paperInk).frame(width: 3, height: 11)
+        HStack(spacing: 3 * k) {
+          Rectangle().fill(paperInk).frame(width: 3 * k, height: 11 * k)
+          Rectangle().fill(paperInk).frame(width: 3 * k, height: 11 * k)
         }
       case .prev, .next:
-        HStack(spacing: 1.5) {
-          if kind == .prev { Rectangle().fill(paperInk).frame(width: 2, height: 10) }
-          Triangle().fill(paperInk).frame(width: 7, height: 9)
+        HStack(spacing: 1.5 * k) {
+          if kind == .prev { Rectangle().fill(paperInk).frame(width: 2 * k, height: 10 * k) }
+          Triangle().fill(paperInk).frame(width: 7 * k, height: 9 * k)
             .rotationEffect(.degrees(kind == .prev ? 180 : 0))
-          if kind == .next { Rectangle().fill(paperInk).frame(width: 2, height: 10) }
+          if kind == .next { Rectangle().fill(paperInk).frame(width: 2 * k, height: 10 * k) }
         }
       case .rewind, .forward:
-        HStack(spacing: 1) {
-          Triangle().fill(paperInk).frame(width: 7, height: 9)
-          Triangle().fill(paperInk).frame(width: 7, height: 9)
+        HStack(spacing: 1 * k) {
+          Triangle().fill(paperInk).frame(width: 7 * k, height: 9 * k)
+          Triangle().fill(paperInk).frame(width: 7 * k, height: 9 * k)
         }
         // A rewind key is the forward key turned round, which is how every
         // mirrored glyph in this app is built rather than a second drawing.
@@ -1104,8 +1198,8 @@ struct LastPlayedView: View {
         HeartGlyph().fill(paperInk).frame(width: g * 0.50, height: g * 0.50)
       case .plus, .minus:
         ZStack {
-          Rectangle().fill(paperInk).frame(width: 11, height: 2)
-          if kind == .plus { Rectangle().fill(paperInk).frame(width: 2, height: 11) }
+          Rectangle().fill(paperInk).frame(width: 11 * k, height: 2 * k)
+          if kind == .plus { Rectangle().fill(paperInk).frame(width: 2 * k, height: 11 * k) }
         }
       }
     }

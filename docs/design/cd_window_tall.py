@@ -99,8 +99,28 @@ os.environ['OUT'] = _want
 
 from assets import A                        # noqa: E402
 
-CSS = BT.CSS
 ART = A['coastal']
+
+# ── THE LARGE TILE IS NOT ONE SIZE, WHICH IS THE WHOLE OF THIS ROUND ───────
+# WidgetKit hands a large widget a different box on every screen, and this
+# window is drawn in FIXED POINTS for exactly one of them. `.l` (338x354) is
+# the one it fits; on a Pro Max the same content leaves 36pt dead at the foot
+# and 26pt dead down the right, which is what she photographed.
+#
+# THE SHEET COULD NOT HAVE SHOWN THAT until now: it only ever drew `.l`, i.e.
+# the one size where the arithmetic is exact. Fourth time this family of file
+# has hit a fidelity fault (21.09 cd_widget drawing build 47; 25.09 this file
+# under-drawing type by 30%; 26.09 ticket_tall padding inside its heights) and
+# the rule is the same each time: before a harness can answer a question about
+# a size, check that it draws that size.
+TILES = {
+    'S': (329, 345),   # 375x812  — SE 3rd gen, 13 mini
+    'M': (338, 354),   # 390x844 / 393x852 — the size the Swift was drawn for
+    'B': (364, 382),   # 428x926 / 430x932 — Pro Max, and almost certainly hers
+}
+
+CSS = BT.CSS + '.slot { width:min-content; }' + ''.join(
+    f'.l{n} {{ width:{w*2}px; height:{h*2}px; }}' for n, (w, h) in TILES.items())
 
 # ── THE ONE SCALE RULE ─────────────────────────────────────────────────────
 # 1 point = 2 pixels, because the large tile is 338x354 points and this sheet
@@ -278,7 +298,7 @@ def keyrow(kinds, widths, h_pt, gap_pt):
             + ''.join(key(k, w, h_pt) for k, w in zip(kinds, widths)) + '</div>')
 
 
-def cluster(kind):
+def cluster(kind, k=1.0, h_pt=None):
     """The share card's own right-hand block, in three arrangements.
 
     'three'  what ships today: a disc and three keys, which is most of the
@@ -288,25 +308,27 @@ def cluster(kind):
     'tall'   148 x 156, bought by dropping the Mode field. Every part grows
              and the volume gets a row of its own.
     """
+    def z(x):
+        return x * k
     if kind == 'three':
-        return (f'<div style="width:{P(180)}px;height:{P(124)}px;display:flex;'
+        return (f'<div style="width:{P(z(180))}px;height:{P(z(124))}px;display:flex;'
                 f'flex-direction:column;align-items:center;justify-content:space-between;">'
-                f'{cd_glyph(23)}{keyrow(("prev","play","next"),(21,21,21),15,3)}</div>')
+                f'{cd_glyph(z(23))}{keyrow(("prev","play","next"),(z(21),)*3,z(15),z(3))}</div>')
     if kind == 'wide':
-        top = (f'<div style="display:flex;gap:{P(7)}px;align-items:center;height:{P(44)}px;">'
-               f'{cd_glyph(40)}{deck_glyph(80, 40)}{volume(46, 40)}</div>')
+        top = (f'<div style="display:flex;gap:{P(z(7))}px;align-items:center;height:{P(z(44))}px;">'
+               f'{cd_glyph(z(40))}{deck_glyph(z(80), z(40))}{volume(z(46), z(40))}</div>')
         rows = [top,
-                keyrow(('pause', 'shuffle', 'repeat'), (88, 41, 41), 30, 5),
-                keyrow(('prev', 'rew', 'ff', 'next', 'heart'), (32,) * 5, 32, 5)]
-        w, h = 180, 124
+                keyrow(('pause', 'shuffle', 'repeat'), (z(88), z(41), z(41)), z(30), z(5)),
+                keyrow(('prev', 'rew', 'ff', 'next', 'heart'), (z(32),) * 5, z(32), z(5))]
+        w, h = z(180), (h_pt if h_pt else z(124))
     else:
-        top = (f'<div style="display:flex;gap:{P(8)}px;align-items:center;height:{P(46)}px;">'
-               f'{cd_glyph(46)}{deck_glyph(94, 46)}</div>')
+        top = (f'<div style="display:flex;gap:{P(z(8))}px;align-items:center;height:{P(z(46))}px;">'
+               f'{cd_glyph(z(46))}{deck_glyph(z(94), z(46))}</div>')
         rows = [top,
-                volume(148, 34),
-                keyrow(('pause', 'shuffle', 'repeat'), (62, 41, 41), 32, 2),
-                keyrow(('prev', 'rew', 'ff', 'next', 'heart'), (26,) * 5, 32, 4)]
-        w, h = 148, 156
+                volume(z(148), z(34)),
+                keyrow(('pause', 'shuffle', 'repeat'), (z(62), z(41), z(41)), z(32), z(2)),
+                keyrow(('prev', 'rew', 'ff', 'next', 'heart'), (z(26),) * 5, z(32), z(4))]
+        w, h = z(148), z(156)
     return (f'<div style="width:{P(w)}px;height:{P(h)}px;display:flex;'
             f'flex-direction:column;justify-content:space-between;">{"".join(rows)}</div>')
 
@@ -327,102 +349,210 @@ def lastplayed(label_pt=12, time_pt=15):
 
 
 # ── the drawings ───────────────────────────────────────────────────────────
+#
+# THE 25.09 SHEET DREW FOUR LOOKS AT ONE SIZE. This one draws ONE look at
+# several sizes, because that is where the fault turned out to be:
+#
+#   Owner, 26.09, with the big tile on her Home Screen: "Love the widgets!
+#   But at the moment it's looking a bit compressed at the top leaving an
+#   awkward gap at the bottom. Can we space them out and show me some
+#   drawings"
+#
+# COUNTED BEFORE ANYTHING WAS DRAWN. Every number in `cdBodyTall` is a fixed
+# point value, and they add to 346 of height and 338 of width:
+#
+#   title bar 36 + top pad 8 + top row 124 + air 10 + fields 138
+#     + foot 20 + bottom pad 10 = 346
+#   pad 12 + cover 124 + gap 10 + cluster 180 + pad 12 = 338
+#
+# against the real tiles:
+#
+#   329 x 345   content is 1pt OVER  — something has to squeeze
+#   338 x 354   exact, both axes     — the one phone it was drawn for
+#   360 x 379   33pt dead at the foot, 22pt dead down the right
+#   364 x 382   36pt dead at the foot, 26pt dead down the right
+#
+# So "compressed at the top" and "an awkward gap at the bottom" are ONE
+# fault with one cause: the stack is pinned to the top with
+# `.frame(maxHeight: .infinity, alignment: .top)` — added on 25.09 to remove
+# a strip ABOVE the title bar — and it removes that strip by piling every
+# spare point at the FOOT instead. Re-centring would simply put the top strip
+# back, which is why this needs redistributing rather than reversing.
 
-def window(*, fill, top, cover_pt, clust, rows, foot, top_pad,
-           title_pt, cap_pt, val_pt, field_h_pt, cap_w_pt):
-    """One drawing, a handful of switches, so the prototypes cannot drift.
+# The size the Swift's fixed numbers were drawn against.
+BASE_W, BASE_H = 338, 354
 
-    `fill`  the window runs to the tile's own edge rather than sitting on a
-            border of room (owner, 25.09: "could we make the Winamp take up
-            the black border surroundings?").
-    `top`   the title bar is pinned to the top rather than floating in a
-            centred stack. NOT a taste: the stack is SHORTER than the tile,
-            so SwiftUI centres it — which is the strip of window above the
-            title bar AND the gap below the last field, i.e. two of her
-            complaints from one cause.
-    `rows`  which fields are printed. Dropping Mode buys 36pt, which is what
-            lets every part of the cluster grow in D.
+BIGGER = dict(title_pt=19, cap_pt=14, val_pt=16, field_h_pt=30, cap_w_pt=64)
+
+
+def window(tile, *, k=1.0, air='one', cover_pt=124, clust='wide',
+           field_h_pt=30, field_gap_pt=6, title_pt=19, cap_pt=14, val_pt=16,
+           cap_w_pt=64, cluster_pt=180, spread=True):
+    # A COVER TALLER THAN THE CLUSTER IS NOT AVAILABLE, and it was drawn
+    # before it was believed. The cluster is 124 tall because that is what
+    # three rows of keys need; stretching it to match a bigger picture
+    # spreads those rows and reads as scattered, and leaving it short opens
+    # a second empty band beside the picture. So the picture can only grow
+    # by SCALING, which is what C and D do.
+    """One drawing of the tall window, laid out on a REAL tile.
+
+    Every gap is worked out here in points rather than left to CSS flex, so
+    the sheet's own arithmetic is the arithmetic the Swift will carry.
+
+    `k`       scales every size in the window, the way ModeWidget's own `k`
+              scales the three heroes (14.09). k = 1 is the shipped drawing.
+    `air`     where the leftover height goes:
+                'one'    all of it in one Spacer above the foot row — what
+                         ships today, and the gap she photographed.
+                'shared' split evenly between the three seams (under the
+                         title bar, under the top row, above the foot).
+    `spread`  the cover and the cluster run to the window's full width, so
+              the cluster's right edge meets the fields' right edge. False
+              leaves the shipped 10pt gap and therefore the dead column.
     """
-    inset = 0 if fill else P(13)
-    justify = 'flex-start' if top else 'center'
-    all_rows = (('Artist:', 'Oasis'), ('Track:', 'Champagne Supernova'),
-                ('Station:', 'Calm &middot; 940 AM'), ('Mode:', 'CD'))
+    tw, th = tile
+
+    def z(x):
+        return x * k
+
+    bar, top_pad, bot_pad, foot_h = z(36), z(8), z(10), z(20)
+    cover, clust_w = z(cover_pt), z(cluster_pt)
+    fh, fgap = z(field_h_pt), z(field_gap_pt)
+    fields_h = 4 * fh + 3 * fgap
+    gap1 = z(10)
+
+    # The width: the content row is spread to meet the fields' right edge, or
+    # left at its shipped gap so the dead column shows.
+    inner_w = tw - 2 * z(12)
+    gap_cc = (inner_w - cover - clust_w) if spread else z(10)
+
+    # The height: what is left after every fixed block.
+    used = bar + top_pad + cover + gap1 + fields_h + foot_h + bot_pad
+    if used > th + 0.5:
+        raise SystemExit(
+            f'overflow: {used:.0f}pt of content in a {th}pt tile '
+            f'(k={k:.3f}, cover={cover_pt}, field {field_h_pt}+{field_gap_pt}). '
+            f'The window clips, so the drawing would look fine and be false.')
+    slack = th - used
+    if air == 'shared':
+        e = slack / 3
+        top_pad, gap1, gap2 = top_pad + e, gap1 + e, e
+    else:
+        gap2 = slack
+
+    all_rows = (('Artist:', 'P!nk'), ('Track:', 'Who Knew - Edit'),
+                ('Station:', 'Party &middot; 730 AM'), ('Mode:', 'CD'))
     fields = ''.join(
-        field(c, v, h_pt=field_h_pt, cap_pt=cap_pt, val_pt=val_pt, cap_w_pt=cap_w_pt)
-        + f'<div style="height:{P(6)}px;"></div>'
-        for c, v in all_rows[:rows])
-    cover = (f'<div class=dn style="width:{P(cover_pt)}px;height:{P(cover_pt)}px;flex:none;'
-             f'padding:{P(3)}px;"><img src="data:image/jpeg;base64,{ART}" '
-             f'style="width:100%;height:100%;object-fit:cover;display:block;"></div>')
+        field(c, v, h_pt=field_h_pt * k, cap_pt=cap_pt * k, val_pt=val_pt * k,
+              cap_w_pt=cap_w_pt * k)
+        + (f'<div style="height:{P(fgap)}px;"></div>' if i < 3 else '')
+        for i, (c, v) in enumerate(all_rows))
+    pic = (f'<div class=dn style="width:{P(cover)}px;height:{P(cover)}px;flex:none;'
+           f'padding:{P(z(3))}px;"><img src="data:image/jpeg;base64,{ART}" '
+           f'style="width:100%;height:100%;object-fit:cover;display:block;"></div>')
 
     return f"""
   <div style="position:absolute;inset:0;background:linear-gradient(180deg,#1b1f28,#0a0c11);"></div>
-  <div style="position:absolute;inset:0;background:
-      radial-gradient(circle at 50% 88%,rgba(106,208,255,.26),transparent 64%);"></div>
-  <div class=up style="position:absolute;inset:{inset}px;padding:0;overflow:hidden;
-      display:flex;flex-direction:column;justify-content:{justify};">
-    {titlebar(title_pt)}
-    <div style="padding:{P(top_pad)}px {P(12)}px {P(10)}px;flex:1;display:flex;
-        flex-direction:column;min-height:0;">
-      <div style="display:flex;gap:{P(10)}px;">
-        {cover}
-        {cluster(clust)}
-      </div>
-      <div style="height:{P(10)}px;"></div>
+  <div class=up style="position:absolute;inset:0;overflow:hidden;
+      display:flex;flex-direction:column;">
+    {titlebar(title_pt * k, 36 * k)}
+    <div style="padding:{P(top_pad)}px {P(z(12))}px {P(bot_pad)}px;flex:1;
+        display:flex;flex-direction:column;min-height:0;">
+      <div style="display:flex;gap:{P(gap_cc)}px;">{pic}{cluster(clust, k * cluster_pt / 180)}</div>
+      <div style="height:{P(gap1)}px;"></div>
       {fields}
-      <div style="flex:1;min-height:0;"></div>
-      {foot}
+      <div style="height:{P(gap2)}px;"></div>
+      {lastplayed(label_pt=12 * k, time_pt=15 * k)}
     </div>
   </div>"""
 
 
-TODAY = dict(title_pt=15, cap_pt=11, val_pt=12, field_h_pt=26, cap_w_pt=52)
-BIGGER = dict(title_pt=19, cap_pt=14, val_pt=16, field_h_pt=30, cap_w_pt=64)
-BIGGEST = dict(title_pt=19, cap_pt=15, val_pt=17, field_h_pt=32, cap_w_pt=68)
+def fit(tile):
+    """ONE SCALE FOR BOTH AXES, which is ModeWidget's own rule (`k =
+    min(width, height) / 158`). Taking the smaller of the two ratios means
+    nothing is ever stretched — a square cover stays square — and the tile
+    it was drawn for comes back at exactly k = 1."""
+    return min(tile[0] / BASE_W, tile[1] / BASE_H)
 
-A_ = BT.slot('LAST PLAYED &middot; large', 'A &mdash; build 69, what you have',
-             window(fill=False, top=False, cover_pt=120, clust='three', rows=4,
-                    foot='', top_pad=8, **TODAY),
-             'l', note='The window floats on a border and the stack is centred &mdash; which is '
-                       'the strip above the title bar AND the gap at the foot. Title 15pt, '
-                       'captions 11pt, values 12pt.')
 
-B_ = BT.slot('LAST PLAYED &middot; large', 'B &mdash; layout fixed, type stepped up',
-             window(fill=True, top=True, cover_pt=124, clust='three', rows=4,
-                    foot=lastplayed(), top_pad=8, **BIGGER),
-             'l', note='Window to the tile&rsquo;s own edge, bar pinned to the top, and the '
-                       'type sized off the box: title 19pt, captions 14pt, values 16pt. '
-                       'Nothing else added &mdash; so the space beside the cover is still empty.')
+BIG, MID, SML = TILES['B'], TILES['M'], TILES['S']
+TAG = 'LAST PLAYED &middot; large, on a Pro Max (364 x 382)'
 
-C_ = BT.slot('LAST PLAYED &middot; large', 'C &mdash; + the whole cluster, all four fields',
-             window(fill=True, top=True, cover_pt=124, clust='wide', rows=4,
-                    foot=lastplayed(), top_pad=8, **BIGGER),
-             'l', note='Her card&rsquo;s full right-hand block: CD, tape deck, volume, then '
-                       'pause/shuffle/repeat and prev/rew/ff/next/heart. Everything she asked '
-                       'for, and the fields keep their full width.')
+# THE WHOLE CHOICE IS ONE NUMBER: 36 spare points, and how many go to SIZE
+# rather than to AIR. B spends them all on air, C all on size, D splits it.
+K_D = min(fit(BIG), 1.04)
 
-D_ = BT.slot('LAST PLAYED &middot; large', 'D &mdash; bigger everything, Mode dropped',
-             window(fill=True, top=True, cover_pt=156, clust='tall', rows=3,
-                    foot=lastplayed(), top_pad=6, **BIGGEST),
-             'l', note='Mode comes off &mdash; the tile already draws the CD &mdash; and its '
-                       '36pt goes to the cover (156 square) and the cluster, so the volume '
-                       'gets a row of its own and every key grows.')
+A_ = BT.slot(TAG, 'A &mdash; what you have now',
+             window(BIG, k=1, air='one', spread=False),
+             'lB', note='Every size in this window is a fixed number of points, chosen for a '
+                        '338 x 354 tile. On this phone the same content leaves <b>36pt dead '
+                        'above LAST PLAYED</b> and <b>26pt dead down the right</b> &mdash; '
+                        'the gap at the foot and the crowding at the top, from one cause.')
+
+B_ = BT.slot(TAG, 'B &mdash; all of it as air',
+             window(BIG, k=1, air='shared'),
+             'lB', note='Nothing changes size. The 36pt is split between the three seams &mdash; '
+                        'under the title bar, under the picture, above LAST PLAYED &mdash; so '
+                        'each gets <b>12pt</b>, and the picture and keys spread to meet the '
+                        'fields&rsquo; right edge. Roomiest of the three, but it cannot be the '
+                        'whole answer: on the smallest phone this same content is 1pt TALLER '
+                        'than the tile, so something there still has to squeeze.')
+
+C_ = BT.slot(TAG, 'C &mdash; all of it as size',
+             window(BIG, k=fit(BIG), air='shared'),
+             'lB', note=f'Every size becomes a share of the tile instead of a number of points, '
+                        f'so here the whole window is <b>{fit(BIG)*100-100:.0f}% bigger</b>: '
+                        f'picture {124*fit(BIG):.0f} square, rows {30*fit(BIG):.0f} tall, '
+                        f'values {16*fit(BIG):.0f}pt. {382-346*fit(BIG):.0f}pt of air left, so '
+                        f'the gaps stay as tight as they are today. This is what the Mode tile '
+                        f'already does, and it is the only option that also fits the smallest '
+                        f'phone.')
+
+D_ = BT.slot(TAG, 'D &mdash; some of each (recommended)',
+             window(BIG, k=K_D, air='shared'),
+             'lB', note=f'Grows {K_D*100-100:.0f}% and keeps <b>{382-346*K_D:.0f}pt as air</b>, '
+                        f'{(382-346*K_D)/3:.0f}pt at each seam. Bigger where it matters and '
+                        f'space between the blocks &mdash; both halves of your note &mdash; '
+                        f'and it still scales down properly on a smaller phone.')
+
+ROW2 = 'The same drawing, D, on all three phones'
+S_ = BT.slot(ROW2, 'smallest &mdash; 329 x 345 (SE, 13 mini)',
+             window(SML, k=min(fit(SML), 1.04), air='shared'),
+             'lS', note=f'k = {fit(SML):.3f}, so everything comes down a little &mdash; which '
+                        f'it has to: today&rsquo;s fixed 346pt of content is 1pt taller than '
+                        f'this tile.')
+
+M_ = BT.slot(ROW2, 'the one it was drawn for &mdash; 338 x 354',
+             window(MID, k=1.0, air='shared'),
+             'lM', note='k = 1.000, i.e. exactly the sizes signed off on 25.09, with the 8pt of '
+                        'slack shared between the seams instead of all sitting at the foot.')
+
+B2_ = BT.slot(ROW2, 'biggest &mdash; 364 x 382 (Pro Max)',
+              window(BIG, k=K_D, air='shared'),
+              'lB', note=f'k = {K_D:.3f}. One design at every size, which is the claim the Look '
+                         f'row makes when it offers you a large tile.')
 
 
 html = (f"<html><head><meta charset=utf-8><style>{CSS}</style></head><body>"
-        + BT.head('The big CD player &mdash; filling it, and sizing the type',
-                  'Owner, 25.09: "Leave the progress bar out then and keep &lsquo;last '
-                  'played&rsquo;. I want to have these contents on the right hand side. The '
-                  'designs are still missing a lot of details &mdash; there&rsquo;s too much '
-                  'empty space. Lastly the texts needs to scale larger." <br>'
-                  'The type was never scaled for this tile at all: the title bar and the '
-                  'fields are shared with the medium window, so they set at 15/11/12pt on a '
-                  'tile whose value boxes are nearly twice as wide and which carries four '
-                  'rows instead of two. B is that fixed and the two layout faults with it; '
-                  'C and D then spend the reclaimed room on her cluster two different ways. '
-                  'The volume well is drawn EMPTY and there is no scrub bar &mdash; both for '
-                  'the same reason she gave.')
+        + BT.head('The big CD window &mdash; spacing it out',
+                  'Owner, 26.09, with the big tile on her Home Screen: "Love the widgets! But '
+                  'at the moment it&rsquo;s looking a bit compressed at the top leaving an '
+                  'awkward gap at the bottom. Can we space them out and show me some '
+                  'drawings" <br>'
+                  '<b>COUNTED FIRST, AND IT IS ONE FAULT.</b> Every size in this window is a '
+                  'fixed number of points, and they add to 346 tall by 338 wide &mdash; the '
+                  'large tile on a 393-wide phone, exactly. iOS hands a large widget a '
+                  'different box on every screen, so on a Pro Max (364 x 382) that same '
+                  'content leaves 36pt dead at the foot and 26pt dead down the right. It all '
+                  'collects at the foot because the stack is pinned to the top, which is how '
+                  '25.09 removed a strip ABOVE the title bar &mdash; so re-centring would just '
+                  'put that strip back. <br>'
+                  '<b>SO THE CHOICE IS ONE NUMBER:</b> of those 36 spare points, how many go '
+                  'to making things BIGGER and how many to putting AIR between them. B spends '
+                  'them all on air, C all on size, D splits it. The second row is D on all '
+                  'three real phones.')
         + f'<div class=row>{A_}{B_}{C_}{D_}</div>'
+        + f'<div class=row>{S_}{M_}{B2_}</div>'
         + "</body></html>")
 pathlib.Path(_want).write_text(html)
 print(f"wrote {_want}")

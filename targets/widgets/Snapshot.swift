@@ -290,15 +290,53 @@ func srgbLuminance(_ c: (Double, Double, Double)) -> Double {
   return 0.2126 * lin(c.0) + 0.7152 * lin(c.1) + 0.0722 * lin(c.2)
 }
 
+/**
+ * THE PAINTED DECK: A WHOLE TILE IN ONE COLOUR, RATHER THAN A GLOW IN IT.
+ *
+ * Owner, 27.09, off the prototype sheet: "I'll do the album cover painted for
+ * the background." So the large Mode tile's record no longer stands in
+ * `tileHalo`'s radial glow — the tile IS the deck, and its colour comes from
+ * whatever picture is on the label rather than from the station.
+ *
+ * IT IS DEEPENED HARD AND THAT IS NOT TASTE. The object standing on this is a
+ * BLACK RECORD, so the ground's whole job is to be something the disc can be
+ * read against; a saturated fill behind it leaves the disc nothing to stand
+ * on, which is the measurement the record's own halo round settled on 20.09.
+ * A channel arrives at a quarter of its own brightness plus a small floor, so
+ * a near-white cover paints a mid-grey deck and a near-black one paints
+ * something barely off black — and the disc reads on both, which is what the
+ * scaling exists for rather than a preference about brightness.
+ *
+ * THE FLOOR IS WHAT KEEPS A DARK COVER FROM BEING A HOLE. Without it a night
+ * photograph would average to nearly nothing and the tile would come out flat
+ * black, which is the monochrome square this look spent 20.09 getting away
+ * from. Without the scaling a bright cover would come out bright enough to
+ * swallow the record. Both ends are the same rule.
+ *
+ * THE RAMP RUNS CORNER TO CORNER, about 14 degrees off vertical, and it falls
+ * to a near-black foot on purpose: the three silver keys sit down there and
+ * they need somewhere dark to sit, the same reasoning as the ground they were
+ * drawn on when they were first approved.
+ */
+func paintedDeck(_ rgb: (Double, Double, Double)) -> LinearGradient {
+  func lift(_ scale: Double, _ floor: Double) -> Color {
+    Color(red: min(1, rgb.0 * scale + floor),
+          green: min(1, rgb.1 * scale + floor),
+          blue: min(1, rgb.2 * scale + floor))
+  }
+  return LinearGradient(
+    stops: [Gradient.Stop(color: lift(0.26, 0.10), location: 0),
+            Gradient.Stop(color: lift(0.16, 0.05), location: 0.52),
+            Gradient.Stop(color: Color(hex: "#0b0d0f"), location: 1)],
+    startPoint: UnitPoint(x: 0.38, y: 0),
+    endPoint: UnitPoint(x: 0.62, y: 1))
+}
+
 extension WidgetStation {
   /// The accent slot every mode wears — eqColors[1] in the app, sent already
   /// resolved so a widget can never pick a different one from the screen it
   /// links into. Falls back to the ramp's mid stop, then to the app's violet.
-  var accentColor: Color {
-    if !accent.isEmpty { return Color(hex: accent) }
-    if colors.count > 1 { return Color(hex: colors[1]) }
-    return Color(hex: "#7B38E0")
-  }
+  var accentColor: Color { Color(hex: accentHex) }
 
   /// The station's own ramp, corner to corner — the same diagonal the app's
   /// cards use, so a widget sits beside the app rather than beside iOS.
@@ -358,9 +396,20 @@ extension WidgetStation {
   /// while the colour saying which station this is stays plainly visible.
   /// 0.50 is the next step down if it is ever wanted quieter still; below
   /// about 0.35 the tile is back to the monochrome square this replaced.
+  /// WHICH HEX IS THIS STATION'S COLOUR, in one place.
+  ///
+  /// This expression lived inside `tileHalo` and had exactly one reader until
+  /// the painted deck needed the same answer for its fallback. Two copies of
+  /// it is how a tile ends up glowing one colour and painted another on the
+  /// same station — and the fallbacks are the half that would rot first,
+  /// since they are only reached by a custom station with no accent, which
+  /// nobody has on screen while tuning anything.
+  var accentHex: String {
+    !accent.isEmpty ? accent : (colors.count > 1 ? colors[1] : "#7B38E0")
+  }
+
   func tileHalo(_ k: CGFloat = 1, strength: Double = 1) -> RadialGradient {
-    let src = !accent.isEmpty ? accent : (colors.count > 1 ? colors[1] : "#7B38E0")
-    let (r, g, b) = rgbOf(src)
+    let (r, g, b) = rgbOf(accentHex)
     let mean = max(0.02, (r + g + b) / 3)
     let peak = max(0.02, max(r, max(g, b)))
     func stop(_ target: Double, _ neutral: Double) -> Color {
@@ -401,8 +450,7 @@ extension WidgetStation {
   /// dark at the hinge to light at the buttons — built by darkening and
   /// lightening the accent itself, so hue AND saturation survive intact.
   private var titleBarRGB: [(Double, Double, Double)] {
-    let src = !accent.isEmpty ? accent : (colors.count > 1 ? colors[1] : "#7B38E0")
-    let (r, g, b) = rgbOf(src)
+    let (r, g, b) = rgbOf(accentHex)
     func scaled(_ f: Double) -> (Double, Double, Double) { (r * f, g * f, b * f) }
     func lifted(_ t: Double) -> (Double, Double, Double) {
       (r + (1 - r) * t, g + (1 - g) * t, b + (1 - b) * t)

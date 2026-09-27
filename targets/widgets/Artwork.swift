@@ -1,4 +1,11 @@
 import SwiftUI
+// CoreGraphics reaches this file through UIKit, and UIKit reaches it through
+// SwiftUI on iOS — `UIImage` has been used here since 01.09 on the strength
+// of that. `averageColour` below asks for a CGContext as well, so the import
+// is written out rather than leaned on: there is no Swift compiler in this
+// repo, and an import is the cheapest possible insurance against finding out
+// on a build.
+import UIKit
 
 /**
  * The station's backdrop, and the last-played album cover.
@@ -80,13 +87,26 @@ enum Art {
     return nil
   }
 
-  static func station(_ id: String?) -> Image? {
+  /// THE SAME PICTURE, BEFORE IT BECOMES A SwiftUI `Image`.
+  ///
+  /// A SwiftUI `Image` is a drawing instruction and nothing can be read back
+  /// out of it, so anything that needs to MEASURE a picture — `averageColour`
+  /// below, and through it the deck's painted ground — has to reach it one
+  /// step earlier. Every `Image` in this file is now a thin wrapper over its
+  /// own UIImage twin, so the two can never disagree about which picture is
+  /// being used: the ground is derived from the very bytes the label draws.
+  static func stationUI(_ id: String?) -> UIImage? {
     guard let id else { return nil }
-    if let ui = bundledStation(id) { return Image(uiImage: ui) }
+    if let ui = bundledStation(id) { return ui }
     guard
       let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup),
       let ui = UIImage(contentsOfFile: dir.appendingPathComponent(stationFile(id)).path)
     else { return nil }
+    return ui
+  }
+
+  static func station(_ id: String?) -> Image? {
+    guard let ui = stationUI(id) else { return nil }
     return Image(uiImage: ui)
   }
 
@@ -121,17 +141,71 @@ enum Art {
    * twice at two sizes.
    */
   static func songCover(station id: String?) -> Image? {
-    lastPlayed() ?? station(id)
+    guard let ui = songCoverUI(station: id) else { return nil }
+    return Image(uiImage: ui)
+  }
+
+  /// `songCover`'s own picture, one step before it becomes a drawing.
+  static func songCoverUI(station id: String?) -> UIImage? {
+    lastPlayedUI() ?? stationUI(id)
   }
 
   /// The cover of the last song the app saw play, or nil if there wasn't one.
   static func lastPlayed() -> Image? {
+    guard let ui = lastPlayedUI() else { return nil }
+    return Image(uiImage: ui)
+  }
+
+  static func lastPlayedUI() -> UIImage? {
     guard
       let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup),
       let data = try? Data(contentsOf: dir.appendingPathComponent(artworkFile)),
       let ui = UIImage(data: data)
     else { return nil }
-    return Image(uiImage: ui)
+    return ui
+  }
+
+  /**
+   * THE ONE COLOUR A PICTURE AVERAGES TO.
+   *
+   * Owner, 27.09, picking the painted ground off the prototype sheet: the
+   * large deck's tile is painted in the album's own colour rather than the
+   * station's. Nothing in the snapshot carries that colour and nothing
+   * should — the app would have to decode the JPEG it just downloaded and
+   * average it in JavaScript, which needs a native module it does not have,
+   * and it would put a second copy of this rule on the far side of a build.
+   * THE EXTENSION ALREADY HOLDS THE PICTURE, because it is about to draw it,
+   * so it is the honest place to ask.
+   *
+   * IT IS ONE 1x1 DRAW, WHICH IS WHY IT IS AFFORDABLE. Handing CoreGraphics a
+   * one-pixel context and asking it to draw the whole image into it IS the
+   * average — the resampler does the arithmetic, in C, over the decoded
+   * bitmap that is being decoded anyway. There is no loop over pixels here
+   * and no second decode. A widget draws a handful of times a day.
+   *
+   * PREMULTIPLIED, SO THE ALPHA IS UNDONE BEFORE THE COLOUR IS READ. A cover
+   * is opaque in practice, but a PNG with transparent corners would otherwise
+   * report itself darker than it is — the colour would be scaled by the very
+   * coverage that should have been divided out, which is the same class of
+   * fault as a clipped channel shifting a hue (10.09).
+   *
+   * Nil is a perfectly good answer and every caller must have somewhere to
+   * go: no cover and no station photograph is an ordinary state on a custom
+   * station, and the ground falls back to the station's own accent there.
+   */
+  static func averageColour(_ ui: UIImage) -> (Double, Double, Double)? {
+    guard let cg = ui.cgImage else { return nil }
+    var px: [UInt8] = [0, 0, 0, 0]
+    guard let ctx = CGContext(
+      data: &px, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+      space: CGColorSpaceCreateDeviceRGB(),
+      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return nil }
+    ctx.interpolationQuality = .medium
+    ctx.draw(cg, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+    let a = Double(px[3]) / 255
+    guard a > 0.01 else { return nil }
+    return (Double(px[0]) / 255 / a, Double(px[1]) / 255 / a, Double(px[2]) / 255 / a)
   }
 }
 

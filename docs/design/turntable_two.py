@@ -116,16 +116,24 @@ def halo(src, strength=0.70):
 def painted(src):
     """The whole tile painted rather than a glow in the middle of it — the
     same colour, spent as a surface. Deepened hard, because a saturated fill
-    behind a black record leaves the disc nothing to stand against (20.09)."""
+    behind a black record leaves the disc nothing to stand against (20.09).
+
+    THIS IS `paintedDeck` IN Snapshot.swift, NUMBER FOR NUMBER: a channel
+    arrives at 0.26 of itself plus a 0.10 floor at the top, 0.16 plus 0.05
+    through the middle, and the foot is #0b0d0f. She picked it off this
+    drawing, so the drawing is what had to ship."""
     r, g, b = _rgb(src)
     top = 'rgb({},{},{})'.format(*[round(min(1, x * 0.26 + 0.10) * 255) for x in (r, g, b)])
     mid = 'rgb({},{},{})'.format(*[round(min(1, x * 0.16 + 0.05) * 255) for x in (r, g, b)])
+    # NO BRUSHED GRAIN, AND THE OMISSION IS DELIBERATE. The first draft laid
+    # 2.2%-white hairlines over this, and the Swift does not: there is no
+    # cheap repeating pattern in SwiftUI and a Canvas full of hairlines is a
+    # real cost for something invisible at 2% on a phone. A harness that draws
+    # what the code does NOT do is the fidelity fault this folder has now hit
+    # six times, so it comes out here rather than going in there.
     return f"""
     <div style="position:absolute;inset:0;background:
-        linear-gradient(166deg,{top},{mid} 52%,#0b0d0f);"></div>
-    <div style="position:absolute;inset:0;background:
-        repeating-linear-gradient(97deg,rgba(255,255,255,.022) 0 1px,
-          transparent 1px 5px);"></div>"""
+        linear-gradient(166deg,{top},{mid} 52%,#0b0d0f);"></div>"""
 
 
 def unlit():

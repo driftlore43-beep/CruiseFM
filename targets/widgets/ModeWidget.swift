@@ -641,8 +641,31 @@ private struct Turntable: View {
     // against 15 to the right of the weight, and 16 above it.
     let dx = -5.6 * k
     let dy = -7.4 * k
+    // THE TILE IS PAINTED IN THE LABEL'S OWN COLOUR (owner, 27.09: "I'll do
+    // the album cover painted for the background").
+    //
+    // THE GROUND IS THE AVERAGE OF WHATEVER IS ON THE LABEL, and that phrasing
+    // is the rule rather than a description. `songCoverUI` is the very call
+    // `RecordView` below draws from, so the two cannot disagree: the song's
+    // cover when there is one, the station's photograph when there is not,
+    // and a custom station with neither falls through to its own accent —
+    // which is where `accentHex` earns its keep, since that is the one case
+    // where a second copy of "which colour is this station" could rot unseen.
+    //
+    // MEASURED IN THE EXTENSION, NOT SENT IN THE SNAPSHOT. The app would have
+    // to decode the JPEG it just downloaded and average it in JavaScript,
+    // which needs a native module it does not have; this process is holding
+    // the decoded picture already because it is about to draw it. No new
+    // snapshot field, so no build-ordering trap either.
+    //
+    // WRITTEN AS PLAIN BINDINGS RATHER THAN A CHAIN OF `flatMap`s, which is
+    // the standing rule for a target with no compiler here: prefer the shape
+    // with fewer ways to be wrong over the one that is marginally neater.
+    var ground = rgbOf(station.accentHex)
+    if let ui = Art.songCoverUI(station: station.image),
+       let avg = Art.averageColour(ui) { ground = avg }
     return ZStack {
-      station.tileHalo(k, strength: 0.70)
+      paintedDeck(ground)
       RecordShadow(size: vinyl)
         .offset(x: dx, y: dy)
       // THE COVER ON THE LABEL (owner, 26.09, picking C off the sheet), with

@@ -449,9 +449,20 @@ check('the Deck\'s dropped third look is gone', !/DeckLook\.set|case \.set:|case
   // that is the distinction the two rules encode and a call site reaching for
   // the wrong one would look perfectly fine.
   const art = src['Artwork.swift'] ?? '';
+  // 27.09: the `??` moved down one level when the painted deck needed the
+  // same picture as a UIImage — `songCover` is now a wrapper and `songCoverUI`
+  // holds the order. The RULE is unchanged and so is what it protects, so the
+  // check follows it rather than being loosened to match whatever is there.
   check('the song-first rule is cover first, station second',
-    /static func songCover\(station id: String\?\) -> Image\? \{\s*lastPlayed\(\) \?\? station\(id\)/.test(art),
+    /static func songCoverUI\(station id: String\?\) -> UIImage\? \{\s*lastPlayedUI\(\) \?\? stationUI\(id\)/.test(art),
     'the station is the fallback, so no cover still means a real picture');
+  // AND THE TWO HALVES MUST BE ONE PICTURE. `songCover` exists only to wrap
+  // `songCoverUI`; if it ever grows its own lookup the tile could paint itself
+  // from one image and draw another on the label, which is precisely the
+  // disagreement the ground was derived from the label to avoid.
+  check('the drawn cover and the measured cover are the same call',
+    /static func songCover\(station id: String\?\) -> Image\? \{[\s\S]{0,160}?songCoverUI\(station: id\)/.test(art),
+    'songCover must wrap songCoverUI rather than repeat its lookup');
   // 20.09: the station-first rule was deleted when Last Played flipped to the
   // song, because nothing was left calling it. Reintroducing it is allowed —
   // it is the owner's call — but it must come back with a caller, not sit
@@ -478,6 +489,73 @@ check('the Deck\'s dropped third look is gone', !/DeckLook\.set|case \.set:|case
       /Art\.station\(/.test(src[f] ?? ''),
       'if this stops matching the check above passes for the wrong reason');
   }
+}
+
+// ── the large deck is PAINTED, and painted from its own label ────────────
+//
+// Owner, 27.09: "I'll do the album cover painted for the background." Three
+// separate things have to hold or the look quietly becomes something else,
+// and none of them is visible in review.
+{
+  const mode = src['ModeWidget.swift'] ?? '';
+  const snap = src['Snapshot.swift'] ?? '';
+  const art = src['Artwork.swift'] ?? '';
+  const i = mode.indexOf('private struct Turntable');
+  const j = mode.indexOf('private struct Tonearm');
+  const deck = i >= 0 && j > i ? mode.slice(i, j) : '';
+  check('Turntable was found at all', deck.length > 400, `${deck.length} chars`);
+  check('the large deck is painted rather than haloed',
+    /paintedDeck\(/.test(deck) && !/tileHalo\(/.test(deck),
+    'a glow in the middle is the look she replaced, not the one she picked');
+  // THE GROUND IS THE AVERAGE OF WHATEVER IS ON THE LABEL. Measuring a
+  // different picture from the one drawn is the whole failure mode here, and
+  // it would look perfectly reasonable on the screen of anyone whose station
+  // photograph happens to resemble their album art.
+  check('the ground is measured from the same picture the label draws',
+    /Art\.songCoverUI\(station: station\.image\)/.test(deck)
+    && /Art\.songCover\(station: station\.image\)/.test(deck),
+    'the painted colour and the label must come from one call');
+  // ...AND THE SMALL RECORD IS DELIBERATELY NOT PAINTED. It carries no arm
+  // and no keys, it is a record rather than a deck, and it kept the station's
+  // glow on 20.09 for a reason that has not changed.
+  check('the small record tile still stands in the station\'s glow',
+    /tileHalo\(k, strength: 0\.70\)/.test(mode),
+    'scoping this to the large tile is the decision, so it is pinned');
+
+  // BOTH ENDS OF THE SCALING ARE LOAD-BEARING: the floor is what stops a
+  // night photograph painting a flat black hole, and the scale is what stops
+  // a white sleeve painting a ground bright enough to swallow a black record.
+  // Either one removed is a change of look that reads as a bug on exactly one
+  // kind of cover, which is the hardest sort to notice.
+  const lifts = [...snap.matchAll(/lift\(([\d.]+), ([\d.]+)\)/g)]
+    .map((m) => [Number(m[1]), Number(m[2])]);
+  check('paintedDeck scales and floors every stop it lifts', lifts.length >= 2
+    && lifts.every(([scale, floor]) => scale > 0 && scale < 0.5 && floor > 0),
+    lifts.map(([a, b]) => `${a}/${b}`).join(' ') || 'no lift() found');
+  check('paintedDeck ends on a near-black foot',
+    /Gradient\.Stop\(color: Color\(hex: "#0b0d0f"\), location: 1\)/.test(snap),
+    'the silver keys sit there and need somewhere dark to sit');
+
+  // ONE PLACE DECIDES WHICH HEX A STATION IS. The painted deck's fallback and
+  // the halo's source were the same expression written twice for about an
+  // hour; the copy that would rot is the one only a custom station with no
+  // accent ever reaches.
+  check('the station-colour fallback is not written twice',
+    /var accentHex: String/.test(snap)
+    && /rgbOf\(accentHex\)/.test(snap)
+    && !/!accent\.isEmpty \? accent : \(colors\.count > 1[\s\S]{0,40}\)\n\s*let \(r, g, b\)/.test(snap),
+    'tileHalo and paintedDeck must ask the same question of the same place');
+
+  // A PREMULTIPLIED PIXEL READ WITHOUT UNDOING ITS ALPHA IS DARKER THAN THE
+  // PICTURE IS. A cover is opaque in practice, so this would be right almost
+  // always and wrong invisibly — the worst shape available.
+  check('averageColour undoes the premultiplied alpha',
+    /premultipliedLast/.test(art) && /Double\(px\[0\]\) \/ 255 \/ a/.test(art),
+    'otherwise a transparent corner quietly darkens the whole tile');
+  check('averageColour has somewhere to go when it cannot measure',
+    /guard let cg = ui\.cgImage else \{ return nil \}/.test(art)
+    && /guard a > 0\.01 else \{ return nil \}/.test(art),
+    'nil is an ordinary answer and the caller falls back to the accent');
 }
 
 // ── a check that cannot fail is worse than none ──────────────────────────

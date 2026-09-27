@@ -1104,10 +1104,133 @@ if (declared.length < 5 || Object.keys(kinds).length < 5) {
   const deck = structBody('Turntable', mw) ?? '';
   const armed = deck.match(/Tonearm\(r: (\w+) \/ 2\)/);
   check('the arm takes the record’s own radius', !!armed,
-    'its geometry is fractions of the disc — the stylus at 0.80r, the weight at 1.169r');
+    'its geometry is fractions of the disc — the stylus at 0.80r, the weight at 1.194r');
   check('and it is the same record the tile draws',
     !!armed && new RegExp(`size: ${armed[1]}\\b`).test(deck),
     'two numbers for one disc is how an arm ends up on the label');
+}
+
+// ── THE ARM IS PAID FOR IN RECORD, AND THE DISC MUST BE SOLVED FOR IT ─────
+//
+// Owner, 27.09: "Why are they all short? Could we extend the tonearm a
+// little?" They are short because on a fixed 338x354 tile every part of the
+// arm sits above and to the right of the disc, so length is bought out of
+// diameter — the rod leans back at 71 degrees, which means a point of length
+// costs 0.32 of width and 0.95 of HEIGHT, and it is the tile's top edge that
+// runs out first.
+//
+// SO THE ONE THING THAT CAN ROT HERE IS THE PAIR COMING APART: someone
+// lengthens the arm and leaves the disc where it was, and the counterweight
+// goes off the top of the tile — silently, because Swift compiles fine and
+// nothing in this repo can render a widget. `fit()` in
+// `docs/design/turntable_two.py` is ported here and run against the
+// constants the Swift actually carries, which is the only way to check it.
+{
+  const mode = src['ModeWidget.swift'] ?? '';
+  const i = mode.indexOf('private struct Turntable');
+  const j = mode.indexOf('private struct Tonearm');
+  const deck = i >= 0 && j > i ? mode.slice(i, j) : '';
+  const arm = j >= 0 ? mode.slice(j, mode.indexOf('private struct ShellPlate')) : '';
+  check('the deck and the arm were both found', deck.length > 400 && arm.length > 400,
+    `${deck.length} / ${arm.length} chars`);
+
+  // THE ARM'S OWN FOOTPRINT, as multiples of the record's radius: how far
+  // right of the disc's centre anything reaches, and how far above it. The
+  // counterweight's far CORNER is the extreme in both directions, and the
+  // bearing plate is checked too because on a short arm it can be the widest
+  // thing on the tile.
+  const extent = (rod) => {
+    const a = (71.24 * Math.PI) / 180;
+    const u = [Math.cos(a), -Math.sin(a)];
+    const perp = [-u[1], u[0]];
+    const s = [0.8 * Math.cos(-Math.PI / 36), 0.8 * Math.sin(-Math.PI / 36)];
+    const p = [s[0] + rod * u[0], s[1] + rod * u[1]];
+    const back = 0.096 + 0.24 / 2;              // fold + half the barrel
+    const w = [p[0] + back * u[0], p[1] + back * u[1]];
+    const xs = [w[0] + (perp[0] * 0.115) / 2, w[0] - (perp[0] * 0.115) / 2, p[0] + 0.115];
+    const ys = [w[1] + (perp[1] * 0.115) / 2, w[1] - (perp[1] * 0.115) / 2, p[1] - 0.115];
+    return [Math.max(...xs), -Math.min(...ys)];
+  };
+  // The largest record that fits, and where its centre goes. Across, the disc
+  // plus the arm's reach must leave 15 either side; down, the weight's top
+  // must clear 16 while the record's foot stays 14 above a 21pt key row
+  // sitting 16 off the bottom.
+  const fit = (wx, wy) => {
+    const r = Math.min((338 - 30) / (wx + 1), (354 - 16 - 16 - 21 - 14) / (wy + 1));
+    return { r, cx: 338 / 2 - ((wx - 1) * r) / 2, cy: 354 - 16 - 21 - 14 - r };
+  };
+
+  const rodM = arm.match(/\.frame\(width: r \* ([\d.]+), height: r \* 0\.038\)/);
+  check('the rod declares its own length', !!rodM, 'everything else is a fraction of it');
+  const rod = rodM ? Number(rodM[1]) : 0;
+
+  // AND IT IS THE LENGTH THE PROTOTYPE PRICED, not a number typed in here.
+  // The sheet she picked C off carries the shipped arm as ROD_TODAY and C as
+  // ten per cent of it; a constant copied into one file and edited in the
+  // other is exactly how a check goes stale.
+  const proto = fs.readFileSync(
+    new URL('../docs/design/turntable_two.py', import.meta.url), 'utf8');
+  const baseM = proto.match(/^ROD_TODAY = ([\d.]+)/m);
+  check('the prototype still declares the arm it was measured against', !!baseM);
+  check('and the shipped rod is that arm plus the 10% she asked for',
+    !!baseM && Math.abs(rod - Number(baseM[1]) * 1.1) < 1e-5,
+    `${rod} against ${baseM ? (Number(baseM[1]) * 1.1).toFixed(6) : '?'}`);
+
+  const vin = deck.match(/let vinyl = ([\d.]+) \* k/);
+  const dxM = deck.match(/let dx = (-?[\d.]+) \* k/);
+  const dyM = deck.match(/let dy = (-?[\d.]+) \* k/);
+  check('the deck declares its disc and where it sits', !!vin && !!dxM && !!dyM);
+  const k = 338 / 158;
+  const drawn = {
+    r: vin ? (Number(vin[1]) * k) / 2 : 0,
+    cx: dxM ? 338 / 2 + Number(dxM[1]) * k : 0,
+    cy: dyM ? 354 / 2 + Number(dyM[1]) * k : 0,
+  };
+  const want = fit(...extent(rod));
+  check('the disc is the largest one this arm leaves room for',
+    Math.abs(drawn.r - want.r) < 0.6,
+    `drawn ${(drawn.r * 2).toFixed(1)}pt against ${(want.r * 2).toFixed(1)} solved`);
+  check('and it sits where that solve puts it',
+    Math.abs(drawn.cx - want.cx) < 0.6 && Math.abs(drawn.cy - want.cy) < 0.6,
+    `(${drawn.cx.toFixed(1)}, ${drawn.cy.toFixed(1)}) against `
+    + `(${want.cx.toFixed(1)}, ${want.cy.toFixed(1)})`);
+
+  // NEAR A CORNER OF THIS TILE, CHECK AGAINST THE CURVE. A widget clips to a
+  // rounded rectangle of about 22pt, so the weight has to clear the ARC and
+  // not the straight sides — the first render of this deck passed every
+  // edge test and was visibly sliced.
+  {
+    const a = (71.24 * Math.PI) / 180;
+    const u = [Math.cos(a), -Math.sin(a)];
+    const perp = [-u[1], u[0]];
+    const s = [0.8 * Math.cos(-Math.PI / 36), 0.8 * Math.sin(-Math.PI / 36)];
+    const p = [s[0] + rod * u[0], s[1] + rod * u[1]];
+    const w = [p[0] + 0.096 * u[0], p[1] + 0.096 * u[1]];
+    let worst = 0;
+    for (const sa of [0.5, -0.5]) {
+      for (const sb of [0.5, -0.5]) {
+        const x = drawn.cx + drawn.r * (w[0] + sa * 0.24 * u[0] + sb * 0.115 * perp[0]);
+        const y = drawn.cy + drawn.r * (w[1] + sa * 0.24 * u[1] + sb * 0.115 * perp[1]);
+        if (x > 338 - 22 && y < 22) worst = Math.max(worst, Math.hypot(x - 316, y - 22));
+      }
+    }
+    check('the counterweight clears the tile’s own rounded corner',
+      worst <= 22, `furthest corner ${worst.toFixed(1)} against the arc’s 22`);
+  }
+
+  // THE STYLUS STAYS ON THE OUTER GROOVES. 0.80r at five degrees below the
+  // horizontal is the app's own number (03.08) and the one place a needle
+  // never is, is the label.
+  check('the arm is still built off the stylus at 0.80r',
+    /0\.796956 \+ back \* 0\.321605/.test(arm) && /-0\.069725 - back \* 0\.946874/.test(arm),
+    'those two are 0.80r at -5 degrees, solved; a drift here walks the needle onto the label');
+
+  // THE PLATE IS METAL, NOT THE APP'S GRAPHITE. On the full-screen deck it
+  // sits on a lit plinth; on a tile it sits beside a BLACK RECORD, where a
+  // dark disc beside a dark disc reads as a hole rather than as hardware.
+  check('the bearing plate is not the app’s near-black',
+    !/#212228/.test(arm),
+    'keep the design, not the literal — the same call the Winamp’s title bar needed');
 }
 
 // ── PINNING A TILE TO A STATION ───────────────────────────────────────────

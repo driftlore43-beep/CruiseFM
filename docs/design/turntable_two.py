@@ -336,7 +336,8 @@ def arm_app(cx, cy, r, *, rod=ROD_TODAY, stub=None, lean=LEAN, uid='x'):
         box-shadow:0 {P(2.2)}px {P(4.6)}px rgba(0,0,0,.72),
           inset 0 {P(0.8)}px 0 rgba(255,255,255,.9);"></div>
     {''.join(
-        f'<div style="position:absolute;left:{P(wx + f * BARREL_L * r)}px;top:{P(wy)}px;'
+        f'<div style="position:absolute;left:{P(wx + f * BARREL_L * r * u[0])}px;'
+        f'top:{P(wy + f * BARREL_L * r * u[1])}px;'
         f'width:{P(0.9)}px;height:{P(BARREL_W * r * 0.78)}px;'
         f'transform:translate(-50%,-50%) rotate({ang:.3f}deg);'
         f'background:rgba(0,0,0,.34);"></div>' for f in (-0.26, -0.16, 0.16, 0.26))}
@@ -428,6 +429,16 @@ G2, _ = deck(halo(ALBUM), plate=False)
 G3, _ = deck(painted(ALBUM), plate=False)
 G4, _ = deck(unlit(), plate=False)
 
+SHIPPED, _r_shipped = deck(painted(ALBUM), rod=ROD_TODAY * 1.10, plate=True, uid='s')
+
+AS_SHIPPED = BT.slot(
+    'WHAT SHIPPED', 'the deck as it now draws', SHIPPED, 'l',
+    note='Ground 3 and arm C together: the tile painted in the cover&rsquo;s own average, the '
+         'app&rsquo;s own hardware on the arm, and the rod 10% longer than build 70 carries. '
+         f'Record {_r_shipped * 2:.0f} across &mdash; ten points of disc, which is what the '
+         'longer arm cost. Needs a build: this is Swift inside the widget extension, so nothing '
+         'in it can reach a phone over the air.')
+
 GROUND = ''.join([
     BT.slot('THE GROUND', '1 &mdash; the station&rsquo;s colour (what you have)', G1, 'l',
             note='Night&nbsp;Run&rsquo;s teal, through the same arithmetic the mirror ball and '
@@ -453,9 +464,12 @@ GROUND = ''.join([
 
 # ── row 2: the arm ─────────────────────────────────────────────────────────
 
-LONG_1 = 0.848     # +10% of rod
-LONG_2 = 0.926     # +20%
-LONG_3 = 1.02      # +32%, and the app's own back end with it
+# EXACT MULTIPLES RATHER THAN ROUNDED LITERALS, so the number on the sheet is
+# the number in the Swift: C shipped on 27.09 and `ModeWidget.swift` carries
+# 0.848376r, which is this.
+LONG_1 = ROD_TODAY * 1.10     # +10% of rod -- THIS IS WHAT SHIPPED
+LONG_2 = ROD_TODAY * 1.20     # +20%
+LONG_3 = ROD_TODAY * 1.32     # +32%, and the app's own back end with it
 APP_STUB = 0.26    # the app's back end: the weight out past the bearing
 
 A1, r1 = deck(halo(STATION), plate=False)
@@ -536,6 +550,7 @@ html = (f"<html><head><meta charset=utf-8><style>{CSS}</style></head><body>"
                   'picked, and the solver is checked first against what the widget ships today '
                   '&mdash; fed the shipped arm it returns a 142pt radius centred at (157.0, '
                   '161.3), which is what the Swift actually carries.')
+        + f'<div class=row>{AS_SHIPPED}</div>'
         + f'<div class=row>{GROUND}</div>'
         + f'<div class=row>{ARMS}</div>'
         + f'<div class=row>{WHERE}</div>'

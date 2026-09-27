@@ -588,23 +588,35 @@ private struct RecordShadow: View {
  * avoid. Folding the weight INTO the pivot housing, which is how a slim arm
  * is really built and is what the reference shows, brings that to 1.169r.
  *
+ * AND THEN 27.09 SPENT SOME OF THAT BACK, deliberately (owner: "Could we
+ * extend the tonearm a little?"). The rod is 10% longer than the one build 70
+ * carries, which reaches 1.194r wide and 1.096r up and costs ten points of
+ * disc. The whole ladder, all of it solved by `fit()` in
+ * `docs/design/turntable_two.py` from each arm's own measured footprint:
+ *
  *   build 69, no arm         321 across
  *   the app's own arm        231 across   (-28%)
- *   this one                 284 across   (-12%)
+ *   the folded arm           284 across   (-12%)
+ *   this one, rod +10%       274 across   (-15%)
+ *   rod +20%                 265 across   (-17%)
  *
- * COUNTED, NOT EYEBALLED, in the 338x354pt the large tile actually is.
- * Across: r + 1.169r = 2.169r, 307pt, leaving 15 either side. Down: 1.023r
- * above the record's centre (the weight sits above the disc) and r below,
- * from 16 of top air to the record's foot at 303, which leaves 14 of air, a
- * 21pt key and 16 of bottom margin.
+ * COUNTED, NOT EYEBALLED, in the 338x354pt the large tile actually is. Across:
+ * r + 1.194r = 2.194r, 300pt, leaving 18.8 either side — the WIDTH has slack
+ * now, because it is the height that binds. Down: 1.096r above the record's
+ * centre (the weight sits above the disc) and r below, from 16 of top air to
+ * the record's foot at 303, which leaves 14 of air, a 21pt key row and 16 of
+ * bottom margin. That is the trade in one line: the rod's 71 degree lean means
+ * a point of length buys 0.32 of width and 0.95 of HEIGHT, so it is the tile's
+ * TOP edge that runs out first and the disc that pays.
  *
  * AND THE TOP-RIGHT CORNER IS WHAT ACTUALLY BINDS, which the first render
  * missed: a widget clips to a rounded rectangle of about 22pt, so the weight
  * has to clear the CURVE and not the edges. The first pass put the pivot at
  * 1.06r / -0.86r with a longer barrel, which measures 1.140r above the centre
  * and lands the weight's far corner INSIDE that curve — the render shows it
- * sliced. As drawn the corner sits at (323, 16), 94 against the corner
- * circle's 484. RULE: near a corner of this tile, check against the curve.
+ * sliced. As drawn the corner sits at (319.2, 21.1), which is 3.3 from that
+ * arc's own centre against a radius of 22. RULE: near a corner of this tile,
+ * check against the curve.
  *
  * ── WHAT THE KEYS MAY AND MAY NOT CLAIM ──────────────────────────────────
  *
@@ -630,17 +642,38 @@ private struct Turntable: View {
   let k: CGFloat
 
   var body: some View {
-    // 133 * k = 284pt on an iPhone's large tile. The record, its shadow and
+    // 128 * k = 274pt on an iPhone's large tile. The record, its shadow and
     // its arm all read this, so they cannot disagree about where its edge is
     // — two copies of one expression is how they would.
-    let vinyl = 133 * k
+    //
+    // IT WAS 133 (284pt) UNTIL 27.09, AND THE TEN POINTS WENT ON THE ARM.
+    // Owner: "Could we extend the tonearm a little?" The rod is up 10% and
+    // the disc pays for it, because on a fixed tile it always does — every
+    // part of the arm sits above and to the right of the disc, so length is
+    // bought out of diameter at about a point of record per one per cent of
+    // rod. SOLVED RATHER THAN PICKED: `fit()` in
+    // `docs/design/turntable_two.py` takes the arm's own measured footprint
+    // (1.194 radii wide, 1.096 up) and returns the largest disc that still
+    // leaves 15pt either side, 16 above the counterweight, 14 under the
+    // record and room for the key row; fed the arm that shipped before this
+    // it reproduces exactly what this file used to carry, which is the only
+    // reason to believe it about anything new.
+    let vinyl = 128 * k
     // WHERE THE RECORD SITS, AND IT IS NOT THE TILE'S CENTRE. The arm lives
     // to the RIGHT of the disc and above it, so a centred record puts the
-    // counterweight through the corner. -5.6k across and -7.4k up is what
-    // balances the whole object in the tile: 15pt of margin on the left
-    // against 15 to the right of the weight, and 16 above it.
-    let dx = -5.6 * k
-    let dy = -7.4 * k
+    // counterweight through the corner. -6.2k across and -5.1k up is what
+    // balances the whole object in the tile: 18.8pt of margin on the left
+    // against 18.8 to the right of the weight, 16 above it, and the record's
+    // foot at 303 with the keys' row starting at 317.
+    //
+    // AND THE CORNER IS CHECKED AGAINST THE CURVE, NOT THE EDGES. A widget
+    // clips to a rounded rectangle of about 22pt, so the weight has to clear
+    // the arc rather than the straight sides — its far corner lands at
+    // (319.2, 21.1), which is 3.3 from that arc's own centre against a radius
+    // of 22. The first render of this deck passed every straight-edge test
+    // and was visibly sliced.
+    let dx = -6.2 * k
+    let dy = -5.1 * k
     // THE TILE IS PAINTED IN THE LABEL'S OWN COLOUR (owner, 27.09: "I'll do
     // the album cover painted for the background").
     //
@@ -695,7 +728,23 @@ private struct Turntable: View {
 }
 
 /**
- * THE ARM, REBUILT SLIM.
+ * THE ARM, NOW THE APP'S OWN — AND 10% LONGER THAN IT WAS.
+ *
+ * OWNER, 27.09, OFF THE PROTOTYPE SHEET: "Why are they all short? Could we
+ * extend the tonearm a little?" They are all short for one reason and it is
+ * worth having in writing, because the next person will ask the same thing:
+ * ON A FIXED TILE THE ARM IS PAID FOR IN RECORD. Every part of it sits above
+ * and to the right of the disc, so length is bought out of the disc's own
+ * diameter — about a point of record for every one per cent of rod. The arm
+ * that shipped was the shortest one that still looked like an arm precisely
+ * so the record could be as big as it is.
+ *
+ * SO THIS IS A DELIBERATE TRADE RATHER THAN A FREE IMPROVEMENT: the rod is up
+ * 10% (0.771251r -> 0.848376r) and the disc comes down 284 -> 274 across, a
+ * shade under 4%. `docs/design/turntable_two.py` prices the rest of the ladder
+ * — +20% costs 265, and the app's arm whole, with its weight out on a stub,
+ * costs 238. That last one is the version 26.09 measured and she asked me to
+ * avoid, so the back end stays FOLDED (see below).
  *
  * THREE RULES ARE THE APP'S OWN (03.08) AND DO NOT MOVE. The stylus lands at
  * 0.80 of the record's radius, because any further in is the LABEL and that
@@ -705,92 +754,363 @@ private struct Turntable: View {
  * objects out of one. And it comes down onto the outer grooves at about three
  * o'clock.
  *
- * WHAT CHANGED IS THE BACK END, and it is the whole reason the record can be
- * 284 instead of 231: the app's arm hangs its weight off a stub behind the
- * bearing, this one folds it into the pivot housing. See `Turntable`.
+ * WHAT IS STILL NOT THE APP'S IS THE BACK END, and it is the whole reason the
+ * record can be 274 instead of 238: the app's arm hangs its weight off a stub
+ * behind the bearing, this one folds it into the pivot housing — which is how
+ * a slim arm is really built, and what her own reference shows. See
+ * `Turntable`.
  *
- * THE TRIGONOMETRY IS SOLVED IN THIS COMMENT RATHER THAN CALLED AT DRAW TIME,
- * so every constant below can be CHECKED against the arithmetic instead of
- * trusted. With the pivot at (1.045r, -0.80r) and the stylus at 0.80r five
- * degrees below the horizontal:
+ * WHAT *IS* NOW THE APP'S IS THE HARDWARE, AND IT COST NOTHING (owner, 27.09:
+ * "can we have the same tonearm design that's in the app transferred to the
+ * widget"). The bearing PLATE with its vents, four screws and cast shadow, the
+ * ANTI-SKATE DIAL, the COLLAR, the FINGER LIFT, the shell's VENT SLOTS and
+ * bright front FACE, and a tapered CARTRIDGE with the stylus at its point —
+ * all of it sits INSIDE the footprint the counterweight already claimed, so
+ * the disc measures exactly the same with it as without. The plate's own edge
+ * reaches 1.16 radii against the weight's 1.19, and the dial is put on the
+ * INBOARD shoulder, where there is dead space above the disc, rather than the
+ * outboard one, where it would be the widest thing on the tile.
  *
- *   stylus     ( 0.796956r, -0.069725r)
- *   dx, dy     (-0.248044r, +0.730275r)
- *   rod        0.771251r long at 108.760 degrees
- *   rod centre ( 0.920978r, -0.434862r)   = pivot + (len/2)(cos, sin)
- *   weight     ( 1.075875r, -0.890900r)   = pivot + 0.096r along the back
- *   headshell  ( 0.832333r, -0.173880r)   = stylus + 0.11r along the back
+ * THE PLATE IS METAL RATHER THAN THE APP'S GRAPHITE, and that is a correction
+ * rather than a drift. The app draws it near-black (#212228) because on the
+ * full-screen deck it sits on a lit plinth with the whole room behind it; on a
+ * tile it sits directly beside a BLACK RECORD, and the first render showed
+ * exactly what that costs — a dark disc beside a dark disc reads as a hole,
+ * not as hardware. Brushed metal lit from above is the same object in the
+ * light this tile actually has, which is the same call the Winamp's title bar
+ * needed on 10.09: keep the design, not the literal.
+ *
+ * THE TRIGONOMETRY IS SOLVED HERE RATHER THAN CALLED AT DRAW TIME, so every
+ * constant below can be CHECKED against the arithmetic instead of trusted:
+ *
+ *   u          ( 0.321605, -0.946874)   stylus -> bearing, a 71.24 deg lean
+ *   perp       ( 0.946874,  0.321605)   across the rod, outboard
+ *   stylus     ( 0.796956, -0.069725)   = 0.80r at 5 deg below the horizontal
+ *   pivot      ( 1.069798, -0.873030)   = stylus + 0.848376r along u
+ *   rod centre ( 0.933377, -0.471377)   = stylus + 0.424188r along u
+ *   weight     ( 1.100672, -0.963930)   = stylus + 0.944376r along u
+ *   rod angle  108.760 deg              = the direction of -u
  *
  * y GROWS DOWNWARD in SwiftUI exactly as it does in CSS, so the signs carry
- * over from `docs/design/turntable_one.py` unchanged.
+ * over from `docs/design/turntable_two.py` unchanged.
  *
  * NOTHING HERE CALLS A TRIG FUNCTION, AND NOTHING IS PLACED FROM AN END. A
- * rotated rectangle is positioned by its own centre, which is why every
- * constant above is a centre — the first version of the app's own arm was
- * placed from an end with a percentage transform-origin and hung the
- * counterweight off the tile's corner.
+ * rotated rectangle is positioned by its own centre, which is why `axis`
+ * below returns a centre — the first version of the app's own arm was placed
+ * from an end with a percentage transform-origin and hung the counterweight
+ * off the tile's corner.
  */
 private struct Tonearm: View {
   /// The record's radius. Every number here is a fraction of it, so the arm
   /// cannot drift out of step with the disc it is sitting on.
   let r: CGFloat
 
+  /// The rod's own direction, in SwiftUI's rotation convention.
   private var angle: Double { 108.760 }
 
+  /// The bearing plate's radius. Nearly everything bolted to the plate is a
+  /// share of it, so the whole housing grows and shrinks as one object.
+  private var pr: CGFloat { r * 0.115 }
+
+  /// A point `back` radii from the STYLUS toward the bearing and `out` radii
+  /// across the rod on its OUTBOARD side, as an offset from the record's
+  /// centre.
+  ///
+  /// ONE PIECE OF ARITHMETIC RATHER THAN A TABLE OF SOLVED CENTRES, which is
+  /// the change from the version before the arm grew its hardware: with a
+  /// dozen parts strung along one axis, a hand-solved centre each is a dozen
+  /// numbers nobody can check, while `back` and `out` read straight off the
+  /// prototype's own fractions. It still calls no trig — the two basis
+  /// vectors above ARE the solved constants.
+  private func axis(_ back: CGFloat, _ out: CGFloat) -> CGSize {
+    CGSize(width: r * (0.796956 + back * 0.321605 + out * 0.946874),
+           height: r * (-0.069725 - back * 0.946874 + out * 0.321605))
+  }
+
+  /// A point `dx` plate-radii right of the bearing and `dy` below it — the
+  /// TILE's axes, not the rod's, because the plate is bolted to the plinth
+  /// rather than to the arm and its own furniture sits square to it.
+  private func plateAt(_ dx: CGFloat, _ dy: CGFloat) -> CGSize {
+    CGSize(width: r * 1.069798 + pr * dx, height: -r * 0.873030 + pr * dy)
+  }
+
+  /// Eight hairline vents on a ring. The cosines are WRITTEN OUT rather than
+  /// called, for the reason the header gives; the angle each one is turned
+  /// through comes off its own index, so the two cannot disagree.
+  private static let vents: [(CGFloat, CGFloat)] = [
+    (1, 0), (0.7071, 0.7071), (0, 1), (-0.7071, 0.7071),
+    (-1, 0), (-0.7071, -0.7071), (0, -1), (0.7071, -0.7071),
+  ]
+  /// The plate's four mounting screws, in plate-radii.
+  private static let screws: [(CGFloat, CGFloat)] = [
+    (-0.62, -0.50), (0.62, -0.50), (-0.62, 0.50), (0.62, 0.50),
+  ]
+  /// The counterweight's machined ribs, as shares of the barrel's own length.
+  private static let ribs: [CGFloat] = [-0.26, -0.16, 0.16, 0.26]
+
+  /// FIVE GROUPS RATHER THAN ONE STACK, and it is not tidiness: a ViewBuilder
+  /// takes at most ten children, and the arm now draws more than twenty parts.
   var body: some View {
     ZStack {
-      // The rod, drawn as a TUBE: light along its top, shadow under it. One
-      // flat bar is a drawn stripe, which is the note the app's own arm
-      // collected twice.
-      RoundedRectangle(cornerRadius: r * 0.015)
-        .fill(LinearGradient(
-          colors: [Color(hex: "#ffffff"), Color(hex: "#e2e6ea"),
-                   Color(hex: "#9aa0a9"), Color(hex: "#6b717a")],
-          startPoint: .top, endPoint: .bottom))
-        .frame(width: r * 0.771251, height: r * 0.030)
-        .rotationEffect(.degrees(angle))
-        .offset(x: r * 0.920978, y: -r * 0.434862)
-        .shadow(color: .black.opacity(0.55), radius: r * 0.018, y: r * 0.008)
-      // The counterweight: a barrel ON the pivot rather than out past it.
-      RoundedRectangle(cornerRadius: r * 0.0575)
-        .fill(LinearGradient(
-          colors: [Color(hex: "#eef1f5"), Color(hex: "#b3b9c1"),
-                   Color(hex: "#71777f"), Color(hex: "#565c64")],
-          startPoint: .top, endPoint: .bottom))
-        .frame(width: r * 0.24, height: r * 0.115)
-        .rotationEffect(.degrees(angle))
-        .offset(x: r * 1.075875, y: -r * 0.890900)
-        .shadow(color: .black.opacity(0.55), radius: r * 0.020, y: r * 0.009)
-      // The bearing: a low cylinder, not a sphere. Rendered as a ball it read
-      // as a second object sitting beside the weight.
-      Circle()
-        .fill(RadialGradient(
-          colors: [Color(hex: "#f1f4f7"), Color(hex: "#adb3bb"), Color(hex: "#767c85")],
-          center: .init(x: 0.36, y: 0.28), startRadius: 0, endRadius: r * 0.11))
-        .frame(width: r * 0.185, height: r * 0.185)
-        .offset(x: r * 1.045, y: -r * 0.80)
-        .shadow(color: .black.opacity(0.55), radius: r * 0.025, y: r * 0.011)
-      Circle()
-        .fill(RadialGradient(
-          colors: [Color(hex: "#f6f8fa"), Color(hex: "#6b6f78")],
-          center: .init(x: 0.40, y: 0.32), startRadius: 0, endRadius: r * 0.032))
-        .frame(width: r * 0.063, height: r * 0.063)
-        .offset(x: r * 1.045, y: -r * 0.80)
-      // The headshell, and the cartridge under it.
-      RoundedRectangle(cornerRadius: r * 0.014)
-        .fill(LinearGradient(
-          colors: [Color(hex: "#f5f7fa"), Color(hex: "#b7bcc4"), Color(hex: "#868c95")],
-          startPoint: .top, endPoint: .bottom))
-        .frame(width: r * 0.22, height: r * 0.095)
-        .rotationEffect(.degrees(angle))
-        .offset(x: r * 0.832333, y: -r * 0.173880)
-        .shadow(color: .black.opacity(0.60), radius: r * 0.020, y: r * 0.008)
-      Circle()
-        .fill(Color(hex: "#23262c"))
-        .frame(width: r * 0.040, height: r * 0.040)
-        .offset(x: r * 0.796956, y: -r * 0.069725)
+      plate
+      rod
+      weight
+      bearing
+      headshell
     }
     .allowsHitTesting(false)
+  }
+
+  @ViewBuilder private var plate: some View {
+    // THE CAST SHADOW, and it is the one thing that stops the whole assembly
+    // floating (the app's own note, 13.09). A real arm's bearing stands on a
+    // machined pillar rising out of the plinth; this deck has no plinth, so
+    // only the light can put it ON something. Pure falloff — a stroked ring
+    // under it would read as a sticker, which is the note this target has
+    // collected on the mirror ball's rim, the vinyl's wedges and the CD's
+    // corner clips — squashed to an ellipse because the light comes from
+    // above and a circle of shadow reads as a second disc.
+    Circle()
+      .fill(RadialGradient(
+        colors: [.black.opacity(0.60), .black.opacity(0.32), .clear],
+        center: .center, startRadius: 0, endRadius: pr * 1.5))
+      .frame(width: pr * 3.0, height: pr * 3.0)
+      .scaleEffect(x: 1, y: 0.8)
+      .offset(plateAt(0.18, 0.34))
+    Circle()
+      .fill(LinearGradient(
+        stops: [
+          .init(color: Color(hex: "#f0f3f7"), location: 0.00),
+          .init(color: Color(hex: "#b9bfc8"), location: 0.32),
+          .init(color: Color(hex: "#7d838c"), location: 0.62),
+          .init(color: Color(hex: "#4e535b"), location: 1.00),
+        ],
+        startPoint: .init(x: 0.36, y: 0.02), endPoint: .init(x: 0.64, y: 0.98)))
+      .frame(width: pr * 2, height: pr * 2)
+      .overlay(Circle().stroke(
+        LinearGradient(colors: [.white.opacity(0.9), .clear],
+                       startPoint: .top, endPoint: .center),
+        lineWidth: 0.8))
+      .shadow(color: .black.opacity(0.55), radius: 3.4, y: 1.6)
+      .offset(plateAt(0, 0))
+    // The recessed well the bearing stands in.
+    Circle()
+      .fill(LinearGradient(colors: [Color(hex: "#31343b"), Color(hex: "#1b1d22")],
+                           startPoint: .init(x: 0.36, y: 0.02),
+                           endPoint: .init(x: 0.64, y: 0.98)))
+      .frame(width: pr * 1.54, height: pr * 1.54)
+      .offset(plateAt(0, 0))
+    ForEach(Array(Self.vents.enumerated()), id: \.offset) { i, v in
+      Rectangle()
+        .fill(Color.white.opacity(0.20))
+        .frame(width: pr * 0.30, height: 1.1)
+        .rotationEffect(.degrees(Double(i) * 45))
+        .offset(plateAt(v.0 * 0.58, v.1 * 0.58))
+    }
+    ForEach(Array(Self.screws.enumerated()), id: \.offset) { _, s in
+      Circle()
+        .fill(Color(hex: "#61666e"))
+        .frame(width: pr * 0.17, height: pr * 0.17)
+        .overlay(Circle().stroke(
+          LinearGradient(colors: [.white.opacity(0.6), .clear],
+                         startPoint: .top, endPoint: .center),
+          lineWidth: 0.4))
+        .offset(plateAt(s.0 * 0.86, s.1 * 0.86))
+    }
+    // THE ANTI-SKATE DIAL, INBOARD ON PURPOSE. Outboard it would be the
+    // widest thing on the tile and the record would pay for it.
+    Circle()
+      .fill(LinearGradient(colors: [Color(hex: "#9aa0a9"), Color(hex: "#4d525a")],
+                           startPoint: .init(x: 0.41, y: 0.01),
+                           endPoint: .init(x: 0.59, y: 0.99)))
+      .frame(width: pr * 0.62, height: pr * 0.62)
+      .shadow(color: .black.opacity(0.5), radius: 2, y: 1)
+      .offset(plateAt(-1.30, 0.34))
+    Rectangle()
+      .fill(Color(hex: "#23262c"))
+      .frame(width: 1.2, height: pr * 0.28)
+      .offset(plateAt(-1.30, 0.32))
+  }
+
+  /// THE ROD, ONE TUBE SHADED ACROSS ITS OWN WIDTH. Six stacked slices is
+  /// what made the app's own arm read as "cheap" once it grew (14.09): the
+  /// banding IS the detail, so a real cross-section has to be continuous.
+  private var rod: some View {
+    RoundedRectangle(cornerRadius: r * 0.019)
+      .fill(LinearGradient(
+        stops: [
+          .init(color: Color(hex: "#8e939c"), location: 0.00),
+          .init(color: Color(hex: "#dfe4ec"), location: 0.12),
+          .init(color: Color(hex: "#ffffff"), location: 0.26),
+          .init(color: Color(hex: "#d2d7e0"), location: 0.44),
+          .init(color: Color(hex: "#9aa0aa"), location: 0.66),
+          .init(color: Color(hex: "#6a707a"), location: 0.86),
+          .init(color: Color(hex: "#474c54"), location: 1.00),
+        ],
+        startPoint: .top, endPoint: .bottom))
+      .frame(width: r * 0.848376, height: r * 0.038)
+      .rotationEffect(.degrees(angle))
+      .offset(axis(0.424188, 0))
+      .shadow(color: .black.opacity(0.55), radius: 3.6, y: 1.6)
+  }
+
+  @ViewBuilder private var weight: some View {
+    // The counterweight: a barrel ON the pivot rather than out past it.
+    RoundedRectangle(cornerRadius: r * 0.0575)
+      .fill(LinearGradient(
+        stops: [
+          .init(color: Color(hex: "#eef1f5"), location: 0.00),
+          .init(color: Color(hex: "#b3b9c1"), location: 0.44),
+          .init(color: Color(hex: "#71777f"), location: 0.76),
+          .init(color: Color(hex: "#565c64"), location: 1.00),
+        ],
+        startPoint: .top, endPoint: .bottom))
+      .frame(width: r * 0.24, height: r * 0.115)
+      .overlay(RoundedRectangle(cornerRadius: r * 0.0575).stroke(
+        LinearGradient(colors: [.white.opacity(0.9), .clear],
+                       startPoint: .top, endPoint: .center),
+        lineWidth: 0.8))
+      .rotationEffect(.degrees(angle))
+      .offset(axis(0.944376, 0))
+      .shadow(color: .black.opacity(0.72), radius: 4.6, y: 2.2)
+    // ITS RIBS, SPACED ALONG THE BARREL'S OWN AXIS rather than across the
+    // tile: at a 109 degree lean the barrel is very nearly upright, so a
+    // sideways offset would march them off it. Hairlines in POINTS, never in
+    // radii — a 1pt rib is a 1pt rib at every size (20.09).
+    ForEach(Array(Self.ribs.enumerated()), id: \.offset) { _, f in
+      Rectangle()
+        .fill(Color.black.opacity(0.34))
+        .frame(width: 0.9, height: r * 0.0897)
+        .rotationEffect(.degrees(angle))
+        .offset(axis(0.944376 + f * 0.24, 0))
+    }
+  }
+
+  @ViewBuilder private var bearing: some View {
+    // The bearing itself: a low cylinder, not a sphere. Rendered as a ball it
+    // read as a second object sitting beside the weight.
+    Circle()
+      .fill(RadialGradient(
+        colors: [Color(hex: "#f1f4f7"), Color(hex: "#adb3bb"), Color(hex: "#767c85")],
+        center: .init(x: 0.36, y: 0.28), startRadius: 0, endRadius: pr * 0.46))
+      .frame(width: pr * 0.92, height: pr * 0.92)
+      .overlay(Circle().stroke(
+        LinearGradient(colors: [.white.opacity(0.85), .clear],
+                       startPoint: .top, endPoint: .center),
+        lineWidth: 0.6))
+      .shadow(color: .black.opacity(0.55), radius: 5, y: 2.2)
+      .offset(plateAt(0, 0))
+    Circle()
+      .fill(RadialGradient(
+        colors: [Color(hex: "#f6f8fa"), Color(hex: "#6b6f78")],
+        center: .init(x: 0.40, y: 0.32), startRadius: 0, endRadius: pr * 0.16))
+      .frame(width: pr * 0.32, height: pr * 0.32)
+      .overlay(Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.6))
+      .offset(plateAt(0, 0))
+  }
+
+  /// THE HEADSHELL, AS A WEDGE: narrow where it bolts to the tube and
+  /// widening to the cartridge face. A shell barely wider than the rod reads
+  /// as a blob, which is the note the app's own arm collected. It runs from
+  /// 0.30r behind the stylus to the stylus itself, so every `back` below is a
+  /// share of that read off the prototype's own left/top fractions.
+  @ViewBuilder private var headshell: some View {
+    // the collar it bolts on with
+    RoundedRectangle(cornerRadius: 1.4)
+      .fill(LinearGradient(
+        stops: [
+          .init(color: Color(hex: "#c3c8d1"), location: 0.00),
+          .init(color: Color(hex: "#8f959e"), location: 0.60),
+          .init(color: Color(hex: "#666c74"), location: 1.00),
+        ],
+        startPoint: .top, endPoint: .bottom))
+      .frame(width: r * 0.066, height: r * 0.1377)
+      .rotationEffect(.degrees(angle))
+      .offset(axis(0.267, 0))
+    // the finger lift, bolted under the shell on its outboard side
+    RoundedRectangle(cornerRadius: 1)
+      .fill(LinearGradient(colors: [Color(hex: "#9aa0ab"), Color(hex: "#6b7079")],
+                           startPoint: .top, endPoint: .bottom))
+      .frame(width: r * 0.12, height: r * 0.0459)
+      .rotationEffect(.degrees(angle))
+      .offset(axis(0.138, 0.08505))
+    // the shell's body
+    ShellPlate()
+      .fill(LinearGradient(
+        stops: [
+          .init(color: Color(hex: "#e9edf3"), location: 0.00),
+          .init(color: Color(hex: "#aab0b9"), location: 0.46),
+          .init(color: Color(hex: "#7a8089"), location: 0.78),
+          .init(color: Color(hex: "#565b63"), location: 1.00),
+        ],
+        startPoint: .top, endPoint: .bottom))
+      .frame(width: r * 0.18, height: r * 0.135)
+      .rotationEffect(.degrees(angle))
+      .offset(axis(0.156, 0))
+      .shadow(color: .black.opacity(0.6), radius: 3.4, y: 1.4)
+    // its two vent slots
+    RoundedRectangle(cornerRadius: 1)
+      .fill(Color(hex: "#0a0b0e").opacity(0.72))
+      .frame(width: r * 0.06, height: r * 0.01755)
+      .rotationEffect(.degrees(angle))
+      .offset(axis(0.162, 0.018225))
+    RoundedRectangle(cornerRadius: 1)
+      .fill(Color(hex: "#0a0b0e").opacity(0.72))
+      .frame(width: r * 0.06, height: r * 0.01755)
+      .rotationEffect(.degrees(angle))
+      .offset(axis(0.162, -0.016875))
+    // THE SHELL'S BRIGHT FRONT FACE. Without it the shell and the cartridge
+    // merge into one dark wedge and only the needle reads.
+    Rectangle()
+      .fill(Color(hex: "#cfd4dc"))
+      .frame(width: r * 0.021, height: r * 0.1242)
+      .rotationEffect(.degrees(angle))
+      .offset(axis(0.0675, 0))
+    // the cartridge, tapering to the stylus at its point
+    CartridgeBody()
+      .fill(LinearGradient(colors: [Color(hex: "#2a2d34"), Color(hex: "#16181d")],
+                           startPoint: .top, endPoint: .bottom))
+      .frame(width: r * 0.063, height: r * 0.0864)
+      .rotationEffect(.degrees(angle))
+      .offset(axis(0.0315, 0))
+    // THE STYLUS, A SPECK AND NOTHING MORE. Given a glow it drew as a
+    // detached bright dot floating off the end of the arm; the cartridge
+    // already tapers to a point, so the point is what carries it.
+    Circle()
+      .fill(Color(hex: "#eef2f8"))
+      .frame(width: r * 0.018, height: r * 0.018)
+      .offset(axis(0, 0))
+  }
+}
+
+/// The headshell's own plate: WIDE at the cartridge end and narrow where it
+/// bolts to the tube, which is the shape that reads as a shell rather than as
+/// a bar. Drawn in its own box and rotated with the rest of the arm, so the
+/// fractions are the prototype's unchanged.
+private struct ShellPlate: Shape {
+  func path(in rect: CGRect) -> Path {
+    var p = Path()
+    p.move(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.26))
+    p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.02))
+    p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.98))
+    p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.74))
+    p.closeSubpath()
+    return p
+  }
+}
+
+/// The cartridge: full depth where it meets the shell and tapering to the
+/// stylus at its point. A SHAPE rather than a rotated rectangle, because the
+/// taper is the whole reason the needle reads as the end of something.
+private struct CartridgeBody: Shape {
+  func path(in rect: CGRect) -> Path {
+    var p = Path()
+    p.move(to: CGPoint(x: rect.minX, y: rect.minY))
+    p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.34))
+    p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.66))
+    p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+    p.closeSubpath()
+    return p
   }
 }
 

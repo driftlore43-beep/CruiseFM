@@ -144,7 +144,26 @@ def unlit():
 # line from there, so `rod` is the only length knob and everything else
 # follows from it.
 STY_A = math.radians(-5)
-U = (0.321600, -0.946900)          # unit vector, stylus -> pivot
+# WHICH WAY THE ARM COMES FROM, in degrees above the horizontal, measured
+# along the rod from the needle back to the bearing.
+#
+# 71.24 IS WHAT THE WIDGET SHIPS AND IT IS NOT AN ACCIDENT: scanned in half
+# degrees from 45 to 87 against `fit` below, it is the angle that leaves the
+# BIGGEST record — 284 across, where 65 gives 272 and 78 gives 280. Both axes
+# bind at once there, which is what an optimum looks like. The app's own deck
+# leans 77.9 (its pivot sits 1.006r right of the record's centre and 1.045r
+# above it), steeper because it has a whole screen to hang off rather than a
+# 338pt tile.
+LEAN = 71.24
+
+
+def u_of(lean=LEAN):
+    """Unit vector from the stylus back to the bearing."""
+    a = math.radians(lean)
+    return (math.cos(a), -math.sin(a))
+
+
+U = u_of()
 PERP = (-U[1], U[0])               # across the rod
 
 ROD_TODAY = 0.771251               # what ModeWidget.swift carries
@@ -153,7 +172,7 @@ FOLD = 0.096                       # weight centre behind the pivot, folded in
 PLATE_R = 0.115                    # the app's own bearing plate
 
 
-def extent(rod, stub, plate):
+def extent(rod, stub, plate, lean=LEAN):
     """The arm's own footprint, as multiples of the record's radius: how far
     right of the disc's centre anything reaches, and how far above it.
 
@@ -163,12 +182,14 @@ def extent(rod, stub, plate):
     and half-width across it; the bearing plate is checked as well, because
     on a short arm it can be the thing that sticks out furthest.
     """
+    u = u_of(lean)
+    perp = (-u[1], u[0])
     sx, sy = 0.80 * math.cos(STY_A), 0.80 * math.sin(STY_A)
-    px, py = sx + rod * U[0], sy + rod * U[1]
+    px, py = sx + rod * u[0], sy + rod * u[1]
     back = (stub if stub is not None else FOLD) + BARREL_L / 2
-    wx, wy = px + back * U[0], py + back * U[1]
-    xs = [wx + PERP[0] * BARREL_W / 2, wx - PERP[0] * BARREL_W / 2]
-    ys = [wy + PERP[1] * BARREL_W / 2, wy - PERP[1] * BARREL_W / 2]
+    wx, wy = px + back * u[0], py + back * u[1]
+    xs = [wx + perp[0] * BARREL_W / 2, wx - perp[0] * BARREL_W / 2]
+    ys = [wy + perp[1] * BARREL_W / 2, wy - perp[1] * BARREL_W / 2]
     if plate:
         xs.append(px + PLATE_R)
         ys.append(py - PLATE_R)
@@ -192,7 +213,7 @@ def fit(wx, wy, *, w=338, h=354, side=15, top=16, gap=14, key_h=21, foot=16):
     return r, cx, cy, rx, ry
 
 
-def arm_app(cx, cy, r, *, rod=ROD_TODAY, stub=None, uid='x'):
+def arm_app(cx, cy, r, *, rod=ROD_TODAY, stub=None, lean=LEAN, uid='x'):
     """THE APP'S OWN ARM, brought across piece by piece.
 
     WHAT THE WIDGET WAS MISSING IS HARDWARE, NOT SHAPE. Both arms are already
@@ -214,19 +235,19 @@ def arm_app(cx, cy, r, *, rod=ROD_TODAY, stub=None, uid='x'):
     bearing rather than folded into it. That is the one part of the app's arm
     that is not free, and the sheet prices it.
     """
+    u = u_of(lean)
     sx = cx + r * 0.80 * math.cos(STY_A)
     sy = cy + r * 0.80 * math.sin(STY_A)
-    px, py = sx + rod * r * U[0], sy + rod * r * U[1]
+    px, py = sx + rod * r * u[0], sy + rod * r * u[1]
     ang = math.degrees(math.atan2(sy - py, sx - px))
     back_deg = ang + 180
     rod_w = r * 0.038
     length = math.hypot(sx - px, sy - py)
 
     off = (stub if stub is not None else FOLD) * r
-    wx = px + (off + BARREL_L * r / 2) * U[0] - (BARREL_L * r / 2) * U[0]
     # centre of the barrel: `off` back from the pivot along the rod's axis
-    wx = px + off * U[0]
-    wy = py + off * U[1]
+    wx = px + off * u[0]
+    wy = py + off * u[1]
     pr = PLATE_R * r
     head_l, head_w = r * 0.30, r * 0.135
 
@@ -387,9 +408,9 @@ R0, CX0, CY0, _rx, _ry = fit(*extent(ROD_TODAY, None, False))
 KEY_Y = 354 - 16 - 21 / 2
 
 
-def deck(ground, *, rod=ROD_TODAY, stub=None, plate=True, uid='x'):
-    r, cx, cy, _, _ = fit(*extent(rod, stub, plate))
-    body = arm_app(cx, cy, r, rod=rod, stub=stub, uid=uid) if plate \
+def deck(ground, *, rod=ROD_TODAY, stub=None, plate=True, lean=LEAN, uid='x'):
+    r, cx, cy, _, _ = fit(*extent(rod, stub, plate, lean))
+    body = arm_app(cx, cy, r, rod=rod, stub=stub, lean=lean, uid=uid) if plate \
         else arm_slim(cx, cy, r)
     return ground + record(cx, cy, r, LABEL) + body + keys(KEY_Y), r
 
@@ -464,6 +485,35 @@ ARMS = ''.join([
                  f'than described.'),
 ])
 
+# ── row 3: where the arm comes from ────────────────────────────────────────
+#
+# Owner, 27.09: "All the tone arms seem to sit at the top right corner of the
+# vinyl." She is right, they all do — and so does the tile that is on her
+# phone, so does the app's own deck, and so does the bearing on every real
+# turntable, which is bolted to the plinth at the rear right of the platter.
+# What this row answers is whether it HAS to: the needle stays where it
+# belongs, on the outer grooves at three o'clock, and the bearing is swung
+# round the disc to see what else is available and what each costs.
+
+W1, w1 = deck(halo(STATION), lean=58, plate=True, uid='f')
+W2, w2 = deck(halo(STATION), lean=LEAN, plate=True, uid='g')
+W3, w3 = deck(halo(STATION), lean=77.9, plate=True, uid='h')
+
+WHERE = ''.join([
+    BT.slot('WHERE IT COMES FROM', 'i &mdash; in from the side (58&deg;)', W1, 'l',
+            note=f'The bearing drops down the tile&rsquo;s right edge and the arm reaches across '
+                 f'rather than down. Record {cost(w1)} &mdash; the counterweight moves out into '
+                 f'the margin instead of up into the corner, and the width runs out first.'),
+    BT.slot('WHERE IT COMES FROM', 'ii &mdash; where it is today (71&deg;)', W2, 'l',
+            note=f'Record {cost(w2)}. Scanned in half degrees from 45 to 87, this is the angle '
+                 f'that leaves the biggest disc &mdash; both edges of the tile run out at the '
+                 f'same moment, which is what an optimum looks like.'),
+    BT.slot('WHERE IT COMES FROM', 'iii &mdash; down from above (78&deg;)', W3, 'l',
+            note=f'The app&rsquo;s own lean: on the full-screen deck the bearing sits 1.0 radii '
+                 f'right of the record and 1.05 above it. Record {cost(w3)} &mdash; steeper '
+                 f'pushes the weight into the corner and the height runs out first.'),
+])
+
 html = (f"<html><head><meta charset=utf-8><style>{CSS}</style></head><body>"
         + BT.head('The deck: what it stands on, and how long its arm is',
                   'Owner, 26.09: "do you suggest putting the station theme colour on the '
@@ -480,6 +530,7 @@ html = (f"<html><head><meta charset=utf-8><style>{CSS}</style></head><body>"
                   '161.3), which is what the Swift actually carries.')
         + f'<div class=row>{GROUND}</div>'
         + f'<div class=row>{ARMS}</div>'
+        + f'<div class=row>{WHERE}</div>'
         + "</body></html>")
 pathlib.Path(_want).write_text(html)
 print(f"wrote {_want}")

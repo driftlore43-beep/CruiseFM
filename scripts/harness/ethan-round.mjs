@@ -36,7 +36,16 @@ const click = visibleClicker(page);
 page.on('pageerror', (e) => { fails++; console.log('  PAGE ERROR', e.message); });
 
 await page.goto(BASE, { waitUntil: 'networkidle' });
-await page.waitForTimeout(2500);
+// WAIT FOR THE SHEET, DO NOT GUESS AT IT. This was `waitForTimeout(2500)`, and
+// the sheet mounts a little after the first paint — so on a slower machine the
+// very first click landed before it existed and the whole run died on "no
+// reachable copy of Apple Music", with the app perfectly healthy. A fixed
+// sleep is a guess about someone else's machine; waiting for the thing itself
+// is not.
+await page.waitForFunction(
+  () => /Connect Your Music/i.test(document.body.innerText || ''),
+  null, { timeout: 30000 });
+await page.waitForTimeout(400);   // let the sheet finish sliding in
 
 // ── 1. THE PLATFORM SHEET REMEMBERS ────────────────────────────────────────
 // Ethan: "Apple Music keeps unselecting in settings menu." The sheet always

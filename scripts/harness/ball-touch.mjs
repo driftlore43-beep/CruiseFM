@@ -128,65 +128,97 @@ if (playAfter === false) { await p.mouse.click(cx, cy); await p.waitForTimeout(1
 // "held" alone could pass on a frozen ball, and "idle" alone could pass on a
 // ball that ignores touch entirely; the three together can only pass if the
 // finger genuinely owns the surface.
-// SIGNAL AGAINST NOISE, because the ball never holds perfectly still.
 //
-// Two measurement attempts failed before this one, and both failed the same
-// way — by assuming some part of the picture is quiet. A pixel diff of the
-// ball's box catches the glitter, the fireflies and the light rays, each on
-// its own clock; reading the full-size layers' opacities catches the colour
-// reflections and the spotlight as well as the six flipbook frames. There is
-// no still thing to compare against.
+// HOW THIS USED TO BE MEASURED, AND WHY IT IS NOT ANY MORE (28.09).
+// It compared two SCREENSHOTS of the ball's box a beat apart, idle against
+// dragged, and asserted a ratio. Two earlier attempts had already failed by
+// assuming some part of the picture is quiet — and so did this one, more
+// slowly: the box also holds glitter, fireflies and light beams, each on its
+// own clock, so most of the "noise" was other components and the ratio
+// wandered with the machine's load. It failed three sweeps running on a ball
+// whose gesture code had not been touched since 14.09 (`64a644e`), which is
+// the shape of an instrument fault rather than a bug. Reading the full-size
+// layers' opacities was rejected at the time for catching nine layers rather
+// than six — true, and the fix is to identify the six by an invariant only
+// they have, which is what the code below does.
 //
-// So compare LIKE FOR LIKE over equal intervals: how much the ball changes on
-// its own (noise) versus how much it changes when a finger drags across it
-// (signal). A surface that tracks the finger moves far more than one merely
-// twinkling, and the ratio is the assertion. The diff itself is done in
-// Python — the method this repo already uses for "is it animating?".
-const shotDir = process.env.SHOT_DIR || '/tmp/balltouch';
-await p.evaluate(() => {});
-const ballBox = { x: cx - 105, y: cy - 105, width: 210, height: 210 };
-const fs = await import('node:fs');
-fs.mkdirSync(shotDir, { recursive: true });
-const grab = async (name) => { await p.screenshot({ clip: ballBox, path: `${shotDir}/${name}.png` }); };
+// READ THE BALL, DO NOT PHOTOGRAPH THE ROOM.
+//
+// The ball's rotation is READABLE DIRECTLY. It is a flipbook: six grids
+// cross-faded, and their opacities always sum to exactly 1, which is what
+// identifies them among everything else on the screen. Nothing else in the
+// room contributes to that vector, so there is no noise to out-shout.
+//
+// That also makes the THIRD case measurable, which the old method could not
+// manage — and it is the one that actually proves the finger owns the ball:
+//
+//   idle        the vector travels        — the ball turns on its own
+//   held still  the vector STOPS DEAD     — a claimed wind suspends the turn
+//   moving      the vector travels again  — it follows the finger
+//
+// Measured in small steps and summed, so a step can never carry the ball
+// far enough for the six-frame cycle to alias back onto itself.
+const ballVec = () => p.evaluate(() => {
+  for (const par of document.querySelectorAll('*')) {
+    const kids = [...par.children];
+    if (kids.length !== 6) continue;
+    const ops = kids.map((k) => parseFloat(getComputedStyle(k).opacity));
+    if (ops.some(Number.isNaN)) continue;
+    const s = ops.reduce((a, b) => a + b, 0);
+    if (s > 0.97 && s < 1.03) return ops;
+  }
+  return null;
+});
 
-// NOISE: the ball left alone over one interval.
-await grab('idle1');
-await p.waitForTimeout(160);
-await grab('idle2');
+// If the flipbook cannot be found at all, say so — a check that quietly
+// measures nothing is worse than one that fails.
+const found = await ballVec();
 
-// SIGNAL: the same interval, but with the finger dragging across it.
-await p.mouse.move(cx - 80, cy);
+const travel = async (ms, step = 16) => {
+  let prev = await ballVec(), total = 0, reads = 0;
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    await p.waitForTimeout(step);
+    const v = await ballVec();
+    if (prev && v) { total += v.reduce((a, x, i) => a + Math.abs(x - prev[i]), 0); reads++; }
+    prev = v;
+  }
+  return { total: +total.toFixed(3), reads };
+};
+
+const idle = await travel(600);
+
+// Claim the wind: press, then move far enough to be judged a turn rather
+// than a tap or a pull-down, and then HOLD STILL.
+await p.mouse.move(cx, cy);
 await p.mouse.down();
-await p.mouse.move(cx - 40, cy);
-await p.waitForTimeout(60);
-await grab('drag1');
-await p.mouse.move(cx + 70, cy);
-await p.waitForTimeout(160);
-await grab('drag2');
+await p.mouse.move(cx + 25, cy, { steps: 4 });
+await p.waitForTimeout(250);
+const held = await travel(600);
+
+// Still holding, now genuinely moving the whole time.
+let prev = await ballVec(), moving = 0, x = cx + 25, dir = 1;
+const until = Date.now() + 600;
+while (Date.now() < until) {
+  x += dir * 14;
+  if (x > cx + 95 || x < cx - 95) dir = -dir;
+  await p.mouse.move(x, cy);
+  const v = await ballVec();
+  if (prev && v) moving += v.reduce((a, q, i) => a + Math.abs(q - prev[i]), 0);
+  prev = v;
+}
 await p.mouse.up();
 await p.waitForTimeout(1200);
 
-const { execFileSync } = await import('node:child_process');
-const out = execFileSync('python3', ['-c', `
-import numpy as np
-from PIL import Image
-def d(a, b):
-    x = np.asarray(Image.open(f"${shotDir}/"+a+".png").convert("L"), dtype=float)
-    y = np.asarray(Image.open(f"${shotDir}/"+b+".png").convert("L"), dtype=float)
-    return float(np.abs(x - y).mean())
-print(round(d("idle1","idle2"), 3), round(d("drag1","drag2"), 3))
-`]).toString().trim();
-const [noise, signal] = out.split(/\s+/).map(Number);
-// A drag has to move the surface clearly more than the room's own twinkle.
-const tracksFinger = signal > noise * 2 && signal > 1.0;
-const idleMoves = noise > 0.05;   // the ball does turn on its own
-const heldStill = true;           // not measurable here — see the note above
+const idleMoves    = !!found && idle.reads > 10 && idle.total > 1;
+const handsOver    = held.total < idle.total * 0.15;   // a claimed wind stops the turn
+const tracksFinger = moving > 1 && moving > held.total * 4;
 
-console.log(`     ball change: idle ${noise}  dragged ${signal}  (ratio ${(signal / Math.max(noise, 0.001)).toFixed(1)}x)`);
-
-const swipeWorked = idleMoves && tracksFinger && heldStill;
-console.log(`${swipeWorked ? 'ok  ' : 'FAIL'} swipe turns the ball  idle-moves ${idleMoves}  tracks-finger ${tracksFinger}`);
-if (!swipeWorked) problems.push(`swipe: idleMoves ${idleMoves}, tracksFinger ${tracksFinger}`);
+console.log(`     ball turn: idle ${idle.total}  held-still ${held.total}  moving ${moving.toFixed(3)}`);
+const swipeWorked = idleMoves && handsOver && tracksFinger;
+console.log(`${swipeWorked ? 'ok  ' : 'FAIL'} swipe turns the ball  idle-moves ${idleMoves}  hands-over ${handsOver}  tracks-finger ${tracksFinger}`);
+if (!found) problems.push('the flipbook\'s six frames were not found — this check measured nothing');
+if (!swipeWorked) problems.push(`swipe: idleMoves ${idleMoves}, handsOver ${handsOver}, tracksFinger ${tracksFinger}`);
 
 // The song-position half needs a real track, which this build cannot have.
 const t = await elapsed();

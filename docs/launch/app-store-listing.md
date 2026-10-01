@@ -1,5 +1,15 @@
 # App Store listing — Cruise FM
 
+> **SUPERSEDED FOR THE LIVE TEXT, 01.10.2026.** The paste-ready listing is
+> **`listing-1.4.3.md`**. The description block below is three releases stale:
+> it still says "nothing to buy" (false since subscriptions attached at 1.4.1),
+> has never mentioned the widgets (shipped 1.4.0), omits Circular EQ from the
+> free modes (free since 25.07), and predates the Terms of Use link Apple
+> demanded under 3.1.2 on 18.09. Everything else here — the *reasoning* behind
+> the name, the subtitle and the keyword rules, and the Strofi Technologies
+> section — is still current and still worth reading. Corrected forward rather
+> than rewritten, per this project's own rule.
+
 Written 08.08.2026, the day of launch, to replace copy that had drifted:
 the old draft was Spotify-only, still listed Sound Waves (retired 25.07),
 counted seven modes instead of eight and eight stations instead of ten, and

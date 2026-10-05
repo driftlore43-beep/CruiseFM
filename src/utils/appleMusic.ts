@@ -1,8 +1,9 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
-import { NativeModules, Platform } from 'react-native';
+import { AppState, NativeModules, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { probeAppleArtwork } from './appleArtwork';
+import { isInFront } from './useAppActive';
 import type { LinkedPlaylist } from './stationPlaylists';
 
 /**
@@ -111,11 +112,68 @@ export function appleMusicAvailable(): boolean {
   return bridge != null;
 }
 
+/**
+ * EVERY NATIVE CALL IS BOUNDED, AND THE BOUND LIVES HERE RATHER THAN AT THE
+ * CALL SITES — which is the whole point of this change.
+ *
+ * `withTimeout` below was added on 25.08 for exactly this reason (Ethan: "if
+ * the Apple Music app is not open cruise fm will not play music and will
+ * freeze inside a station"), and it was retrofitted onto FOUR call sites:
+ * `playPlaylist` and `play` inside startApplePlaylist, and the two inside
+ * recoverApplePlayback. `currentEntry` has its own race. Everything ELSE that
+ * reaches the bridge — play, pause, next, previous, seekTo, setShuffle,
+ * setRepeat, authorizationStatus, canPlayCatalog, playlistTracks,
+ * playTrackInPlaylist — was still awaited with no bound at all, three rounds
+ * later. A fix applied per call site is a fix that goes stale the next time
+ * someone adds a call, and it did.
+ *
+ * IT MATTERS MOST ON THE ONE THAT STARTS A DRIVE. `playStationMusic`'s Apple
+ * branch opens with `await isAppleMusicConnected()`, i.e.
+ * `bridge.authorizationStatus()`. A Swift `try?` call that HANGS rather than
+ * throws leaves that promise unresolved for ever: nothing plays, no verdict
+ * is reported, no notice appears, and the holding beat clears itself at 8s
+ * with the drive still dead. That is "when starting a station within the app
+ * nothing happens" (Ethan, 05.10) read straight off the code.
+ *
+ * A timeout resolves to the FALLBACK rather than throwing, because every
+ * caller of `safe` already treats the fallback as "could not find out" —
+ * degrading to "don't know" for one call is the behaviour this file is built
+ * on. The two sites that genuinely want a throw use `withTimeout` directly
+ * and are untouched.
+ *
+ * `timeoutMs: 0` means unbounded, and `connectAppleMusic` is the ONE caller
+ * that passes it: that call puts Apple's own permission dialog on screen and
+ * does not come back until a person answers it, so a bound there would report
+ * "notDetermined" while the sheet was still up and the app would conclude
+ * access had been refused.
+ */
+const BRIDGE_TIMEOUT_MS = 6000;
+
+/**
+ * The two BULK reads get longer, because they are a different kind of call
+ * and the cost of cutting them short is different.
+ *
+ * A control either lands or it does not, and a drive cannot wait on it. A
+ * whole library playlist's track list can legitimately take several seconds
+ * over MusicKit, and the one screen that reads it is a list someone is
+ * sitting looking at — cutting that off at six seconds would turn a slow but
+ * perfectly healthy playlist into "no songs", which is the exact fault the
+ * 04.08 round fixed from the other end. Nothing on the drive-start path waits
+ * this long anyway: `queueHoldsTrack` races the same call at 3s of its own,
+ * because THERE the honest answer to a slow library is "start the playlist
+ * properly".
+ */
+const READ_TIMEOUT_MS = 15000;
+
 /** Swallow anything the bridge throws — playback must never crash a drive. */
-async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+async function safe<T>(fn: () => Promise<T>, fallback: T, timeoutMs = BRIDGE_TIMEOUT_MS): Promise<T> {
   if (!bridge) return fallback;
   try {
-    return await fn();
+    if (timeoutMs <= 0) return await fn();
+    return await Promise.race([
+      fn(),
+      new Promise<T>((resolve) => setTimeout(() => resolve(fallback), timeoutMs)),
+    ]);
   } catch {
     return fallback;
   }
@@ -130,7 +188,9 @@ async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
  * where a reflexive "Don't Allow" would be expensive to undo.
  */
 export async function connectAppleMusic(): Promise<AuthStatus> {
-  return safe(() => bridge!.requestAuthorization(), 'notDetermined');
+  // Unbounded on purpose — this is the system dialog, and it waits on a
+  // person. See the note on `safe`.
+  return safe(() => bridge!.requestAuthorization(), 'notDetermined', 0);
 }
 
 export async function appleMusicStatus(): Promise<AuthStatus> {
@@ -224,7 +284,7 @@ export function applePlaylistId(uri: string): string {
 }
 
 export async function getAppleUserPlaylists(): Promise<LinkedPlaylist[]> {
-  const raw = await safe(() => bridge!.userPlaylists(), [] as { id: string; name: string }[]);
+  const raw = await safe(() => bridge!.userPlaylists(), [] as { id: string; name: string }[], READ_TIMEOUT_MS);
   return raw.map((p) => ({ uri: `${APPLE_PLAYLIST_PREFIX}${p.id}`, name: p.name }));
 }
 
@@ -267,6 +327,66 @@ export function lastAppleQueueUri(): string | null { return lastQueuedUri; }
  */
 const QUEUE_KEY = 'cruisefm_apple_queue_uri';
 let queuedUri: string | null | undefined;
+
+/**
+ * ONE OWNER OF THE QUEUE AT A TIME — and until today there was none.
+ *
+ * Ethan, 05.10: "every widget I click on will either freeze the app or
+ * restart my playlist like 3 or 4 times." Counted off the code, a single
+ * drive start on Apple Music can re-queue the playlist up to four times,
+ * through chains that know nothing about each other:
+ *
+ *   1. `startApplePlaylist` queues it (restart one) and arms
+ *      `verifyPlaylistTook`, which at ~6s re-queues it again if the player
+ *      says it is not playing (restart two).
+ *   2. `resumeAppleQueue` presses play and, if that has not taken at 3.5s,
+ *      calls `startApplePlaylist` — which queues it AND arms a second
+ *      `verifyPlaylistTook` of its own.
+ *   3. The transport's own `verifyResume` in useAppleMusicPlayback calls
+ *      `recoverApplePlayback` on the same evidence.
+ *
+ * `startStationMusic`'s generation counter (25.08) supersedes the START
+ * chains, which is why a swept dial no longer melts — but these checks are
+ * fired and forgotten from INSIDE this file and outlive the call that armed
+ * them, so the counter cannot see them. Tap a widget, watch nothing happen,
+ * tap it again: now two verifications are in flight, each with its own
+ * recovery, and each restart is a fresh track one.
+ *
+ * THE ASYMMETRY IS THE PROOF IT WAS AN OMISSION RATHER THAN A DESIGN.
+ * `verifyResume` has carried three guards since 27.08 — the transport was
+ * touched since, the component is gone, the app is not in front —
+ * and `verifyPlaylistTook` was given the SECOND half of that round's lesson
+ * (look twice before believing a failure) and none of the first.
+ *
+ * So anything that changes what the player holds, or that the listener
+ * presses, claims the queue; every deferred check captures the number it was
+ * armed with and stands down if it is no longer current. A pause two seconds
+ * into a start is the cheapest case to describe: before this, the check found
+ * "not playing" at 6s — because they had paused — and dutifully restarted the
+ * playlist from the top.
+ */
+let queueGen = 0;
+
+/** Claim the queue: every older deferred check stands down. */
+function claimQueue(): number {
+  queueGen += 1;
+  return queueGen;
+}
+
+/** Has anything else claimed the queue since this check was armed? */
+function queueStale(gen: number): boolean {
+  return queueGen !== gen;
+}
+
+/**
+ * The listener pressed something. Called by every transport control, so a
+ * verification that is still counting cannot act on a state the DRIVER chose
+ * and read it as a failure. Exported because the controls live in
+ * useAppleMusicPlayback and the deferred checks live here.
+ */
+export function noteAppleQueueTouched(): void {
+  queueGen += 1;
+}
 
 async function readQueuedUri(): Promise<string | null> {
   if (queuedUri !== undefined) return queuedUri;
@@ -371,12 +491,36 @@ const START_VERIFY_MS = 3500;
  */
 const START_RECHECK_MS = 2500;
 
-async function verifyPlaylistTook(): Promise<void> {
+/**
+ * AND IT STANDS DOWN THE MOMENT IT STOPS BEING THE CURRENT START.
+ *
+ * Two guards, both of which `verifyResume` has had since 27.08 and this never
+ * did — see the note on `queueGen` for why that is the whole of Ethan's
+ * "restart my playlist like 3 or 4 times".
+ *
+ *   `queueStale(gen)` — another start, a recovery, or a press of the
+ *   transport has happened since; whoever did that owns the queue now, and a
+ *   check armed by a start the driver has already moved past must not
+ *   re-queue anything. Checked before each look AND again after it, because
+ *   reading the player takes real time and a thumb can land inside it.
+ *
+ *   `isInFront` — the app has gone. The 25.08 report was exactly this
+ *   ("requests will come in late and reset my playlist if Apple Music is
+ *   still playing after closing Cruise app"): a widget tap brings the app to
+ *   the front, so leaving again within six seconds is the ordinary case, not
+ *   an edge one, and the music then belongs to the Music app. Not ours to
+ *   second-guess once we are not the thing on screen.
+ */
+async function verifyPlaylistTook(gen: number): Promise<void> {
   await new Promise((r) => setTimeout(r, START_VERIFY_MS));
+  if (queueStale(gen) || !isInFront(AppState.currentState)) return;
   let entry = await getAppleNowPlaying().catch(() => null);
+  if (queueStale(gen) || !isInFront(AppState.currentState)) return;
   if (entry?.isPlaying) return;
   await new Promise((r) => setTimeout(r, START_RECHECK_MS));
+  if (queueStale(gen) || !isInFront(AppState.currentState)) return;
   entry = await getAppleNowPlaying().catch(() => null);
+  if (queueStale(gen) || !isInFront(AppState.currentState)) return;
   if (entry?.isPlaying) return;
   const at = entry?.positionMs ?? null;
   await recoverApplePlayback(at != null && at > 1500 ? at : null);
@@ -457,10 +601,17 @@ export async function appleQueueState(
  * nothing playing.
  */
 export async function resumeAppleQueue(uri: string): Promise<void> {
+  const gen = claimQueue();
   await applePlay();
   (async () => {
     await new Promise((r) => setTimeout(r, START_VERIFY_MS));
+    // Same two guards as verifyPlaylistTook, and for the same reason: this
+    // fallback QUEUES the playlist, which is a restart from track one, and it
+    // must never land on a station the driver has since tuned past or on
+    // music they chose to pause.
+    if (queueStale(gen) || !isInFront(AppState.currentState)) return;
     const entry = await getAppleNowPlaying().catch(() => null);
+    if (queueStale(gen) || !isInFront(AppState.currentState)) return;
     if (entry?.isPlaying) return;
     await startApplePlaylist(uri);
   })().catch(() => {});
@@ -468,6 +619,10 @@ export async function resumeAppleQueue(uri: string): Promise<void> {
 
 export async function startApplePlaylist(uri?: string): Promise<'playing' | 'error'> {
   if (!bridge) return 'error';
+  // Claimed BEFORE the native call, so a start that overtakes this one while
+  // it is still in flight has already superseded it by the time the check
+  // below is armed.
+  const gen = claimQueue();
   try {
     if (uri && isApplePlaylist(uri)) {
       await withTimeout(bridge.playPlaylist(applePlaylistId(uri)), 6000);
@@ -476,7 +631,7 @@ export async function startApplePlaylist(uri?: string): Promise<'playing' | 'err
     } else {
       await withTimeout(bridge.play(), 6000);
     }
-    verifyPlaylistTook().catch(() => {});
+    verifyPlaylistTook(gen).catch(() => {});
     return 'playing';
   } catch {
     return 'error';
@@ -516,6 +671,10 @@ export async function startApplePlaylist(uri?: string): Promise<'playing' | 'err
  */
 export async function recoverApplePlayback(resumeAtMs: number | null): Promise<boolean> {
   if (!bridge) return false;
+  // A recovery is the newest word on what the player should hold, so it takes
+  // the queue too — any other check still counting stands down rather than
+  // re-queueing on top of this.
+  claimQueue();
   // NO QUEUE OF OUR OWN IS STILL WORTH A SECOND PRESS. A drive started from
   // music already playing (the "I can hear this" card) never calls
   // startApplePlaylist, by design — adopting exists precisely to touch
@@ -566,7 +725,7 @@ export async function getApplePlaylistTracks(
   // the playlist had no songs while it played happily (owner, 04.08).
   // playAppleTrack stripped the prefix; this didn't. One rule now.
   const id = isApplePlaylist(playlistId) ? applePlaylistId(playlistId) : playlistId;
-  const rows = await safe(() => bridge!.playlistTracks(id), []);
+  const rows = await safe(() => bridge!.playlistTracks(id), [], READ_TIMEOUT_MS);
   return (rows ?? []).map((t) => ({
     uri: `applemusic:track:${t.id}`,
     title: t.title ?? '',

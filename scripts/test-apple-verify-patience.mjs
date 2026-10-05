@@ -153,6 +153,15 @@ function loadHook(src, { isPlayingAfterPress } = {}) {
         };
       },
       recoverApplePlayback: async (resumeAt) => { calls.push(['recover', resumeAt]); return true; },
+      // RECORDED RATHER THAN SWALLOWED. The suite had to gain this the day
+      // the hook started calling it (05.10) — the standing harness trap: a
+      // stub stands in for a module's FUTURE imports too, and `useAppActive`
+      // taught the same lesson on 18.09. Noting it rather than returning a
+      // bare no-op makes the new contract something this suite asserts,
+      // since every transport press must now claim the Apple queue or a
+      // start's own verification will read a deliberate pause as a failure
+      // and restart the playlist. See appleMusic's `queueGen`.
+      noteAppleQueueTouched: () => { calls.push(['claim']); },
       appleNext: async () => {}, applePrev: async () => {},
       applePlay: async () => {}, applePause: async () => {},
       appleSeekTo: async () => {}, appleSetShuffle: async () => {}, appleSetRepeat: async () => {},
@@ -204,6 +213,14 @@ console.log("\n  a resume that only settles AFTER the old single check window:")
   await sleep(50);
   check('the fix gives it a second look and does NOT recover a healthy resume',
     !calls.some(([f]) => f === 'recover'), JSON.stringify(calls));
+}
+
+console.log('\n  and the press itself claims the queue:');
+{
+  const { calls } = loadHook(fs.readFileSync(HOOK_SRC_PATH, 'utf8'), { isPlayingAfterPress: true });
+  await sleep(50);
+  check('pressing play tells appleMusic the driver has touched the queue',
+    calls.some(([f]) => f === 'claim'), JSON.stringify(calls));
 }
 
 console.log('\n  a resume that genuinely never takes still gets recovered:');

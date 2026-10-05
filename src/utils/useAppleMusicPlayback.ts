@@ -17,6 +17,7 @@ import {
   appleSetRepeat,
   appleSetShuffle,
   getAppleNowPlaying,
+  noteAppleQueueTouched,
   recoverApplePlayback,
   isAppleMusicConnected,
 } from './appleMusic';
@@ -415,14 +416,25 @@ export function useAppleMusicPlayback(visible: boolean, opts?: { pollMs?: number
     // Controls are optimistic: fire, then re-read so the display catches up.
     // Playback is local, so these land far faster than Spotify's remote calls
     // and need none of its waking machinery.
-    play: () => { ping(); lastControlRef.current = Date.now(); applePlay(); after(); verifyResume(); },
-    pause: () => { ping(); lastControlRef.current = Date.now(); applePause(); after(); },
-    next: () => { ping(); lastControlRef.current = Date.now(); appleNext(); after(); },
+    /**
+     * EVERY PRESS CLAIMS THE QUEUE — see the note on `queueGen` in
+     * appleMusic.ts. `lastControlRef` already stops one press from being
+     * second-guessed by a verification THIS hook armed; it says nothing to
+     * `verifyPlaylistTook`, which is armed deep inside a drive start and used
+     * to re-queue the playlist from track one on finding the player stopped —
+     * including when it was stopped because the listener had just pressed
+     * pause. The two guards now agree, because the driver's intent outranks
+     * any check still counting.
+     */
+    play: () => { ping(); lastControlRef.current = Date.now(); noteAppleQueueTouched(); applePlay(); after(); verifyResume(); },
+    pause: () => { ping(); lastControlRef.current = Date.now(); noteAppleQueueTouched(); applePause(); after(); },
+    next: () => { ping(); lastControlRef.current = Date.now(); noteAppleQueueTouched(); appleNext(); after(); },
     // Restart-then-previous, same rule and same window as Spotify's — see the
     // note on RESTART_WINDOW_MS there.
     prev: () => {
       ping();
       lastControlRef.current = Date.now();
+      noteAppleQueueTouched();
       if (backButtonAction(trackRef.current) === 'restart') { appleSeekTo(0); after(); return; }
       applePrev();
       after();

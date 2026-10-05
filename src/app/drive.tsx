@@ -48,25 +48,49 @@ export default function DriveLink() {
       const last = await loadLastCruise().catch(() => null);
       if (cancelled) return;
 
-      const wanted = params.station;
-      // resolveAnyStation falls back to a real station for an unknown id, so
-      // compare ids to find out whether the link actually named one we have.
-      const station = wanted && resolveAnyStation(wanted).id === wanted
-        ? wanted
-        : (last?.stationId ?? defaultStationForNow());
-      const mode = knownMode(params.mode ?? last?.mode ?? 'equalizer');
-      // Nothing from a URL is trusted, this included: only the two words the
-      // app itself uses are accepted, and anything else leaves the remembered
-      // answer exactly where it was.
-      const kind: SessionKind | undefined =
-        params.kind === 'driving' || params.kind === 'listening' ? params.kind : undefined;
+      /**
+       * THIS ROUTE MUST ALWAYS HAND OVER, EVEN IF THE WORK BELOW GOES WRONG.
+       *
+       * What it renders is a bare black rectangle — it exists only to be
+       * passed through — and `done` means the effect cannot be retried. So
+       * anything that throws between here and `router.replace` leaves the
+       * driver looking at a full-screen black void with no control on it and
+       * no way out but force-quitting the app. From the outside that is not
+       * an error, it is "every widget I click on will freeze the app" (Ethan,
+       * 05.10), and it is the only reading of that sentence that fits a tap
+       * which never even reaches a deck.
+       *
+       * Neither await above can throw (both are caught), so the exposure is
+       * the resolving below — `resolveAnyStation` reaches into the custom
+       * station cache, `defaultStationForNow` reads the broadcast timetable.
+       * The point is not that either is known to fail. It is that the cost of
+       * being wrong here is a dead screen, a `finally` is one line, and the
+       * fallback it lands on (the hour's own station in the Equalizer) is a
+       * perfectly good drive — which is this route's own stated rule applied
+       * to the one case it had not covered.
+       */
+      try {
+        const wanted = params.station;
+        // resolveAnyStation falls back to a real station for an unknown id, so
+        // compare ids to find out whether the link actually named one we have.
+        const station = wanted && resolveAnyStation(wanted).id === wanted
+          ? wanted
+          : (last?.stationId ?? defaultStationForNow());
+        const mode = knownMode(params.mode ?? last?.mode ?? 'equalizer');
+        // Nothing from a URL is trusted, this included: only the two words the
+        // app itself uses are accepted, and anything else leaves the remembered
+        // answer exactly where it was.
+        const kind: SessionKind | undefined =
+          params.kind === 'driving' || params.kind === 'listening' ? params.kind : undefined;
 
-      // HAND OVER RATHER THAN OPEN HERE. The deck's host lives in the tabs
-      // layout, which does not exist yet when a tap cold-starts the app into
-      // this route — opening from here measured as a real session with the
-      // right station and no deck on screen. See utils/driveRequest.
-      requestDrive({ stationId: station, mode, kind });
-      router.replace('/');
+        // HAND OVER RATHER THAN OPEN HERE. The deck's host lives in the tabs
+        // layout, which does not exist yet when a tap cold-starts the app into
+        // this route — opening from here measured as a real session with the
+        // right station and no deck on screen. See utils/driveRequest.
+        requestDrive({ stationId: station, mode, kind });
+      } finally {
+        if (!cancelled) router.replace('/');
+      }
     })();
 
     return () => { cancelled = true; };

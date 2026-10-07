@@ -1,6 +1,6 @@
-import { Dimensions, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
-import { isTabletSize } from '@/constants/theme';
+import { isTabletDevice } from '@/constants/theme';
 
 /**
  * Rotation is allowed ONLY while a fullscreen mode is open. The rest of the
@@ -67,15 +67,21 @@ export async function allowRotation(): Promise<void> {
  * system turning the window underneath a tree that had already rendered —
  * which is exactly the landscape-screen-with-portrait-layout the owner
  * photographed (14.09). No forced turn, no race to lose.
+ *
+ * AND IT ASKS THE DEVICE RATHER THAN MEASURING THE WINDOW, which until the
+ * iPhone Duo was announced (09.09.2026, 7.6in unfolded) were the same
+ * question. They are not: an unfolded foldable has a tablet-sized window and
+ * is a PHONE, so it keeps the phone's rule — upright on the list pages, free
+ * to turn inside a mode, which is what every mode unlocks for itself. That
+ * is the conservative answer as well as the honest one, because "a folding
+ * phone should behave like a phone" is a decision somebody can revisit on
+ * purpose, where inheriting the iPad's rule off a width threshold is a
+ * decision nobody took. See `isTabletDevice`.
  */
 function isTablet(): boolean {
-  try {
-    const { width, height } = Dimensions.get('window');
-    return isTabletSize(width, height);
-  } catch {
-    return false;
-  }
+  return isTabletDevice();
 }
+
 
 /** Everywhere else: pinned upright. Also snaps the screen back to portrait
  *  if the mode was closed while the phone lay sideways. */

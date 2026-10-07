@@ -94,10 +94,17 @@ export const PAGE_GUTTER     = 20;
  * page's content is capped at `PAGE_MAX_W` and centred, so every card keeps
  * the proportions it was designed at and the extra width becomes margin.
  *
- * BOTH NUMBERS ARE CHOSEN SO A PHONE CAN NEVER REACH THEM. The widest phone
- * this app runs on is 430 points, so on any phone the cap never binds and the
- * layout is byte-identical to what shipped — which is the whole safety of
- * doing it this way rather than by rewriting the page.
+ * BOTH NUMBERS WERE CHOSEN SO A PHONE COULD NEVER REACH THEM. The widest
+ * phone this app runs on is 430 points, so on any phone the cap never binds
+ * and the layout is byte-identical to what shipped — which is the whole
+ * safety of doing it this way rather than by rewriting the page.
+ *
+ * A FOLDING PHONE REACHES THEM, AND THAT IS CORRECT RATHER THAN A BUG (the
+ * iPhone Duo, 7.6in unfolded). This is a question about the WINDOW: a window
+ * that wide needs a reading column whether the thing holding it folds or
+ * not, and the hero ceiling should lift with it. What must NOT be decided by
+ * this number is what KIND of device it is — see `isTabletDevice`, which is
+ * where that question went after the two tests were split apart.
  */
 export const WIDE_MIN        = 700;
 export const PAGE_MAX_W      = 720;
@@ -106,16 +113,51 @@ export const PAGE_MAX_W      = 720;
 export const isWide = (winW: number) => winW >= WIDE_MIN;
 
 /**
- * A TABLET IN EITHER ORIENTATION — the SHORTER edge is the honest test.
+ * IS THIS A TABLET? — ASK THE DEVICE, NEVER THE GLASS.
  *
- * `isWide` asks about the window it is laying out, which is exactly right for
- * a reading column. It is the wrong question for "what kind of device is
- * this?", because a phone turned sideways is 932 points wide and would
- * answer yes. Every iPad's shorter edge clears 700 (the smallest is 744) and
- * every iPhone's falls well short of it (the widest is 440), so this can
- * never mistake one for the other whichever way it is being held.
+ * THIS REPLACES `isTabletSize`, AND THAT FUNCTION'S OWN COMMENT IS WHAT
+ * DATED IT. It measured the window's SHORTER edge against `WIDE_MIN` and
+ * said: "every iPad's shorter edge clears 700 and every iPhone's falls well
+ * short of it (the widest is 440), so this can never mistake one for the
+ * other whichever way it is being held." True of every iPhone ever made,
+ * until Apple announced a FOLDING one — the iPhone Duo (09.09.2026, 7.6in
+ * unfolded, on sale 23.10.2026), which is a phone whose screen is
+ * tablet-sized the moment it is opened.
+ *
+ * THE FAULT WAS ONE TEST ANSWERING TWO DIFFERENT QUESTIONS, and only one of
+ * them is about size.
+ *
+ *   "Is this window wide enough to need a reading column?" is a LAYOUT
+ *   question, `isWide` still answers it by measuring, and that is right — an
+ *   unfolded foldable SHOULD get the centred column and the lifted hero
+ *   ceiling, for exactly the reason an iPad does.
+ *
+ *   "Is this a tablet rather than a phone?" is a question about the DEVICE,
+ *   and the two places that asked it carry real consequences: a tablet is
+ *   never pinned upright (orientation.ts) and is never asked whether it is
+ *   heading anywhere, answering 'listening' for good (sessionKind.ts). Both
+ *   are right for an iPad and plainly wrong for a phone that folds — a
+ *   folding iPhone goes in a car like any other, so measuring the glass
+ *   would have silently stopped counting its owner's drives as drives, on
+ *   the one new iPhone most likely to be mounted on a dash.
+ *
+ * `Platform.isPad` IS THE HONEST TEST AND IT COSTS NOTHING. It is iOS's own
+ * `userInterfaceIdiom`, which reads `.phone` on a folding iPhone however big
+ * the screen gets, and it is a constant already on the bridge — no native
+ * module, so this ships over the air rather than waiting for a build.
+ * Anything that is not iOS answers no: Android has no iPad, and on web the
+ * browser is a phone-shaped harness whatever size its window is, which is
+ * what every browser check in `scripts/harness` already assumes (the one
+ * that did not — `shots.mjs` at `DEVICE=ipad` — now seeds the answer a real
+ * iPad would give, because a browser cannot have a device idiom to read).
+ *
+ * NOTHING SHIPPING TODAY CHANGES BEHAVIOUR, which is the whole safety of it:
+ * an iPad answers yes either way, and no phone on sale has ever had a
+ * shorter edge anywhere near 700, so the old test and this one disagree on
+ * precisely one device — the one that has not shipped yet.
  */
-export const isTabletSize = (w: number, h: number) => Math.min(w, h) >= WIDE_MIN;
+export const isTabletDevice = (): boolean =>
+  Platform.OS === 'ios' && (Platform as { isPad?: boolean }).isPad === true;
 
 /**
  * THE CEILING ON A MODE'S CENTRAL OBJECT — and why an iPad needed it lifted.

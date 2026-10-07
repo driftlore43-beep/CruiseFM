@@ -37,13 +37,15 @@ function load(file, stubs = {}) {
 const S = load(`${ROOT}/constants/schedule.ts`, {
   '@/constants/stations': `({ STATIONS: ${JSON.stringify(IDS.map((id) => ({ id })))} })`,
 });
-// The real theme, not a copied threshold: sessionKind asks isTabletSize
-// whether this is an iPad, and a stub carrying its own 700 would silently
-// disagree the day that number moves. theme.ts only needs its stylesheet
+// The real theme, not a copied threshold: sessionKind asks isTabletDevice
+// whether this is an iPad, and a stub answering that itself would never
+// catch the test being wired to the wrong thing. theme.ts only needs its stylesheet
 // import and Platform stubbed to load here.
 const TH = load(`${ROOT}/constants/theme.ts`, {
   '@/global.css': '({})',
-  'react-native': "({ Platform: { OS: 'ios', select: (o) => (o.ios ?? o.default) } })",
+  // isPad FALSE IS THE WHOLE POINT, and it used to be a window size. This is
+  // what makes these PHONE notifications now (see the sessionKind stub below).
+  'react-native': "({ Platform: { OS: 'ios', isPad: false, select: (o) => (o.ios ?? o.default) } })",
 });
 globalThis.__th = TH;
 const SK = load(`${ROOT}/utils/sessionKind.ts`, {
@@ -52,11 +54,12 @@ const SK = load(`${ROOT}/utils/sessionKind.ts`, {
   // sessionKind exports a hook as well as the plain functions, so it imports
   // React. Nothing here renders, so the hooks only need to exist.
   react: '({ useEffect: () => {}, useState: (v) => [v, () => {}] })',
-  // A PHONE window, deliberately. Since 14.09 sessionKind asks the window
-  // whether it is a tablet and answers 'listening' unconditionally if it is —
-  // which would make every line here a desk line and test nothing about the
-  // drive vocabulary. These are phone notifications.
-  'react-native': '({ Dimensions: { get: () => ({ width: 393, height: 852 }) } })',
+  // NO react-native STUB IS NEEDED HERE ANY MORE, and that is worth a line.
+  // This module used to measure the window to decide whether it was on an
+  // iPad — which answers 'listening' unconditionally and would make every
+  // line here a desk line. Since the iPhone Duo it asks the DEVICE instead
+  // (isTabletDevice, in the theme stubbed above), so it imports no window at
+  // all and the phone-ness of this run is decided by `isPad: false` up there.
   '@/constants/theme': 'globalThis.__th',
 });
 globalThis.__sk = SK;

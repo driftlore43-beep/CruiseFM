@@ -93,7 +93,18 @@ async function page() {
     viewport: { width: DEV.width, height: DEV.height },
     deviceScaleFactor: DEV.scale,
   });
-  await ctx.addInitScript(() => {
+  // THE SESSION KIND HAS TO BE SEEDED PER DEVICE NOW, and it did not used to.
+  // An iPad has no driving mode at all (owner, 12.09), and sessionKind.ts used
+  // to enforce that by MEASURING the window — so at DEVICE=ipad the seed below
+  // was overridden to 'listening' whatever it said. That test is now a device
+  // fact (`isTabletDevice`, iOS's own userInterfaceIdiom), because a folding
+  // iPhone has a tablet-sized window and is a phone — and a browser has no
+  // idiom to read, so the override no longer fires here and the seed is what
+  // decides. Seeding 'driving' at iPad size would print the drive vocabulary
+  // on a device the app does not offer driving on, i.e. a listing screenshot
+  // of something the app does not do.
+  const seedKind = DEV === DEVICES.ipad ? 'listening' : 'driving';
+  await ctx.addInitScript((kind) => {
     // 'none' is the companion listener: no service, so no track, so every mode
     // shows the station's tagline instead of a song.
     localStorage.setItem('cruisefm_platform', 'none');
@@ -103,8 +114,8 @@ async function page() {
     // the app, which is how a harness passes while testing nothing.
     localStorage.setItem('cruisefm_intro_seen', '1');
     localStorage.setItem('cruise_appearance', 'dark');
-    localStorage.setItem('cruisefm_session_kind', 'driving');
-  });
+    localStorage.setItem('cruisefm_session_kind', kind);
+  }, seedKind);
   const p = await ctx.newPage();
   p.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
   await p.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 240000 });

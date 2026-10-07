@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
-import { Dimensions } from 'react-native';
 
-import { isTabletSize } from '@/constants/theme';
+import { isTabletDevice } from '@/constants/theme';
 
 /**
  * Driving, or just listening.
@@ -37,34 +36,30 @@ let cached: SessionKind | null = null;
  * It is never in a car, never mounted on a dash — it is a stationary screen,
  * so the honest answer is always 'listening' and there is no question to ask.
  *
- * SAME SIGNAL theme.ts ALREADY TRUSTS for "is this a tablet, not a phone":
- * the widest iPhone this app runs on is 440pt on its SHORTER edge and the
- * smallest iPad clears 700pt on its, so comparing shorter edges can never
- * mistake one for the other whichever way the device is held — and no
- * separate definition of "iPad" to keep in step. It used to compare the
- * WIDTH, which is the same test only while the app is pinned upright; it no
- * longer is (14.09).
+ * ASK THE DEVICE, NOT THE WINDOW — AND THE IPHONE DUO IS WHY.
+ *
+ * This used to measure the window's shorter edge against theme.ts's
+ * `WIDE_MIN`, on the stated grounds that no iPhone's shorter edge comes near
+ * 700 while every iPad's clears it. Apple then announced a FOLDING iPhone
+ * (the Duo, 7.6in unfolded), i.e. a phone with a tablet-sized screen — and
+ * on that device the measurement would have answered "tablet" and so
+ * answered 'listening' for good, taking the driving question away from the
+ * one new iPhone most likely to end up on a dash. The drives would still
+ * have happened; they would simply have stopped being COUNTED as drives,
+ * which is the quietest way for this file to be wrong.
+ *
+ * `isTabletDevice()` asks iOS's own `userInterfaceIdiom` instead, which says
+ * phone on a foldable however big it is opened. Note the test is a DEVICE
+ * fact rather than a window measurement, so unlike the old one it does not
+ * need re-reading after a rotation OR a fold — there is nothing about it a
+ * resize can change.
  *
  * WHY THE OVERRIDE LIVES HERE rather than as a prop threaded down from a
  * component: `cachedSessionKind()` is read from a dozen places with no
  * window to hand it — widgets, notifications, the drive stats strip — so the
  * one place they all already funnel through is the one place this has to be
- * decided. `Dimensions.get`, not `useWindowDimensions`, because this file has
- * no component to hook from; it never needs to react to rotation since an
- * iPad's shorter edge never dips below the threshold either way.
+ * decided.
  */
-function isIPadWindow(): boolean {
-  try {
-    const { width, height } = Dimensions.get('window');
-    // THE SHORTER EDGE, not the width: a phone turned sideways is over 900
-    // points wide, and since every mode can now be landscape that is a real
-    // window this can be asked about — a phone would have been quietly
-    // recorded as a tablet and never asked the question. See isTabletSize.
-    return isTabletSize(width, height);
-  } catch {
-    return false;
-  }
-}
 
 /**
  * The remembered answer, or null if they have never been asked.
@@ -74,7 +69,7 @@ function isIPadWindow(): boolean {
  * no change needed in that file at all.
  */
 export async function loadSessionKind(): Promise<SessionKind | null> {
-  if (isIPadWindow()) { cached = 'listening'; return cached; }
+  if (isTabletDevice()) { cached = 'listening'; return cached; }
   try {
     const raw = await AsyncStorage.getItem(KEY);
     cached = raw === 'driving' || raw === 'listening' ? raw : null;
@@ -94,7 +89,7 @@ export async function loadSessionKind(): Promise<SessionKind | null> {
  * wrong even for a single frame before a load has run).
  */
 export function cachedSessionKind(): SessionKind {
-  if (isIPadWindow()) return 'listening';
+  if (isTabletDevice()) return 'listening';
   return cached ?? 'driving';
 }
 

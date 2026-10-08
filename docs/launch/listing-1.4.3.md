@@ -44,7 +44,7 @@ order of how much they are worth against how much they cost:
 | 1 | **Keywords** | 93 of 100 characters used; the word **widget** appears in no indexed field at all, and `widget,` is exactly 7 characters | **YES — free, zero risk** |
 | 2 | **Screenshots** | Not one of the ten shows a widget; position 3 is a viewfinder | **YES — see §5** |
 | 3 | **Subtitle** | 27 of 30 characters, unchanged since launch, and most of them are not search terms | **Her call — see §3** |
-| 4 | App name | Changed one week ago | **No. Leave it.** |
+| 4 | **App name** | 26 of 30; `Visuals` is a word nobody searches, and the subtitle repeats it | **YES, revisited 08.10 — see §4** |
 | 5 | Subscription display names | Indexed, and currently "Premium Monthly" / "Premium Annual" | Minor. See §7. |
 
 ---
@@ -155,8 +155,15 @@ costs a slot" were left for a word worth having, and this is one.
 
 **The two standing rules still hold** and nothing here breaks them: no word is
 repeated from the name (*cruise, fm, driving, visuals*) or the subtitle
-(*music, drive, feels*), and there are no phrases — Apple splits on commas and
-spaces and forms the combinations itself.
+(*visual, music, player* — **corrected 08.10**; this paragraph was written
+against the subtitle these notes wrongly believed was live), and there are no
+phrases — Apple splits on commas and spaces and forms the combinations itself.
+
+> **AND THIS PASTE BLOCK DEPENDS ON §4 — READ THAT FIRST.** If the name change
+> is taken, `visualizer` moves into the name and **must come out of the keyword
+> field in the same sitting**, which frees 11 characters rather than 7 and
+> changes the block to paste. §4 carries the version to use in that case. If the
+> name is left alone, the block above is the one.
 
 ---
 
@@ -241,20 +248,69 @@ same sitting**, because *widget* and *turntable* would then be repeats and
 
 ---
 
-## 4. App name — leave it
+## 4. App name — RECOMMENDED, and it is the cheapest edit on the page
 
 ```
-Cruise FM: Driving Visuals
+Cruise FM: Driving Visualizer
 ```
 
-26 of 30, four spare. `Cruise FM: Driving Visualizer` would fit (29) and would
-put the much higher-volume *visualizer* into the highest-weighted field, freeing
-11 characters in the keywords.
+29 of 30. **This section said "leave it" on 01.10 and that is reversed here, on
+two arguments that did not exist then** rather than on a change of taste.
 
-**Do not do it now.** The name was only applied with 1.4.2, released 24.09 —
-one week ago. Changing it again throws away whatever ranking it has started to
-accrue and confuses anyone who has just seen it. Revisit in a few months with
-evidence, not a week later on a hunch.
+**What it buys.** It swaps `Visuals` — a word almost nobody types into a search
+box — for **`visualizer`, which is the category's actual search term**, and it
+does so in the single highest-weighted field in the store. It keeps `Driving`,
+which since 15.09 is carried by the name **alone** (that round took it out of
+the keyword field precisely because it moved into the name). `Cruise FM` is
+untouched, so nobody loses the app.
+
+**New argument 1: it fixes the subtitle for free.** Apple matches plurals, so
+`Visuals` in the name and `Visual` in the live subtitle are **one term today,
+sitting in two slots**. `visualizer` and `visual` are different words, so the
+moment the name carries `Visualizer` the subtitle's first word stops being a
+repeat and starts earning its slot — with the best-written line on the page
+left exactly as it is. One edit, two fields fixed, no taste call required.
+
+**New argument 2: the ranking this would throw away has never existed where it
+matters.** 01.10's whole objection was that the name was a week old and should
+be left to accrue. It is a fortnight now — and **the EU has been dark the entire
+time**, so whatever the name has accrued, it has accrued in zero of the 27
+storefronts that represent the largest market this app has never reached. There
+is no European ranking to protect because there has been no European listing.
+
+**The keyword field moves in the same sitting — this is not optional.**
+`visualizer` is in the keyword field today, and a word in the name AND the
+keywords is a slot thrown away (15.09's rule, and the reason this round keeps
+restating it). Removing `visualizer,` takes the field from 93 to **82**, which
+buys the planned `widget` **and** a second real term:
+
+```
+road,trip,equalizer,mood,night,cassette,vinyl,car,radio,retro,aesthetic,visualiser,widget,turntable
+```
+
+99 of 100. `turntable` is in no indexed field, the app has a Vinyl deck and a
+drawn turntable in its widgets, and `dashboard` is the alternative if that reads
+better. **The British spelling stays in the keywords and the American goes in
+the name**: Apple does not map the two, the US is the biggest storefront, and
+Australia reads either — so each spelling sits where it is worth most. A name
+carrying `Visualiser` would be the same trade run backwards.
+
+**Two candidates named so nobody re-proposes them.** `Cruise FM: Music
+Visualizer` (27) is the obvious-looking one and `store-listing-next-build.md`
+recommended it once: it is **worse on both counts**, dropping `driving` (which
+nothing else carries) and repeating `music` (which the subtitle already owns) —
+it spends a slot to lose a term. And leaving the name alone while swapping the
+subtitle's first word is a genuine alternative: **`Widget Music Player` is
+exactly 19 characters**, the same as the live line, so it is a one-word swap
+with no reflow — but it spends her copy on a feature list and leaves
+`visualizer` in the weakest of the three fields. Both edits together are
+available and are the maximum; the name alone is the one that costs nothing.
+
+**Nothing in the app changes.** `expo.name` stays `CruiseFM` — that is the label
+under the icon, where iOS truncates at about twelve characters. The listing's
+name is a **version** field typed into App Store Connect, so it goes in with
+1.4.3 alongside the description, keywords, subtitle and screenshots, and after
+Submit it cannot change without another review.
 
 ---
 
@@ -409,16 +465,20 @@ during a review. Park it until 1.4.3 is approved.
 
 ## 8. What to do, in order
 
-1. **Now, with the 1.4.3 submission** — paste the description (§1) and the
-   keywords (§2). Both belong to the version, so this is the sitting for them.
-2. **Now** — decide the subtitle (§3). If it changes, it changes with this
-   version too.
-3. **Before pressing Submit** — take the widget screenshot (§5) so the new
+1. **Now** — decide the **name** (§4). It comes first because it decides which
+   keyword block gets pasted in step 3 and whether the subtitle needs touching
+   at all.
+2. **Now** — decide the subtitle (§3). If the name change is taken, the honest
+   answer here is probably "leave it", because the name fixes its one fault.
+3. **Now, with the 1.4.3 submission** — paste the description (§1) and the
+   keywords (§2, or §4's version if the name changed). All of it belongs to the
+   version, so this is the sitting for it.
+4. **Before pressing Submit** — take the widget screenshot (§5) so the new
    slide goes in with this version. Screenshots belong to the version as well;
    once 1.4.3 is live they cannot be changed without another submission.
-4. **The day it is released** — swap the promotional text (§6). No review, so it
+5. **The day it is released** — swap the promotional text (§6). No review, so it
    can happen the same minute.
-5. **After approval** — the subscription display names (§7), if at all.
+6. **After approval** — the subscription display names (§7), if at all.
 
 **Nothing in this document needs a build.** It is all metadata, and build 72 is
 unaffected by every word of it.

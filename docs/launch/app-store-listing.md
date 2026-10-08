@@ -108,7 +108,16 @@ different forms of one.
 
 > Cruise FM: Driving Visuals
 
-(26 characters.) Decided on 10.08 and then, for five weeks, never actually
+(26 characters, so four are spare.)
+
+> **A CHANGE IS RECOMMENDED FOR 1.4.3 — see `listing-1.4.3.md` §4.**
+> `Cruise FM: Driving Visualizer` (29) puts the category's real search term in
+> the strongest field, frees 11 keyword characters, and — because Apple matches
+> plurals — stops the live subtitle's `Visual` being a repeat of this name's
+> `Visuals`. The 01.10 "leave it" is reversed there on two arguments that did
+> not exist then. **If it is taken, `visualizer` must come out of the keyword
+> field in the same sitting.**
+ Decided on 10.08 and then, for five weeks, never actually
 typed into App Store Connect — the live listing stayed plain `Cruise FM`. It
 goes in with the 1.4.0 submission. The name field is the **highest-weighted** thing in App Store
 search, and the old name spent all of it on the brand — "Cruise FM" is nine

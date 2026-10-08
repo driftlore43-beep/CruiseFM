@@ -20,6 +20,10 @@ whatever is there rather than trying to reconcile the two.
 
 These notes record what was decided and what to paste, never what is live.
 
+**The What's New text is NOT in this file** — it is
+`release-notes-1.4.3.md`, written 08.10, alongside 1.4.0's, 1.4.1's and
+1.4.2's. It goes into the same version page in the same sitting.
+
 ---
 
 ## 0. THE HONEST ANSWER ABOUT ASO, FIRST
@@ -473,12 +477,19 @@ during a review. Park it until 1.4.3 is approved.
 3. **Now, with the 1.4.3 submission** — paste the description (§1) and the
    keywords (§2, or §4's version if the name changed). All of it belongs to the
    version, so this is the sitting for it.
-4. **Before pressing Submit** — take the widget screenshot (§5) so the new
+4. **Now, same sitting** — paste the **What's New** from
+   `release-notes-1.4.3.md`. It is the one field on the page that is about the
+   binary rather than about the listing, and it is the one 1.4.3 did not have
+   written until 08.10.
+5. **Before pressing Submit** — take the widget screenshot (§5) so the new
    slide goes in with this version. Screenshots belong to the version as well;
    once 1.4.3 is live they cannot be changed without another submission.
-5. **The day it is released** — swap the promotional text (§6). No review, so it
+6. **Then** — attach **build 72** and press Submit for Review. The Submit
+   button is what the EU trader paperwork is blocking, so this step may wait on
+   a phone call to Apple rather than on anything here.
+7. **The day it is released** — swap the promotional text (§6). No review, so it
    can happen the same minute.
-6. **After approval** — the subscription display names (§7), if at all.
+8. **After approval** — the subscription display names (§7), if at all.
 
 **Nothing in this document needs a build.** It is all metadata, and build 72 is
 unaffected by every word of it.

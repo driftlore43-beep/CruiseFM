@@ -71,9 +71,12 @@ original 10.08 decision rather than this file's own recommendation, and the
 reason is the keyword rule rather than taste.
 
 `Cruise FM: Music Visualizer` was recommended here on the assumption that the
-**subtitle would change too**. It did not: the subtitle stays
+**subtitle would change too**. It did not at the time: the subtitle stayed
 `Music for how a drive feels`, so a name carrying *Music* would repeat a word
-the subtitle already owns — and Apple indexes the two fields separately and
+the subtitle already owned. **(Corrected 2026-10-08: the live subtitle is now
+`Visual Music Player`, which still carries *music*, so this reasoning holds —
+but it now repeats *Visual(s)* with the name that was chosen instead. See
+AGENTS.md, 08.10.)** — and Apple indexes the two fields separately and
 combines them, so a repeat buys nothing. *Driving Visuals* adds two words the
 subtitle does not have. Keeping a search term is worth more than upgrading one.
 
@@ -86,9 +89,17 @@ subtitle does not have. Keeping a search term is worth more than upgrading one.
 
 ---
 
-## Subtitle (30 characters) — **NOT CHANGED, owner's call 15.09**
+## Subtitle (30 characters) — **NOT CHANGED, owner's call 15.09** — **AND THEN IT WAS, SEE BELOW**
 
-The subtitle stays `Music for how a drive feels`. Everything below is the
+> **CORRECTED 2026-10-08.** The live subtitle is **`Visual Music Player`**
+> (19 of 30), read off the owner's App Information screenshot. This section's
+> claim that it "stays `Music for how a drive feels`" is wrong, as is the
+> line further down calling that value "never applied" — these notes managed
+> to assert both at once, which is how the real value went unnoticed. The
+> argument below is kept as a real argument about a field that has since
+> moved; weigh it against the line that is actually there.
+
+The subtitle was recorded as staying `Music for how a drive feels`. Everything below is the
 argument for changing it, kept because it is a real argument and the decision
 may be revisited on a later version — but it was weighed at the 1.4.0
 submission and deliberately not taken: the current subtitle was chosen for
@@ -104,7 +115,9 @@ words the name could not. With *music* and *visualizer* now spent in the name,
 the four best remaining terms are **vinyl**, **cassette**, **retro** and
 **drive** — all real search terms, all things the app genuinely does.
 
-This replaces "Music for how a drive feels" (never applied either), which was
+This replaces "Music for how a drive feels" (recorded here as never applied,
+and recorded elsewhere in these docs as live — both wrong as of 2026-10-08,
+when the field was found to read `Visual Music Player`), which was
 lovely and spent 27 characters on *music* — already in the name — plus *feels*,
 which nobody searches.
 

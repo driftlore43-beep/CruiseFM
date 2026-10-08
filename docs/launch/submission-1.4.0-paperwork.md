@@ -142,7 +142,7 @@ These three belong to a *version*, so this submission is the moment.
 | Field | Type this |
 |---|---|
 | Name | `Cruise FM: Driving Visuals` |
-| Subtitle | `Music for how a drive feels` *(unchanged)* |
+| Subtitle | `Music for how a drive feels` *(unchanged)* — **stale, corrected 2026-10-08: the live subtitle is now `Visual Music Player`. See AGENTS.md, 08.10.** |
 | Keywords | `road,trip,visualizer,equalizer,mood,night,cassette,vinyl,car,radio,retro,aesthetic,visualiser` |
 
 **The name was decided on 10.08 and never actually typed in** — the live

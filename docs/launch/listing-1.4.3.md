@@ -162,7 +162,36 @@ spaces and forms the combinations itself.
 
 ## 3. Subtitle — the real ASO decision, and it is the owner's
 
-Live (27 of 30):
+> **CORRECTED 2026-10-08, AND EVERYTHING BELOW THIS LINE WAS WRITTEN AGAINST
+> THE WRONG LINE.** The live subtitle is **`Visual Music Player`** (19 of 30),
+> read off the owner's own App Information screenshot — the character counter
+> says 11 remaining, which is exactly 30 − 19, so it is the saved value and not
+> a misread. `Music for how a drive feels` has not been the subtitle for some
+> time and nothing in this repo recorded it changing. The analysis below is
+> kept as the record of what was reasoned on 01.10; read it as being about the
+> line the store used to carry.
+>
+> **WHAT THE REAL LINE COSTS, and it is one word rather than the whole field:**
+> Apple matches plurals, so the subtitle's **`Visual`** and the name's
+> **`Visuals`** are ONE term indexed twice — i.e. the store's second-most-
+> weighted field spends a third of itself on a word the highest-weighted field
+> already owns, with **11 characters spare**. `music` is carried exactly as
+> before, `player` is a genuinely new term, and what was dropped costs nothing
+> by this section's own reading (stop words, a term nobody searches, and
+> *drive*, which the name already carries as *Driving*). Replacing the single
+> word `Visual` with any term not already indexed adds a search term for free
+> and changes nothing else about the line. **Option C below is therefore no
+> longer the only way to improve this field.**
+>
+> **THE KEYWORD FIELD IS CLEAN AGAINST THE NEW LINE** — `visualizer` and
+> `visualiser` are different words rather than plurals of `visual`, so section
+> 2's plan to spend the last 7 characters on `widget` still stands. But if
+> `Visual` is ever swapped for a word the keyword field already carries
+> (`retro`, `radio`, `aesthetic`, `cassette`, `vinyl`), that keyword must come
+> OUT of the field in the same edit.
+
+Live until some point before 2026-10-08, and the line the rest of this section
+is about (27 of 30):
 
 ```
 Music for how a drive feels

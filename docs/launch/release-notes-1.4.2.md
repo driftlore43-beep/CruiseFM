@@ -160,7 +160,7 @@ belongs to a version rather than to the app:
 | Field | Value |
 |---|---|
 | Name | `Cruise FM: Driving Visuals` |
-| Subtitle | `Music for how a drive feels` *(unchanged)* |
+| Subtitle | `Music for how a drive feels` *(unchanged)* — **WRONG, corrected 2026-10-08: the live subtitle is `Visual Music Player`. Nothing here recorded it changing; the screenshot is the authority. See AGENTS.md, 08.10.** |
 | Keywords | `road,trip,visualizer,equalizer,mood,night,cassette,vinyl,car,radio,retro,aesthetic,visualiser` |
 
 **The keywords must move in the same sitting as the name.** Apple indexes the

@@ -27,9 +27,29 @@ time with no review at all.
 
 ## Subtitle (30 characters)
 
+> Visual Music Player
+
+(19 characters, so 11 are spare.)
+
+**CORRECTED 2026-10-08 and the old value is left below, because this file
+asserted the wrong one and that is worth being able to see.** The subtitle was
+recorded here as `Music for how a drive feels` (27 characters) and the live
+field reads `Visual Music Player` — read off the owner's own App Information
+screenshot, whose character counter says 11 remaining, i.e. exactly 30 − 19.
+Nothing in this repo recorded the change, and `store-listing-next-build.md`
+had separately claimed the old line was "never applied", so these notes have
+contradicted each other about this one field for weeks. **App Store Connect is
+the only witness to what is in App Store Connect.**
+
+**AND THE REAL LINE REPEATS A WORD WITH THE NAME**, which rule 1 below exists
+to prevent: Apple matches plurals, so the subtitle's `Visual` and the name's
+`Visuals` are one term indexed twice. `player` is a genuinely new term;
+`music` is carried exactly as the old line carried it. Replacing the single
+word `Visual` with anything not already indexed adds a search term for free.
+
 > Music for how a drive feels
 
-(27 characters.)
+(27 characters — the value this file used to report, kept for the record.)
 
 ## Promotional text (170 characters — editable any time, no review)
 
@@ -65,7 +85,11 @@ it would take.
 1. **Never repeat a word that already appears in the app name or the subtitle.**
    Apple indexes those fields separately and combines them with this one, so a
    repeat buys nothing. The old list carried `drive` and `music`, both of which
-   the subtitle already covers ("Music for how a drive feels").
+   the subtitle covered at the time ("Music for how a drive feels"). **As of
+   2026-10-08 the subtitle is `Visual Music Player`, so the word the keyword
+   field must not repeat is `player`, and `music` is still covered. The name's
+   `Visuals` and the subtitle's `Visual` already break this rule between
+   themselves — see the subtitle section above.**
 2. **Never write phrases.** Apple splits on commas *and* spaces and forms the
    combinations itself, so `road trip` and `night drive` were spending
    characters on words already present. Single words only.

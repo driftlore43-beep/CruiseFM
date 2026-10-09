@@ -273,7 +273,7 @@ same sitting**, because *widget* and *turntable* would then be repeats and
 
 ---
 
-## 4. App name — **DECIDED 09.10. Paste this.**
+## 4. App name — **DECIDED 09.10, AND PASTED IN THE SAME DAY**
 
 ```
 Cruise FM: Driving Visualizer
@@ -283,11 +283,16 @@ Cruise FM: Driving Visualizer
 whats new". **This section said "leave it" on 01.10 and that is reversed here,
 on two arguments that did not exist then** rather than on a change of taste.
 
-> **AND IT IS NOT RECORDED AS LIVE UNTIL SHE SAYS SO.** Decided here means
-> decided here; the name is a field in App Store Connect and only App Store
-> Connect witnesses what is in it. 08.10 found the subtitle these notes had
-> asserted for five read-backs was not the one on the store, and the subtitle
-> field is the reason this warning is in capitals rather than in brackets.
+> **ENTERED 09.10 — owner: "ive pasted it all in."** Which is the only evidence
+> that counts: a field is in App Store Connect when the person at the keyboard
+> says it is, never when this file says it was decided. 08.10 found the
+> subtitle these notes had asserted through five read-backs was not the one on
+> the store, which is why this paragraph exists at all. The name, the keywords,
+> the description and the What's New all went in together, and the subtitle was
+> deliberately left alone.
+>
+> **It is entered, not live.** It goes live when 1.4.3 is released, and 1.4.3
+> is still waiting on the EU trader paperwork for its Submit button.
 
 **What it buys.** It swaps `Visuals` — a word almost nobody types into a search
 box — for **`visualizer`, which is the category's actual search term**, and it
@@ -469,6 +474,29 @@ Ten mood stations, eight modes. Try Premium free for 7 days.
 Leading with "New:" is worth a lot in release week and nothing a month later,
 so it can be swapped back to the line above whenever, with no review.
 
+> **ASKED FOR ON 09.10 AND DELIBERATELY NOT PASTED — owner: "now it need to
+> work on the promotional text."** The line above is written, counted and
+> ready; what is not safe is entering it **today**, and the reason is the one
+> thing that makes this field special. It is the only field that can go live
+> **without review**, which also means it can go live **before 1.4.3 does** —
+> and nothing here can tell from the outside whether saving it on a version
+> that is still waiting to be submitted pushes it to the store now or holds it
+> for release. One of those two outcomes is a problem: a store page that says
+> "New: big Home Screen tiles" above an app whose newest release has none of
+> them is **false metadata**, which is its own rejection (2.3) with nothing
+> wrong in the binary at all.
+>
+> **THE LIVE LINE IS CORRECT TODAY, so there is nothing to fix.** Re-counted
+> out of the code on 09.10 rather than remembered, which is 24.09's rule:
+> `stations.ts` holds **ten** ids and `modeCatalog.ts` holds **eight**, and
+> pinning a widget to a mood genuinely shipped in 1.4.2, which is what the
+> public has. 118 of 170, every claim true.
+>
+> **So: leave it until release day.** The effort that was going to go here is
+> worth more on §8's product page header, which is empty real estate rather
+> than a correct line being rewritten — and, unlike this field, it is not
+> waiting on Apple.
+
 ---
 
 ## 7. The field nobody has used: the subscription names
@@ -495,7 +523,107 @@ during a review. Park it until 1.4.3 is approved.
 
 ---
 
-## 8. What to do, in order
+## 8. The three things Apple put in that blue banner, ranked
+
+Owner, 09.10, with a screenshot of the 1.4.3 page: "Apple has also suggested
+new ways on promoting the app." The banner reads *New Ways to Market Apps* and
+carries three separate things. **All of them are new — Apple turned the
+creative assets on 5 October 2026, four days ago** — so nothing in this
+project has ever used them and there is no house precedent to follow.
+
+**THE ONE FACT THAT MAKES THEM WORTH DOING NOW:** creative assets are
+**submitted and approved independently of an app version**, and they can be
+approved in advance of the update that uses them. So they are the only part of
+this listing that can move while the Submit button is held by the EU trader
+paperwork. Everything else on the page is finished and waiting.
+
+**They show on iOS 27 and iPadOS 27 and later**, and they are **in addition to**
+the screenshots and app previews rather than a replacement for them.
+
+### (a) Product page header — WORTH DOING, and nothing is lost by trying
+
+A wide banner across the top of the product page. There is nothing in that
+space today, so this is **purely additive**: no screenshot is displaced, no
+existing asset is given up, and if it is bad it can be removed.
+
+Specs read off Apple's own page (`developer.apple.com/help/app-store-connect/
+reference/app-information/creative-assets-specifications`) rather than from the
+secondary write-ups, **which disagree with each other**:
+
+| | aspect | resolution | formats |
+|---|---|---|---|
+| image | 21:9 | 3840 × 1646 | .jpeg .jpg .png |
+| image | 16:9 | 5244 × 2950 | **.png only** |
+| video | 21:9 | 3840 × 1646 | .mov .m4v .mp4, 30/60fps, 5–30s |
+
+Apple's design guidance, quoted rather than paraphrased: *"Focus on a single,
+clear idea. Visually dense or cluttered assets dilute your impact."* and *"Be
+sure your focal point artwork is within the center of your composition to
+prevent any unwanted clipping."* Text is allowed but should be *"a short phrase
+that enhances your visual rather than describes it"* — **and it must be
+localised for every supported language**, which is an argument for no text at
+all on an app with one listing language and no translation budget. Banned
+outright: prices, discounts, URLs, copyright symbols, other platforms' logos,
+and any Apple recognition the app has not received.
+
+**21:9 is a shape this app has never drawn.** Every screen it owns is portrait
+and every marketing slide is 1284×2778. A header is therefore a new design
+round rather than a crop of something existing — draw directions, let the
+owner pick, which is how every design round here has gone.
+
+### (b) Search results asset — A TRADE, not an addition. Think before taking it
+
+The same banner offers an asset for the search results row. **This one is not
+free**, and Apple's own best-practices page says why: if you do not use one,
+*"your In-App Events, app previews, and screenshots will appear"* — up to
+**three** screenshots or previews. Supplying a search asset replaces that row
+with **one** image.
+
+That matters more here than it would for most apps, because 01.10 already
+reasoned about exactly this row: positions 1–3 are what Apple puts in search
+results, and that is the stated reason the widget slide was planned for
+position 3. Giving up three app screenshots for one banner is a real decision,
+not a tick-box.
+
+| | aspect | resolution | formats |
+|---|---|---|---|
+| image | 3:2 | 1920×1280 min – 3840×2560 max | .jpeg .jpg .png |
+| image | 16:9 | 5244 × 2950 | **.png only** |
+| video | 3:2 | same range | .mov .m4v .mp4, 30/60fps, 5–30s, **muted and cannot be unmuted** |
+
+**Recommendation: header first, search asset only if the header turns out
+well.** If one is ever made, Apple advises using the same artwork in both so
+the brand reads as one thing.
+
+### (c) iPhone Duo screenshots — OPTIONAL UNTIL APRIL 2027, AND NOT HONEST YET
+
+Apple's own release notes, 5 October 2026: *"Submit your iPhone Duo optimized
+apps and games in App Store Connect today. Starting April 2027, any apps or
+games submitted will need to include screenshots for iPhone Duo."* So it is
+optional for 1.4.3 and **required for whatever is submitted after April 2027**,
+which is roughly six months away.
+
+**DO NOT UPLOAD DUO SCREENSHOTS YET, AND THE REASON IS THIS PROJECT'S OWN
+RULE.** The 07.10 round made the app behave correctly on a foldable —
+`isTabletDevice()` reads iOS's own idiom, so an unfolded Duo is still counted
+as a phone and its drives are still counted as drives — and that same entry
+says plainly what is NOT done: **the nearly-square inner screen is an aspect
+ratio every deck's hero sizing was tuned against 19.5:9 and 4:3 and has never
+been seen on**, and **the widget tiles get sizes nobody has drawn, on two
+screens**, the outer one likely the narrowest window this app has ever been
+handed. Nobody here has a Duo, a Mac or a simulator.
+
+A screenshot is a claim about how the app looks on a device. Taking that
+picture before anyone has run it on one would be inventing the claim — the
+same class of thing this project has spent months deleting (a clock running
+over silence, a scene animating over nothing, a notification naming a station
+that was off air). **The order is: see it on a Duo, fix what the square screen
+breaks, then photograph it.** The device goes on sale 23.10 and the deadline
+is April; there is no reason to run that backwards.
+
+---
+
+## 9. What to do, in order
 
 1. ~~Decide the name~~ — **done 09.10: the change is taken** (§4),
    `Cruise FM: Driving Visualizer`. It had to come first because it decides
@@ -503,23 +631,30 @@ during a review. Park it until 1.4.3 is approved.
 2. ~~Decide the subtitle~~ — **settled by step 1: leave it alone** (§3).
    `Visual Music Player` stops being a repeat the moment the name carries
    `Visualizer`, so the best-written line on the page needs no edit at all.
-3. **Now, with the 1.4.3 submission** — paste the **name** (§4), the
-   **keywords** (§4's 99-character block, *not* §2's), and the **description**
-   (§1). All four fields belong to the version, so this is the one sitting for
-   them, and the keywords must go in alongside the name rather than after it.
-4. **Now, same sitting** — paste the **What's New** from
-   `release-notes-1.4.3.md`. It is the one field on the page that is about the
-   binary rather than about the listing, and it is the one 1.4.3 did not have
-   written until 08.10.
+3. ~~Paste the name, keywords and description~~ — **done 09.10**
+   (owner: "ive pasted it all in"). All of it belongs to the version, so it
+   went in one sitting, with the keywords alongside the name rather than after.
+4. ~~Paste the What's New~~ — **done 09.10, same sitting**, from
+   `release-notes-1.4.3.md`.
 5. **Before pressing Submit** — take the widget screenshot (§5) so the new
    slide goes in with this version. Screenshots belong to the version as well;
    once 1.4.3 is live they cannot be changed without another submission.
 6. **Then** — attach **build 72** and press Submit for Review. The Submit
    button is what the EU trader paperwork is blocking, so this step may wait on
    a phone call to Apple rather than on anything here.
-7. **The day it is released** — swap the promotional text (§6). No review, so it
-   can happen the same minute.
-8. **After approval** — the subscription display names (§7), if at all.
+7. **The day it is released — and NOT before** — swap the promotional text
+   (§6). No review, so it can happen the same minute; entered early it risks
+   advertising tiles the store has not got yet. The live line is correct in the
+   meantime and was re-counted against the code on 09.10.
+8. **Available right now, and the only thing here that is** — the product page
+   header (§8a). Creative assets are approved independently of an app version,
+   so this does not wait on the trader paperwork and the trader paperwork does
+   not wait on it.
+9. **Not yet** — the search results asset (§8b), which costs three screenshots
+   to gain one banner, and **iPhone Duo screenshots** (§8c), which are optional
+   until April 2027 and should follow somebody actually seeing the app on a Duo
+   rather than precede it.
+10. **After approval** — the subscription display names (§7), if at all.
 
 **Nothing in this document needs a build.** It is all metadata, and build 72 is
 unaffected by every word of it.

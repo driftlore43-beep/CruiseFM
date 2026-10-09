@@ -460,19 +460,34 @@ always carry whatever shipped most recently.
 Live (applied 24.09):
 
 ```
-Ten mood stations, eight full-screen modes, and widgets you can pin to the
-mood you want. Try Premium free for 7 days.
+Ten mood stations, eight full-screen modes, and widgets you can pin to the mood you want. Try Premium free for 7 days.
 ```
 
 For 1.4.3 (**135 of 170**):
 
 ```
-New: big Home Screen tiles — a full turntable, a CD window, a torn ticket.
-Ten mood stations, eight modes. Try Premium free for 7 days.
+New: big Home Screen tiles — a full turntable, a CD window, a torn ticket. Ten mood stations, eight modes. Try Premium free for 7 days.
 ```
 
 Leading with "New:" is worth a lot in release week and nothing a month later,
 so it can be swapped back to the line above whenever, with no review.
+
+**BOTH BLOCKS ABOVE ARE ONE UNWRAPPED LINE EACH AND MUST STAY THAT WAY — DO
+NOT RE-WRAP THEM TO FIT AN EDITOR.** They were hard-wrapped at ~74 columns
+when this section was written and corrected on 09.10, because **App Store
+Connect keeps the line breaks you paste**: wrapped, this would have arrived on
+the live product page with a break mid-sentence, directly after the full stop
+following "ticket." That is the 01.10 round's finding about the description and
+the 09.10 round's about the What's New, now hit a **third** time in the field
+immediately above them — a lesson recorded against one field does not transfer
+itself to the next one.
+
+**EVERY CLAIM RE-VERIFIED OUT OF THE CODE ON 09.10 RATHER THAN RECALLED**,
+which is 24.09's rule: `stations.ts` holds **ten** ids, `modeCatalog.ts` holds
+**eight**, and all three named tiles genuinely exist at `.systemLarge` — the
+turntable is the Mode widget's Record look, the CD window and the torn ticket
+are Last Played's `cdPlayer` and `stub` looks, each declared on a
+`supportedFamilies` list that includes `.systemLarge`. 135 of 170.
 
 > **ASKED FOR ON 09.10 AND DELIBERATELY NOT PASTED — owner: "now it need to
 > work on the promotional text."** The line above is written, counted and

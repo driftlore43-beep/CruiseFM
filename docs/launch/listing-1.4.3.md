@@ -571,6 +571,31 @@ and every marketing slide is 1284×2778. A header is therefore a new design
 round rather than a crop of something existing — draw directions, let the
 owner pick, which is how every design round here has gone.
 
+> **BUILT 09.10 — the file is `screenshots-header/product-page-header.jpg`,
+> 3840 × 1646.** Five directions were drawn at Apple's real size and the owner
+> picked **C2**: five phones in a shallow arc, each showing a visibly different
+> object (tape, disc, mirror ball, record, sun), the Mirror Ball centre and
+> largest so the focal point sits dead centre as Apple's guidance asks, on that
+> station's own blurred photograph so the banner reads as one place rather than
+> a collage. **No text at all** — which is the localisation rule answered by not
+> taking it on. Rebuild with `node scripts/marketing/header.mjs`; the four
+> rejected directions are named in that file's own header so nobody re-proposes
+> them.
+>
+> **IT IS A JPEG ON PURPOSE AND THAT IS STRUCTURAL.** Apple's spec says in as
+> many words that *"images can't include alpha channels or transparency"*, and a
+> browser screenshot is RGBA by default — a JPEG cannot carry an alpha channel
+> at all, so the rule is satisfied by construction rather than by a check that
+> has to keep passing. Measured against a lossless render of the same frame
+> before being trusted, because this image is mostly smooth dark gradient, which
+> is JPEG's worst case: mean error **0.6 of 255**, and the dark ground alone
+> maxes at **4**. Its largest single-pixel step across that gradient is smaller
+> than the lossless render's, i.e. it introduces no banding. 0.74 MB against the
+> PNG's 3.5.
+>
+> **UPLOAD IT UNDER Product Page Information → Header**, and nothing here is
+> recorded as live until the page shows it.
+
 ### (b) Search results asset — A TRADE, not an addition. Think before taking it
 
 The same banner offers an asset for the search results row. **This one is not
@@ -647,9 +672,12 @@ is April; there is no reason to run that backwards.
    advertising tiles the store has not got yet. The live line is correct in the
    meantime and was re-counted against the code on 09.10.
 8. **Available right now, and the only thing here that is** — the product page
-   header (§8a). Creative assets are approved independently of an app version,
-   so this does not wait on the trader paperwork and the trader paperwork does
-   not wait on it.
+   header (§8a), which is **drawn and waiting at
+   `screenshots-header/product-page-header.jpg`**. Upload it under Product Page
+   Information → Header. Creative assets are approved independently of an app
+   version, so this does not wait on the trader paperwork and the trader
+   paperwork does not wait on it — it is the one thing on this page that can
+   move today.
 9. **Not yet** — the search results asset (§8b), which costs three screenshots
    to gain one banner, and **iPhone Duo screenshots** (§8c), which are optional
    until April 2027 and should follow somebody actually seeing the app on a Duo

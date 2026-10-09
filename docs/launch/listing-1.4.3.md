@@ -552,7 +552,7 @@ secondary write-ups, **which disagree with each other**:
 
 | | aspect | resolution | formats |
 |---|---|---|---|
-| image | 21:9 | 3840 × 1646 | .jpeg .jpg .png |
+| image | 21:9 | 3840 × 1646 | .jpeg .jpg .png — **BUT SEE BELOW: the slot refuses JPEG** |
 | image | 16:9 | 5244 × 2950 | **.png only** |
 | video | 21:9 | 3840 × 1646 | .mov .m4v .mp4, 30/60fps, 5–30s |
 
@@ -571,8 +571,8 @@ and every marketing slide is 1284×2778. A header is therefore a new design
 round rather than a crop of something existing — draw directions, let the
 owner pick, which is how every design round here has gone.
 
-> **BUILT 09.10 — the file is `screenshots-header/product-page-header.jpg`,
-> 3840 × 1646.** Five directions were drawn at Apple's real size and the owner
+> **BUILT 09.10 — the file is `screenshots-header/product-page-header.png`,
+> 3840 × 1646, RGB.** Five directions were drawn at Apple's real size and the owner
 > picked **C2**: five phones in a shallow arc, each showing a visibly different
 > object (tape, disc, mirror ball, record, sun), the Mirror Ball centre and
 > largest so the focal point sits dead centre as Apple's guidance asks, on that
@@ -582,16 +582,39 @@ owner pick, which is how every design round here has gone.
 > rejected directions are named in that file's own header so nobody re-proposes
 > them.
 >
-> **IT IS A JPEG ON PURPOSE AND THAT IS STRUCTURAL.** Apple's spec says in as
-> many words that *"images can't include alpha channels or transparency"*, and a
-> browser screenshot is RGBA by default — a JPEG cannot carry an alpha channel
-> at all, so the rule is satisfied by construction rather than by a check that
-> has to keep passing. Measured against a lossless render of the same frame
-> before being trusted, because this image is mostly smooth dark gradient, which
-> is JPEG's worst case: mean error **0.6 of 255**, and the dark ground alone
-> maxes at **4**. Its largest single-pixel step across that gradient is smaller
-> than the lossless render's, i.e. it introduces no banding. 0.74 MB against the
-> PNG's 3.5.
+> **CORRECTED THE SAME DAY — IT IS A PNG, BECAUSE APP STORE CONNECT REFUSES A
+> JPEG HERE WHATEVER ITS OWN DOCUMENTATION SAYS.** It shipped as a JPEG first,
+> on the strength of the table above, which is quoted accurately off Apple's
+> help page: the 21:9 size's *"Supported extensions"* really are listed as
+> *".jpeg, .jpg, or .png"*, with PNG-only reserved for the 16:9 5244 × 2950.
+> The Header slot answered **"file has an invalid extension"** anyway. Two
+> independent write-ups report the identical split — the help page says JPEG,
+> the live catalog accepts PNG only — so this is Apple's documentation
+> disagreeing with Apple's implementation rather than anything wrong with the
+> file. **THE SLOT IS THE AUTHORITY AND THE SPEC IS NOT**, which is this repo's
+> own most-repeated lesson in a new place: a conclusion reasoned off a
+> specification is worth nothing once the actual output contradicts it. The old
+> paragraph is corrected forward rather than deleted, because the reasoning it
+> carried was sound and the premise was not.
+>
+> **WHICH MOVES THE ALPHA RULE FROM STRUCTURAL TO ENFORCED, and that is the one
+> thing worth watching.** Apple's spec says *"images can't include alpha
+> channels or transparencies"*. A JPEG cannot carry one at all, so that was
+> satisfied by construction — whereas **a browser screenshot is RGBA by
+> default**, so a PNG can carry one by accident. The builder therefore flattens
+> the frame to RGB **unconditionally** (no test first: "it happened to come out
+> RGB" is exactly the shape of a thing that is fine until it is not) and then
+> reads the colour type back out of the PNG's own IHDR, **failing with a
+> non-zero exit** if it is anything but 2. Gating the build rather than warning,
+> so it cannot quietly rot.
+>
+> **THE JPEG MEASUREMENTS ARE KEPT because they were real and they may matter
+> again** — if a future Apple slot does take JPEG, this frame survives it: mean
+> error **0.6 of 255** against a lossless render, the dark ground alone maxing
+> at **4**, and a largest single-pixel step across that gradient *smaller* than
+> the lossless render's, i.e. no banding introduced. It was 0.74 MB against the
+> PNG's ~3.4; the PNG is what ships, and Apple states no size limit for this
+> asset.
 >
 > **UPLOAD IT UNDER Product Page Information → Header**, and nothing here is
 > recorded as live until the page shows it.
@@ -673,7 +696,7 @@ is April; there is no reason to run that backwards.
    meantime and was re-counted against the code on 09.10.
 8. **Available right now, and the only thing here that is** — the product page
    header (§8a), which is **drawn and waiting at
-   `screenshots-header/product-page-header.jpg`**. Upload it under Product Page
+   `screenshots-header/product-page-header.png`**. Upload it under Product Page
    Information → Header. Creative assets are approved independently of an app
    version, so this does not wait on the trader paperwork and the trader
    paperwork does not wait on it — it is the one thing on this page that can

@@ -51,9 +51,11 @@ example
 # app.json's icon and the target config.
 /targets/*/Assets.xcassets
 
-# The product page header's DELIVERABLE (product-page-header.jpg) is committed,
+# The product page header's DELIVERABLE (product-page-header.png) is committed,
 # like every other listing asset — it is the file Apple approves, and if the
 # builder ever drifts, the committed image is what was actually uploaded. The
-# lossless reference PNG is only ever a yardstick for the JPEG's quality and is
-# five times the size, so it is not.
+# -ref copy is the unflattened screenshot, kept only as a yardstick, so it is
+# not. NOTE this pattern deliberately matches *-ref.png and not *.png: the
+# deliverable is itself a PNG since 09.10, when the Header slot turned out to
+# refuse JPEG despite Apple's own spec listing it.
 screenshots-header/*-ref.png

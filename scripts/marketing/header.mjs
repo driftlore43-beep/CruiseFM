@@ -35,20 +35,32 @@
  * placed at 420-600px inside a 3840 banner, i.e. downscaled. Never the other
  * way round.
  *
- * JPEG, NOT PNG, AND THAT IS STRUCTURAL: Apple's spec says in as many words
- * that "images can't include alpha channels or transparency", and a browser
- * screenshot is RGBA by default. A JPEG cannot carry an alpha channel at all,
- * so the rule is satisfied by construction rather than by a check that has to
- * keep passing. The 21:9 size accepts .jpeg/.jpg/.png; only the 16:9
- * 5244x2950 is PNG-only. Quality is measured against a lossless render below,
- * because this image is mostly smooth dark gradient, which is JPEG's worst
- * case for banding.
+ * PNG, AND THE REASON IS A CORRECTION RATHER THAN A PREFERENCE (09.10, same
+ * day): this shipped as a JPEG first, on the strength of Apple's own help
+ * page, which lists the 21:9 size's supported extensions as ".jpeg, .jpg, or
+ * .png" and reserves PNG-only for the 16:9 5244x2950. THE UPLOAD SLOT REFUSED
+ * IT — "file has an invalid extension" — so App Store Connect contradicts its
+ * own documentation here, and two independent write-ups report the identical
+ * split (the help page says JPEG, the live catalog says PNG only). THE SLOT IS
+ * THE AUTHORITY AND THE DOCUMENTATION IS NOT, which is this repo's own oldest
+ * lesson arriving at a new door: when a conclusion reasoned from a spec is
+ * contradicted by the actual output, the output wins and the spec gets a note.
+ *
+ * WHICH MOVES THE ALPHA RULE FROM STRUCTURAL TO ENFORCED, and that is worth
+ * saying plainly. Apple's spec says "images can't include alpha channels or
+ * transparencies"; a JPEG cannot carry one at all, so that was satisfied by
+ * construction, whereas a browser screenshot is RGBA BY DEFAULT. So the frame
+ * is flattened to RGB unconditionally after it is written, and the colour type
+ * is then read back out of the PNG's own IHDR with a NON-ZERO EXIT if it is
+ * anything but 2. Unconditional, so there is no branch to skip; and gating the
+ * build rather than warning, so it cannot quietly rot.
  *
  *   node scripts/marketing/header.mjs
  *   PLAYWRIGHT_MODULE=<scratchpad>/node_modules/playwright-core/index.mjs ...
- *   REF=1 node scripts/marketing/header.mjs   # also write the lossless PNG
+ *   REF=1 node scripts/marketing/header.mjs   # also keep an unflattened copy
  */
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 
@@ -116,25 +128,35 @@ const p = await (await br.newContext({
 await p.setContent(`<!doctype html><meta charset="utf-8">${html}`, { waitUntil: 'load' });
 await p.waitForTimeout(400);
 
-const jpg = `${OUT}/product-page-header.jpg`;
-await p.screenshot({ path: jpg, type: 'jpeg', quality: 96 });
-if (process.env.REF) await p.screenshot({ path: `${OUT}/product-page-header-ref.png` });
+const png = `${OUT}/product-page-header.png`;
+await p.screenshot({ path: png });
+if (process.env.REF) await p.screenshot({ path: `${OUT}/product-page-header-ref.png`, type: 'png' });
 
-// Measure what is actually on disk rather than what was asked for. A JPEG's
-// SOF0 marker carries its real dimensions; if Apple ever rejects this, the
-// first question is whether the file is the size the slot wants.
-const buf = fs.readFileSync(jpg);
-let w = 0, h = 0;
-for (let i = 2; i < buf.length - 9;) {
-  if (buf[i] !== 0xff) { i++; continue; }
-  const m = buf[i + 1];
-  if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
-    h = buf.readUInt16BE(i + 5); w = buf.readUInt16BE(i + 7); break;
-  }
-  i += 2 + buf.readUInt16BE(i + 2);
+// FLATTEN TO RGB UNCONDITIONALLY. Chromium may emit either colour type for an
+// opaque page and "it happened to come out RGB" is exactly the shape of a
+// thing that is fine until it is not, so this does not test first.
+const flat = spawnSync('python3', ['-c',
+  'import sys;from PIL import Image;p=sys.argv[1];Image.open(p).convert("RGB").save(p,optimize=True)',
+  png], { encoding: 'utf-8' });
+if (flat.status !== 0) {
+  console.error('could not flatten to RGB (needs python3 + PIL):\n' + (flat.stderr || flat.error));
+  process.exit(1);
 }
-const ok = w === 3840 && h === 1646;
-console.log(`${jpg}  ${w}x${h}  ${(buf.length / 1048576).toFixed(2)} MB  ${ok ? 'OK' : 'WRONG SIZE'}`);
-if (!ok) process.exitCode = 1;
 
-await br.close();
+// Measure what is actually on disk rather than what was asked for. A PNG's
+// IHDR carries its real dimensions and its colour type: 2 is truecolour RGB,
+// 6 is truecolour + alpha, which Apple refuses.
+const buf = fs.readFileSync(png);
+const sig = buf.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
+const w = sig ? buf.readUInt32BE(16) : 0;
+const h = sig ? buf.readUInt32BE(20) : 0;
+const colourType = sig ? buf[25] : -1;
+const mb = (buf.length / 1048576).toFixed(2);
+
+const bad = [];
+if (!sig) bad.push('not a PNG');
+if (w !== 3840 || h !== 1646) bad.push(`wrong size ${w}x${h}, wanted 3840x1646`);
+if (colourType !== 2) bad.push(`colour type ${colourType}, wanted 2 (RGB, no alpha)`);
+
+console.log(`${png}  ${w}x${h}  colour type ${colourType}  ${mb} MB  ${bad.length ? 'FAILED: ' + bad.join('; ') : 'OK'}`);
+if (bad.length) process.exitCode = 1;

@@ -110,14 +110,21 @@ different forms of one.
 
 (26 characters, so four are spare.)
 
-> **A CHANGE IS RECOMMENDED FOR 1.4.3 — see `listing-1.4.3.md` §4.**
-> `Cruise FM: Driving Visualizer` (29) puts the category's real search term in
-> the strongest field, frees 11 keyword characters, and — because Apple matches
-> plurals — stops the live subtitle's `Visual` being a repeat of this name's
-> `Visuals`. The 01.10 "leave it" is reversed there on two arguments that did
-> not exist then. **If it is taken, `visualizer` must come out of the keyword
-> field in the same sitting.**
- Decided on 10.08 and then, for five weeks, never actually
+> **SUPERSEDED — DECIDED 09.10 FOR 1.4.3: the name becomes
+> `Cruise FM: Driving Visualizer`** (29 of 30). See `listing-1.4.3.md` §4 for
+> the paste block and the full reasoning. It puts the category's real search
+> term in the strongest field, frees 11 keyword characters, and — because Apple
+> matches plurals — stops the live subtitle's `Visual` being a repeat of this
+> name's `Visuals`, which is why the subtitle needs no edit of its own. The
+> 01.10 "leave it" is reversed there on two arguments that did not exist then.
+> **`visualizer` comes out of the keyword field in the same sitting** — a word
+> in the name and the keywords is a slot thrown away.
+>
+> **The line above it is what this file believed was live, and this file is not
+> a witness.** Nothing here is recorded as applied until the owner confirms the
+> App Store Connect page, which is the 08.10 subtitle lesson.
+
+Decided on 10.08 and then, for five weeks, never actually
 typed into App Store Connect — the live listing stayed plain `Cruise FM`. It
 goes in with the 1.4.0 submission. The name field is the **highest-weighted** thing in App Store
 search, and the old name spent all of it on the brand — "Cruise FM" is nine

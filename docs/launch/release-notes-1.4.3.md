@@ -46,29 +46,29 @@ rewrite, the sweeps, and the trader paperwork.
 
 ## Use this
 
+**Every paragraph and every bullet below is ONE unwrapped line, deliberately.**
+App Store Connect keeps the line breaks you paste, so a block hard-wrapped at
+80 columns for readability arrives on the update screen with ragged breaks in
+the middle of sentences. 01.10 caught that in the description's paste block;
+this file was written wrapped on 08.10 and fixed on 09.10, which is the same
+mistake in the same week in a second field. **Do not re-wrap these to fit a
+text editor.**
+
 ```
 Cruise FM widgets come in a large size now.
 
-Press and hold your Home Screen, add a large Cruise FM tile, then press and
-hold the tile itself to choose its look. The record becomes a whole
-turntable with a tonearm and silver keys, the CD player becomes a full
-window, and the ticket stub gains the album cover.
+Press and hold your Home Screen, add a large Cruise FM tile, then press and hold the tile itself to choose its look. The record becomes a whole turntable with a tonearm and silver keys, the CD player becomes a full window, and the ticket stub gains the album cover.
 
 Also in this update:
-• The deck under the big record is painted in the colour of whatever album
-  is on the label, so the tile changes with the song
-• The big CD window and the ticket stub are laid out for every iPhone size
-  rather than one
+• The deck under the big record is painted in the colour of whatever album is on the label, so the tile changes with the song
+• The big CD window and the ticket stub are laid out for every iPhone size rather than one
 • More detail on the record's grooves and the CD's case
 ```
 
 ## Shorter, if you prefer
 
 ```
-Widgets in a large size. Press and hold your Home Screen, add a large Cruise
-FM tile, then press and hold the tile to choose its look: a turntable with a
-real tonearm, a full CD player window, or a ticket stub carrying the album
-cover.
+Widgets in a large size. Press and hold your Home Screen, add a large Cruise FM tile, then press and hold the tile to choose its look: a turntable with a real tonearm, a full CD player window, or a ticket stub carrying the album cover.
 ```
 
 ---

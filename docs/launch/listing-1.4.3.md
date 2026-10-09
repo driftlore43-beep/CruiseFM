@@ -139,7 +139,10 @@ Live (93 of 100):
 road,trip,visualizer,equalizer,mood,night,cassette,vinyl,car,radio,retro,aesthetic,visualiser
 ```
 
-Paste this instead (**100 of 100**):
+**SUPERSEDED 09.10 — paste §4's block, not this one.** This is the block for a
+name that is *not* changing, and the name **is** changing. It is kept because
+the reasoning under it is why `widget` earns a slot at all, and that reasoning
+survives into §4's version:
 
 ```
 road,trip,visualizer,equalizer,mood,night,cassette,vinyl,car,radio,retro,aesthetic,visualiser,widget
@@ -163,15 +166,33 @@ repeated from the name (*cruise, fm, driving, visuals*) or the subtitle
 against the subtitle these notes wrongly believed was live), and there are no
 phrases — Apple splits on commas and spaces and forms the combinations itself.
 
-> **AND THIS PASTE BLOCK DEPENDS ON §4 — READ THAT FIRST.** If the name change
-> is taken, `visualizer` moves into the name and **must come out of the keyword
-> field in the same sitting**, which frees 11 characters rather than 7 and
-> changes the block to paste. §4 carries the version to use in that case. If the
-> name is left alone, the block above is the one.
+> **RESOLVED 09.10 — THE NAME CHANGE IS TAKEN, SO §4's BLOCK IS THE ONE TO
+> PASTE.** `visualizer` moves into the name and therefore **comes out of the
+> keyword field in the same sitting** — that is 15.09's rule and it is not
+> optional. Removing it frees 11 characters rather than 7, which buys `widget`
+> **and** `turntable`. There is now exactly one keyword block to paste and it
+> is in §4; the 100-character block above is the record of a decision that was
+> overtaken, not an alternative.
 
 ---
 
-## 3. Subtitle — the real ASO decision, and it is the owner's
+## 3. Subtitle — **SETTLED 09.10: leave it alone.** The reasoning is kept below
+
+> **RESOLVED 09.10 BY THE NAME CHANGE, AT NO COST.** The subtitle stays
+> **`Visual Music Player`** and needs no edit. Its one fault was that `Visual`
+> was a plural-match of the name's `Visuals`, i.e. one term in two of the three
+> indexed fields — and §4's name change replaces `Visuals` with
+> **`Visualizer`**, which is a different WORD rather than a plural, so the
+> repeat disappears and the subtitle's first word starts earning its slot. The
+> best-written line on the page is left exactly as the owner wrote it, which is
+> the brand call 01.10 settled was hers. **One edit, two fields fixed.**
+>
+> **AND OPTION C IS NOW MORE EXPENSIVE THAN IT LOOKS BELOW.** `Music widgets &
+> turntable deck` would repeat **both** `widget` AND `turntable`, because the
+> keyword field gained them in the same 09.10 edit — so taking C means pulling
+> two keywords out in the same sitting rather than one. It is still available
+> and it is still a brand decision; it simply costs two slots now instead of
+> one.
 
 > **CORRECTED 2026-10-08, AND EVERYTHING BELOW THIS LINE WAS WRITTEN AGAINST
 > THE WRONG LINE.** The live subtitle is **`Visual Music Player`** (19 of 30),
@@ -252,14 +273,21 @@ same sitting**, because *widget* and *turntable* would then be repeats and
 
 ---
 
-## 4. App name — RECOMMENDED, and it is the cheapest edit on the page
+## 4. App name — **DECIDED 09.10. Paste this.**
 
 ```
 Cruise FM: Driving Visualizer
 ```
 
-29 of 30. **This section said "leave it" on 01.10 and that is reversed here, on
-two arguments that did not exist then** rather than on a change of taste.
+29 of 30, and **taken** — owner, 09.10: "apply the name change and the new
+whats new". **This section said "leave it" on 01.10 and that is reversed here,
+on two arguments that did not exist then** rather than on a change of taste.
+
+> **AND IT IS NOT RECORDED AS LIVE UNTIL SHE SAYS SO.** Decided here means
+> decided here; the name is a field in App Store Connect and only App Store
+> Connect witnesses what is in it. 08.10 found the subtitle these notes had
+> asserted for five read-backs was not the one on the store, and the subtitle
+> field is the reason this warning is in capitals rather than in brackets.
 
 **What it buys.** It swaps `Visuals` — a word almost nobody types into a search
 box — for **`visualizer`, which is the category's actual search term**, and it
@@ -469,14 +497,16 @@ during a review. Park it until 1.4.3 is approved.
 
 ## 8. What to do, in order
 
-1. **Now** — decide the **name** (§4). It comes first because it decides which
-   keyword block gets pasted in step 3 and whether the subtitle needs touching
-   at all.
-2. **Now** — decide the subtitle (§3). If the name change is taken, the honest
-   answer here is probably "leave it", because the name fixes its one fault.
-3. **Now, with the 1.4.3 submission** — paste the description (§1) and the
-   keywords (§2, or §4's version if the name changed). All of it belongs to the
-   version, so this is the sitting for it.
+1. ~~Decide the name~~ — **done 09.10: the change is taken** (§4),
+   `Cruise FM: Driving Visualizer`. It had to come first because it decides
+   which keyword block gets pasted and whether the subtitle needs touching.
+2. ~~Decide the subtitle~~ — **settled by step 1: leave it alone** (§3).
+   `Visual Music Player` stops being a repeat the moment the name carries
+   `Visualizer`, so the best-written line on the page needs no edit at all.
+3. **Now, with the 1.4.3 submission** — paste the **name** (§4), the
+   **keywords** (§4's 99-character block, *not* §2's), and the **description**
+   (§1). All four fields belong to the version, so this is the one sitting for
+   them, and the keywords must go in alongside the name rather than after it.
 4. **Now, same sitting** — paste the **What's New** from
    `release-notes-1.4.3.md`. It is the one field on the page that is about the
    binary rather than about the listing, and it is the one 1.4.3 did not have

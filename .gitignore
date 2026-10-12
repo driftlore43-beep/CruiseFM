@@ -59,3 +59,14 @@ example
 # deliverable is itself a PNG since 09.10, when the Header slot turned out to
 # refuse JPEG despite Apple's own spec listing it.
 screenshots-header/*-ref.png
+
+# SEARCH RESULTS ASSET — the CANDIDATES are not committed, the CHOICE is.
+# scripts/marketing/search-asset.mjs renders three directions at 4.5 MB each,
+# two of which get deleted the moment one is picked (the 15.09 rule: an unused
+# drawing that looks like working machinery is its own trap). Committing all
+# three would put 14 MB in the history for ever to keep one. The chosen one is
+# renamed to screenshots-header/search-results-asset.png, which this pattern
+# deliberately does NOT match, so the deliverable is tracked exactly as
+# product-page-header.png is — if the builder ever drifts, the committed image
+# is still what Apple actually approved.
+screenshots-header/search-asset-*.png

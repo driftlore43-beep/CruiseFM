@@ -11,6 +11,8 @@ import { PRIVACY_POLICY, TERMS_OF_SERVICE, type LegalDoc } from '@/constants/leg
 import { sendTestCrash } from '@/utils/crashReports';
 import { DEFAULT_DRIVER_NAME, getDriverName, setDriverName } from '@/utils/driverName';
 import { disconnectSpotify } from '@/utils/spotify';
+import { clearWidgetStationImages, forgetLastSongForWidgets } from '@/utils/widgetArtwork';
+import { publishWidgetData } from '@/utils/widgetData';
 import {
   DEFAULT_NOTIF_PREFS, getNotifPrefs, getPermissionState, requestPermission, setNotifPrefs,
   type NotifPermission, type NotifPrefs,
@@ -123,14 +125,55 @@ function AccountBody() {
       <SettingsSection label="YOUR DATA">
         <View style={[styles.para, styles.paraBorder]}>
           <Text style={styles.paraText}>
-            Cruise FM has no account or password — everything lives on this phone. Deleting your
-            data disconnects Spotify and wipes your drive history, playlists, badges and settings
-            from this device.
+            Cruise FM has no account or password — everything lives on this phone. Forgetting the
+            last song clears its name and cover from your Home Screen widgets, and nothing else.
+            Deleting your data disconnects Spotify and wipes your drive history, playlists,
+            badges, station photos and settings from this device.
           </Text>
         </View>
+        <ForgetSongRow />
         <DeleteDataRow />
       </SettingsSection>
     </>
+  );
+}
+
+/**
+ * CLEAR WHAT THE WIDGETS SAY ABOUT THE LAST SONG.
+ *
+ * ONE TAP, NOT TWO, and the difference from the row below is deliberate:
+ * nothing is lost that the next song will not replace, so arming it would be
+ * ceremony. It resets itself after a few seconds so it can be used again.
+ *
+ * THE PUBLISH IS THE SECOND HALF OF THE JOB. `forgetLastSongForWidgets`
+ * removes the cover and the stored song, but the title and artist a tile
+ * PRINTS come from the snapshot — so without republishing it, the record
+ * loses its album art and goes on naming the track underneath.
+ */
+function ForgetSongRow() {
+  const styles = useStyles(makeStyles);
+  const pal = usePalette();
+  const [state, setState] = useState<'idle' | 'working' | 'done'>('idle');
+
+  const handle = async () => {
+    if (state !== 'idle') return;
+    setState('working');
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try { await forgetLastSongForWidgets(); } catch {}
+    try { await publishWidgetData(); } catch {}
+    setState('done');
+    setTimeout(() => setState((s) => (s === 'done' ? 'idle' : s)), 4000);
+  };
+
+  const value = { idle: undefined, working: 'Clearing…', done: 'Forgotten ✓' }[state];
+
+  return (
+    <Pressable onPress={handle} style={({ pressed }) => (pressed && state === 'idle' ? { opacity: 0.7 } : undefined)}>
+      <View style={[styles.legalRow, styles.legalRowBorder]}>
+        <Text style={styles.legalRowLabel}>Forget the Last Song</Text>
+        {value != null && <Text style={[styles.dangerValue, { color: pal.ink(0.5) }]}>{value}</Text>}
+      </View>
+    </Pressable>
   );
 }
 
@@ -151,7 +194,19 @@ function DeleteDataRow() {
       return;
     }
     try { await disconnectSpotify(); } catch {}
+    // BEFORE the wipe, and in this order on purpose. The widgets hold two
+    // things AsyncStorage cannot reach — the last song's cover and every
+    // custom station's photograph, both copied into the App Group container —
+    // and `clearWidgetStationImages` reads the station list to know what to
+    // clear, which `AsyncStorage.clear()` is about to destroy. Until 12.10
+    // neither was touched, so "Delete My Data" left a picture of your last
+    // song sitting on your Home Screen.
+    try { await forgetLastSongForWidgets(); } catch {}
+    try { await clearWidgetStationImages(); } catch {}
     try { await AsyncStorage.clear(); } catch {}
+    // Last, so the tiles fall back to their empty state rather than keeping
+    // whatever the snapshot said before any of this ran.
+    try { await publishWidgetData(); } catch {}
     setState('done');
   };
 

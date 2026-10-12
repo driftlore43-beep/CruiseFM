@@ -3,7 +3,7 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { cachedCustomStations, loadCustomStations } from './customStations';
-import { noteLastPlayed } from './lastPlayed';
+import { clearLastPlayed, noteLastPlayed } from './lastPlayed';
 
 /**
  * Send the last-played album cover across to the widgets.
@@ -166,5 +166,57 @@ export async function backfillStationImagesOnce(): Promise<void> {
     }
   } catch {
     // Nothing here is worth interrupting anything for.
+  }
+}
+
+
+/**
+ * FORGET THE LAST SONG, ON BOTH SIDES OF THE PROCESS BOUNDARY.
+ *
+ * The widgets say what the last song was from TWO different places, and only
+ * clearing one of them is what made "Delete My Data" dishonest until 12.10:
+ * the title and artist travel in the snapshot (AsyncStorage), while the COVER
+ * is a JPEG this app wrote into the App Group container, which nothing in
+ * JavaScript can reach. Wipe AsyncStorage alone and the record keeps the
+ * album art; clear the artwork alone and the tile keeps printing the name.
+ *
+ * WHY IT DOES NOT REPUBLISH THE SNAPSHOT ITSELF, which is the obvious missing
+ * step: `widgetData` imports THIS file for the back-fill, so importing it back
+ * would close a circle. The caller publishes, exactly as `noteSongForWidgets`
+ * leaves it to its caller and for the same reason.
+ *
+ * `setArtwork(null)` is the bridge's own documented clear — it removes the
+ * file and asks iOS to redraw — and it has been in every binary since the
+ * widgets shipped, so this reaches phones over the air with no build.
+ */
+export async function forgetLastSongForWidgets(): Promise<void> {
+  await clearLastPlayed();
+  if (!bridge) return;
+  await bridge.setArtwork(null).catch(() => {});
+}
+
+/**
+ * DROP EVERY CUSTOM STATION'S PHOTOGRAPH OUT OF THE SHARED CONTAINER.
+ *
+ * `deleteCustomStation` already does this one station at a time, through
+ * `deleteStationPhoto`. "Delete My Data" does not go that way — it calls
+ * `AsyncStorage.clear()` — so the copies were left behind: invisible, since
+ * no widget will ever name a station that is gone, but still the person's own
+ * photographs sitting in storage after they asked for their data to be
+ * deleted.
+ *
+ * CALL IT BEFORE WIPING STORAGE, or the list of stations to clear is already
+ * gone. Each failure is swallowed on purpose: a photograph that will never be
+ * drawn again is not worth stopping a deletion for.
+ */
+export async function clearWidgetStationImages(): Promise<void> {
+  if (!bridge?.setStationImage) return;
+  try {
+    if (!cachedCustomStations().length) await loadCustomStations().catch(() => {});
+    for (const st of cachedCustomStations()) {
+      await sendStationImageToWidgets(st.id, null);
+    }
+  } catch {
+    // See above.
   }
 }

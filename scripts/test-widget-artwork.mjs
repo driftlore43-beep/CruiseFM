@@ -50,6 +50,11 @@ function load(src) {
     default: {
       getItem: async (k) => (store.has(k) ? store.get(k) : null),
       setItem: async (k, v) => { store.set(k, v); },
+      // Not used by anything below — `lastPlayed` gained `clearLastPlayed`
+      // on 12.10 and this stub would have thrown the day a test reached
+      // it. A harness that loads a real module inherits that module's
+      // future calls; this is the cheapest possible insurance.
+      removeItem: async (k) => { store.delete(k); },
     },
   };
   const m = { exports: {} };

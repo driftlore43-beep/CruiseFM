@@ -81,3 +81,28 @@ export async function noteLastPlayed(
     return false;
   }
 }
+
+/**
+ * FORGET THE LAST SONG.
+ *
+ * Two different people want this and they want it for the same reason. A
+ * listener whose Home Screen is naming whatever they last played, to anyone
+ * who glances at the phone; and anyone pressing "Delete My Data", which until
+ * 12.10 wiped AsyncStorage and left the widgets printing a title, an artist
+ * and an album cover — a privacy button that left a picture of your last song
+ * on your Home Screen.
+ *
+ * THIS IS ONLY HALF OF IT. The title and artist live here, in AsyncStorage;
+ * the COVER is a JPEG in the App Group container, which only the native
+ * bridge can remove. `forgetLastSongForWidgets` in widgetArtwork.ts does both
+ * and then republishes, and is what callers should reach for — this is
+ * exported for it rather than for them.
+ */
+export async function clearLastPlayed(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(KEY);
+  } catch {
+    // Nothing here is worth interrupting anything for: the worst outcome is
+    // a widget still naming a song, which is exactly today's behaviour.
+  }
+}

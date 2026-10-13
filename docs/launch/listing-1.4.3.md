@@ -454,10 +454,12 @@ land at lightness 0.30 by construction, so slide 2's frame sits in the family
 than the Horizon slide). What stands out in a thumbnail row is **the wallpaper
 inside the phone**: nine slides are dark cinematic scenes and this one is bright
 pink, so the eye lands on the pink rather than on the turntable, which is the
-thing being sold. A re-shoot on a dark wallpaper would put the eye on the
-widgets and cost thirty seconds. Shipping it as it stands is perfectly fine —
-breaking the dark run at position 2 is not purely a cost, since the dark slides
-blend together at thumbnail size.
+thing being sold. **RE-SHOT 13.10 on a muted rose wallpaper** — the wallpaper band's saturation
+drops 0.45 to 0.27, tint re-sampled `#693043` to `#633647`, and the slide stops
+fighting slides 1 and 3 for attention. Note it is slightly BRIGHTER overall than
+the first shot (mean luminance 65.8 to 78.0), so it remains the lightest of the
+ten; a genuinely dark wallpaper is the last notch available and is not worth
+holding a submission for.
 
 ### Then, here — the exact mechanism
 

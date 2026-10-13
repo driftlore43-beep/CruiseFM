@@ -440,7 +440,7 @@ container does not have it. `pip install --target <scratchpad>/pylibs Pillow`
 then run with `PYTHONPATH=<scratchpad>/pylibs` — never into the project.
 
 **DONE 2026-10-13.** The shot is in as `screenshots-appstore/11-widgets-home.jpg`
-(1284x2778, exactly the size the rest of the set already uses, so nothing was
+(1284x2778, exactly the size the rest of the set used at the time, so nothing was
 resized), the row is second in `PHONE_SLIDES`, `08-yourphoto-framing` is out,
 and `screenshots-marketing/` is ten slides again with the widget one at **02**.
 Tint `#693043`, sampled not picked. The two orphaned renders the builder left
@@ -495,6 +495,59 @@ iPad is the one device where the app has dropped the driving frame entirely.
 Leave it unless she wants it.
 
 ---
+
+### CORRECTION 2026-10-13 — APPLE CHANGED THE SIZE AND THE WHOLE SET WAS REFUSED
+
+The ten slides were uploaded and App Store Connect rejected them: *"File
+dimensions are invalid"*, naming `01-mirrorball-downtown.png`,
+`02-stations-dial.png` and `02-widgets-home.png` (two files numbered 02,
+because the stale folder and the new one were dragged in together).
+
+**The slot itself names what it takes, and 1284×2778 is not on the list.**
+Apple has consolidated its iPhone screenshot slots into a single **iPhone with
+Dynamic Island (medium display)** tab — the only iPhone screenshot tab on the
+page now, alongside iPhone Duo, iPad 13" and Apple Watch — and its own text
+reads: *"Drag and drop to add assets or choose from your Asset Library for
+iPhone 6.1" or 6.3" displays. Supported sizes for app previews include
+1920 × 886px and 886 × 1920px. For app screenshots, supported sizes include
+2556 × 1179px, 1179 × 2556px, 2622 × 1206px and 1206 × 2622px."*
+
+**THE SET IS NOW 1206×2622**, the largest portrait size on that list, because
+Apple scales a screenshot DOWN to smaller devices and never up — and the page
+says so in as many words: *"Screenshots will automatically scale down to
+smaller device sizes unless you add specific app previews and screenshots for
+other device sizes."*
+
+**THIS IS THE 09.10 HEADER LESSON A SECOND TIME.** That round quoted Apple's
+own help page saying the header slot accepted JPEG, and the slot refused it.
+**The slot is the authority; the documentation is not, and neither are these
+notes.** Both times the only thing that settled it was one upload.
+
+**THE APP PREVIEW NEEDS NOTHING.** The September cut is 886×1920, which is on
+that same list, and the page reads *1 of 3 App Previews* — it carried forward
+intact.
+
+**AND THE RAW CAPTURES ARE UNCHANGED AT 1284×2778, ON PURPOSE.**
+`scripts/harness/shots.mjs` shoots at 428×926 logical × 3, and
+`build-slides.mjs` composites those into a drawn phone frame about 825px wide
+— so the captures only have to EXCEED the frame, and shooting them smaller
+would throw detail away for nothing. Only the slide canvas moved.
+
+**EVERY NUMBER IN THE PHONE COLUMN IS THE OLD ONE × 1206/1284**, so this is
+the same composition at a smaller size rather than a re-design; `G.k` carries
+that factor into the CARDS layout, whose numbers were written against the
+original canvas. Verified rather than assumed: all ten outputs read back
+1206×2622 from the files themselves, and each one diffed against its own
+predecessor scaled down measures a mean of **1.6–6.2 of 255** — resampling,
+not a moved element. **Slide 10, the one whose numbers had to be scaled by
+hand, is second-LOWEST at 2.60**, which is the control that matters: a wrong
+constant there would have made it the outlier.
+
+**THE iPAD SET IS UNTOUCHED AND WAS NOT RE-RENDERED.** It is still
+2064×2752 at `screenshots-marketing-ipad/`, still carrying its 15.09
+numbering, and it is already on the listing from 1.4.2. Nobody here has seen
+what sizes the iPad 13" tab now names — **check that tab before assuming it
+still takes 2064×2752.**
 
 ## 6. Promotional text — change it the day this ships
 
@@ -627,7 +680,8 @@ outright: prices, discounts, URLs, copyright symbols, other platforms' logos,
 and any Apple recognition the app has not received.
 
 **21:9 is a shape this app has never drawn.** Every screen it owns is portrait
-and every marketing slide is 1284×2778. A header is therefore a new design
+and every marketing slide was 1284×2778 (**1206×2622 since 13.10 — see the
+correction at the foot of §5**). A header is therefore a new design
 round rather than a crop of something existing — draw directions, let the
 owner pick, which is how every design round here has gone.
 

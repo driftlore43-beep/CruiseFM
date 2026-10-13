@@ -1,9 +1,23 @@
 /**
- * App Store marketing slides — a headline over each raw screenshot, at Apple's
- * 6.5" size (1284x2778).
+ * App Store marketing slides — a headline over each raw screenshot.
  *
- *   node scripts/marketing/build-slides.mjs              # iPhone, 1284x2778
+ *   node scripts/marketing/build-slides.mjs              # iPhone, 1206x2622
  *   DEVICE=ipad node scripts/marketing/build-slides.mjs  # iPad 13", 2064x2752
+ *
+ * THE PHONE SIZE MOVED 1284x2778 -> 1206x2622 ON 2026-10-13, and it was not a
+ * preference. App Store Connect consolidated its iPhone screenshot slots into
+ * one "iPhone with Dynamic Island (medium display)" tab, and that slot refused
+ * every 1284x2778 file outright ("File dimensions are invalid"), naming the
+ * four it does take: 2556x1179, 1179x2556, 2622x1206, 1206x2622. The largest
+ * portrait one is taken, because Apple scales a screenshot DOWN to smaller
+ * devices and never up. SAME LESSON AS THE 09.10 HEADER, which Apple's own
+ * help page said accepted JPEG while the slot refused it: THE SLOT IS THE
+ * AUTHORITY, not the documentation and not these notes.
+ *
+ * Every number in the phone column is the old one times k = 1206/1284, so the
+ * slides are the same composition at a smaller size rather than a re-design;
+ * `G.k` carries that factor into the CARDS layout, whose numbers are written
+ * against the original 1284 canvas.
  *
  * Reads screenshots-appstore/*.jpg, writes screenshots-marketing/*.png; the
  * iPad run reads screenshots-appstore-ipad/ and writes screenshots-marketing-ipad/.
@@ -39,11 +53,18 @@ const G = IPAD ? {
   // stays fully opaque to 18% and fades out by 44% — the same rule as the
   // phone's: opaque past the type, or the app's own header ghosts through it.
   scrim: [18, 22, 32, 44],
+  k: 1,
 } : {
-  W: 1284, H: 2778, headTop: 168, pad: 92, h1: 98, h1Small: 88, h1B: 100,
-  devW: 906, devTop: 120, devRadius: 78, devPad: 14, imgRadius: 64,
+  // 1206x2622 since 13.10 — see the header. Each number is its 1284x2778
+  // predecessor times k, rounded: 168, 92, 98, 88, 100, 906, 120, 78, 14, 64.
+  W: 1206, H: 2622, headTop: 158, pad: 86, h1: 92, h1Small: 83, h1B: 94,
+  devW: 851, devTop: 113, devRadius: 73, devPad: 13, imgRadius: 60,
   scrim: [15.5, 20, 30, 42],
+  k: 1206 / 1284,
 };
+// The CARDS layout's numbers are written against the original 1284 canvas, so
+// they go through this rather than being re-typed.
+const k = n => Math.round(n * G.k);
 fs.mkdirSync(OUT, { recursive: true });
 const b64 = f => 'data:image/jpeg;base64,' + fs.readFileSync(`${SHOTS}/${f}.jpg`).toString('base64');
 const png = f => 'data:image/png;base64,' + fs.readFileSync(`${SHOTS}/${f}.png`).toString('base64');
@@ -169,24 +190,24 @@ const B = s => `<style>${base}
 const CARDS = s => `<style>${base}
     body{background:radial-gradient(122% 60% at 50% 4%, ${s.t}e0 0%, ${s.t}55 36%, #07070c 76%),#07070c;
          display:flex;flex-direction:column;align-items:center}
-    .head{margin-top:180px;text-align:center;padding:0 92px}
-    h1{font-size:98px}
+    .head{margin-top:${k(180)}px;text-align:center;padding:0 ${k(92)}px}
+    h1{font-size:${k(98)}px}
     .mid{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center}
     /* Sized to the cards themselves rather than to the slide: a box taller
        than its contents opens a dead band above them once it is centred. */
-    .stack{position:relative;width:1284px;height:1190px}
-    .stack img{position:absolute;border-radius:26px;
+    .stack{position:relative;width:${k(1284)}px;height:${k(1190)}px}
+    .stack img{position:absolute;border-radius:${k(26)}px;
       box-shadow:0 54px 120px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.14)}
     /* Behind: tilted and pushed left, with its right third under the front
        card. Enough of it shows to read as a different design. The left inset
        has to clear the rotation — a card rotated 7 degrees swings its corners
        out by about half its height times sin(7), roughly 50px here. */
-    .back{width:790px;left:34px;top:20px;transform:rotate(-7deg)}
-    .front{width:950px;left:300px;top:110px;transform:rotate(3.5deg)}
+    .back{width:${k(790)}px;left:${k(34)}px;top:${k(20)}px;transform:rotate(-7deg)}
+    .front{width:${k(950)}px;left:${k(300)}px;top:${k(110)}px;transform:rotate(3.5deg)}
     /* On its own it has the whole stack, so it is bigger and centred rather
        than pushed right to make room for a card that is no longer there. */
-    .solo{width:1060px;left:112px;top:40px;transform:rotate(-2deg)}
-    .foot{margin-top:64px;color:#ffffff8a;font-size:36px;letter-spacing:1px}
+    .solo{width:${k(1060)}px;left:${k(112)}px;top:${k(40)}px;transform:rotate(-2deg)}
+    .foot{margin-top:${k(64)}px;color:#ffffff8a;font-size:${k(36)}px;letter-spacing:1px}
   </style>
   <div class="head"><h1>${s.a}<span>${s.b}</span></h1></div>
   <div class="mid">

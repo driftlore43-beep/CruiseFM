@@ -4,8 +4,12 @@
 //   PLAYWRIGHT_MODULE=/abs/path/node_modules/playwright/index.mjs \
 //     BASE_URL=http://localhost:8085 node scripts/harness/shots.mjs
 //
-// 428 x 926 logical at deviceScaleFactor 3 = 1284 x 2778, which is Apple's
-// 6.5" slot. No device frame is drawn — these are raw screens, so a design
+// 428 x 926 logical at deviceScaleFactor 3 = 1284 x 2778. THIS IS DELIBERATELY
+// BIGGER THAN THE SLIDE IT ENDS UP IN and must not be "corrected" down: App
+// Store Connect's iPhone slot wants 1206x2622 since 13.10, but build-slides.mjs
+// composites these INTO a drawn phone frame about 825px wide, so the captures
+// only have to exceed that. Shooting them smaller would throw detail away.
+// No device frame is drawn here — these are raw screens, so a design
 // tool can put whatever frame it likes around them (or none).
 //
 // NOTHING IS CONNECTED, ON PURPOSE. With no music service every mode falls

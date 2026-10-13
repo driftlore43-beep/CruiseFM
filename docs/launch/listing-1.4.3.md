@@ -754,17 +754,21 @@ is April; there is no reason to run that backwards.
    (§6). No review, so it can happen the same minute; entered early it risks
    advertising tiles the store has not got yet. The live line is correct in the
    meantime and was re-counted against the code on 09.10.
-8. **Available right now, and the only thing here that is** — the product page
-   header (§8a), which is **drawn and waiting at
-   `screenshots-header/product-page-header.png`**. Upload it under Product Page
-   Information → Header. Creative assets are approved independently of an app
-   version, so this does not wait on the trader paperwork and the trader
-   paperwork does not wait on it — it is the one thing on this page that can
-   move today.
-9. **Not yet** — the search results asset (§8b), which costs three screenshots
-   to gain one banner, and **iPhone Duo screenshots** (§8c), which are optional
-   until April 2027 and should follow somebody actually seeing the app on a Duo
-   rather than precede it.
+8. ~~Available right now~~ **UPLOADED** — the product page header (§8a,
+   `screenshots-header/product-page-header.png`), placed by the owner on 09.10
+   under Product Page Information → Header. Creative assets are approved
+   independently of an app version, which is why it could go up while the
+   Submit button was still held by the trader paperwork.
+9. ~~Not yet~~ **UPLOADED 2026-10-13** — the search results asset (§8b),
+   `screenshots-header/search-results-asset.png`, owner: "the search results
+   images are up". **It is a TRADE rather than an addition** and that decision
+   is already taken (12.10, direction TRIO): the row that would have shown up
+   to three screenshots now shows this one image. Which also means §8b's
+   argument for holding the widget slide at position 3 no longer applies —
+   positions 1-3 are a product-page consideration now, not a search one.
+   **Still not yet: iPhone Duo screenshots** (§8c), optional until April 2027,
+   and they should follow somebody actually seeing the app on a Duo rather
+   than precede it.
 10. **After approval** — the subscription display names (§7), if at all.
 
 **Nothing in this document needs a build.** It is all metadata, and build 72 is

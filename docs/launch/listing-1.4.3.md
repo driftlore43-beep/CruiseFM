@@ -439,6 +439,26 @@ photograph on the label, no album art anywhere in the frame.
 container does not have it. `pip install --target <scratchpad>/pylibs Pillow`
 then run with `PYTHONPATH=<scratchpad>/pylibs` — never into the project.
 
+**DONE 2026-10-13.** The shot is in as `screenshots-appstore/11-widgets-home.jpg`
+(1284x2778, exactly the size the rest of the set already uses, so nothing was
+resized), the row is second in `PHONE_SLIDES`, `08-yourphoto-framing` is out,
+and `screenshots-marketing/` is ten slides again with the widget one at **02**.
+Tint `#693043`, sampled not picked. The two orphaned renders the builder left
+behind were deleted — **it writes by position and never prunes**, so after a
+re-order the folder holds the old numbering too and an "upload everything" would
+send a duplicate and a dropped slide.
+
+**THE ONE THING WORTH HER DECIDING, and it is not the surround.** The tints all
+land at lightness 0.30 by construction, so slide 2's frame sits in the family
+(hue 340, between the mirror ball's 259 and the dial's 25, and less saturated
+than the Horizon slide). What stands out in a thumbnail row is **the wallpaper
+inside the phone**: nine slides are dark cinematic scenes and this one is bright
+pink, so the eye lands on the pink rather than on the turntable, which is the
+thing being sold. A re-shoot on a dark wallpaper would put the eye on the
+widgets and cost thirty seconds. Shipping it as it stands is perfectly fine —
+breaking the dark run at position 2 is not purely a cost, since the dark slides
+blend together at thumbnail size.
+
 ### Then, here — the exact mechanism
 
 The slide set is an explicit list in `scripts/marketing/build-slides.mjs`

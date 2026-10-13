@@ -70,15 +70,34 @@ const IPAD_SLIDES = [
 
 const PHONE_SLIDES = [
   { f: '01-mirrorball-downtown',  t: '#443663', s: 'B', a: 'Your music,',            b: 'worth looking at' },
+  // The Home Screen, placed SECOND because Apple shows the first few slides in
+  // the search results themselves and this is the most differentiating image
+  // the app has: every music visualiser has a glowing disc, and a Home Screen
+  // carrying a drawn turntable looks like a system-level product. It is also
+  // the only slide that can show the widgets at all — two releases of work
+  // that the listing had never once mentioned.
+  //
+  // Two SMALL tiles plus one LARGE fills exactly one 4x6 page and shows two
+  // sizes; two large tiles is 8 rows of a 6-row page and cannot be shot.
+  // The rose surround is sampled from the shot like every other — it is her
+  // wallpaper's colour, so it moves if the wallpaper does.
+  //
+  // THE TURNTABLE'S LABEL MUST NOT CARRY AN ALBUM COVER. It draws the last
+  // song's artwork, which is the one surface the 03.08 "shoot it with no music
+  // service connected" rule cannot reach, because a widget draws a picture the
+  // app saved weeks ago. Account → Forget the Last Song clears it and the
+  // label falls back to the station's own photograph, which is what this shot
+  // carries. Re-check that before any re-shoot.
+  { f: '11-widgets-home',         t: '#693043', s: 'A', a: 'Your moods,',             b: 'on your Home Screen' },
   // Amber, not the old teal: the re-shot page is the dial itself, and amber is
   // the dial's own colour (tints.py re-sampled it after the reshoot).
   { f: '03-stations-dial',        t: '#774622', s: 'A', a: 'Ten moods.',             b: 'Not ten genres.' },
-  // 1.3.0's headline, placed third on purpose: Apple shows the first two or
-  // three in search results, and nothing else on the listing shows that the
-  // picture behind a drive can be YOURS. The framing screen says it better
-  // than a finished mode does — a mode with a photo behind it just looks
-  // like the built-in stations, whereas a viewfinder can only mean one thing.
-  { f: '08-yourphoto-framing',    t: '#685531', s: 'A', a: 'Your own photo,',        b: 'behind your own station' },
+  // 08-yourphoto-framing was HERE until 13.10 and is dropped, not lost: the set
+  // is at Apple's limit of ten, the widget slide had to replace something, and
+  // a photo-cropping VIEWFINDER was the weakest thing in the three slots Apple
+  // shows in search — it was 1.3.0's news and had not been news for two
+  // months. The feature still shows: a custom station appears on the dial
+  // slide and the description gives it its own section.
   { f: '02-vinyl-sunset',         t: '#653439', s: 'A', a: 'Your Apple Music',       b: 'or Spotify playlists' },
   { f: '05-cassette-daylight',    t: '#635436', s: 'A', a: 'Eight ways to',          b: 'watch your music' },
   { f: '06-cd-coastal',           t: '#365163', s: 'A', a: 'Every disc',             b: 'catches the light' },

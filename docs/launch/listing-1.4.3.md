@@ -416,6 +416,29 @@ Mode tile actually placed before anything goes to Apple. So:
    unchanged-looking tile after an update is the cache rather than the work.
 5. Screenshot that page and send it.
 
+**CORRECTED 2026-10-13 — STEPS 2 AND 3 ABOVE CANNOT BOTH FIT ON ONE PAGE, AND
+THE OWNER'S OWN ARRANGEMENT IS THE RIGHT ONE.** A Home Screen page is 4 columns
+by 6 rows and a large tile is 4x4, so asking for a large Mode tile *and* a large
+Last Played tile is asking for 8 rows of a 6-row page. What she shot instead —
+two **small** tiles side by side on the top row (Mirror Ball and Start Drive)
+with the **large turntable** underneath — fills exactly one page, shows three
+widgets rather than two, and shows two different sizes, which is the thing the
+slide is meant to prove. Shoot it that way.
+
+**AND THE SHOT WAS NOT TAKEABLE UNTIL 12.10, WHICH IS WHY THIS SLIDE WAITED.**
+The large turntable draws the last song's cover on its label, so the first two
+attempts carried a commercial album cover — a rights problem rather than a
+taste one, and the one surface the 03.08 "shoot it with no music service
+connected" rule cannot reach, because a widget draws a picture the app saved
+weeks ago. The **Forget the Last Song** round (12.10) is what cleared it: the
+label now falls back to the station's own photograph, and the deck's painted
+ground warms with it. **Confirmed on her phone 13.10** — Sunset AM's own
+photograph on the label, no album art anywhere in the frame.
+
+**NOTE FOR WHOEVER RUNS THE PIPELINE:** `tints.py` needs Pillow, and a fresh
+container does not have it. `pip install --target <scratchpad>/pylibs Pillow`
+then run with `PYTHONPATH=<scratchpad>/pylibs` — never into the project.
+
 ### Then, here — the exact mechanism
 
 The slide set is an explicit list in `scripts/marketing/build-slides.mjs`

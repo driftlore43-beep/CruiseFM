@@ -88,7 +88,7 @@ const PHONE_SLIDES = [
   // app saved weeks ago. Account → Forget the Last Song clears it and the
   // label falls back to the station's own photograph, which is what this shot
   // carries. Re-check that before any re-shoot.
-  { f: '11-widgets-home',         t: '#693043', s: 'A', a: 'Your moods,',             b: 'on your Home Screen' },
+  { f: '11-widgets-home',         t: '#633647', s: 'A', a: 'Your moods,',             b: 'on your Home Screen' },
   // Amber, not the old teal: the re-shot page is the dial itself, and amber is
   // the dial's own colour (tints.py re-sampled it after the reshoot).
   { f: '03-stations-dial',        t: '#774622', s: 'A', a: 'Ten moods.',             b: 'Not ten genres.' },

@@ -798,12 +798,19 @@ is April; there is no reason to run that backwards.
    went in one sitting, with the keywords alongside the name rather than after.
 4. ~~Paste the What's New~~ — **done 09.10, same sitting**, from
    `release-notes-1.4.3.md`.
-5. **Before pressing Submit** — take the widget screenshot (§5) so the new
-   slide goes in with this version. Screenshots belong to the version as well;
-   once 1.4.3 is live they cannot be changed without another submission.
-6. **Then** — attach **build 72** and press Submit for Review. The Submit
-   button is what the EU trader paperwork is blocking, so this step may wait on
-   a phone call to Apple rather than on anything here.
+5. ~~Before pressing Submit — take the widget screenshot~~ — **done**: shot
+   on 13.10 and in the set as slide 2. **AND THE WHOLE SET WAS RE-RENDERED AT
+   1206x2622 THE SAME DAY**, because App Store Connect refused 1284x2778
+   outright — see the correction block in §5. Uploaded 15.10, which is the only
+   possible confirmation that the new size is right: there is no way to ask that
+   slot what it wants except by pressing upload.
+6. ~~Attach build 72 and press Submit for Review~~ — **DONE 2026-10-15**
+   (owner: "All done", then "The app is still in review"). The Submit button
+   really was held by the EU trader paperwork, exactly as this step predicted:
+   it cleared on 12.10 and the button pressed. **THE PRODUCTION CHANNEL IS SHUT
+   until Apple answers**, and `c459101` (the widgets forgetting a song) is
+   waiting on it — the Monday lag Routine will offer to publish, and the answer
+   is no while the review is open.
 7. **The day it is released — and NOT before** — swap the promotional text
    (§6). No review, so it can happen the same minute; entered early it risks
    advertising tiles the store has not got yet. The live line is correct in the

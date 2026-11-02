@@ -811,7 +811,13 @@ is April; there is no reason to run that backwards.
    until Apple answers**, and `c459101` (the widgets forgetting a song) is
    waiting on it — the Monday lag Routine will offer to publish, and the answer
    is no while the review is open.
-7. **The day it is released — and NOT before** — swap the promotional text
+   **DONE 02.11: the owner confirmed 1.4.3 is RELEASED, so the channel reopened
+   and `c459101` was published to production the same day** (update group
+   `fba68f99-4988-4236-a20d-6a0bdfbdfeef`, runtime 1.3.0, confirmed by
+   `production-lag.mjs` flipping to "up to date" on its own).
+7. **DUE NOW — 1.4.3 WAS CONFIRMED RELEASED ON 02.11, so this is the one
+   field still outstanding and the risk it was being held for is gone.**
+   Swap the promotional text
    (§6). No review, so it can happen the same minute; entered early it risks
    advertising tiles the store has not got yet. The live line is correct in the
    meantime and was re-counted against the code on 09.10.

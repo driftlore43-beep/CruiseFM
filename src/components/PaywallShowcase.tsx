@@ -17,6 +17,7 @@ const AMBER = '#F59E0B';
 const SCENE_S = 4.2; // seconds each mode is on stage
 const FADE_S = 0.45; // crossfade at scene edges
 const LOOP_S = 3.6; // one motion cycle within a scene
+const HOLD_S = 7.2; // extra dwell on a scene the preview gate asked for
 
 // All FIVE premium modes — the feature list under this stage says "5 Premium
 // Visual Modes", and a showcase that previews four of them reads as a missing
@@ -217,10 +218,19 @@ export type ShowcaseChrome = {
   height?: number;
   /** Mode chips: amber (the old look) or the app's white selected-pill. */
   chips?: 'amber' | 'white' | 'none';
+  /**
+   * Open the carousel ON this mode rather than wherever the rotation starts.
+   *
+   * The preview gate sends the mode somebody was actually tasting when they
+   * pressed See Premium (03.11), so the first thing the page shows is the
+   * thing they wanted. An id with no scene of its own — a free mode, or
+   * nothing at all — falls back to the normal rotation rather than failing.
+   */
+  startWith?: string;
 };
 
 export function PaywallShowcase({
-  boxed = true, badge = true, height, chips = 'amber',
+  boxed = true, badge = true, height, chips = 'amber', startWith,
 }: ShowcaseChrome = {}) {
   const [t, setT] = useState(0);
 
@@ -241,10 +251,29 @@ export function PaywallShowcase({
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const active = Math.floor(t / SCENE_S) % SCENES.length;
-  const sceneAge = t % SCENE_S;
-  // Fade in at the start of a scene, out at the end.
-  const stageOpacity = Math.min(1, sceneAge / FADE_S, (SCENE_S - sceneAge) / FADE_S);
+  // `findIndex` answers -1 for a free mode or an unknown id, which Math.max
+  // turns back into the normal starting scene — so an unrecognised request
+  // degrades to the old behaviour instead of blanking the stage.
+  const asked = SCENES.findIndex((sc) => sc.id === startWith);
+  const startAt = Math.max(0, asked);
+  // A REQUESTED SCENE HOLDS LONGER BEFORE THE ROTATION TAKES OVER. The page
+  // leads with "Unlock CD" when the gate sent somebody here from the CD, and
+  // at the normal 4.2s dwell the stage had moved on to the Tuner before they
+  // had finished reading it — the headline and the picture disagreeing at the
+  // one moment somebody is deciding. It still rotates afterwards, because the
+  // other four are the rest of the argument.
+  const hold = asked >= 0 ? HOLD_S : 0;
+  const firstLen = SCENE_S + hold;
+  const inFirst = hold > 0 && t < firstLen;
+  // Slot, its length, and how far into it we are — one triple, so the fade
+  // below works the same whether this slot is the long one or a normal one.
+  const slot = inFirst ? 0 : hold > 0 ? 1 + Math.floor((t - firstLen) / SCENE_S) : Math.floor(t / SCENE_S);
+  const slotLen = inFirst ? firstLen : SCENE_S;
+  const sceneAge = inFirst ? t : hold > 0 ? (t - firstLen) % SCENE_S : t % SCENE_S;
+  const active = (startAt + slot) % SCENES.length;
+  // Fade in at the start of a scene, out at the end. With no scene requested
+  // `hold` is 0 and every line above collapses to what it was before.
+  const stageOpacity = Math.min(1, sceneAge / FADE_S, (slotLen - sceneAge) / FADE_S);
   const clock = (t % LOOP_S) / LOOP_S;
   const scene = SCENES[active];
 

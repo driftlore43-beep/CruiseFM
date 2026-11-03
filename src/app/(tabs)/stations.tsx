@@ -13,6 +13,7 @@ import { GlossSheen } from '@/components/GlossSheen';
 import { useNowPlaying } from '@/context/NowPlayingContext';
 import { Cruise, Fonts, PAGE_GUTTER, TAB_SAFE_INSET, pageColumn } from '@/constants/theme';
 import { STATIONS, stationDial, type Band, type Station } from '@/constants/stations';
+import { needsPreview } from '@/constants/modeCatalog';
 import { useEntitlements } from '@/context/EntitlementsContext';
 import { deleteCustomStation, isCustomStation, loadCustomStations, type CustomStation } from '@/utils/customStations';
 import { clockLabel, isScheduled, onAirNow, upNext } from '@/constants/schedule';
@@ -540,7 +541,17 @@ export default function StationsScreen() {
             featured={station.id === onAirStation.id}
             locked={!isPro}
             lcd={lcd}
-            onPress={isPro ? () => setSelectedStation(station) : undefined}
+            // A PADLOCK THAT DOES NOTHING IS A DEAD END, AND IT WAS SEVEN OF
+            // THE TEN STATIONS. This used to read `isPro ? … : undefined`, so
+            // a free user pressing Sunset got no page, no taste and no
+            // paywall — the dial, which is the app's whole metaphor and its
+            // biggest surface, could never show anyone what sat behind the
+            // price. It opens for everyone now, on the same shop-window rule
+            // the row already followed by being dimmed rather than hidden.
+            // The taste and the gate are `needsPreview`'s job, exactly as
+            // they are for a premium MODE and for a widget pinned to an FM
+            // station (21.09) — the lock lives in the player, not here.
+            onPress={() => setSelectedStation(station)}
           />
         ))}
 
@@ -570,12 +581,20 @@ export default function StationsScreen() {
         onClose={() => setSelectedStation(null)}
         onStartDrive={(mode, preview) => {
           if (selectedStation) {
-            if (!preview) {
-              // A taste shouldn't overwrite the saved cruise or count as a drive.
+            // The sheet judges the MODE; the STATION is judged here, so both
+            // doorways ask the same question — cruise.tsx has done this since
+            // the home shelf gained a station page, and this copy needed it
+            // the moment a locked FM row became tappable. A free mode on a
+            // premium station is a taste, and recording one as a drive would
+            // overwrite the saved cruise and count toward the badges. `open`
+            // gates the player centrally either way, so nobody walks through
+            // the paywall; this is about not RECORDING a taste as a drive.
+            const taste = preview || needsPreview(isPro, selectedStation.id, mode);
+            if (!taste) {
               rememberCruise({ stationId: selectedStation.id, mode });
               recordDriveStart(selectedStation.id, undefined, mode);
             }
-            np.open(mode, selectedStation.id, { preview });
+            np.open(mode, selectedStation.id, { preview: taste });
           }
           setSelectedStation(null);
         }}

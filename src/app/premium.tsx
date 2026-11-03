@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -203,6 +203,14 @@ function TickCell({ on, amber }: { on: boolean; amber?: boolean }) {
 
 export default function PremiumScreen() {
   const insets = useSafeAreaInsets();
+  // WHAT BROUGHT THEM HERE, when anything did (03.11). The preview gate sends
+  // `focus` — the mode or the station it had just told them was locked — and
+  // `scene` when that is a premium mode the showcase can actually draw. The
+  // page is reachable from Profile too, where neither exists, so both are
+  // optional and the page falls back to its general pitch.
+  const params = useLocalSearchParams<{ focus?: string; scene?: string }>();
+  const focus = typeof params.focus === 'string' ? params.focus : undefined;
+  const scene = typeof params.scene === 'string' ? params.scene : undefined;
   const { refreshSubscription, isPro } = useEntitlements();
   const [busy, setBusy] = useState(false);
   const [legal, setLegal] = useState<SettingsPage | null>(null);
@@ -337,7 +345,7 @@ export default function PremiumScreen() {
                   back the same way a deck's own scrim holds its backdrop
                   down under white type. */}
               <View style={styles.heroVeil} pointerEvents="none" />
-              <PaywallShowcase boxed={false} badge={false} height={302} chips="none" />
+              <PaywallShowcase boxed={false} badge={false} height={302} chips="none" startWith={scene} />
               <LinearGradient
                 colors={['transparent', 'rgba(10,10,16,0.62)', GROUND[0]]}
                 locations={[0, 0.55, 1]}
@@ -346,7 +354,16 @@ export default function PremiumScreen() {
               />
               <View style={styles.heroText}>
                 <Text style={styles.title}>Cruise FM Premium</Text>
-                <Text style={styles.subtitle}>Everything here, and everything added next.</Text>
+                {/* NAME THE THING THEY CAME FOR. A feature list is what the
+                    page falls back to; it is not what made anybody press the
+                    button. The promise of future additions stays either way —
+                    Premium is a subscription, so it has to be about what comes
+                    next as well as what is here (24.09). */}
+                <Text style={styles.subtitle}>
+                  {focus
+                    ? `Unlock ${focus} — and everything else here, including what comes next.`
+                    : 'Everything here, and everything added next.'}
+                </Text>
               </View>
             </View>
 

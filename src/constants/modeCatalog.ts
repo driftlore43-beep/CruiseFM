@@ -70,9 +70,16 @@ export function isProStation(stationId: string): boolean {
  * hero, the station page, a widget tap — and a doorway that forgets half of
  * it is a doorway through the paywall. It used to be written inline as
  * `!isPro && isProMode(mode)`, which was complete while only MODES were
- * premium: a locked FM row is simply not tappable on the Stations page
+ * premium: a locked FM row was simply not tappable on the Stations page
  * (`onPress={isPro ? … : undefined}`), so a free user had no way to reach a
  * premium station at all.
+ *
+ * THAT IS NO LONGER TRUE, AND IT WAS NEVER A FEATURE (03.11). A padlock that
+ * does nothing when pressed was seven of the ten stations — the dial could
+ * show a free user what they were missing and then refuse to open it, so the
+ * app's biggest surface produced no paywall views at all. The row opens for
+ * everyone now and the gate below is what holds it, which is the only place
+ * a lock belongs.
  *
  * PINNING A WIDGET TO A STATION MADE ONE (21.09). The picker offers the FM
  * band to everyone and marks it, which is the same shop-window rule the

@@ -156,5 +156,108 @@ check('a free taste of premium is not recorded as a drive',
   check('and the scan found the doorways', sawNeeds >= 3, `${sawNeeds} files`);
 }
 
+/* ── 5. the padlock on the FM band has to lead somewhere ── */
+
+// A DEAD PADLOCK WAS SEVEN OF THE TEN STATIONS (03.11). The row used to read
+// `onPress={isPro ? () => setSelectedStation(station) : undefined}`, so a free
+// user pressing Sunset got no page, no taste and no paywall: the dial is the
+// app's biggest surface and it produced no paywall views at all. The lock
+// belongs in the player (`needsPreview`, which `open` applies centrally), not
+// in whether a row can be pressed — a row that cannot be pressed is the one
+// shape that can never show anybody what sits behind the price.
+{
+  const stationsSrc = fs.readFileSync(path.join(root, 'src/app/(tabs)/stations.tsx'), 'utf8');
+  const fmRow = /<BandHeader band="FM"[\s\S]*?\/>\s*\)\)\}/.exec(stationsSrc)?.[0] ?? '';
+  check('found the FM band rows', fmRow.length > 200, `${fmRow.length} chars`);
+  check('a locked FM row still opens its station page',
+    /onPress=\{\(\) => setSelectedStation\(station\)\}/.test(fmRow) &&
+    !/onPress=\{isPro \?/.test(fmRow));
+
+  // Both station-page doorways judge the STATION, not just the mode: the
+  // sheet's own `selectedIsLocked` only ever looked at the mode, so a free
+  // mode on a premium station would be recorded as a real drive — saved as
+  // the last cruise and counted toward the badges.
+  for (const rel of ['src/app/(tabs)/stations.tsx', 'src/app/(tabs)/cruise.tsx']) {
+    const src = fs.readFileSync(path.join(root, rel), 'utf8');
+    const handler = /onStartDrive=\{\(mode, preview\) => \{[\s\S]*?\n {8}\}\}/.exec(src)?.[0] ?? '';
+    check(`found ${rel.split('/').pop()}'s start handler`, handler.length > 150, `${handler.length} chars`);
+    check(`${rel.split('/').pop()} judges the station, not only the mode`,
+      /needsPreview\s*\(\s*isPro\s*,/.test(handler) && /if\s*\(!taste\)/.test(handler));
+  }
+}
+
+/* ── 6. the gate names what is locked, and carries it to the paywall ── */
+
+// The card used to say "<mode> is a Premium mode" whatever the session was,
+// which was only ever safe because a premium STATION could not be reached.
+// With the row open, a free mode on a premium station would have announced
+// "Cassette is a Premium mode" — and Cassette is free.
+{
+  const gate = fs.readFileSync(path.join(root, 'src/components/PreviewGate.tsx'), 'utf8');
+  check('the gate asks about the station too', /isProStation\s*\(/.test(gate));
+  check('the gate says "Premium station" when that is what is locked',
+    /Premium station/.test(gate) && /are both Premium/.test(gate));
+  check('and it no longer hardcodes the mode wording',
+    !/\{label\} is a Premium mode/.test(gate));
+  check('See Premium carries what they were looking at',
+    /router\.push\(\{\s*pathname: '\/premium'/.test(gate) && /params\.scene = mode/.test(gate));
+  // The session still has to END: a preview left alive could be resumed from
+  // the mini-player, which is a hole straight through the paywall.
+  check('and the taste still ends', /np\.stop\(\);/.test(gate));
+}
+
+/* ── 7. the paywall opens on the mode they were tasting ── */
+
+{
+  const show = fs.readFileSync(path.join(root, 'src/components/PaywallShowcase.tsx'), 'utf8');
+  const ids = [...show.matchAll(/\{ id: '([a-z]+)', label: '[^']+' \}/g)].map((m) => m[1]);
+  check('read the showcase scenes', ids.length >= 5, ids.join(', '));
+  check('the showcase takes a starting scene', /startWith\?: string/.test(show));
+  check('and offsets the rotation by it',
+    /SCENES\.findIndex\(\(sc\) => sc\.id === startWith\)/.test(show) &&
+    /\(startAt \+ slot\) % SCENES\.length/.test(show));
+  check('a requested scene holds before rotating', /const hold = asked >= 0 \? HOLD_S : 0;/.test(show));
+
+  // The arithmetic itself, replicated against the real scene list: the named
+  // scene must be the FIRST one shown, an unknown id must fall back to the
+  // normal rotation rather than blanking the stage, and it must still wrap.
+  const SCENE_S = Number(/const SCENE_S = ([\d.]+)/.exec(show)[1]);
+  const HOLD_S = Number(/const HOLD_S = ([\d.]+)/.exec(show)[1]);
+  check('read the scene timings', SCENE_S > 0 && HOLD_S > 0, `scene ${SCENE_S}s, hold ${HOLD_S}s`);
+
+  // The rule as the component computes it, replicated against the real
+  // scene list and the real timings.
+  const sceneAtTime = (startWith, t) => {
+    const asked = ids.findIndex((id) => id === startWith);
+    const startAt = Math.max(0, asked);
+    const hold = asked >= 0 ? HOLD_S : 0;
+    const firstLen = SCENE_S + hold;
+    const inFirst = hold > 0 && t < firstLen;
+    const slot = inFirst ? 0 : hold > 0 ? 1 + Math.floor((t - firstLen) / SCENE_S) : Math.floor(t / SCENE_S);
+    return ids[(startAt + slot) % ids.length];
+  };
+  check('a named mode is the first thing shown',
+    sceneAtTime('cd', 0) === 'cd' && sceneAtTime('disco', 0) === 'disco');
+  // THE HEADLINE AND THE PICTURE MUST STILL AGREE WHILE SOMEBODY READS IT.
+  // At the plain 4.2s dwell the stage had moved on to another mode before
+  // the sentence naming this one had been read.
+  check('and it is still on screen ten seconds in',
+    sceneAtTime('cd', 10) === 'cd' && sceneAtTime('disco', 10) === 'disco');
+  check('then the rotation takes over',
+    sceneAtTime('cd', SCENE_S + HOLD_S + 0.1) === ids[(ids.indexOf('cd') + 1) % ids.length]);
+  check('an unknown or free mode keeps the normal rotation',
+    sceneAtTime('cassette', 0) === ids[0] && sceneAtTime(undefined, 0) === ids[0]);
+  // With nothing requested the timings must be exactly what they were.
+  check('and an unasked showcase is unchanged',
+    sceneAtTime(undefined, SCENE_S * 2 + 0.1) === ids[2] &&
+    sceneAtTime(undefined, SCENE_S * 5 + 0.1) === ids[0]);
+  check('the rotation still wraps', sceneAtTime('cd', SCENE_S * ids.length + HOLD_S + 0.1) === 'cd');
+
+  const paywall = fs.readFileSync(path.join(root, 'src/app/premium.tsx'), 'utf8');
+  check('the paywall reads what brought them', /useLocalSearchParams/.test(paywall));
+  check('it passes the scene to the showcase', /startWith=\{scene\}/.test(paywall));
+  check('and it names the thing they came for', /Unlock \$\{focus\}/.test(paywall));
+}
+
 console.log(`\n${failures === 0 ? 'ALL GOOD' : `${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);

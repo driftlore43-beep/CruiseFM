@@ -46,8 +46,8 @@ is noise, and acting on noise is how the wrong thing gets rebuilt.
 
 ## 1. OWNER — status unknown, and nothing here can see it
 
-Three were put on the calendar for 08.11; Tomáš is answered, so **two are
-left**. **This repo cannot verify either of them**, and the 18.09 lesson
+Three were put on the calendar for 08.11; two are now closed on the owner's
+word, so **one is left**. **This repo cannot verify it**, and the 18.09 lesson
 applies: a belief recorded as a fact is indistinguishable from a fact when it
 is read back. Marked unknown on purpose rather than assumed outstanding.
 
@@ -55,14 +55,13 @@ is read back. Marked unknown on purpose rather than assumed outstanding.
       characters. No review, live on save. **One unwrapped line** — App Store
       Connect keeps the breaks you paste, which this project has been caught by
       in three separate fields.
-- [ ] **The published DSA address.** The EU page carried her **home address**
-      as of 12.10, and she reported the field editable the same day. Whether it
-      now carries the Anytime Mailbox address is a question only
-      `apps.apple.com/de/app/id6793233679` can answer, and this sandbox's proxy
-      refuses that host outright (403 to CONNECT, re-confirmed 08.11, including
-      on `gb`, which is demonstrably live — so that is the proxy, not evidence).
-      **Her browser is the instrument.** If the page does not load at all, that
-      is a third answer: the edit went through and Apple is re-verifying.
+- [x] **The published DSA address — DONE, owner confirmed 10.11.** The EU
+      product page carried her **home address** from 07.09 to at least 12.10; it
+      now carries the Anytime Mailbox one. That closes the 25.08 open item and
+      the whole chain that started with a stranger in Czechia on 06.10.
+      Recorded on her word: `apps.apple.com` answers http 000 from this sandbox
+      for every storefront, control storefronts included, so nothing here can
+      confirm a listing field — ever.
 - [x] **Reply to Tomáš Janů — DONE, owner confirmed 10.11.** He wrote
       unprompted with nothing to go on but a dead link, guessed the cause was
       on our side and specific to the EU storefronts, and was exactly right.

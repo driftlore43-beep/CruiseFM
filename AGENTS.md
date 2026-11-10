@@ -10,7 +10,7 @@ file.** It is the entry document and it points at four others:
 | `docs/CURRENT_STATE.md` | Versions, builds, channels, health checks, and exactly what was in progress |
 | `docs/KNOWN_ISSUES.md` | Open bugs, settled dead ends, and the traps this project has hit more than once |
 | `docs/TODO.md` | Remaining work, ordered, split into code-side and owner-side |
-| `docs/WIDGET_HANDOFF.md` | The task that was mid-flight: widget designs H and I, ready to execute |
+| `docs/WIDGET_HANDOFF.md` | The widgets as they ship: the six gallery rows, how the snapshot reaches them, what a tile may and may not claim |
 
 ## What THIS file is, and how to use it
 
@@ -34,8 +34,9 @@ on 2026-09-05 (commit `84e3cab`) found four stale claims, corrected here and in
 | iPad `supportsTablet` is still to do | **Already `true` in `app.json`.** |
 | The entitlements list must be empty | It now correctly holds `com.apple.security.application-groups`. |
 
-Consequently **`docs/launch/next-build.md` is partly out of date**: its items 1
-and 2 are done in configuration and waiting only on a build that succeeds.
+Consequently **`docs/launch/next-build.md` is finished rather than pending** —
+every item on it shipped, and it carries a dated superseded header saying so
+(10.11). `docs/TODO.md` §3 is what a build would carry today.
 
 ---
 

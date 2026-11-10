@@ -1,5 +1,16 @@
 # The next build — what goes in it
 
+> **SUPERSEDED 2026-11-10. This is a historical record, not a plan.** It was
+> written for the 1.4.0 build and everything on it has shipped: the App Group is
+> registered, the widget extension is in the store, `supportsTablet` is live,
+> and the Apple Music repeat fix was proven on a phone on 23.09. The App Store
+> has had 1.4.3 (build 72) since 02.11.
+>
+> **Read `docs/TODO.md` §3 for what a build would actually carry today**, and
+> `docs/launch/pre-submission-checklist.md` for how to cut one. Kept because its
+> Apple-side walkthroughs — the App Group dropdown, the credentials wizard's
+> one gap — are still accurate if any of that ever has to be done again.
+
 Written 1 September 2026, at the owner's request, after publishing the Mint fix
 to production.
 

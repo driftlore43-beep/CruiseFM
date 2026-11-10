@@ -1,368 +1,231 @@
-# Widget designs H and I — the exact task, ready to execute
+# Cruise FM — The Widgets, As Shipped
 
-**Written 2026-09-08 at commit `0572efa`, branch `claude/cruise-fm-v4wk5f`.**
-**CORRECTED 2026-09-12: that branch was merged into `main`, which is now the
-branch everything happens on.**
+**Rewritten 2026-11-10 at commit `b3edd34`**, read off the Swift rather than
+recalled.
 
-This is the one piece of work that was **mid-flight** when the previous agent
-handed over. `docs/TODO.md` §0 describes it; this file is the executable
-version — exact files, exact line numbers, exact current values, and how to see
-the result.
-
-**Read `.cursor/rules/cruise-fm.mdc` first** (it is applied automatically) and
-`docs/CLAUDE_HANDOVER.md` for the project as a whole.
+**This file used to be something else, and that matters.** It was a 368-line
+executable brief for mockup work on two designs — the Mirror Ball's silhouette
+and shading, and the CD's case and diffraction — written 08.09 when that was the
+one task mid-flight. **All of it shipped.** The mirror ball was ported to the
+app's own chrome recipe on 10.09, its colour fault fixed on 22.09, the CD's case
+and fan rebuilt on 10.09 and 21.09, and the whole extension went to the store in
+**1.4.3 (build 72)**, released 02.11. A step-by-step brief for finished work is
+the most misleading thing a doc set can contain, and this one was named in the
+project's own "read this first" table — so it is now a **reference to what
+exists**, not a task.
 
 ---
 
-## 0. What stage this is at
+## 0. The thirty-second version
 
-**Mockup only. Nothing from this round exists in Swift.**
+The widgets are a **WidgetKit extension in Swift**, at `targets/widgets/`, built
+through `@bacons/apple-targets`. They are **not JavaScript**: nothing about them
+can ship over the air, so every change waits for a build.
 
-The ten widget designs live in two places:
+They are also a **separate process with its own sandbox**. The extension cannot
+call into the app, cannot reach a music service, cannot read the app's
+AsyncStorage and cannot see the app's bundle. Everything a tile draws was
+written down in advance by the app, into a shared App Group container. That one
+fact explains almost every design decision below.
 
-| | |
+---
+
+## 1. The six gallery rows
+
+A **row** is what someone sees in the widget gallery. A **look** is a different
+way of drawing the same idea, picked by long-pressing a placed tile.
+
+| Row | `kind` | Sizes | Looks | Draws |
+|---|---|---|---|---|
+| **On Air Now** | `CruiseOnAir` | small, medium | — | The schedule: what is on air this hour, and what follows |
+| **Start Drive** | `CruiseStartDrive` | small, medium | — | The station's photograph full-bleed with a play button; one tap starts a drive |
+| **On the Deck** | `CruiseFMVinyl` | medium | Road, Label | A record, on the station's photograph or on its own printed sleeve |
+| **The Mode** | `CruiseMode` | small, **large** | Mirror Ball, CD, Record | The mode as an object. Large draws a whole deck — tonearm, three silver keys, the ground painted in the album's own colour |
+| **Last Played** | `CruiseLastPlayed` | medium, **large** | CD player, Pocket player, Ticket stub | The last song, as an object |
+| **On Air** (Lock Screen) | `CruiseLockScreen` | accessoryRectangular, accessoryCircular, accessoryInline | — | The dial and the station, on the Lock Screen |
+
+**A size is declared for the whole ROW, not per look.** `.supportedFamilies`
+sits on the `Widget`, so offering a large tile for the Pocket player offers it
+for the CD window and the stub as well — which is why all three had to gain tall
+arrangements at once, rather than being drawn stretched at a size the gallery
+advertises.
+
+### Pinning
+
+Every tile defaults to **"my last station"**, which is exactly what all of them
+did before pinning existed — so a tile already on a Home Screen kept behaving as
+it had, with no migration and no default value declared anywhere.
+
+A tile can instead be **pinned to a station**, including one the driver made
+themselves. That forces an `AppEntity` rather than an `AppEnum`: a list written
+into the binary cannot contain stations that did not exist when it was compiled,
+so `StationQuery` reads the pickable list **out of the snapshot**, because
+`suggestedEntities()` is asked while the app is not running.
+
+Two rules there are load-bearing:
+
+- **The sentinel.** The list's first row has an empty id and means the same as
+  nil. An optional parameter gives no reliable way back, and a setting you can
+  change but not undo is worse than no setting.
+- **An unknown pinned id falls back rather than blanking.** A pinned station can
+  be deleted, and a tile that goes empty over it looks broken when the default
+  behaviour is a perfectly good tile.
+
+**On Air Now** and the **Lock Screen** row are deliberately not pinnable — the
+first is about the schedule rather than a station of yours, and the second is
+iOS 16-capable while `AppIntentConfiguration` is 17+.
+
+---
+
+## 2. How the data gets there
+
+```
+the app  →  widgetData.ts  →  setSnapshot(json)  →  App Group  →  Snapshot.swift
+```
+
+`src/utils/widgetData.ts` builds the snapshot; `modules/cruise-widgets` is the
+bridge, whose one job is to write it and call `WidgetCenter.reloadAllTimelines()`.
+
+**Three rules, each of which was learnt by breaking something:**
+
+1. **A field ADDED to the snapshot must be optional in Swift, in its own build,
+   before the JS starts sending it** — and a field being REMOVED goes optional
+   first too. Swift's decoder is all-or-nothing: one required property missing
+   and the whole decode returns nil, blanking every tile at once with nothing
+   logged anywhere. A binary already on a phone keeps being handed newer
+   snapshots by an app that updates over the air.
+2. **`scripts/test-widget-contract.mjs` is what holds the two sides together.**
+   It reads the property names straight out of the shipped Swift, checks them
+   against a snapshot built by the shipped TypeScript, and asserts the App Group
+   string and storage key match across all three files. If those disagree the
+   widgets read an empty container for ever, with no error.
+3. **Republishing is the caller's job, and the order matters.**
+   `rememberCruise.ts` saves the cruise and republishes as one action, in that
+   order — the publish READS the cruise back out of storage, so a publish that
+   ran first would hand the widgets the previous station. It could not go inside
+   `saveLastCruise` because `widgetData` imports `lastCruise`.
+
+### What a tile may and may not claim
+
+- **"LAST PLAYED", never "now playing".** iOS redraws a widget a handful of
+  times a day and the poll stops when the app is backgrounded, so the app often
+  does not know what is playing. A claim about the past does not go stale; that
+  one word is the whole of this row's honesty.
+- **`currentOnAir(at:)`, never `onAir.first`.** The snapshot carries a
+  *timeline* — entry 0 is "now" at the moment the app wrote it, the rest are the
+  day's changeovers each stamped with the minute it happens, which is the trick
+  that lets a tile change through the day with the app never running. Taking the
+  head of that list presented a hours-old station as current, which reads as a
+  widget that has **stopped working** rather than one that is wrong.
+- **No control may be wired to anything.** The three silver keys on the big deck
+  and the Pocket player's wheel are furniture — part of the object whether or
+  not anything is playing. A key that looked live would be broken, because the
+  extension cannot reach a music service (§5 and `KNOWN_ISSUES.md` §2.9).
+- **The paywall is not in the extension and must never be.** The station picker
+  offers the FM band to everyone and marks it, the same shop-window rule the
+  Stations page follows; `premium` and `isPro` travel in the snapshot for
+  presentation only. A widget reads a file out of shared storage, so a lock
+  decided from that is a lock anyone can edit. `test-widget-bundle.mjs` fails if
+  any Swift file so much as branches on those two fields.
+
+---
+
+## 3. Standing rules for a target with no compiler
+
+**Swift cannot be built, rendered or photographed in this environment.** A
+mistake in the extension is invisible until a build burns a review cycle, and
+three builds have died on Swift that read perfectly (40, 41, 64). So:
+
+- **`scripts/test-widget-bundle.mjs` is the compiler this environment does not
+  have.** It checks what is checkable: every declared `Widget` is registered in
+  the bundle (one written and never registered is simply absent from the gallery
+  with nothing logged); a configurable widget always has a pre-17 fallback **on
+  the same `kind`** (a changed kind makes a placed tile vanish); nothing is
+  declared twice across the target, since every file compiles into one module;
+  no **bare call** names something the target does not declare (which is what
+  build 64 died on — one `placeholder` still calling a helper that had been
+  renamed); and a long list of design rules proven to fail before being
+  believed.
+- **Balance-check every edited file** for braces, parens and brackets — with
+  **string literals stripped BEFORE comments**, or a `//` inside
+  `"cruisefm://drive"` eats the rest of that line and its closing bracket.
+- **Prefer the version with fewer ways to be wrong.** A method written against a
+  protocol the type does not conform to compiles as a method nobody calls, and
+  nothing here would notice.
+- **A size must be a share of its tile, never a number of points.** WidgetKit
+  hands a large tile a different box on every screen — 329x345, 338x354,
+  360x379, 364x382 — and fixed numbers were exact on one phone and 1pt over or
+  36pt short on the others.
+- **A `GeometryReader` aligns its content top-leading, not centre**, so anything
+  inside one needs an explicit frame or it is silently pushed off two edges.
+- **Nothing structural may carry a hue.** The material is neutral chrome and the
+  LIGHT carries the mood — the app learnt this on its own mirror ball in round
+  22 and the widget's copy had drifted back to three hues.
+- **A widget cannot animate itself.** Settled three times (20.08, 27.08, 19.09):
+  iOS budgets a widget to a handful of redraws a day and only countdown-style
+  text may animate. Every app, not just this one.
+
+### And the rule no check can replace
+
+**A build that changes native code must be LAUNCHED on a phone, with the tiles
+actually placed, before it goes to Apple.** A build that compiles is not a build
+whose gallery offers the new size.
+
+**A tile already on a Home Screen must be removed and re-added to be judged** —
+iOS caches a widget's last successful draw **per placed tile**, so a tile can be
+older than the app that drew it, and an unchanged-looking tile after an update
+is the cache rather than the work. Two tiles on one Home Screen have been
+observed rendering from different builds at once.
+
+---
+
+## 4. The design harnesses
+
+The owner reviews this work **visually**, and so should you. `docs/design/`
+draws a tile in Python or HTML so a design can be approved before anyone writes
+Swift:
+
+| File | Draws |
 |---|---|
-| `docs/design/v3.py` (575 lines) | The **mockup** — HTML, rendered to a gallery sheet the owner reviews visually |
-| `targets/widgets/*.swift` | The **real widget extension** — what actually ships |
+| `v3.py` + `shot4.mjs` | The original ten-design gallery sheet |
+| `ball.py`, `ball_widget.py` | The mirror ball, with the app's own shading model |
+| `cd_widget.py`, `cd_case.py`, `cd_window_tall.py` | The CD disc, its jewel case, the big Winamp window |
+| `record_widget.py`, `turntable_{one,two}.py` | The record, and the big deck's tonearm geometry |
+| `ticket.py`, `ticket_tall.py` | The ticket stub, wide and tall |
+| `cassette_widget.py`, `big_tiles.py` | The cassette, and the large family |
+| `assets.py` | Resolves the **repo's own** fonts and station photographs |
 
-The mockup is how the owner approves a design before anyone writes Swift, because
-**Swift cannot be compiled in this environment** and a mistake in the extension is
-invisible until a build burns a review cycle.
+Run everything **from the repo root** — `assets.py` resolves relative to it, so
+running from `docs/design/` fails on a missing font; set `CRUISE_ROOT` if you
+must. Then **look at the picture**: faults that reading the code cannot find
+have been caught that way repeatedly — a barcode across an artist's name, a
+sleeve opening that drew perfectly and showed nothing because the record covered
+it, a tonearm's stylus sitting on the label, a counterweight sliced off by the
+tile's rounded corner.
 
-**The mockup is a proposal until the Swift exists, and a lie about the Swift
-afterwards unless it is kept in step.** That has cost a round of confusion twice —
-once when a card showed "Cassette mode" that the Swift never printed, and again on
-the Stub. When you finish a design here, **port it**, then keep the two together.
+**`assets.py` reading the real files is deliberate.** An earlier harness inlined
+base64 copies of the fonts and photographs, which die on a container reset and
+can drift from what ships, so a mockup could show a station in a colour the app
+does not have.
 
----
-
-## 1. The render loop
-
-Everything runs **from the repo root** (`assets.py` resolves the real fonts and
-station photographs relative to it — running from `docs/design/` fails with
-`missing .../docs/design/assets/fonts/DSEG7Classic-Bold.ttf`; set `CRUISE_ROOT`
-if you must run it elsewhere).
-
-```bash
-# 1. build the sheet
-OUT=/tmp/widgets.html python3 docs/design/v3.py
-
-# 2. screenshot it
-PLAYWRIGHT_MODULE=/opt/node22/lib/node_modules/playwright/index.mjs \
-  IN=/tmp/widgets.html OUT=/tmp/gallery.png node docs/design/shot4.mjs
-```
-
-Then **look at the picture**. The owner reviews this work visually and so should
-you — three of the last six changes were only caught by zooming into the render
-(a barcode overlapping an artist's name; a sleeve opening that drew perfectly and
-showed nothing because the record covered it; a "0 AM" where a label sat half
-under a sleeve).
-
-`PLAYWRIGHT_MODULE` may differ on your machine — it is an absolute path to
-`playwright/index.mjs`. Drop the variable if Playwright resolves normally.
-
-The sheet is 316×316 for a small widget (`.s`) and 676×316 for a medium (`.m`),
-corner radius 44 — see `MW, MH, S` and `RAD` at `docs/design/v3.py:6-7`.
+> **The mockup is a proposal until the Swift exists, and a lie about the Swift
+> afterwards unless it is kept in step.** That has cost a round of confusion
+> three times. See `KNOWN_ISSUES.md` §3.18.
 
 ---
 
-## 2. H — the Mirror Ball (small)
-
-### What the owner asked for, verbatim
-
-> "H — Remove the text beneath the mirror ball. Smooth out the edges, and make it
-> reflective and realistic. Like how we made the mirror ball in the app."
-
-This follows an earlier note on the same widget — *"make this one reflect off
-pretty pink, blue and purple colours, as if it's a party happening"* — which is
-**already done and must be kept**. The party lamps stay; what changes is the
-material and the silhouette.
-
-### Where it lives
-
-| What | File | Line |
-|---|---|---|
-| The widget slot | `docs/design/v3.py` | `BALL` at **509** |
-| The room's beams | `docs/design/v3.py` | `_BALL_BEAMS` at **506** |
-| The ball itself | `docs/design/ball.py` | whole file, 111 lines |
-| **The reference** | `src/components/MirrorBallFlipbook.tsx` | the app's real ball |
-
-### What the render shows today
-
-Rendered and looked at on 08.09, so this is the *observed* state rather than a
-reading of the code:
-
-- **The silhouette is visibly polygonal** — the outer edge is a chain of flat
-  tile edges, plainest on the left and right limbs.
-- **Almost every mirror is mid-grey.** There is very little dark-beside-bright,
-  which is the uniform scatter (§2.3) showing itself. It reads as speckled paint.
-- **The tiles are chunky** — 17 × 30 across 228 px.
-- **The colour lands in three broad blobs** — purple across the top, pink at the
-  lower left, blue at the right — rather than as individual mirrors catching a
-  lamp. That is the single-lobe problem: brightness and colour share one `d ** 9`
-  term, so wherever a lamp is bright it is also fully tinted, in a patch.
-- The bottom pole shows a small rosette of slivers where the columns converge.
-
-### 2.1 Remove the caption
-
-`docs/design/v3.py:519-521` — the block ending `<span ...>Garage</span>`. Delete
-it outright. Nothing replaces it: the ball is the whole widget.
-
-### 2.2 Smooth the silhouette
-
-The ball is drawn as ~300 polygons (`mirror_ball()` in `ball.py`), so its outer
-edge is a **polygon chain, not a circle** — visibly faceted at 228 px.
-
-`ball_svg()` (`ball.py:100-111`) already draws a body circle underneath and a
-hairline circle on top, but the tiles themselves overhang. The fix is a
-`<clipPath>` circle in the `<defs>` block and a `clip-path` on the tile group, so
-the edge is perfectly round **whatever the tiling does**:
-
-```python
-f'<defs>...<clipPath id="ballclip">'
-f'<circle cx="{size/2}" cy="{size/2}" r="{size/2}"/></clipPath></defs>'
-...
-f'<g clip-path="url(#ballclip)">' + mirror_ball(size, **kw) + '</g>'
-```
-
-Note `ball_svg` currently sets `style="...overflow:visible;"` — that is what lets
-the tiles spill past the viewBox in the first place. A clip is the honest fix;
-switching to `overflow:hidden` would clip at the **square** viewBox, not the
-circle.
-
-### 2.3 Match the app's shading model
-
-This is the substance of "reflective and realistic". `ball.py` was written as a
-simplified port and has drifted from `MirrorBallFlipbook.tsx` in four ways. **The
-app's version is the reference** — it went through 23 rounds with the owner.
-
-| | `ball.py` today | `MirrorBallFlipbook.tsx` |
-|---|---|---|
-| Grid | `rows=17, cols=30` (line **32**) | `ROWS = 23` (116), `COLS = 44` (117) |
-| Scatter | `rnd.uniform(-0.13, 0.13)` — **uniform** (line **73**) | **end-weighted** (line **220**) |
-| Lamp lobes | one lobe, `d ** 9` (line **70**) | **two**, kept apart (lines 202-208) |
-| Bevel | `shrink=0.91` toward the centre (line **62**) | `BEVEL = { u0: .08, u1: .92, v0: .07, v1: .93 }` (136) |
-
-**The end-weighted scatter is the important one.** The app pushes each mirror's
-brightness toward the *ends* of its range:
-
-```js
-// MirrorBallFlipbook.tsx:220
-const spread = Math.sign(env - 0.5) * Math.pow(Math.abs(env - 0.5) * 2, 0.68) * 0.5;
-```
-
-A uniform scatter clusters mirrors around the mean, which reads as speckled grey
-paint. **A genuinely dark mirror beside a genuinely bright one is the cue that
-sells chrome** — that sentence is in the app's own comments and it is the whole
-reason this constant exists.
-
-**Two lobes per lamp, and keeping them apart matters.** The app runs a *wide*
-lobe (`dot ** 10`) for brightness and a *narrow* one (`dot ** 28`) for colour:
-
-```js
-const wide   = Math.pow(dot, 10) * L.power;   // how bright
-const narrow = Math.pow(dot, 28) * L.power;   // what colour
-```
-
-`ball.py` uses a single `d ** 9` for both, which is why widening it to brighten
-the ball also tints half the surface. **A ball that is broadly blue is a coloured
-sphere, not a mirrored one.**
-
-### 2.4 The one knob that does NOT work
-
-> **Do not raise the ambient floor** (`b = 0.20` at `ball.py:66`).
-
-This was tried on the app's ball and measured: the median brightness moved, and
-the share of pixels above 200 fell **4.1% → 0.6%**. The dark mirrors went with it
-and the ball flattened into a uniform grey sphere. **Widening the bright lobe is
-the knob that works** — more mirrors catching a lamp brightens the ball *and*
-widens the gap between a lit mirror and its neighbour at the same time. The full
-reasoning is in `MirrorBallFlipbook.tsx:182-199`; read it before touching
-brightness.
-
-### 2.5 What must not change
-
-- **The party lamps stay.** `LAMP_COLORS` (`ball.py:30`) is pink / blue / purple,
-  one per lamp, so a mirror is tinted by **which lamp is catching it** rather than
-  painted a single colour overall. That is an explicit owner decision.
-- **The material carries no hue; mood arrives as light.** The mirror ball is
-  neutral chrome lit by coloured lamps — never chrome that is itself coloured.
-  This is rule 23 in `.cursor/rules/cruise-fm.mdc` and it has been relearnt on
-  this component more than once.
-- **The room's beams** (`_BALL_BEAMS`, `v3.py:506`) are already recoloured to
-  match the lamps, so the ball reads as lit *by* the room. Keep them in step if
-  the lamp colours ever move.
-
----
-
-## 3. I — the CD (small)
-
-### What the owner asked for, verbatim
-
-> "I — make sure the CD has this rainbow effect on the disc. (The photo I
-> uploaded) Make the station image less opaque also. I would suggest the shape of
-> the widget should be the CD case, so rather than having a square inside the
-> round square widget — the widget holds the CD."
-
-### The reference photo is not in the repo
-
-She attached a photograph of a real CD. **It is not committed** and you cannot see
-it. What it shows, so you can work from the description:
-
-- Diffraction that **radiates outward from the hub as angular streaks**, not as
-  flat concentric bands and not as an even conic wash. The colour sweeps round the
-  disc *and* changes with radius, so the streaks fan.
-- A **silver base** underneath. The rainbow sits on metal, so there is grey
-  showing between the colours — it is not a saturated rainbow disc.
-- A **clear plastic hub ring** with a darker ring around it, and the small centre
-  hole.
-- A strong **white specular sweep** across one side, which is most of what makes
-  it read as a physical shiny object rather than a printed circle.
-
-If in doubt, **ask the owner to re-send it** rather than guessing — she reviews
-this visually and one render either way is cheap.
-
-### Where it lives
-
-`docs/design/v3.py`, `CD` at line **525**, running to **571**. Current structure,
-in draw order:
-
-| Lines | What |
-|---|---|
-| 526 | dark backdrop |
-| 530-547 | **the case** — inset rectangle at `left/top/right/bottom: 14px`, hinge spine, three hinge lugs, four corner posts, one diagonal plastic sheen |
-| 552-570 | **the disc** — 250 px, `left:53% top:50%`, station photo at `saturate(1.15) brightness(.72)`, two conic gradients (one `overlay` at .95 from 20deg, one `screen` at .5 from 200deg), a fine radial ring texture, a diagonal specular, then label rings at `inset:86px` and `inset:107px` |
-
-### What the render shows today
-
-- **The case is drawn inside the widget** with a visible dark margin around it
-  and its own near-square corners sitting inside the widget's 44 px radius —
-  precisely the "square inside the round square" she named.
-- **The rainbow is not reading as a rainbow.** The two conic gradients over a
-  darkened photograph have flattened into a milky mint-and-lilac wash. There is
-  no silver, no angular streaking, and no sense of a metal surface underneath.
-- **The station photograph is very present** in the lower half of the disc —
-  the coast road is fully legible. That is the "less opaque" note.
-- **The hub is a plain grey ring with a black hole.** There is no clear plastic
-  ring and no dark ring around it, which is a good part of why the disc reads as
-  a printed circle rather than an object.
-- The specular sweep is not reading at all at this size.
-
-### 3.1 The widget becomes the case
-
-Today a case is drawn **inside** the widget with a 14 px margin all round, so the
-picture reads as *a square object photographed inside a rounded square*. She wants
-the widget itself to be the case.
-
-So: drop the `14px` inset and let the hinge spine, corner posts and plastic sheen
-run to the **widget's own edges** (the `.s` box, 316×316, radius 44). The case's
-own `border-radius:4px` goes — the widget's 44 px corner becomes the case's
-corner. The disc then sits inside that, and the backdrop at line 526 has nothing
-left to show, so it can go or become the case's own interior.
-
-**Watch the corner posts.** At `top/left: 7px` inside a 4 px-radius rectangle they
-sit in a square corner; against a 44 px radius they will float in mid-air unless
-they move inward and follow the curve. This is the kind of thing the render shows
-in one look and the CSS does not.
-
-### 3.2 The rainbow
-
-Two flat conic gradients cannot produce what the photo shows — a conic band is the
-same colour at every radius, so it reads as a pinwheel. What is wanted is angular
-streaks that **fan out and change with radius**. Approaches worth trying, cheapest
-first:
-
-- a **`repeating-conic-gradient`** at fine angular pitch for the streaks, masked
-  with a `radial-gradient` mask so it fades toward the hub and toward the rim
-  (the data area of a real CD is an annulus, not the whole face)
-- **two or three layers at different pitches and offsets**, so no single period is
-  legible — the same trick the app's own CD mode uses, where 50 overlapping
-  low-opacity wedges avoid reading as spokes
-- a **silver base** under all of it, so the rainbow modulates metal rather than
-  replacing it
-
-**Do not draw the rainbow as hard-edged wedges.** Rule 22: light is gradient
-falloff, never a stroked or hard-edged shape. This exact mistake was made on the
-app's own CD fan and on the vinyl's sheen, and both were reported as artefacts.
-
-### 3.3 The station image, less opaque
-
-`v3.py:555` — `filter:saturate(1.15) brightness(.72)`. She wants the photo to sit
-further back. Lower the brightness, or add an `opacity` to the `<img>`, or both.
-Then re-check the rainbow reads against it — the reason the photo was *darkened*
-in the last round was so the colour would show, so these two pull against each
-other and the render is the arbiter.
-
----
-
-## 4. When both are approved
-
-1. **Port every approved change into the Swift.** Both live in
-   **`targets/widgets/ModeWidget.swift`** (423 lines):
-
-   | | Line |
-   |---|---|
-   | `ModeView.ball(_:)` — the ball's whole widget, beams and all | 128 |
-   | `ModeView.disc(_:)` — the CD's whole widget | 149 |
-   | `BeamField` — the room's light beams | 163 |
-   | `MirrorBall` — the sphere projection and its shading | 202 |
-   | `JewelCase` — hinge spine and corner posts | 292 |
-   | `CompactDisc` — the disc face and its diffraction | 354 |
-
-   Nothing from this round is there yet. Note the Swift `MirrorBall` is a
-   *third* implementation of the same idea (after the app's and `ball.py`'s) —
-   when you change the shading model, change all three or say plainly which one
-   is now the reference.
-2. **Run the three widget suites** — they are the compiler this environment does
-   not have:
-   ```bash
-   node scripts/test-widget-bundle.mjs      # every declared widget is registered;
-                                            # kinds match; nothing declared twice
-   node scripts/test-widget-contract.mjs    # the TS snapshot and Snapshot.swift agree
-   node scripts/test-widget-fonts.mjs       # Swift asks for names the ttf actually has
-   ```
-3. **Then the full sweep**, before anything is pushed:
-   ```bash
-   npx tsc --noEmit
-   for f in scripts/test-*.mjs; do node "$f" || echo "FAILED $f"; done   # 31 suites
-   node scripts/preflight.mjs
-   ```
-   `scripts/test-contrast.mjs` needs Playwright **and** a running web build
-   (`npx expo start --web`); its offline failure is a missing dependency, not a
-   regression.
-
-### Three widget rules that will bite
-
-- **Any new field on the snapshot must be OPTIONAL in `targets/widgets/Snapshot.swift`.**
-  Swift's decoder is all-or-nothing — one missing property blanks **every** widget
-  at once, with nothing logged anywhere.
-- **Widget `kind` strings are permanent.** Changing one makes a widget already on
-  someone's Home Screen vanish. Build 39 has already placed the Deck.
-- **Prefer the version with fewer ways to be wrong.** Swift cannot be built here.
-  A `.blendMode(.overlay)` was dropped from the sleeve for exactly this reason —
-  it looked right in the mockup, it was composited inside a `.clipped()` stack,
-  and a plain low-opacity ring looks the same and cannot surprise anyone.
-
----
-
-## 5. Nothing here reaches a phone without a build
-
-**Widgets are native. None of this ships over the air.**
-
-Build 39 (cut 2 September, on the owner's phone) carries the widgets as they
-stood at `498c2ef`. **`ModeWidget.swift` landed on 3 September in `33cda4f`, so
-the Mirror Ball and CD widgets have never existed on any phone** — nor have the
-Deck's Look setting (`DeckLook.swift`) or the Last Played row
-(`LastPlayedWidget.swift`). Anything you see on a device today predates all of
-it.
-
-The remaining blockers are in `docs/TODO.md` §1 and are the owner's, not code's:
-
-- verify the App Group `group.com.driftlore.CruiseFM` on Apple's site
-- cut a build — **budget a failed build or two**, because the widget extension is
-  a second app ID that does not exist until a build tries to create it
-- install it, open it, check the widgets
-- **only then** move `runtimeVersion` to 1.4.0, in the same commit
-
-So the design work here is worth doing well and is **not** what is holding the
-release. The release is waiting on a build.
+## 5. What is not done
+
+- **The iPhone Duo's tile sizes.** Two screens, and the outer 5.4in is very
+  likely the narrowest window this app has ever been handed. `KNOWN_ISSUES.md`
+  §1.1 has the detail; nothing is blocked, since Duo screenshots are optional
+  until April 2027.
+- **A Live Activity.** The biggest thing left on the widget list and the one
+  that would also light up the CarPlay Dashboard for free. It needs its own
+  round, and it needs the open question answered honestly: keeping it in step
+  with the actual song needs either the app running or a server, and there is no
+  Cruise FM server by design. The buildable scope is "a drive is in progress" —
+  station, mode and a native ticking timer — rather than a song-by-song tracker.
+- **A refresh button that does something.** Not a design gap but a platform
+  one; `KNOWN_ISSUES.md` §2.9 records why, including the route Apple names and
+  why this app has already been rejected over it once.

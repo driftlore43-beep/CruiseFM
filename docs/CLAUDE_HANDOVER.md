@@ -13,7 +13,7 @@ This is the entry document. Read it, then the four beside it:
 | **`CURRENT_STATE.md`** | Versions, builds, channels, health checks, and **exactly what was being worked on** |
 | **`KNOWN_ISSUES.md`** | Open bugs, settled dead ends, and the traps this project has hit more than once |
 | **`TODO.md`** | Remaining work, ordered, split into what code can do and what only the owner can |
-| **`WIDGET_HANDOFF.md`** | The one task that was **mid-flight** — widget designs H and I, ready to execute |
+| **`WIDGET_HANDOFF.md`** | The widgets as they actually ship — the six gallery rows, how the snapshot reaches them, what a tile may and may not claim, and the rules for a target with no compiler |
 | **`AGENTS.md`** | The full chronological log. Enormous. Searchable, not readable end to end |
 
 Everything in these five was **verified against the codebase**, not recalled.
@@ -32,10 +32,12 @@ rather than genre.
 > Spotify organises by artist and genre; Cruise FM organises by how a drive
 > feels.
 
-**It is live on the App Store** at 1.3.1 (build 32), ~87 downloads, 3–5 a day.
-Everything since 19 August has shipped **over the air** to that binary. A large
-batch of **native** work — the whole widget extension, iPad support — is
-written, committed and **has never run on a phone**.
+**It is live on the App Store** at **1.4.3 (build 72)**, released 2 November
+2026, with **Premium on sale** since 19 September. The widgets, iPad support and
+the paywall are all shipped and in public hands. The app is **finished**; the
+open question is not whether it is built but **whether anyone buys it** — six
+weeks of Premium have produced no trial started, and `TODO.md` §0 is the
+authority on what to read and when. Download numbers are not knowable from here.
 
 **Cruise FM never plays the audio.** Spotify or the Apple Music system player
 does. That is not an implementation detail; it is why the app declares no
@@ -232,28 +234,23 @@ step**: a comment that has drifted from its code is worse than none.
 
 ---
 
-## 7. What was happening the moment this handover was written
+## 7. What is happening now — nothing is mid-flight
 
-**Aesthetic refinement of the ten widget designs, at the mockup stage.**
+**Corrected 2026-11-10.** This section used to describe widget mockup
+refinement as the work in progress. That shipped: the mirror ball was ported to
+the app's own chrome recipe on 10.09, the CD's case and diffraction were rebuilt
+on 10.09 and 21.09, and the whole extension went to the store in 1.4.3.
 
-Six changes were completed and committed in `84e3cab` (C2, G, K, F, H, I — see
-`CURRENT_STATE.md` §5). The owner then asked for two more, which are **not
-started**:
+**There is no half-finished work.** The last three rounds all shipped and were
+published, and `scripts/production-lag.mjs` reads the public app as up to date.
 
-- **H (Mirror Ball):** remove the caption, smooth the silhouette, and make it
-  reflective and realistic "like how we made the mirror ball in the app"
-- **I (CD):** match a real CD's rainbow (she supplied a reference photo), make
-  the station image less opaque, and **make the widget itself the CD case**
-  rather than drawing a case inside it
-
-I had just read `src/components/MirrorBallFlipbook.tsx` to match the app's real
-shading model when the handover was requested. The findings are written up in
-`CURRENT_STATE.md` §5, turned into a task list in `TODO.md` §0, and written out
-in full — with exact files, line numbers and current-versus-target values — in
-**`docs/WIDGET_HANDOFF.md`**, which is the one to open if you are picking this up.
-
-**Nothing from this round is in Swift.** It lives only in `docs/design/v3.py`
-and `docs/design/ball.py`.
+What comes next is **a reading, not a change.** On **17 November** — a fortnight
+after the padlock fix reached public phones — read RevenueCat for any trial
+started, and App Store Connect's product-page views against downloads. Three
+answers, three different problems, and only one of them is fixed inside the app.
+`TODO.md` §0 is the authority; do not read them earlier, because four days of
+data on a slow-trickle app is noise and acting on noise is how the wrong thing
+gets rebuilt.
 
 ---
 
@@ -308,10 +305,12 @@ that actually needs judgement.
 | **Cursor — the volume work** | Executing a brief that already exists. Mechanical sweeps across many files. Porting an approved design into Swift. Running the suites and reading the output. Renaming, deleting dead code, keeping the mockup and the Swift in step. Anything where the *decision* is already made and what remains is doing it carefully. |
 | **Claude — the judgement work** | Diagnosing a report from the owner before anything is changed. Deciding what a one-line note actually means. Measuring — the harnesses, the frame extraction, the contrast and brightness probes all live here. Design rounds where the answer is not yet known. Writing the brief Cursor then executes. Release decisions: what goes in a build, when to publish, whether a check can be trusted. |
 
-**The brief is the handoff.** `docs/WIDGET_HANDOFF.md` is the shape to copy —
-exact files, exact line numbers, current value versus target, how to see the
-result, and what must not change. A brief that says "make the ball look better"
-wastes both agents.
+**The brief is the handoff**, and the shape to copy is: exact files, exact line
+numbers, current value versus target, how to see the result, and what must not
+change. A brief that says "make the ball look better" wastes both agents. (The
+widget brief that used to be the worked example has been replaced by
+`WIDGET_HANDOFF.md`'s reference to the shipped result; `git show` it at
+`50a57d3` if you want the original as a template.)
 
 ### The one rule that keeps it safe
 

@@ -1,10 +1,12 @@
 # Cruise FM — Known Issues, Failed Approaches, and Traps
 
-**Audited 2026-09-05 at commit `84e3cab`.**
+**Part 1 re-audited 2026-11-10 at commit `b3edd34`**, every item checked against
+the code rather than against the previous version of this file. Parts 2 and 3
+are findings rather than status, so they are left as written and added to.
 
 Three kinds of thing live here:
 
-1. **Open problems** — real, unfixed
+1. **Open problems** — real, unfixed, each verified today
 2. **Settled dead ends** — tried, failed, and must not be retried
 3. **Recurring traps** — mistakes this project has made more than once
 
@@ -12,34 +14,53 @@ Three kinds of thing live here:
 
 ## PART 1 — OPEN PROBLEMS
 
-### 1.1 The medium widget showed no text at all on build 39 — NOT DIAGNOSED
+Six items closed since the 05.09 audit; they are listed in §1.10 so nobody
+re-opens them. What follows is what is genuinely still true.
 
-**Status: open, cannot be reproduced from here.**
+### 1.1 The iPhone Duo is a screen shape this app has never been handed
 
-The owner photographed her Home Screen on build 39. The Deck widget drew the
-record and the station photo and **nothing else** — no "ON THE DECK", no
-station name, no dial, no "LAST PLAYED". Verified by zooming into the actual
-pixels, not guessed from a thumbnail.
+**Status: open, and it cannot be closed from here.** Apple's first foldable went
+on sale **23.10.2026** — 7.6in inner screen, 5.4in outer, iOS 27.
 
-Build 39 was cut 2 September and carries `498c2ef`, whose medium layout is
-`HStack(RecordView, VStack(dial, name, tagline, lastPlayed))` — i.e. it has
-**always** drawn text beside the record. **The build-age gap does not explain
-it.** Swift cannot be compiled in this environment and no device log was
-available.
+**The app BEHAVES correctly on one already.** The 07.10 round split the two
+questions that one function had been answering at once: `isWide` still measures
+the window (so an unfolded Duo correctly gets the centred reading column), while
+`isTabletDevice()` asks iOS's own idiom, which answers `.phone` on a foldable
+however big it opens — so the driving question is still asked and its drives are
+still **counted** as drives. That shipped over the air on 08.10 and is on every
+public phone.
 
-**Do not invent a cause.** Check it as its own item once a new build is on a
-real phone. If it persists on the new Road/Label code, it is a real bug in how
-the widget reads its data — most likely the snapshot decode (see §3.1).
+**What is untested is how it LOOKS**, and there are two specific risks:
+
+- **The inner screen is nearly square.** App Store Connect lists its screenshot
+  sizes as 2034x1398 / 2853x2007, i.e. about **1.45:1** — far nearer the iPad's
+  4:3 than a phone's 19.5:9. Every deck sizes its hero as
+  `min(a share of width, a share of height, a ceiling)`, tuned against those two
+  shapes, so the likely outcome is an iPad-ish layout rather than the 13.09 fault
+  where the height term binds and the object sits marooned. **That narrows the
+  risk and does not close it.**
+- **The widget tiles get sizes nobody has drawn, on two screens.** The outer
+  5.4in is very likely the narrowest window this app has ever been handed, and
+  26.09 measured the big CD window as **1pt over** on the smallest current
+  iPhone. The last fortnight's rounds made the CD window, the ticket stub and
+  the Mode tile scale with their tile rather than carry fixed numbers, which was
+  lucky timing; what is left is to check nothing still adds to a fixed total.
+
+Nobody here has a Duo, a Mac or a simulator. **Duo screenshots are optional
+until April 2027**, so nothing is blocked. The order is: see it, fix what the
+square screen breaks, then photograph it — a screenshot taken before anyone has
+run it on one would be inventing the claim.
 
 ### 1.2 Two dead routes still ship
 
 `src/app/explore.tsx` (an unmodified Expo template `TabTwoScreen`) and
 `src/app/visuals.tsx` are **unreachable** — nothing links to either (verified by
-grep). They are also the last real reason `react-native-reanimated` is
-imported at all, alongside `components/animated-icon.tsx` and
-`components/ui/collapsible.tsx`.
+grep today). They are also the last real reason `react-native-reanimated` is
+imported at all, alongside `components/animated-icon.tsx`,
+`components/animated-icon.web.tsx` and `components/ui/collapsible.tsx` — all
+five confirmed as the only importers.
 
-Harmless but they bloat the bundle. See `TODO.md`.
+Harmless but they bloat the bundle. See `TODO.md` §5.
 
 ### 1.3 The mirror ball is the app's one performance cost
 
@@ -53,71 +74,94 @@ does, `ROWS`/`COLS` in `MirrorBallFlipbook.tsx` is the knob.
 
 ### 1.4 `expo-dev-client` is in a store binary
 
-It adds `NSLocalNetworkUsageDescription` to the Info.plist. It shipped in build
-23, which Apple **approved**, so it is not a blocker — but a dev client has no
-business in a store build. Allowlisted in `preflight-allow.json` with that
-reasoning. Drop it at a quiet moment, never mid-release.
+Still in `package.json` (`~56.0.20`). It adds `NSLocalNetworkUsageDescription`
+to the Info.plist. It shipped in build 23, which Apple **approved**, so it is
+not a blocker — but a dev client has no business in a store build. Allowlisted
+in `preflight-allow.json` with that reasoning. Drop it at a quiet moment, never
+mid-release.
 
 ### 1.5 `NSPhotoLibraryUsageDescription` may be unnecessary
 
 PHPicker on modern iOS runs out of process and probably needs no read
 permission. Kept deliberately: a missing string means a crash the first time
 someone taps "Add a photo" **plus another build cycle**, while a needless one
-costs a line on the listing that a visible button explains. If a 1.3.0+ build
-proves the picker works without it, removing it is a one-line change.
+costs a line on the listing that a visible button explains. If a build is ever
+confirmed to pick a photo without it, removing it is a one-line change.
 
-### 1.6 The ball-touch harness's swipe check is permanently marginal
+### 1.6 The five contrast flags must be RE-MEASURED, never inherited
 
-`scripts/harness/ball-touch.mjs` reports a signal-to-noise ratio of 1.1–1.4×
-because the room has glitter, dust and rays all on their own clocks. It has
-reported `tracks-finger: false` on a build measured working three ways.
+`scripts/test-contrast.mjs` flags five lines on the Stations hero. They sit on a
+station **photograph**, which every hero lays in as an absolutely-positioned
+**sibling** the probe's ancestor walk cannot see — so it reports the page's
+paper instead and the flags are false positives.
 
-**Do not tune the ball to satisfy it.** Measure the transform, the pill and the
-seek instead. Its two real guards (tap toggles play, pull-down dismisses) are
-sound.
+**But the hero is whoever is genuinely on air at the moment of the run**, so the
+photograph behind those five lines differs between sweeps, and a real 2.3:1
+fault was once found on this very page. Measure from the rendered pixels (the
+darker 60% of each glyph box, so the white type is excluded, with each line's own
+alpha composited over what is actually behind it) rather than carrying the last
+sweep's verdict forward. Recent readings, all clear against a 4.5 bar:
 
-### 1.7 Five permanent false positives in the contrast sweep
+| Sweep | On air | Worst of the five |
+|---|---|---|
+| 01.11 | Sunset AM (4.2 brightness — the hard one) | 5.66:1 |
+| 28.09 | Coastal FM | 5.70:1 |
+| 24.09 | Mountain Pass (the brightest photograph in the set) | 5.66:1 |
 
-`scripts/test-contrast.mjs` flags five lines on the Stations hero at ~1.1:1.
-They sit on a station **photograph**, which is an absolutely-positioned sibling
-the ancestor walk cannot see. Verified by sampling the real pixels behind the
-glyphs: 5.4:1, 5.9:1, 7.9:1, 11.6:1, 19.8:1. **All pass.** Do not "fix" them.
+### 1.7 `ball-touch` must be run ALONE
 
-### 1.9 The iPad layout is a stretched phone, and the home page is the bad one
+Not a fault in the app and no longer a fault in the instrument — the 28.09
+rebuild replaced a screenshot diff of the ball's box (which also caught glitter,
+fireflies and light beams, each on its own clock) with a reading of the
+flipbook's own six cross-faded frames, whose opacities always sum to exactly 1.
+Nothing else on screen contributes to that vector, so there is no noise to
+out-shout.
 
-`supportsTablet: true` has been in `app.json` since `13a5b11` and has never
-shipped. Apple **requires** a 13-inch iPad screenshot set (**2064 x 2752**
-portrait) the moment it does.
+**It still needs running on its own.** On 18.09 it read *below* its own noise
+band purely because it was the fourth harness in a batch — a scripted drag under
+load delivers fewer moves, so a weak reading is evidence about the machine before
+it is evidence about the app. The bands from the rebuild: idle ~18–21, held-still
+**0**, moving ~7.5–9.7, with `hands-over` and `tracks-finger` both true.
 
-Rendered at that size on 08.09 — **zero page errors, so nothing is broken** —
-but it is uneven rather than uniformly bad, and the difference is what decides
-how much work this is:
+### 1.8 The weekly lag Routine's prompt names a dead branch
 
-| Page | At 1032 x 1376 |
-|---|---|
-| **Modes** | **Good.** Rows stretch to the full width, the hero centres, the ball sits correctly |
-| **Stations** | **Good.** The dial rows stretch and read; the on-air hero's photo reads as a dark band |
-| **Profile** | Passable. Badges reflow to three columns, though the tiles go very tall |
-| **Home** | **Poor.** Hero, greeting and Recommended cards all stay phone-sized against the left edge, with the bottom two-fifths of the screen empty |
+`trig_011Pjg2StJ2NSB1xf9pkPjJC` tells its session to work on
+`claude/cruise-fm-v4wk5f`, and `main` became canonical on 12.09. That branch's
+tip is `6ed6cfe` (13.09) and is **not** an ancestor of main — the two histories
+are divergent, 731 commits one way and 51 the other — so the last production
+publish is not reachable from it and `production-lag.mjs` either names a pile of
+irrelevant commits or exits 2 because the commit is missing.
 
-**Do not put the home page on the listing** — it is the first thing an iPad
-browser sees. Two honest options and it is the owner's call: ship 1.4.0 with
-`supportsTablet: false` and stay iPhone-only, or give the home page a tablet
-layout first. Recorded in `TODO.md` §3.
+Either way the Routine is designed to **say nothing on exit 0**, so **a check
+that always reports healthy and a check that is dead look identical from
+outside.** It is the owner's Routine and a stored prompt is hers to approve, so
+it is flagged rather than edited (`TODO.md` §2). **Until then, read `last_run`
+rather than trusting its silence.**
 
-### 1.8 Technical debt, catalogued
+### 1.9 Technical debt, catalogued
 
 | Item | Where | Note |
 |---|---|---|
 | Dead routes | `app/explore.tsx`, `app/visuals.tsx` | §1.2 |
-| Template components | `animated-icon*.tsx`, `ui/collapsible.tsx`, `themed-*.tsx`, `web-badge.tsx` | Expo scaffold |
+| Template components | `animated-icon*.tsx`, `ui/collapsible.tsx`, `themed-*.tsx`, `web-badge.tsx` | Expo scaffold, all still present |
 | Local var named `spotify` | Every mode | Historic; it is really the switchboard. Renaming is pure churn |
-| Three copies of the clock | `useTrackClock`, `VinylMode`, `CassetteMode` | Vinyl and Cassette predate the shared one. **They must be kept in step** — the coast-cap bug had to be fixed in all three |
-| `reelTo` | `TunerMode.tsx` | Dead code |
-| Tuner ignores `needsOffAirAsk` | `TunerMode.tsx` | Tuning to an off-air station bypasses the ask. Deliberate for now — a question at the wheel is worse |
+| Three copies of the clock | `useTrackClock`, `VinylMode`, `CassetteMode` | Vinyl and Cassette predate the shared one. **They must be kept in step** — the coast-cap bug had to be fixed in all three, and Cassette had never had the bound at all |
+| Tuner ignores `needsOffAirAsk` | `TunerMode.tsx` | Tuning to an off-air station bypasses the ask. Deliberate — a question at the wheel is worse than the inconsistency |
 | Tuner snap re-renders ~1000 SVG nodes/frame | `TunerMode.tsx` | `TunerReadout` builds a new `toFixed(2)` string each frame, defeating `React.memo`. Real, but the largest and riskiest of that family |
 | `assets/images/intro/` | — | Orphaned layer-generation scripts |
-| `useSpotifyPlayback` single-blip adopt | `utils/useSpotifyPlayback.ts` | Apple's copy got a two-in-a-row rule; Spotify's covers only the `idle` probe. Not fixed deliberately — nobody has reported it on Spotify, and inferring scope cost a round once already |
+| `useSpotifyPlayback` single-blip adopt | `utils/useSpotifyPlayback.ts` | Apple's copy got a two-in-a-row rule; Spotify's `idleStreakRef` covers only the `idle` probe. Not fixed deliberately — nobody has reported it on Spotify, Spotify is no longer offered to new listeners, and inferring scope cost a round once already |
+| The rating card still leaves the app | `components/RateCard.tsx` | `Linking.openURL(REVIEW_URL)`. Apple's in-app StoreKit prompt needs a native module, so it waits for a build. The rules in `rateApp.ts` do not change — only where the tap goes |
+
+### 1.10 Closed since the last audit — do not re-open
+
+| Was | Closed by |
+|---|---|
+| **The medium widget showed no text on build 39 — not diagnosed** | **Diagnosed 09.09 and confirmed on a phone.** `.aspectRatio(contentMode: .fill)` reports the *enlarged* size as its own layout size, so `.clipped()` trimmed nothing, the stack grew past the tile, WidgetKit centred it and the text rows fell outside. The station photographs are portrait, which is why the record survived and the words did not. Fixed via `cruiseBackdrop()`; the owner's build-44 screenshot shows all four lines |
+| **The iPad layout is a stretched phone, home page the bad one** | **10.09.** `pageColumn` (`maxWidth: PAGE_MAX_W` 720, centred) on all four tab pages plus a matching cap on the tab bar — verified today, all four use it. A phone can never reach the cap, so nothing on iPhone moved |
+| **The ball-touch swipe check is permanently marginal** | **28.09.** Instrument replaced; see §1.7 for what to do instead |
+| **`reelTo` is dead code in `TunerMode.tsx`** | Gone — zero occurrences in `src/` today |
+| **The whole widget extension has never run on a phone** | Builds 70/71/72. Shipped, released in 1.4.3, and pinnable to a station |
+| **Apple Music repeat/shuffle fix waiting on a binary** | **23.09**, proven on a real phone by a tester's own screenshot: MediaPlayer 1 → 3 on both surfaces. Spotify's half was proven the same way on 23.09 |
 
 ---
 
@@ -264,6 +308,32 @@ a deliberate single exception, scoped by the owner to that mode alone.
 - An angular ramp of ~48 thin wedges for the CD — neighbouring steps band
 - Pie-wedge light on the vinyl — two straight radial edges, glaring on black
 - A symmetric bevel inset — reads as smaller squares, not a bevel
+
+### 2.9 A widget cannot usefully refresh itself without opening the app
+
+A tester asked for it, and the button half is real: since iOS 17 a widget may
+hold a `Button(intent:)`, Apple's own staff answer is explicit that an intent
+compiled only into the extension runs only there, and `AppIntents` is already
+imported in this target for the Look pickers. **The data is the problem.**
+
+Every tile draws from the snapshot the APP writes into the App Group. An intent
+running in the extension can re-read that file — and the file has not changed,
+so the tile redraws exactly as it was. The extension links neither MusicKit nor
+MediaPlayer, holds no Spotify token (those live in the app's AsyncStorage, not
+the shared container), and media-library authorisation is per bundle id while
+the extension has its own.
+
+**Apple names a route and it is the one this app has already been rejected
+over**: make the intent an `AudioIntent`, which runs in the app's process in the
+background. That is an audio-playback declaration on an app that deliberately
+does not play audio — build 7's **2.5.4** rejection wearing a third hat. Do not
+reach for it without reading that history. `ForegroundContinuableIntent` is the
+one worth examining, since it makes no audio claim.
+
+So what is honestly available today is a tap that refreshes from a file that
+has not changed, or a tap that opens the app — which is what every tile already
+does. **And none of it changes §2.3**: a widget still cannot animate itself
+between taps, whatever the button does.
 
 ---
 
@@ -458,3 +528,57 @@ unchanged code. Count **actual reads** instead.
   every install, not only before a release.
 - **EUIPO and UK IPO search results cannot be shared as links.** Screenshot
   them.
+
+---
+
+### 3.17 A specification is a claim about a slot; the slot is the fact
+
+**Twice in four days, in two different App Store Connect fields, Apple's own
+documentation was quoted correctly and was wrong about what Apple's own upload
+form accepts.**
+
+| What the docs said | What the slot did |
+|---|---|
+| The 21:9 product-page header's *"Supported extensions"* are *".jpeg, .jpg, or .png"* (re-read after the rejection; it still says exactly that) | Refused the JPEG — *"file has an invalid extension"*. PNG only |
+| Nothing — the iPhone screenshot slots had been 1284x2778 for a year | *"File dimensions are invalid"* on all ten. Apple had consolidated its iPhone slots into one **Dynamic Island (medium display)** tab accepting 2556x1179 / 1179x2556 / 2622x1206 / **1206x2622** |
+
+Both were settled in **seconds by one upload**, after work that had been
+reasoned carefully from a spec. **Nothing in this repo could have caught
+either** — there is no way to ask App Store Connect what it wants without
+pressing upload.
+
+The general form is this file's most expensive lesson in a new place: when a
+fix reasoned from a mechanism does not survive contact, stop reasoning about
+the mechanism and go read what the thing actually said. See §3.12.
+
+### 3.18 A harness cannot answer a question about a size it does not draw
+
+Four rounds in the `docs/design/` family hit this, and each one would have
+answered the owner's question **confidently and wrongly**:
+
+- `cd_widget.py`'s `tile()` was still drawing **build 47** — case inset 8,
+  radius 16, a 124pt disc sidestepped 6pt right — every one of which had moved
+  since. A harness drawing the build before last cannot answer a question about
+  the tile on a phone.
+- `cd_window_tall.py` and `ticket_tall.py` each drew **only** `.l` (338x354) —
+  the one large-tile size where the shipped arithmetic happens to be exact — so
+  neither could ever have shown the fault being asked about, which only appears
+  on the other four real tile sizes.
+- `ticket_tall.py` had not **parsed** since `e2a4de2`: a botched edit corrupted
+  a string literal and the file was a syntax error for a day with nobody
+  re-running it.
+- `cd_window_tall.py` was under-drawing type by **30%** (11/12/15pt rendered as
+  15/17/17 at 2px per point), which is exactly the quantity the round was about.
+
+**Before a harness can answer a question about a size, check that it draws that
+size — and that it still runs.** Write every dimension in points through one
+`P()` helper so a number in the harness can be compared with the Swift by eye,
+make the harness **fail** on an overflow rather than clipping it silently, and
+lead the sheet with a "what shipped" tile so the two can be compared at a
+glance.
+
+And the mirror image: **a harness that draws what the code does NOT do is just
+as wrong.** The tonearm sheet offset the counterweight's ribs in *screen* x
+while the Swift offsets them along the barrel, and a painted-deck sheet laid in
+a brushed grain the Swift has no cheap way to draw. Seven fidelity faults have
+been caught in that folder; all of them by porting or by looking.

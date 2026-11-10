@@ -46,9 +46,10 @@ is noise, and acting on noise is how the wrong thing gets rebuilt.
 
 ## 1. OWNER — status unknown, and nothing here can see it
 
-These three were put on the calendar for 08.11. **This repo cannot verify any
-of them**, and the 18.09 lesson applies: a belief recorded as a fact is
-indistinguishable from a fact when it is read back. Marked unknown on purpose.
+Three were put on the calendar for 08.11; Tomáš is answered, so **two are
+left**. **This repo cannot verify either of them**, and the 18.09 lesson
+applies: a belief recorded as a fact is indistinguishable from a fact when it
+is read back. Marked unknown on purpose rather than assumed outstanding.
 
 - [ ] **Promotional text** — `docs/launch/listing-1.4.3.md` §6 holds the 135
       characters. No review, live on save. **One unwrapped line** — App Store
@@ -62,10 +63,9 @@ indistinguishable from a fact when it is read back. Marked unknown on purpose.
       on `gb`, which is demonstrably live — so that is the proxy, not evidence).
       **Her browser is the instrument.** If the page does not load at all, that
       is a third answer: the edit went through and Apple is re-verifying.
-- [ ] **Reply to Tomáš Janů.** Two things belong in it and neither is the
-      apology: **he was right**, and **it was never his storefront** — the app
-      was missing from all 27 EU countries over a trader declaration whose
-      contact details had never been verified. The Czech page now loads.
+- [x] **Reply to Tomáš Janů — DONE, owner confirmed 10.11.** He wrote
+      unprompted with nothing to go on but a dead link, guessed the cause was
+      on our side and specific to the EU storefronts, and was exactly right.
 
 ---
 
@@ -73,11 +73,16 @@ indistinguishable from a fact when it is read back. Marked unknown on purpose.
 
 - [ ] **The weekly lag Routine names a dead branch.**
       `trig_011Pjg2StJ2NSB1xf9pkPjJC` tells its session to work on
-      `claude/cruise-fm-v4wk5f`, and `main` became canonical on 12.09. That
-      branch's tip is an ancestor of main, so the check always measures zero,
-      always exits 0, and the Routine is designed to **say nothing on exit 0**.
-      **A check that always reports healthy and a check that is dead look
-      identical from outside.** The fix is one line of its stored prompt;
+      `claude/cruise-fm-v4wk5f`, and `main` became canonical on 12.09. Read off
+      the remote on 10.11, that branch's tip is `6ed6cfe` (13.09) and is **not**
+      an ancestor of main — the two histories are divergent, 731 commits one way
+      and 51 the other — so what a firing actually does there cannot be known
+      from here: the last production publish is not reachable from it, so the
+      script either names a pile of irrelevant commits or exits 2 because the
+      commit is missing. Either way the Routine is designed to **say nothing on
+      exit 0**, and **a check that always reports healthy and a check that is
+      dead look identical from outside.** The fix is one line of its stored
+      prompt;
       changing it needs her approval, so it is flagged rather than edited.
       **Until then, its silence is not evidence.**
 - [ ] **Trademark — the Australian search has still never been run.** IP

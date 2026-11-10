@@ -1,250 +1,205 @@
 # Cruise FM — Remaining Work
 
-**Audited 2026-09-05 at commit `84e3cab`.** Ordered by what blocks what.
+**Re-audited 2026-11-10 at commit `f0d2659`.** The previous version of this file
+was audited on 05.09 and last touched 05.10; most of it described work that has
+since shipped, and it still led with a widget mockup round that is now in the
+store. It has been rewritten rather than ticked off — §9 lists what closed, so
+nobody re-opens it.
 
-Two columns run in parallel throughout: **CODE** (an agent can do it) and
-**OWNER** (only Jessica can — Apple's site, App Store Connect, a real phone,
-an accountant). The owner-side items are usually the long pole.
+Two columns run throughout: **CODE** (an agent can do it) and **OWNER** (only
+Jessica can — Apple's site, App Store Connect, a real phone, her own browser).
 
----
-
-## 0. IN PROGRESS — pick this up first
-
-**Widget design refinement, mockup stage.**
-
-> **Open `docs/WIDGET_HANDOFF.md`.** It is the executable version of this
-> section — exact files, exact line numbers, current value versus target, the
-> render loop, and what must not change. The checklist below is the summary.
-
-See `CURRENT_STATE.md` §5 for the full context and the findings already made.
-
-### H — Mirror Ball (`docs/design/v3.py` + `docs/design/ball.py`)
-
-- [ ] Remove the "Garage" text beneath the ball
-- [ ] **Smooth the silhouette** — it is currently polygonal because the outline
-      is made of quads. The fix is an SVG `<clipPath>` circle in
-      `ball_svg()` so the edge is perfectly round whatever the tiling does
-- [ ] **Match the app's shading model** (`src/components/MirrorBallFlipbook.tsx`):
-  - finer grid — the app uses `ROWS = 23, COLS = 44`; `ball.py` is `17 × 30`
-  - **end-weighted scatter** — the app pushes brightness to the ends of its
-    range (`sign(roll) · |roll|^0.68 · 4.6`); `ball.py` uses a *uniform*
-    `rnd.uniform(-0.13, 0.13)`. The dark-beside-bright checkerboard is what
-    sells chrome
-  - **two lobes per lamp, kept apart** — a *wide* bright lobe and a *narrow*
-    colour lobe. Widening a single tinted lobe turns half the ball one colour,
-    which is a coloured sphere rather than a mirrored one
-  - a bevel inset on **both** axes (`u0 .08, u1 .92, v0 .07, v1 .93`)
-  - **Do NOT raise the ambient floor** — measured, it flattens the ball and
-    kills the dark mirrors (>200 share fell 4.1% → 0.6%)
-- [ ] Keep the pink/blue/purple party lamps — colour is the **lighting**, the
-      material stays neutral chrome. That split is an explicit owner decision
-
-### I — CD
-
-- [ ] **Rainbow to match the reference photo** (the owner's uploaded image, not
-      in the repo). A real CD's diffraction radiates as **angular streaks from
-      the centre outward** that vary with radius, not flat conic bands. Needs
-      radial masking, a silver base, and a strong white specular sweep
-- [ ] **Station image less opaque**
-- [ ] **The widget's own shape becomes the CD case** — rather than a square case
-      inset inside the rounded-square widget, the widget *is* the case: hinge
-      spine, corner posts and plastic sheen run to the widget's own edges, with
-      the disc inside it
-
-### Then
-
-- [ ] Port every approved mockup change into the Swift
-      (`targets/widgets/*.swift`) — **nothing from this round is in Swift yet**
-- [ ] Run `node scripts/test-widget-bundle.mjs`, `test-widget-contract.mjs`,
-      `test-widget-fonts.mjs`
-- [ ] Keep `docs/design/v3.py` in step with the Swift, or the mockup becomes a
-      lie about the app (it has been twice)
+> **THE SITUATION CHANGED SHAPE AND SO HAS THIS LIST.** The app is finished,
+> released, paid, and live in every storefront including the EU. The question
+> is no longer *is it built* — it is **does anyone buy it**. Six weeks of
+> Premium on sale have produced **no trial started**, and as of 03.11 we know
+> at least part of why. So this list is ordered by what moves that number, and
+> the code work left is small and mostly deliberate.
 
 ---
 
-## 1. BLOCKING THE NEXT BUILD
+## 0. THE ONE QUESTION — read it on 17 November
 
-### 1.1 OWNER — the App Group (~2 minutes, free, **silent if skipped**)
+The padlock fix reached every public phone on **03.11**. Seven of the ten
+stations had been a padlock that did nothing: pressing one produced no page, no
+taste and no price, so most of the dial could never show anybody what Premium
+was. A fortnight from that publish is **17.11**, which is the first date the
+numbers mean anything.
 
-Almost certainly already done — `preflight-allow.json` says the owner
-registered it — but **verify before building**:
+**OWNER — read two things, in this order:**
 
-1. developer.apple.com → Certificates, Identifiers & Profiles → **Identifiers**
-2. **Switch the dropdown from "App IDs" to "App Groups"** ← the step that trips
-   people up
-3. `group.com.driftlore.CruiseFM` must exist
-4. App ID `com.driftlore.CruiseFM` → App Groups → ticked
+1. **RevenueCat** — has any *trial started* at all?
+2. **App Store Connect → Analytics → product page views**, against downloads.
 
-> **If this is wrong the build still succeeds and the widgets still install** —
-> they simply say "Open the app to get started" for ever, with **no error
-> anywhere**. That is the failure to watch for.
+Three answers, three different problems:
 
-### 1.2 OWNER — budget a failed build per new Apple-side record
+| What you see | What it means | What follows |
+|---|---|---|
+| A trial appears | The dead padlock was the cause | Keep going; the fix worked |
+| Zero, page views healthy | People see the listing and don't install | The listing's job — screenshots, first three especially |
+| Zero, page views low | Nobody is finding it | Discovery. No change inside the app fixes this |
 
-The widget extension is a **second app ID** (`com.driftlore.CruiseFM.widget`)
-that does not exist until a build tries to create it. Builds 33–37 each died on
-one such record. They are cheap and each names its own fix.
-
-### 1.3 CODE — bump the runtime **in the same commit as a successful build**
-
-`version` is 1.4.0, `runtimeVersion` is held at 1.3.0. Move it **only** once a
-1.4.0 build has succeeded. Moving it early stranded every phone once already.
+**Do not read them before the 17th.** Four days of data on a slow-trickle app
+is noise, and acting on noise is how the wrong thing gets rebuilt.
 
 ---
 
-## 2. IN THE NEXT BUILD (native — cannot ship over the air)
+## 1. OWNER — status unknown, and nothing here can see it
+
+These three were put on the calendar for 08.11. **This repo cannot verify any
+of them**, and the 18.09 lesson applies: a belief recorded as a fact is
+indistinguishable from a fact when it is read back. Marked unknown on purpose.
+
+- [ ] **Promotional text** — `docs/launch/listing-1.4.3.md` §6 holds the 135
+      characters. No review, live on save. **One unwrapped line** — App Store
+      Connect keeps the breaks you paste, which this project has been caught by
+      in three separate fields.
+- [ ] **The published DSA address.** The EU page carried her **home address**
+      as of 12.10, and she reported the field editable the same day. Whether it
+      now carries the Anytime Mailbox address is a question only
+      `apps.apple.com/de/app/id6793233679` can answer, and this sandbox's proxy
+      refuses that host outright (403 to CONNECT, re-confirmed 08.11, including
+      on `gb`, which is demonstrably live — so that is the proxy, not evidence).
+      **Her browser is the instrument.** If the page does not load at all, that
+      is a third answer: the edit went through and Apple is re-verifying.
+- [ ] **Reply to Tomáš Janů.** Two things belong in it and neither is the
+      apology: **he was right**, and **it was never his storefront** — the app
+      was missing from all 27 EU countries over a trader declaration whose
+      contact details had never been verified. The Czech page now loads.
+
+---
+
+## 2. OWNER — open, and worth doing
+
+- [ ] **The weekly lag Routine names a dead branch.**
+      `trig_011Pjg2StJ2NSB1xf9pkPjJC` tells its session to work on
+      `claude/cruise-fm-v4wk5f`, and `main` became canonical on 12.09. That
+      branch's tip is an ancestor of main, so the check always measures zero,
+      always exits 0, and the Routine is designed to **say nothing on exit 0**.
+      **A check that always reports healthy and a check that is dead look
+      identical from outside.** The fix is one line of its stored prompt;
+      changing it needs her approval, so it is flagged rather than edited.
+      **Until then, its silence is not evidence.**
+- [ ] **Trademark — the Australian search has still never been run.** IP
+      Australia is the home registry (`search.ipaustralia.gov.au`, or its free
+      TM Checker), AUD $250/class standard or $330 via TM Headstart, which puts
+      an examiner on it first. The EU/UK/worldwide searches already done say
+      **nothing** about who holds *Strofi* in Australia. `docs/brand.md` has the
+      detail, including why a Greek restaurant and a song are almost certainly
+      not blockers (different class, different territory).
+- [ ] **A real domain.** Every share card that leaves the app prints
+      `cruisefm.netlify.app`. When it changes, `INSTALL_HOST`
+      (`ShareCardStyles.tsx`) and `INSTALL_URL` (`ShareCard.tsx`) move
+      **together**. Checked 12.08: `cruisefm.app`, `cruise.fm`, `strofi.app`
+      had no DNS — not proof of availability, confirm at a registrar.
+- [ ] **The App Store Developer line still reads JESSICA ARROYO.** On an
+      individual account that is the account holder's legal name and cannot be
+      set to a studio name. Changing it needs an Organization account (a
+      registered business plus a free D-U-N-S number) or Apple granting a
+      trading name with documentation. **Worth one support ticket first** — far
+      cheaper if allowed. `docs/brand.md` §5.
+
+---
+
+## 3. CODE — needs a build (cannot ship over the air)
+
+Nothing here is urgent, and one of them now matters for the reason in §0.
 
 | # | Item | State |
 |---|---|---|
-| 1 | **The widget extension** — 10 designs, 7 rows | Written, wired, never run |
-| 2 | **iPad full screen** (`supportsTablet: true`) | **Already in `app.json`, and now looked at** (08.09, rendered at 2064x2752): runs clean, Modes and Stations hold up, **the home page is a stretched phone**. Required iPad screenshots are blocked on that — see §3 |
-| 3 | **Apple Music repeat/shuffle** | Swift committed 26.08 (`665d30c`). Verify by pressing repeat twice on a real song |
-| 4 | **Native rating prompt** | **NOT DONE.** `RateCard.tsx` still uses `Linking.openURL(REVIEW_URL)`. Swapping to StoreKit's in-place prompt needs a native piece. The rules in `rateApp.ts` do not change — only where the tap goes |
-| 5 | **Store listing rewrite** | Drafted in `docs/launch/store-listing-next-build.md`. A new name/subtitle can only ship attached to a new version |
+| 1 | **The native rating prompt** | **NOT DONE — verified 10.11.** `RateCard.tsx` still calls `Linking.openURL(REVIEW_URL)`, which throws people out of the app. Apple's in-place StoreKit prompt gets answered far more often, and the listing has almost no ratings, which to a stranger reads as *nobody uses this*. The rules in `rateApp.ts` do not change — only where the tap goes. **This is the one code item with a plausible effect on §0.** |
+| 2 | **iPhone Duo screenshots** | Optional until **April 2027**, per Apple's release notes of 05.10, so it blocks nothing. The app already *behaves* correctly on a foldable (07.10, shipped 08.10 — iOS's own idiom, so an unfolded Duo is still a phone and its drives still count). What is untested is the **nearly-square inner screen** against every deck's hero sizing, and widget tiles at sizes nobody has drawn, on two screens. **See it before photographing it** — a screenshot is a claim about how the app looks on a device. |
+| 3 | **The Live Activity** | The lock-screen banner that also lights up the CarPlay Dashboard for free, which for a driving app is the best-fit surface available. Deliberately unscheduled: its open question is that the app may not be running when the song changes, and a remote push needs a server, which contradicts the privacy promise. **Re-verify the CarPlay behaviour at build time**, not from this note. |
 
-**Deliberately NOT in this build:** the **Live Activity** (the lock-screen
-banner that also lights up CarPlay for free). It is the biggest thing left on
-the widget list and deserves its own round. Its open question is recorded in
-`AGENTS.md` — the app may not be running when the song changes, and a remote
-push needs a server, which contradicts the privacy promise.
+Also unchecked and cheap: **whether the iPad 13" screenshot slot still wants
+2064 x 2752.** Apple moved the iPhone sizes under us without warning on 13.10
+and nobody has looked at whether the iPad ones moved too. The existing set is
+on the listing from 1.4.2 and blocks nothing.
 
 ---
 
-## 3. BEFORE SUBMITTING (marketing — no build needed)
+## 4. CODE — ships over the air
 
-Both were asked for directly by the owner and are **not** parked:
+The honest answer is that there is very little, which is what a finished app
+looks like.
 
-- [x] **App Store screenshots — DONE 08.09.** All eight raw shots retaken from
-      the current build (`scripts/harness/shots.mjs`) and the ten marketing
-      slides rebuilt (`scripts/marketing/build-slides.mjs`). The reshoot found
-      a real contrast bug in three stations' headers, fixed in the same round —
-      see `AGENTS.md`. Re-run `scripts/marketing/tints.py` after **any**
-      screenshot change; it is what caught the tuner slide still wearing Night
-      Run's pre-19.08 blue.
-- [ ] **iPad screenshots — BLOCKED, and this is a decision rather than a task.**
-      Apple **requires** a 13-inch set (**2064 x 2752** portrait) the moment
-      `supportsTablet: true` ships, which is queued for 1.4.0. The app was
-      rendered at that size on 08.09: it runs with **zero page errors**, and
-      **Modes and Stations hold up well** while **the home page does not** —
-      hero, greeting and cards all stay phone-sized against the left edge with
-      the bottom two-fifths empty. A screenshot of that would cost downloads.
-      Two honest options, and the owner picks:
-      **(a)** ship 1.4.0 with `supportsTablet: false` and stay iPhone-only, or
-      **(b)** give the home page a tablet layout first.
-- [ ] **The app preview video.** Full plan, shot list and technical spec are
-      already in `docs/launch/store-listing-next-build.md` under **"THE APP
-      PREVIEW VIDEO — how to actually make it"**. Read that rather than
-      re-deriving it. Two recording routes, both free.
+- [ ] **`website/support/index.html`** still carries one leftover violet accent
+      from the pre-July palette (known since 26.08). Hand-authored, so it needs
+      her own manual Netlify drag — signed in as **cruisefmservice@gmail.com**,
+      not her personal GitHub login. **Never hand-edit `website/privacy/` or
+      `website/terms/`** — `scripts/gen-legal.mts` generates them.
 
 ---
 
-## 4. THE PAYWALL — decided, sequenced, not built
+## 5. TECHNICAL DEBT — verified 10.11, safe, low priority
 
-The owner's position (04.09): **"I wasn't ready to publish to Apple"** and
-**"I'll still wait for those users to come in — it's almost been a month since
-I launched."** So this is deliberately not urgent.
+- [ ] **Delete the five dead template files**, which is also the whole of this
+      repo's use of Reanimated: `src/app/explore.tsx`, `src/app/visuals.tsx`,
+      `src/components/ui/collapsible.tsx`, `src/components/animated-icon.tsx`,
+      `src/components/animated-icon.web.tsx`. Measured: those five are the
+      **only** importers of `react-native-reanimated` left in `src/`. Whether
+      the package can then leave `package.json` is a separate check, not an
+      assumption — react-navigation has depended on it before.
+- [ ] **Drop `expo-dev-client`** (~56.0.20) from a store binary; it adds
+      `NSLocalNetworkUsageDescription`. **Not mid-release.**
+- [ ] **`assets/images/intro/`** — 4 orphaned files, dead since `BrandIntro`
+      was deleted on 28.07.
+- [ ] **Vinyl and Cassette still run their own clocks** (`progress.addListener`
+      in both), separate from `useTrackClock`. Three copies have had to be
+      fixed in lockstep more than once — the coast cap on 18.08 found Cassette
+      still carrying the original bug.
+- [ ] Tuner: `TunerReadout` builds a new `toFixed(2)` string every frame,
+      defeating `React.memo` (~1000 SVG nodes/frame during the snap). **Only if
+      the dial still feels sluggish on a device.**
 
-### 4.1 The grandfathering plan (agreed)
-
-> **Anyone who installed before the paywall keeps everything, free, for ever.
-> New installs get the free/premium split.**
-
-- The app **already** stamps every device: `cruise_rate_state.firstSeenAt`
-  (`utils/rateApp.ts`) is self-initialising and consulted on every home-page
-  visit via `RateCard`. **Nothing needs shipping in advance** — the paywall can
-  read that date when it arrives.
-- **Honest limitation:** it is on-device. Delete and reinstall and it is gone.
-  There is no server and no accounts, and becoming a different kind of app for
-  this is not worth it.
-- **Cap what they keep, not how many they are:** *"You keep everything Cruise FM
-  does today. Anything built from here is part of the paid tier."* That is what
-  stops the cohort getting more expensive over time.
-- **Trigger:** when the paperwork clears, **or at 500 downloads, whichever comes
-  first.** At ~110/month that is ~4 months, which is about when the admin will
-  be done anyway.
-- **It must be a DATE in code, never "the first 500"** — there is no server, so
-  the app genuinely cannot know who the 500th install was. Same rule the
-  Founder tier already follows (`utils/founder.ts`).
-
-### 4.2 Things that must NOT vanish when the cap arrives
-
-The free tier caps custom stations at 3. If someone made six while it was free,
-**those six must stay — visible, playable, with their photos.** The cap may only
-block making a *seventh*. Same for linked playlists. This is the version of
-"suddenly I can't access anything" that would actually sting, because it is the
-user's own work.
-
-### 4.3 OWNER — the long pole, start early
-
-- [ ] **Apple's Paid Applications Agreement** (Agreements, Tax and Banking).
-      Apple pays nothing until it is signed. For an Australian developer this is
-      where the ABN and tax questions bite — worth an accountant, not a
-      week-of-launch scramble
-- [ ] **EU trader declaration** must switch to "I'm a trader" when real charging
-      starts, which requires a **public address**. The owner has said not her
-      home address, so this needs a decision
-- [ ] **Real store products** in App Store Connect (£1.99/mo, £18/yr) and the
-      **real RevenueCat platform keys** — `config.ts` holds a **sandbox
-      `test_` key** today
-- [ ] Only then flip `LAUNCH_FREE = false`
+~~`reelTo` in `TunerMode.tsx`~~ — already gone, verified 10.11.
 
 ---
 
-## 5. GROWTH WORK (what actually moves downloads)
+## 6. GROWTH — where the constraint actually is
 
-At ~3–5 downloads/day and ~87 total, the constraint is discovery, not features.
+At roughly 3–5 downloads a day, discovery is the binding constraint and has
+been since launch. Two facts bear on it that the old version of this file could
+not have known:
 
-- [ ] **The name.** "Cruise FM" says nothing about what the app does, and the
-      name is the strongest thing Apple searches. `Cruise FM: Music Visualizer`
-      is drafted. Ships only attached to a new version
-- [ ] **Ratings.** The listing has almost none, which to a stranger reads as
-      "nobody uses this". The in-place StoreKit prompt (§2.4) gets answered far
-      more often than the current one, which throws people out to the App Store
-- [ ] **Keywords + first three screenshots** — that is all anyone sees in
-      search results
+- **The EU was dark from launch until 12.10** — all 27 storefronts, ~450m
+  people. Every download figure read before that date was measured with the
+  largest market switched off.
+- **Everyone who used the app before 19.09 holds `earlyAccess`** and can never
+  be a customer, by design. That is correct and it also means the paying
+  population starts from zero on that date.
+
+- [ ] **Keywords and the first three screenshots** are all anyone sees in a
+      search result. The keyword field is at 99 of 100 characters since 09.10.
 - [ ] **Ask testers where they actually use it** — car, room, both. There is no
-      analytics and never will be, so this can only be asked. It bears directly
-      on whether the driving frame is right (see `KNOWN_ISSUES.md` §2.6)
-
----
-
-## 6. TECHNICAL DEBT (safe, low priority)
-
-- [ ] Delete `src/app/explore.tsx` and `src/app/visuals.tsx` (dead routes), then
-      the template components that go with them
-      (`animated-icon*.tsx`, `ui/collapsible.tsx`, `themed-*.tsx`,
-      `web-badge.tsx`) — this is also what would finally remove
-      `react-native-reanimated`
-- [ ] Drop `expo-dev-client` from a store binary (adds
-      `NSLocalNetworkUsageDescription`). **Not mid-release**
-- [ ] Delete `reelTo` in `TunerMode.tsx`
-- [ ] `assets/images/intro/` is orphaned
-- [ ] Consider collapsing Vinyl's and Cassette's private clocks into
-      `useTrackClock` — three copies have had to be fixed in lockstep at least
-      once
-- [ ] Tuner: `TunerReadout` builds a new `toFixed(2)` string each frame,
-      defeating `React.memo` (~1000 SVG nodes/frame during the snap).
-      **Only if the dial still feels sluggish on a device**
+      analytics and never will be, so this can only be asked. It bears on
+      whether the driving frame is right at all: the owner herself uses it
+      stationary, in her room, for fun (11.08).
+- [ ] **Ratings** — see §3.1. The surface exists; the prompt is the wrong kind.
 
 ---
 
 ## 7. IDEAS RECORDED, NOT SCHEDULED
 
-- **Live Activity → CarPlay.** A Live Activity now appears on the CarPlay
-  Dashboard automatically once it exists on iPhone — no separate CarPlay app.
-  For a driving app that is the single best-fit surface available.
-  **Re-verify at build time**, not from this note
-- **Strofi**, the next product — a social driving/route platform. Full thinking
-  in `docs/strategy.md`. The wedge is the owner's own idea: **one-time codes
-  that share a route privately with the group doing that drive.** It works at
-  n=2, which is what kills most community apps. Needs a server — a genuine step
-  change from Cruise FM's no-account position
-- **A real domain.** Share cards print `cruisefm.netlify.app`. When it changes,
-  `INSTALL_HOST` (`ShareCardStyles.tsx`) and `INSTALL_URL` (`ShareCard.tsx`)
-  move **together**
-- **Trademark.** File **IP Australia** first (AUD $250/class); Paris Convention
-  priority carries the EU/UK/US for six months. `docs/brand.md` has the detail.
-  **The Australian search has not been run** — that is the gap
+- **Strofi**, the next product — a social driving / route platform. Full
+  thinking in `docs/strategy.md`. The wedge is the owner's own idea: **one-time
+  codes that share a route privately with the group doing that drive.** It works
+  at n=2, which is what kills most community apps. Needs a server — a genuine
+  step change from Cruise FM's no-account, no-server position.
+  **Someone else shipped the same idea**: *CruiserFM* (developer MOHAMMAD KHALED
+  TORYALAE, v1.2.5 as of 19.09) carries cruise codes, a lobby, waypoints, live
+  positions and push-to-talk. The idea was right; the question is whether it is
+  working for him, and his **reviews** are the number to read.
+- **A post-session recap.** Repeatedly raised and repeatedly narrowed: it must
+  never claim a *drive* happened, because the app cannot tell — which is why the
+  "Are you driving?" card exists. The session stub built on 13.08 is the honest
+  version of it and already ships.
+- **Beat-locked visuals are closed, permanently.** Spotify answers 403 on both
+  `/audio-features` and `/audio-analysis` for an app registered after Nov 2024
+  (measured 09.08 on a real drive), and Apple publishes no equivalent. The only
+  route that gives both tempo *and* phase is the microphone, removed on 22.07
+  for Bluetooth road noise and audio-session contention. **Do not re-propose a
+  metadata route.**
 
 ---
 
@@ -255,7 +210,8 @@ At ~3–5 downloads/day and ~87 total, the constraint is discovery, not features
 1. `node scripts/preflight.mjs` — read **every** line
 2. Bump `version` **and** `runtimeVersion` together if native changed
 3. Build on the **`testflight`** profile for the phone, **`production`** for the
-   store. **Never install a production-profile build on the testing phone**
+   store. **Never install a production-profile build on the testing phone** —
+   it moves her off the preview channel and work silently stops reaching her
 4. **Open the build on a real phone before it goes near Apple.** Build 25
    crashed 40 ms into launch over a native module mismatch no static check
    could see. A launch is the only proof
@@ -264,7 +220,27 @@ At ~3–5 downloads/day and ~87 total, the constraint is discovery, not features
    `diagnose` mode and read the "submitted to App Store Connect" line
 7. While in review: **no production-channel publish** at the runtime that build
    listens on. Preview stays safe
-8. After approval and release: check the store page actually loads. An approved,
-   released app whose page 404s is set to *removed from sale* under Pricing and
-   Availability
-- [ ] **Build 41 is in the oven, and a widget can never arrive over the air.** Build 39 (2 Sept) predates all ten widget designs, so the owner's phone could not have shown them however many times the app updated itself. Build 40 errored on a `WidgetBundleBuilder` `else` (fixed in `f7f7d4d`). When 41 lands: install from TestFlight, **open the app once** so the snapshot is written, then check the widgets — and look at whether the medium Deck still shows a record with no text beside it, which is undiagnosed.
+8. After approval and release: check the store page actually loads
+
+---
+
+## 9. CLOSED SINCE THE LAST AUDIT — do not re-open
+
+Everything below was open on 05.10 and is done. Dates are when it landed.
+
+| Was | Closed |
+|---|---|
+| Widget design refinement (mockup stage, §0 of the old file) | Ported to Swift and shipped — builds 70/71/72, Sept 25–Oct 1 |
+| The App Group, and the widget's own app ID | Registered; builds 33–37 are history |
+| The widget extension "written, wired, never run" | Live on real Home Screens, confirmed by photograph 13.10 |
+| iPad "the home page is a stretched phone" | Fixed 10.09 — all four tab pages take a capped reading column, tab bar capped to match, hero alignment fixed 14.09 |
+| iPad screenshots blocked on that decision | Eight shots at 2064x2752, on the listing since 1.4.2 |
+| The app preview video | Shot and cut 15.09; she chose to ship the footage as-is |
+| Apple Music repeat/shuffle "verify on a real phone" | Proven on a stranger's phone 23.09 (MediaPlayer 1 → 3 on both surfaces) |
+| Store listing rewrite / the name | `Cruise FM: Driving Visualizer`, applied 09.10 with the 99-character keyword field |
+| **The whole paywall section** | Built and on sale since 1.4.1 released 19.09 — real products, real RevenueCat key, `LAUNCH_FREE = false`, `OWNER_MODE = false` |
+| Grandfathering the early users | `earlyAccess.ts`, 17.09 — evidence-based rather than a date or a head count, permanent in both directions |
+| Paid Applications Agreement, tax, banking | Active since 25.08 (the 17.09 note that it was unfinished was never true) |
+| Small Business Program (15% not 30%) | Submitted 18.09, approved 10.10 |
+| EU trader declaration | Verified 12.10; all 27 storefronts live, confirmed by `de` and `cz` loading in her browser |
+| `reelTo` dead code | Gone |
